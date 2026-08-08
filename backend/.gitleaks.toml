@@ -1,0 +1,75 @@
+# gitleaks configuration for the backend.
+#
+# Run locally:  gitleaks detect --source . --config .gitleaks.toml --redact
+# Run in CI:    see ci/github-actions-backend.yml (the secret-scan step)
+#
+# WHY A SCANNER WHEN THE RULE IS ALREADY "NO SECRETS IN THE REPO": because the rule is enforced by
+# human attention, and a leaked credential cannot be un-leaked by deleting it later — it stays in the
+# git history and must be rotated. A scanner turns "we should not" into "we cannot", and it fails the
+# build rather than the audit.
+
+title = "SchoolManagement backend secret scan"
+
+[extend]
+# Start from gitleaks' maintained rule set (AWS keys, private keys, GitHub tokens, JWTs, and so on)
+# and add project-specific rules below, rather than reinventing a worse version of it.
+useDefault = true
+
+# ── Project-specific rules ───────────────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "postgres-connection-string-with-password"
+description = "PostgreSQL connection string containing a password"
+# The single most likely leak in this repo: a working connection string pasted into appsettings, a
+# test, or a script while debugging.
+regex = '''(?i)(host|server)\s*=\s*[^;"'\s]+;[^"']*password\s*=\s*[^;"'\s]{1,}'''
+tags = ["database", "connection-string"]
+
+[[rules]]
+id = "aspnet-user-secrets-inline"
+description = "A user-secrets value committed inline instead of stored outside the repo"
+regex = '''(?i)"(ConnectionStrings?|Database):ConnectionString"\s*:\s*"[^"]{10,}"'''
+tags = ["configuration"]
+
+[[rules]]
+id = "bearer-or-api-key-literal"
+description = "Hard-coded bearer token or API key literal"
+regex = '''(?i)\b(api[_-]?key|apikey|bearer|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*["'][A-Za-z0-9_\-\.]{16,}["']'''
+tags = ["credentials"]
+
+# ── Allow-list ───────────────────────────────────────────────────────────────────────────────────
+
+[allowlist]
+description = "Paths and values that are deliberately not secrets"
+
+paths = [
+  # Build output and packages.
+  '''(^|/)(bin|obj|artifacts)/''',
+  '''(^|/)packages/''',
+  # This file: it necessarily contains patterns that look like the things it detects.
+  '''\.gitleaks\.toml$''',
+]
+
+regexes = [
+  # The committed configuration template. Every value in it is empty or a non-secret default on
+  # purpose; it exists to document which keys are required. Verified by reading it, not assumed.
+  '''appsettings\.Development\.template\.json''',
+
+  # Throwaway Testcontainers credentials. The container exists for the duration of one test run, is
+  # reachable only from the machine running it, holds only test data, and is then destroyed. Flagging
+  # these would train people to ignore the scanner, which is worse than not running it.
+  '''test_user''',
+  '''test_password''',
+
+  # The CI service-container credentials in ci/github-actions-backend.yml. Same reasoning: the database
+  # exists only for the duration of one CI job, is reachable only from that job's network namespace, and
+  # holds nothing but data the tests just created. Storing them as GitHub secrets would imply they need
+  # protecting and would obscure that they are disposable.
+  '''ci_user''',
+  '''ci_password''',
+
+  # The documented shape of a connection string in comments and docs — placeholders, not values.
+  '''Username=<user>;Password=<pw>''',
+  '''Password=\.\.\.''',
+  '''<your connection string>''',
+]

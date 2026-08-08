@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Application holds mediator contracts, handlers, behaviours, validators and DTOs.
+    It must NOT reference EF Core (or any other persistence/HTTP technology) — it declares
+    abstractions such as IUnitOfWork and lets Infrastructure implement them.
+    Enforced by DependencyDirectionTests.NoEntityFrameworkTypesInApplication.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SchoolManagement.Domain\SchoolManagement.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Handlers and validators are internal by convention (enforced by HandlerConventionTests), so the
+      unit tests need visibility to construct them. This is the intended trade: the alternative is
+      making them public purely for testability, which also invites production code to bypass ISender.
+    -->
+    <InternalsVisibleTo Include="SchoolManagement.UnitTests" />
+    <InternalsVisibleTo Include="SchoolManagement.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Coverage collection settings. Passed to `dotnet test` with the `settings` option; see scripts/ci.ps1.
+
+  NOTE FOR EDITORS: this is an XML comment, so it must not contain a double hyphen. Writing a CLI flag
+  such as the settings switch in its long form here makes the whole file unparseable, and the error
+  surfaces as "Settings file provided does not conform to required format", which does not obviously
+  point at a comment.
+
+  The THRESHOLD is enforced by scripts/ci.ps1, not here: the coverlet data collector reports coverage
+  but does not fail a run on it. Keeping the gate in the script means the same check runs locally and
+  in CI, rather than only where someone remembered to configure it.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+
+          <!--
+            Test projects and generated code are excluded. Measuring coverage OF the tests inflates the
+            number while telling you nothing: a test file is 100% covered by definition, so including
+            them makes the metric look healthy exactly as production coverage falls.
+          -->
+          <Exclude>[SchoolManagement.UnitTests]*,[SchoolManagement.IntegrationTests]*,[SchoolManagement.ArchitectureTests]*</Exclude>
+
+          <!--
+            EF Core migrations are generated, are verified by actually running against a database, and
+            would otherwise dominate the line count of the Infrastructure project.
+          -->
+          <ExcludeByFile>**/Persistence/Migrations/**/*.cs</ExcludeByFile>
+
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SkipAutoProps>true</SkipAutoProps>
+          <DeterministicReport>true</DeterministicReport>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

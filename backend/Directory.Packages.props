@@ -1,0 +1,118 @@
+<Project>
+
+  <!--
+    Central Package Management. THIS IS THE ONLY FILE THAT MAY CONTAIN A PACKAGE VERSION.
+    Project files reference packages without a Version attribute; a version there is a
+    build error. This makes version drift between projects structurally impossible.
+
+    Adding a package requires a justification line in the task card (root CLAUDE.md §8).
+    Nothing is pinned to a floating version or a wildcard.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="Analysers">
+    <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
+    <PackageVersion Include="Roslynator.Formatting.Analyzers" Version="4.15.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Application layer">
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup Label="Persistence">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <!--
+      Maps PascalCase CLR names to snake_case database identifiers. Justification: unquoted
+      identifiers in PostgreSQL fold to lower case, so PascalCase tables force every hand-written
+      query, psql session and migration script to double-quote everything. One small
+      single-purpose package removes a permanent papercut for anyone touching SQL directly.
+    -->
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="API surface">
+    <PackageVersion Include="Asp.Versioning.Http" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <!--
+      SECURITY PIN — transitive dependency, not referenced directly by any project.
+
+      Microsoft.AspNetCore.OpenApi 10.0.10 resolves Microsoft.OpenApi 2.0.0, which is affected by
+      CVE-2026-49451 (GHSA-v5pm-xwqc-g5wc, High, CVSS 7.5): a crafted OpenAPI document with circular
+      schema references causes a stack overflow and terminates the process that parses it.
+      Affected: >= 2.0.0-preview.11, <= 2.7.4. Patched: 2.7.5 in the 2.x line.
+
+      Pinned to the latest 2.x rather than 3.x: the ASP.NET Core package is built against the 2.x
+      object model, and 3.x is a major version with breaking API changes. This works because
+      CentralPackageTransitivePinningEnabled is set in Directory.Build.props, which lets a
+      PackageVersion entry raise a transitive dependency without adding a direct reference.
+
+      Found by the CI vulnerability-scan gate. Re-check this pin when Microsoft.AspNetCore.OpenApi is
+      next upgraded: once it resolves a patched version itself, this entry becomes redundant and should
+      be removed rather than left to rot.
+    -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.10" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.17" />
+  </ItemGroup>
+
+  <ItemGroup Label="Observability">
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <!--
+      Npgsql emits its own ActivitySource, so Postgres spans come from this stable
+      package rather than OpenTelemetry.Instrumentation.EntityFrameworkCore, which
+      is still pre-release. Deliberate: no beta packages in the scaffold.
+    -->
+    <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Label="Health checks">
+    <!--
+      AddDbContextCheck (from this package) attempts a real connection through the already-configured
+      context, so no separate health-check package is needed and the connection string is not
+      duplicated. A dedicated Npgsql health-check package was considered and rejected on that basis.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup Label="Configuration">
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.10" />
+    <!-- Provides OptionsBuilder<T>.Bind, used to bind options sections outside the Api project. -->
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.10" />
+    <!-- Provides OptionsBuilder<T>.ValidateOnStart, so misconfiguration fails at boot. -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="NSubstitute" Version="6.0.0" />
+    <PackageVersion Include="Bogus" Version="35.6.5" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.8.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,164 @@
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+#  BACKEND CI — READY TO USE, BUT NOT YET ACTIVE.
+#
+#  ACTION REQUIRED BY THE ORCHESTRATOR: copy or merge this file to the REPOSITORY ROOT at
+#
+#      .github/workflows/backend-ci.yml
+#
+#  GitHub Actions only reads workflows from `.github/workflows` at the root of the repository, so this
+#  file does nothing where it currently sits. It lives here because root-level CI is the orchestrator's
+#  to own (root CLAUDE.md §11) and the backend agent must not write outside `backend/**`. Moving it is a
+#  one-line change and needs no edits to the content below.
+#
+#  All the logic is in backend/scripts/ci.ps1, so this workflow is a thin wrapper and the identical
+#  gates run locally. Do not reimplement steps here — change the script.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+name: backend-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'contracts/**'          # a contract change must re-run the drift check
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'contracts/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read                # least privilege: the workflow only needs to read the repo
+
+concurrency:
+  # Supersede an in-flight run for the same ref: the older result is irrelevant once new commits land.
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        # THIS IS WHAT MAKES THE INTEGRATION TESTS ACTUALLY RUN. Without it they SKIP, and the suite
+        # silently shrinks to unit and architecture tests while still reporting success.
+        # Pinned to a specific minor version, matching DatabaseAvailability.PostgresImage.
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: ci_user
+          # Ephemeral credentials for a container that exists only for this job and is reachable only
+          # from it. Not a secret, and deliberately not stored as one: a GitHub secret here would imply
+          # it needed protecting and obscure that it is throwaway.
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: schoolmanagement_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # Full history: gitleaks scans commits, and a shallow clone would leave most of them unscanned
+          # while still reporting a clean result.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Read from backend/global.json so the SDK version has exactly one source of truth.
+          global-json-file: backend/global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # Keyed on the lock-equivalent inputs. Central Package Management means Directory.Packages.props
+          # fully determines the restore graph.
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/Directory.Packages.props', 'backend/global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          version="8.28.0"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Restore local tools
+        working-directory: backend
+        run: dotnet tool restore
+
+      - name: Run all quality gates
+        working-directory: backend
+        shell: pwsh
+        env:
+          CI: 'true'
+          # Supplying this makes the integration tests RUN rather than skip. Host is 'localhost' because
+          # the service container's port is published to the runner.
+          POSTGRES_TEST_CONNECTION: 'Host=localhost;Port=5432;Database=schoolmanagement_ci;Username=ci_user;Password=ci_password'
+        run: ./scripts/ci.ps1 -Configuration Release
+
+      - name: Assert the integration tests were not skipped
+        if: always()
+        working-directory: backend
+        shell: pwsh
+        run: |
+          # A guard against the failure mode this whole file is designed to avoid: the suite passing
+          # because the integration tests quietly skipped. If PostgreSQL was unreachable, the tests skip
+          # by design and everything else still goes green — so CI has to check explicitly.
+          #
+          # Every trx is inspected (one per test project), and the skip count is DERIVED as
+          # total - passed - failed. xunit v3's Assert.Skip does not increment the trx `notExecuted`
+          # counter, so reading that attribute would report zero skips for a fully skipped project.
+          $trxFiles = @(Get-ChildItem ./artifacts/coverage -Filter '*.trx' -ErrorAction SilentlyContinue)
+
+          if ($trxFiles.Count -eq 0) {
+            Write-Host '::error::No test results file found; cannot verify the integration tests ran.'
+            exit 1
+          }
+
+          $skipped = 0
+          foreach ($trx in $trxFiles) {
+            [xml]$results = Get-Content $trx.FullName -Raw
+            $c = $results.TestRun.ResultSummary.Counters
+            $notRun = [int]$c.total - [int]$c.passed - [int]$c.failed
+            Write-Host "$($trx.Name): total=$($c.total) passed=$($c.passed) failed=$($c.failed) notRun=$notRun"
+            if ($notRun -gt 0) { $skipped += $notRun }
+          }
+
+          if ($skipped -gt 0) {
+            Write-Host "::error::$skipped test(s) were SKIPPED. The integration tests require PostgreSQL; a skip means they verified nothing. Check the postgres service container and POSTGRES_TEST_CONNECTION."
+            exit 1
+          }
+
+          Write-Host "No tests were skipped."
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/artifacts/coverage/**
+          retention-days: 14
+
+      - name: Upload the generated OpenAPI document
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # Useful on a drift failure: download it and diff against the committed contract.
+          name: backend-openapi
+          path: backend/artifacts/openapi/**
+          retention-days: 14

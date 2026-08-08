@@ -1,0 +1,67 @@
+/*
+ * Brand ramps — Golden Royal Ark crest.
+ *
+ * Seeded from the logo and expanded into perceptually even OKLCH ramps
+ * (hue held constant, chroma shaped to peak mid-scale so tints and shades
+ * stay clean rather than muddy).
+ *
+ *   royal   #1B3A8C  crest lettering and shield outline  -> primary actions, nav
+ *   gold    #C89B3C  shield border gradient              -> accents, highlights
+ *   crimson #A61B37  ribbon                              -> ceremonial / crest chrome only
+ *
+ * These are RAW ramps. Do not reach for them in components — use the semantic
+ * tokens in semantic.css. They exist so the semantic layer has a palette to
+ * point at, and for genuinely decorative crest chrome.
+ */
+
+@theme {
+  --color-royal-50: oklch(97% 0.008 264.7);
+  --color-royal-100: oklch(94% 0.018 264.7);
+  --color-royal-200: oklch(87% 0.042 264.7);
+  --color-royal-300: oklch(78% 0.078 264.7);
+  --color-royal-400: oklch(68% 0.116 264.7);
+  --color-royal-500: oklch(58% 0.141 264.7);
+  --color-royal-600: oklch(49% 0.141 264.7);
+  --color-royal-700: oklch(41% 0.122 264.7);
+  --color-royal-800: oklch(34% 0.096 264.7);
+  --color-royal-900: oklch(28% 0.074 264.7);
+  --color-royal-950: oklch(20% 0.051 264.7);
+
+  --color-gold-50: oklch(97% 0.007 82.9);
+  --color-gold-100: oklch(94% 0.016 82.9);
+  --color-gold-200: oklch(90% 0.037 82.9);
+  --color-gold-300: oklch(84% 0.067 82.9);
+  --color-gold-400: oklch(78% 0.101 82.9);
+  --color-gold-500: oklch(71.4% 0.123 82.9);
+  --color-gold-600: oklch(62% 0.118 82.9);
+  --color-gold-700: oklch(52% 0.105 82.9);
+  --color-gold-800: oklch(41% 0.083 82.9);
+  --color-gold-900: oklch(32% 0.064 82.9);
+  --color-gold-950: oklch(22% 0.044 82.9);
+
+  --color-crimson-50: oklch(97% 0.01 16.9);
+  --color-crimson-100: oklch(94% 0.022 16.9);
+  --color-crimson-200: oklch(87% 0.052 16.9);
+  --color-crimson-300: oklch(78% 0.094 16.9);
+  --color-crimson-400: oklch(68% 0.141 16.9);
+  --color-crimson-500: oklch(58% 0.172 16.9);
+  --color-crimson-600: oklch(47.3% 0.172 16.9);
+  --color-crimson-700: oklch(41% 0.148 16.9);
+  --color-crimson-800: oklch(34% 0.117 16.9);
+  --color-crimson-900: oklch(28% 0.089 16.9);
+  --color-crimson-950: oklch(20% 0.062 16.9);
+
+  /* Typography — a serif display voice for headings reads as academic without
+     costing a network request. Body stays on the system UI stack. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+
+  /* Radii — calm and institutional; nothing pill-shaped by default. */
+  --radius-xs: 0.1875rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}

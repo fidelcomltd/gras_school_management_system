@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Fast, in-process, no I/O. If a test here needs a database it belongs in IntegrationTests. -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.UnitTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SchoolManagement.Api\SchoolManagement.Api.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Application\SchoolManagement.Application.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Domain\SchoolManagement.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+</Project>

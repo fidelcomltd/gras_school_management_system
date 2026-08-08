@@ -1,0 +1,48 @@
+<Project>
+
+  <!--
+    Repo-wide build settings. Every project inherits these; no project overrides
+    TargetFramework, Nullable, or TreatWarningsAsErrors. If you think you need to,
+    that is a conversation for CONTRIBUTING.md, not a local edit.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Quality gates: a warning is a build failure. See docs/adr/0001. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-All</AnalysisLevel>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+
+    <!-- Required so the OpenAPI generator can read /// comments off contracts (§F). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Central Package Management: versions live only in Directory.Packages.props. -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);NU1901;NU1902;NU1903;NU1904</NoWarn>
+    <!--
+      NU190x (vulnerable transitive package advisories) are surfaced as a dedicated,
+      non-bypassable CI step (the `dotnet list package` vulnerability scan) instead of as
+      build warnings. Rationale: as build errors a brand-new advisory breaks every
+      developer's local build with no route to a fix until an upstream release exists. As
+      a discrete CI step it still blocks merge, but visibly and in one place.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Formatting.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

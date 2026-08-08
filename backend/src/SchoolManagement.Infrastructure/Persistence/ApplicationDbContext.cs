@@ -1,0 +1,158 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Reference;
+
+namespace SchoolManagement.Infrastructure.Persistence;
+
+/// <summary>
+/// The application's EF Core context.
+/// </summary>
+/// <remarks>
+/// <para>
+/// RULES FOR THIS CLASS:
+/// </para>
+/// <list type="bullet">
+/// <item>No per-entity fluent configuration in <see cref="OnModelCreating"/>. Mapping lives in
+/// <c>IEntityTypeConfiguration&lt;T&gt;</c> classes under <c>Persistence/Configurations</c> and is
+/// picked up by assembly scanning. A 400-line <c>OnModelCreating</c> is unreviewable and produces
+/// constant merge conflicts; one file per entity does not.</item>
+/// <item>No public <c>DbSet</c> properties. Application code reaches data through repository
+/// abstractions, so a query cannot be written in a layer that has no business issuing one.</item>
+/// <item>Not registered as a service anything outside this project can resolve.</item>
+/// </list>
+/// <para>
+/// Tracking behaviour is left at EF Core's default (tracking) rather than being switched to
+/// no-tracking globally. Read paths call <c>AsNoTracking</c> explicitly — an audited, visible choice
+/// per query — because a global no-tracking default makes writes silently fail to persist, which is
+/// a far worse failure mode than a forgotten <c>AsNoTracking</c> on a read. See
+/// <c>docs/adr/0006-persistence-conventions.md</c>.
+/// </para>
+/// </remarks>
+public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    : DbContext(options)
+{
+    /// <summary>
+    /// REFERENCE SCAFFOLD — remove alongside <see cref="SampleRecord"/>.
+    /// Internal, not public: only this assembly's repositories may query it.
+    /// </summary>
+    internal DbSet<SampleRecord> SampleRecords => Set<SampleRecord>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        ApplySoftDeleteQueryFilters(modelBuilder);
+        ApplyConcurrencyTokens(modelBuilder);
+
+        base.OnModelCreating(modelBuilder);
+    }
+
+    /// <summary>
+    /// Shadow property holding each row's optimistic-concurrency token.
+    /// </summary>
+    /// <remarks>
+    /// A SHADOW property, so domain entities carry no persistence-concern field. The value is maintained
+    /// by <c>AuditingInterceptor</c>.
+    /// </remarks>
+    public const string ConcurrencyTokenProperty = "Version";
+
+    /// <inheritdoc />
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(configurationBuilder);
+
+        // Every string column is bounded unless an entity configuration says otherwise. Npgsql maps
+        // an unbounded string to `text`, which is fine for PostgreSQL but means nothing stops a
+        // multi-megabyte value arriving in a column intended to hold a name.
+        configurationBuilder.Properties<string>().HaveMaxLength(DefaultStringMaxLength);
+
+        // DateTimeOffset -> timestamptz, which stores an instant in UTC. The repo-wide rule is that
+        // instants are DateTimeOffset in UTC; `timestamp without time zone` is banned because it
+        // silently discards the offset and turns an ordering bug into a data bug.
+        configurationBuilder.Properties<DateTimeOffset>().HaveColumnType("timestamptz");
+
+        base.ConfigureConventions(configurationBuilder);
+    }
+
+    /// <summary>Default maximum length applied to every string property.</summary>
+    private const int DefaultStringMaxLength = 256;
+
+    /// <summary>
+    /// Adds <c>WHERE NOT is_deleted</c> to every <see cref="ISoftDeletable"/> entity.
+    /// </summary>
+    /// <remarks>
+    /// Applied by reflection over the model rather than written per entity, so a new soft-deletable
+    /// entity is filtered automatically. Without this, excluding deleted rows would be the
+    /// responsibility of every individual query, and the first one to forget silently exposes
+    /// deleted data.
+    /// <para>
+    /// To include deleted rows deliberately, a query must call <c>IgnoreQueryFilters()</c> — which
+    /// is greppable, unlike its absence.
+    /// </para>
+    /// </remarks>
+    private static void ApplySoftDeleteQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            var parameter = Expression.Parameter(entityType.ClrType, "entity");
+            var isDeleted = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+            var notDeleted = Expression.Not(isDeleted);
+
+            modelBuilder
+                .Entity(entityType.ClrType)
+                .HasQueryFilter(Expression.Lambda(notDeleted, parameter));
+        }
+    }
+
+    /// <summary>
+    /// Gives every auditable entity an optimistic-concurrency token.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// WHY NOT PostgreSQL's <c>xmin</c>. It is the natural choice — every row already carries the
+    /// transaction ID that last wrote it, so it costs no column and no application code. Npgsql's
+    /// <c>UseXminAsConcurrencyToken()</c> supported it, but that API no longer exists in the EF Core 10
+    /// provider, and mapping <c>xmin</c> by hand makes the migration try to CREATE a column with that
+    /// name — which PostgreSQL rejects, because it collides with the system column. Every new entity
+    /// would then need its migration edited by hand, and generated migrations must not be hand-tuned.
+    /// </para>
+    /// <para>
+    /// So the token is an application-maintained GUID instead. It costs 16 bytes per row and one
+    /// assignment per save, and in exchange it is explicit in the schema, portable off PostgreSQL, and
+    /// needs no per-migration surgery. EF Core puts the ORIGINAL value in the UPDATE's WHERE clause, so a
+    /// write that lost a race affects zero rows and surfaces as <c>DbUpdateConcurrencyException</c> —
+    /// which the global handler turns into a 409 rather than silently overwriting somebody's change.
+    /// </para>
+    /// <para>
+    /// Applied by convention here rather than per entity, so a new aggregate is protected without anyone
+    /// remembering to opt in.
+    /// </para>
+    /// </remarks>
+    private static void ApplyConcurrencyTokens(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(IAuditableEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            modelBuilder
+                .Entity(entityType.ClrType)
+                .Property<Guid>(ConcurrencyTokenProperty)
+                .IsConcurrencyToken()
+                // The application supplies the value; the database must not generate one, or EF would
+                // expect a value back and the token would never match.
+                .ValueGeneratedNever();
+        }
+    }
+}

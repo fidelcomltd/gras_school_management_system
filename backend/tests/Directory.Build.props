@@ -1,0 +1,37 @@
+<Project>
+
+  <!--
+    Shared settings for every test project. Importing the parent explicitly is required:
+    MSBuild stops at the FIRST Directory.Build.props it finds walking up, so without this
+    the repo-wide settings in ../Directory.Build.props would be silently skipped.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <!--
+      Test assemblies are not a public contract, so /// comments are not required
+      (CS1591 stays off for tests/** via .editorconfig). We still generate the doc file
+      because Roslyn refuses to run IDE0005 (remove unnecessary usings) on build without
+      it — see https://github.com/dotnet/roslyn/issues/41640. Keeping unused-using
+      enforcement in tests is worth an unread XML file in bin/.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup Label="Test framework — same everywhere so no project drifts">
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+</Project>

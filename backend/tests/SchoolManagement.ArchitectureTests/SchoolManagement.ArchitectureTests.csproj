@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    These tests are how conventions are ENFORCED rather than merely documented
+    (brief §J). A rule that can be expressed here should never be left to review.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.ArchitectureTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SchoolManagement.Api\SchoolManagement.Api.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Application\SchoolManagement.Application.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Domain\SchoolManagement.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Infrastructure\SchoolManagement.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+</Project>

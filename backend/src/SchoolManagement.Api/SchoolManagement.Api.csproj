@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Api is the composition root and the HTTP surface. It references Infrastructure ONLY to
+    register services in DI (Program.cs); no Infrastructure type may appear in an endpoint
+    signature. Nothing references Api except the integration tests.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.Api</RootNamespace>
+    <UserSecretsId>schoolmanagement-api-6f2c9d31</UserSecretsId>
+
+    <!--
+      OpenAPI document generation (brief §F).
+
+      OPT-IN, NOT ON EVERY BUILD. Microsoft.Extensions.ApiDescription.Server produces the document by
+      STARTING this application and asking it to describe its routes. That is what makes the document
+      impossible to fake — and it also means generation runs the app's startup validation. Since this
+      service refuses to start without a database connection string (by design), leaving generation on
+      by default would make `dotnet build` require a configured database on every developer machine
+      and in every CI job that only wants to compile.
+
+      So it is gated on the GenerateOpenApiContract property, set by exactly one documented command:
+
+          scripts/generate-openapi.ps1        (or scripts/generate-openapi.sh)
+
+      which also sets SCHOOLMANAGEMENT_CONTRACT_GENERATION so startup skips the checks that need live
+      infrastructure. See the HostMode class for why that is a flag rather than a dummy credential.
+
+      Output goes to artifacts/openapi/ (git-ignored). It is NEVER written over
+      ../../contracts/openapi.json — promoting a generated document to the committed contract is a
+      separate, deliberate step described in README "Regenerating the contract".
+    -->
+    <OpenApiDocumentsDirectory>$(MSBuildThisFileDirectory)..\..\artifacts\openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocuments Condition="'$(GenerateOpenApiContract)' == 'true'">true</OpenApiGenerateDocuments>
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(GenerateOpenApiContract)' == 'true'">true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(GenerateOpenApiContract)' != 'true'">false</OpenApiGenerateDocumentsOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SchoolManagement.Application\SchoolManagement.Application.csproj" />
+    <ProjectReference Include="..\SchoolManagement.Infrastructure\SchoolManagement.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Http" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup Label="Observability">
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+    <PackageReference Include="Serilog.Enrichers.Environment" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="Npgsql.OpenTelemetry" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SchoolManagement.IntegrationTests" />
+    <InternalsVisibleTo Include="SchoolManagement.UnitTests" />
+  </ItemGroup>
+
+</Project>

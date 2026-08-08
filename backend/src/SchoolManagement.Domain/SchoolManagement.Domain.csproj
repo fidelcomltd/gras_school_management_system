@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Domain has ZERO package references and ZERO project references, by design.
+    Enforced by DependencyDirectionTests. If you are about to add one, you are about to
+    put infrastructure concerns in the domain — see CONTRIBUTING.md "Layering".
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.Domain</RootNamespace>
+  </PropertyGroup>
+
+</Project>

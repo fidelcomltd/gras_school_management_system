@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Runs the real app via WebApplicationFactory against a real PostgreSQL container
+    (Testcontainers). The in-memory provider is deliberately NOT used anywhere: it hides
+    relational behaviour (constraints, concurrency tokens, SQL translation failures) and
+    lets broken queries pass. See docs/adr/0007.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SchoolManagement.IntegrationTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SchoolManagement.Api\SchoolManagement.Api.csproj" />
+    <ProjectReference Include="..\..\src\SchoolManagement.Infrastructure\SchoolManagement.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Bogus" />
+  </ItemGroup>
+
+</Project>

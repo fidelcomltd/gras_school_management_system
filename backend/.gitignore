@@ -1,0 +1,76 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+*.binlog
+
+## Test results and coverage
+[Tt]est[Rr]esult*/
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+*.trx
+TestResults/
+
+## Local secrets and environment — NEVER commit these.
+## Real values live in dotnet user-secrets (local) or the secret store (deployed).
+## See README.md "Configuration and secrets".
+*.env
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+*.pfx
+*.p12
+*.key
+*.pem
+!**/testdata/**/*.pem
+
+## Generated OpenAPI documents produced for local inspection.
+## The real contract lives in ../contracts/openapi.json and is written only by the
+## documented release command — never by hand, never from a developer machine ad hoc.
+artifacts/openapi/
+*.openapi.local.json
+
+## IDE / editor
+.vs/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+## Rider / ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+## OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+.nuget/
+
+## Misc
+*.log
+*.tmp
+node_modules/
