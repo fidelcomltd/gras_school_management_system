@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(contracts/openapi.json)",
+      "Write(contracts/openapi.json)",
+      "Edit(contracts/CONTRACT.lock)",
+      "Write(contracts/CONTRACT.lock)"
+    ]
+  }
+}

@@ -1,0 +1,671 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "School Management API",
+    "description": "REST API for the School Management service.\n\n**Conventions**\n\n- Errors use RFC 9457 `application/problem+json`. Every error body carries a stable `errorCode` and a `traceId`; branch on `errorCode`, never on the human-readable `detail`.\n- Validation failures return **422** with a `errors` object keyed by property name. A **400** means the request itself was malformed (unparseable JSON, wrong query parameter type).\n- Timestamps are UTC ISO-8601 with an explicit offset. Convert to a local zone in the UI only.\n- IDs are opaque strings. Do not parse them or assume a format.\n- Collections are always paginated in the standard envelope. `pageSize` is capped at 100 and a larger value is rejected, not silently reduced.\n- Enums cross the wire as strings. Tolerate members you do not recognise rather than failing to deserialise.\n- Unknown fields in a request body are REJECTED with **400**, not ignored — a misspelled field is reported rather than silently dropped.\n- An unknown path returns **401**, not 404. Endpoints are protected by default and the policy applies to unmatched routes too, so route existence cannot be probed without authenticating. A 401 on a URL you believe exists may simply be a typo.\n\n**Authentication is not yet configured.** Endpoints are protected by default; while the identity provider decision is outstanding, protected endpoints return 401 for every caller. See `docs/ASSUMPTIONS.md` in the repository.",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/v1/reference/ping": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "Check that the API is reachable",
+        "description": "Echoes the supplied name with the server's UTC time and the API version. Useful as a smoke test of routing, serialisation and the request pipeline. Requires no authentication and touches no database.",
+        "operationId": "Ping",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reference/records": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "List sample records, newest first",
+        "description": "Returns one page of records in the standard pagination envelope. `page` is 1-based and defaults to 1; `pageSize` defaults to 20 and is capped at 100. A `pageSize` above the cap is REJECTED with 422 rather than silently reduced, so a client paging through results cannot skip rows while believing it read everything.",
+        "operationId": "ListSampleRecords",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfSampleRecordDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "Create a sample record",
+        "description": "Creates a record and returns 201 with a `Location` header. The label must be unique among live (not soft-deleted) records; a duplicate returns 409. Runs inside a transaction that is rolled back if the command fails.",
+        "operationId": "CreateSampleRecord",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSampleRecordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSampleRecordResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reference/whoami": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "Return the calling user's identity",
+        "description": "Requires authentication. Included to demonstrate — and test — that endpoints are protected by default: this endpoint declares no authorisation metadata of its own and is secured by the fallback policy. While no identity provider is configured it always returns 401.",
+        "operationId": "WhoAmI",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhoAmIResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateSampleRecordCommand": {
+        "required": [
+          "label",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "A short label for the record. Required, unique among live records.",
+            "example": "Term 1 timetable draft"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An optional free-text note.",
+            "example": "Carried over from the previous academic year."
+          }
+        },
+        "additionalProperties": false,
+        "description": "REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.",
+        "example": {
+          "label": "Term 1 timetable draft",
+          "note": "Carried over from the previous academic year."
+        }
+      },
+      "CreateSampleRecordResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The new record's opaque identifier. Returned in the body as well as in the `Location`\r\nheader, so a client need not parse the URL to learn it.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response to a successful CreateSampleRecordCommand.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+        }
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "urn:schoolmanagement:error:sample_record.label_taken"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "Conflict with current state"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "example": 409
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "A record with that label already exists."
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "/api/v1/reference/records"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "Label": [
+                "Label is required."
+              ],
+              "PageSize": [
+                "PageSize must be at most 100."
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "description": "An RFC 9457 problem response for a validation failure, returned with status 422. Extends the standard problem shape with `errors`: an object keyed by request property name, whose values are the messages for that property, suitable for attaching to form fields. A 400 (rather than 422) means the request itself could not be parsed.",
+        "example": {
+          "type": "urn:schoolmanagement:error:request.validation_failed",
+          "title": "Validation failed",
+          "status": 422,
+          "detail": "One or more validation errors occurred.",
+          "instance": "/api/v1/reference/records",
+          "errorCode": "request.validation_failed",
+          "traceId": "0af7651916cd43dd8448eb211c80319c",
+          "errors": {
+            "Label": [
+              "Label is required."
+            ],
+            "PageSize": [
+              "PageSize must be at most 100."
+            ]
+          }
+        }
+      },
+      "PagedResultOfSampleRecordDto": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleRecordDto"
+            },
+            "description": "The page of items. Empty (never null) when the page is past the end.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "label": "Term 1 timetable draft",
+                "note": "Carried over from the previous academic year.",
+                "createdAtUtc": "2026-08-03T09:30:00+00:00",
+                "modifiedAtUtc": null
+              }
+            ]
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The 1-based page number that produced this response.",
+            "format": "int32",
+            "example": 2
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The page size that produced this response, after clamping.",
+            "format": "int32",
+            "example": 20
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total matching rows across all pages. long because a table can exceed\r\nint rows, and discovering that in production is not the moment to find out.",
+            "format": "int64",
+            "example": 137
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total number of pages available at this page size. Zero when there are no rows.",
+            "format": "int32",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a page after this one exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a page before this one exists.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The one pagination response envelope for the whole API. Consistency here is what lets the\r\nfrontend write a single generic paging hook instead of one per endpoint.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "label": "Term 1 timetable draft",
+              "note": "Carried over from the previous academic year.",
+              "createdAtUtc": "2026-08-03T09:30:00+00:00",
+              "modifiedAtUtc": null
+            }
+          ],
+          "page": 2,
+          "pageSize": 20,
+          "totalCount": 137,
+          "totalPages": 7,
+          "hasNextPage": true,
+          "hasPreviousPage": true
+        }
+      },
+      "PingResponse": {
+        "required": [
+          "message",
+          "serverTimeUtc",
+          "apiVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A greeting echoing the supplied name.",
+            "example": "Hello, Ada."
+          },
+          "serverTimeUtc": {
+            "type": "string",
+            "description": "Server time when the request was handled. Always UTC with an explicit offset (ISO-8601), per the\r\nrepo-wide rule that timestamps cross the wire as DateTimeOffset and are converted\r\nto a local zone only in the UI.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "apiVersion": {
+            "type": "string",
+            "description": "The API version that served the request, matching the URL segment — useful when a client is\r\nunsure which version a proxy routed it to.",
+            "example": "1.0"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response to a PingQuery. Confirms the service is reachable and that its clock,\r\nserialisation, and API version are what the caller expects.",
+        "example": {
+          "message": "Hello, Ada.",
+          "serverTimeUtc": "2026-08-03T09:30:00+00:00",
+          "apiVersion": "1.0"
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "urn:schoolmanagement:error:sample_record.label_taken"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "Conflict with current state"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "example": 409
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "A record with that label already exists."
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "example": "/api/v1/reference/records"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` extension member — it is stable — and never on `detail`, which is human-readable prose that may be reworded. `traceId` identifies this specific occurrence in the server logs; quote it when reporting a problem. `type` is a stable URN of the form `urn:schoolmanagement:error:<code>`.",
+        "example": {
+          "type": "urn:schoolmanagement:error:sample_record.label_taken",
+          "title": "Conflict with current state",
+          "status": 409,
+          "detail": "A record with that label already exists.",
+          "instance": "/api/v1/reference/records",
+          "errorCode": "sample_record.label_taken",
+          "traceId": "0af7651916cd43dd8448eb211c80319c"
+        }
+      },
+      "SampleRecordDto": {
+        "required": [
+          "id",
+          "label",
+          "note",
+          "createdAtUtc",
+          "modifiedAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier. A STRING on the wire even though it is a GUID in the database, per the\r\nrepo-wide rule that IDs are opaque to clients — that way the storage key type can change without\r\nbreaking them.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "label": {
+            "type": "string",
+            "description": "The record's short label.",
+            "example": "Term 1 timetable draft"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The optional note, or `null` if none was supplied.",
+            "example": "Carried over from the previous academic year."
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When the record was created. UTC, ISO-8601 with offset.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "modifiedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the record was last modified, or `null` if never.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "REFERENCE SLICE — read model for a sample record.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "label": "Term 1 timetable draft",
+          "note": "Carried over from the previous academic year.",
+          "createdAtUtc": "2026-08-03T09:30:00+00:00",
+          "modifiedAtUtc": null
+        }
+      },
+      "WhoAmIResponse": {
+        "required": [
+          "userId",
+          "isAuthenticated"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The caller's stable identifier, or `null` when the request is anonymous.",
+            "example": "subject-identifier-from-your-identity-provider"
+          },
+          "isAuthenticated": {
+            "type": "boolean",
+            "description": "Whether the request carried an authenticated identity.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The calling user's identity, as the API sees it.",
+        "example": {
+          "userId": "subject-identifier-from-your-identity-provider",
+          "isAuthenticated": true
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Reference"
+    }
+  ]
+}

@@ -148,17 +148,22 @@ examples and tests, plus a migration dropping the table.
 
 Ordered by how much they block.
 
-### 3.1 BLOCKING — Docker is not installed
+### 3.1 RESOLVED — verified against a real PostgreSQL
 
-Integration tests are written and correct but **SKIP** on this machine. They report `Skipped`, never
-`Passed`, and never fall back to the in-memory provider.
+Docker is still not installed, but the `POSTGRES_TEST_CONNECTION` path was exercised against a hosted
+Neon PostgreSQL instance. **All 32 integration tests pass**, so the Definition of Done item *"the
+reference vertical slice runs end to end against a real database"* is now **verified**, not assumed.
 
-The Definition of Done item *"the reference vertical slice runs end to end against a real database"* is
-therefore **not yet verified on this machine**. Everything else in it is.
+Full suite: **132 passed, 0 failed, 0 skipped**. Coverage 86.43% line / 63.59% branch, above the 60%
+floor with the floor genuinely enforced (it is only enforced when nothing was skipped).
 
-Resolve by either: installing Docker Desktop / Podman (Testcontainers then works with no config), or
-setting `POSTGRES_TEST_CONNECTION`. The supplied CI workflow does the latter with a service container, so
-it will be verified there as soon as CI runs.
+That run found three real defects that no unit or architecture test could have caught — see §4.
+
+Docker remains optional. Either a container runtime or `POSTGRES_TEST_CONNECTION` works; CI uses the
+latter with a service container.
+
+**Note on the test database:** it now contains the `sample_records` table and `__ef_migrations_history`.
+The fixture truncates only tables EF maps, so nothing else in that database can be affected.
 
 ### 3.2 BLOCKING for production — the authentication mechanism
 
@@ -205,7 +210,21 @@ are the human's.
 
 ---
 
-## 4. Verified facts worth recording
+## 4. Defects found by the first real integration run
+
+Recorded because each one argues for keeping a class of test that is otherwise easy to cut, and because
+all three were invisible to the build, the analysers and 100 unit/architecture tests.
+
+| Defect | Impact if shipped | Fix |
+|---|---|---|
+| `GlobalExceptionHandler` ignored `BadHttpRequestException.StatusCode` | **Every malformed request became a 500.** Unparseable JSON, an unknown field, or an oversized body would tell the client the SERVER failed, and each occurrence would inflate the error rate and page somebody | Honour the exception's status code; 400 for malformed, 413 for too large |
+| `MapOpenApi` / Scalar had no `.AllowAnonymous()` | The authorisation fallback policy protected them, so the docs and the OpenAPI document returned **401 to everyone** in Development | Added `.AllowAnonymous()` to both |
+| An unknown path returns 401, not 404 | No impact — the behaviour was correct and the TEST was wrong. See §2.12 | Test corrected to assert 401, and the behaviour documented in the OpenAPI description |
+
+The first is the one that matters: it is a defect in the error contract itself, on the most common
+client mistake there is, and only an end-to-end request could surface it.
+
+## 5. Verified facts worth recording
 
 Established by checking rather than assuming, and easy to get wrong from memory:
 

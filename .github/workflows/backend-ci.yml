@@ -1,18 +1,5 @@
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════
-#  BACKEND CI — READY TO USE, BUT NOT YET ACTIVE.
-#
-#  ACTION REQUIRED BY THE ORCHESTRATOR: copy or merge this file to the REPOSITORY ROOT at
-#
-#      .github/workflows/backend-ci.yml
-#
-#  GitHub Actions only reads workflows from `.github/workflows` at the root of the repository, so this
-#  file does nothing where it currently sits. It lives here because root-level CI is the orchestrator's
-#  to own (root CLAUDE.md §11) and the backend agent must not write outside `backend/**`. Moving it is a
-#  one-line change and needs no edits to the content below.
-#
-#  All the logic is in backend/scripts/ci.ps1, so this workflow is a thin wrapper and the identical
-#  gates run locally. Do not reimplement steps here — change the script.
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+# Thin wrapper: all gate logic lives in backend/scripts/ci.ps1, so the identical gates run locally.
+# Do not reimplement steps here — change the script.
 
 name: backend-ci
 
