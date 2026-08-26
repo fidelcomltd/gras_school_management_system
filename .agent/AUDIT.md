@@ -1,3 +1,8 @@
+> **SUPERSEDED 2026-08-26.** This audit ran against two empty directories on 2026-07-27 and
+> found nothing, correctly, because nothing existed. Both scaffolds have since landed. A real
+> audit is carded as [TASK-0001](tasks/TASK-0001.md) and will replace this file when it runs.
+> Everything below is kept only as the record of why no audit was produced at bootstrap.
+
 # Audit — 2026-07-27
 
 ## Result: no code to audit
