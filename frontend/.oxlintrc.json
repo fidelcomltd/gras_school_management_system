@@ -58,5 +58,5 @@
       }
     }
   ],
-  "ignorePatterns": ["dist", "coverage", "node_modules", "src/api/**"]
+  "ignorePatterns": ["dist", "coverage", "node_modules", "src/api/schema.d.ts", "scripts/**"]
 }

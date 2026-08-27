@@ -117,6 +117,7 @@ builder.Services.AddInfrastructure(builder.Configuration, validateOnStart);
 
 // ── HTTP surface ─────────────────────────────────────────────────────────────────────────────
 builder.Services.AddApiAuthentication(builder.Configuration, validateOnStart);
+builder.Services.AddApiAuthorization();
 builder.Services.AddApiVersioningScheme();
 builder.Services.AddApiOpenApi();
 builder.Services.AddEndpointModules();
@@ -280,6 +281,10 @@ if (isDevelopment)
             .WithOpenApiRoutePattern($"/openapi/{OpenApiSetup.DocumentName}.json"))
         .AllowAnonymous();
 }
+
+// TASK-0002 boot-time guard (spec 9.2). Runs unconditionally — see PrivilegeDeclarationGuard's
+// remarks for why this, unlike StartupEnvironmentGuard, is not gated on validateOnStart.
+PrivilegeDeclarationGuard.Validate(app);
 
 await app.RunAsync().ConfigureAwait(false);
 

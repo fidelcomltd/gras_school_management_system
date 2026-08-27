@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Infrastructure.Authorization;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
@@ -95,6 +97,14 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<ISampleRecordRepository, SampleRecordRepository>();
 
         services.AddScoped<ISecretProvider, ConfigurationSecretProvider>();
+
+        // TASK-0002 authorization seams. See the remarks on each type: role/assignment persistence
+        // and the audit log module do not exist yet, so these are safe (deny-by-default / logging)
+        // stand-ins that a later module replaces.
+        services.AddScoped<IEffectivePrivilegeProvider, NullEffectivePrivilegeProvider>();
+        services.AddScoped<IAuthorizationAuditSink, LoggingAuthorizationAuditSink>();
+        services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
+        services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

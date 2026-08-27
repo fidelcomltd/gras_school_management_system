@@ -8,11 +8,12 @@
       1. restore
       2. build with warnings as errors
       3. dotnet format --verify-no-changes
-      4. tests with coverage collection
-      5. coverage threshold
-      6. dependency vulnerability scan
-      7. secret scan (skipped with a warning if gitleaks is not installed)
-      8. OpenAPI contract drift
+      4. generate the OpenAPI document (no database — SchoolManagement.ArchitectureTests reads it)
+      5. tests with coverage collection
+      6. coverage threshold
+      7. dependency vulnerability scan
+      8. secret scan (skipped with a warning if gitleaks is not installed)
+      9. OpenAPI contract drift
 
     Every gate runs even after one fails, then the script exits non-zero with a summary. Stopping at
     the first failure means a contributor fixes one thing, pushes, and waits to discover the next.
@@ -82,6 +83,20 @@ try {
 
     Invoke-Gate 'Format' {
         dotnet format --verify-no-changes --no-restore
+    }
+
+    Invoke-Gate 'Generate OpenAPI document (no database)' {
+        # SchoolManagement.ArchitectureTests reads this artefact directly instead of starting the
+        # application (TASK-0009 moved the document-property contract tests off the database, since
+        # none of them ever touched it), so it must exist before the Tests gate runs below. This is the
+        # ONLY call to generate-openapi.ps1 in this script: the "OpenAPI contract drift" gate further
+        # down reuses the same file rather than regenerating it, so there is exactly one path to this
+        # document, not two.
+        & (Join-Path $PSScriptRoot 'generate-openapi.ps1') -Configuration $Configuration | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Document generation failed.'
+        }
+        $global:LASTEXITCODE = 0
     }
 
     Invoke-Gate 'Tests' {
@@ -169,9 +184,15 @@ try {
         # skips (Assert.Skip) do not increment notExecuted in the VSTest trx: the integration project
         # reports total=31, passed=0, failed=0, notExecuted=0. Trusting notExecuted would silently
         # conclude the suite was complete and enforce a floor against a partial run.
+        # -LiteralPath, not positional: when two test projects finish in the same second the VSTest
+        # logger disambiguates with a literal "[1]" suffix (...HH_mm_ss[1].trx), and PowerShell's
+        # provider path resolution treats unbracketed square brackets as a wildcard character class.
+        # Without -LiteralPath that bracketed filename fails to resolve and Get-Content throws a
+        # confusing "parameter 'Raw' not found" error instead of a path-not-found one. TASK-0002
+        # hit this while adding a fourth trx-producing run; unrelated to the authorisation work itself.
         $skipped = 0
         foreach ($trx in Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue) {
-            [xml]$results = Get-Content $trx.FullName -Raw
+            [xml]$results = Get-Content -LiteralPath $trx.FullName -Raw
             $counters = $results.TestRun.ResultSummary.Counters
 
             $notRun = [int]$counters.total - [int]$counters.passed - [int]$counters.failed
@@ -242,12 +263,11 @@ try {
                 throw "No committed contract at '$committed'. Create it with: ./scripts/generate-openapi.ps1 -Promote"
             }
 
-            & (Join-Path $PSScriptRoot 'generate-openapi.ps1') -Configuration $Configuration | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw 'Document generation failed.'
-            }
-
             $generated = Join-Path $backendRoot 'artifacts/openapi/SchoolManagement.Api.json'
+
+            if (-not (Test-Path $generated)) {
+                throw "Expected a generated document at '$generated' - the earlier 'Generate OpenAPI document' gate should have produced it. Did that gate fail?"
+            }
 
             # Hash comparison, not a text diff: it is exact, and it cannot be fooled by line endings.
             $generatedHash = (Get-FileHash $generated -Algorithm SHA256).Hash

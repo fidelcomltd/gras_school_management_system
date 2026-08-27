@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using SchoolManagement.Api.Http;
+using SchoolManagement.Api.Security;
+using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Api.Endpoints;
 
@@ -48,6 +51,7 @@ public sealed class ReferenceEndpoints : IEndpointModule
         MapListSampleRecords(group);
         MapCreateSampleRecord(group);
         MapWhoAmI(group);
+        MapSecureArm(group);
     }
 
     /// <summary>The simplest possible endpoint: a query with no persistence.</summary>
@@ -128,25 +132,65 @@ public sealed class ReferenceEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
     /// <summary>
-    /// A PROTECTED endpoint. Exists to prove the deny-by-default authorisation pipeline actually works.
+    /// Reports the calling user's identity. Anonymous by necessity as of TASK-0002 — see the remarks.
     /// </summary>
     /// <remarks>
-    /// Note there is no <c>.AllowAnonymous()</c> and no <c>[Authorize]</c> either — the fallback policy
-    /// protects it. That is the guarantee under test: an endpoint nobody remembered to secure is still
-    /// secured. The integration test asserts this returns 401 while the placeholder authentication
-    /// scheme is in effect.
+    /// <para>
+    /// TASK-0002 CHANGE. Before the boot-time privilege-declaration guard (spec 9.2) existed, this
+    /// endpoint deliberately declared NO authorisation metadata of its own, relying solely on the
+    /// deny-by-default fallback policy, to prove that policy actually protects a route nobody
+    /// remembered to secure. The guard now makes that exact pattern a startup failure: every mapped
+    /// route must either call <c>RequirePrivilege(...)</c> or <c>AllowAnonymous()</c> explicitly, so
+    /// a "protected only by the bare fallback" endpoint can no longer exist in a running application.
+    /// </para>
+    /// <para>
+    /// Per the TASK-0002 task card's own instruction for exactly this situation ("mark it explicitly
+    /// anonymous rather than inventing a privilege for it"), this endpoint is now
+    /// <c>.AllowAnonymous()</c>. It still reports whatever identity the request carries — useful once
+    /// TASK-0003 wires real authentication — it simply no longer requires one. The deny-by-default
+    /// guarantee itself is now proven statically by <c>PrivilegeDeclarationGuardTests</c> (a route
+    /// with neither declaration fails to register) and at runtime by
+    /// <c>SecurityAndErrorContractTests.AnUnknownRoute_Returns401NotFound_BecauseOfTheFallbackPolicy</c>
+    /// (anything unmapped is still denied).
+    /// </para>
     /// </remarks>
     private static void MapWhoAmI(RouteGroupBuilder group) =>
         group.MapGet("/whoami", (ICurrentUser currentUser) =>
                 TypedResults.Ok(new WhoAmIResponse(currentUser.UserId, currentUser.IsAuthenticated)))
+            .AllowAnonymous()
             .WithName("WhoAmI")
             .WithSummary("Return the calling user's identity")
             .WithDescription(
-                "Requires authentication. Included to demonstrate — and test — that endpoints are " +
-                "protected by default: this endpoint declares no authorisation metadata of its own and " +
-                "is secured by the fallback policy. While no identity provider is configured it always " +
-                "returns 401.")
+                "Anonymous. Reports whatever identity the request carries — null and false while no " +
+                "authentication mechanism is wired (see TASK-0003) — without requiring one.")
             .Produces<WhoAmIResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    /// <summary>
+    /// A SCOPABLE PROTECTED endpoint. Exists to prove — and to let the integration tests exercise —
+    /// the TASK-0002 privilege substrate: <see cref="PrivilegeRequirementExtensions.RequirePrivilege"/>,
+    /// scope resolution rule 1 of spec 4.2.1 (a request naming an arm resolves to that arm), and the
+    /// 403 ProblemDetails shape.
+    /// </summary>
+    /// <remarks>
+    /// Copy this call shape — <c>RequirePrivilege(privilege, ScopeParameterKind.Arm, "armId")</c> —
+    /// for any future route scoped by an arm named directly in the path. Requires
+    /// <see cref="Privileges.Arm.View"/> because it is genuinely read-only and scopable, and it does
+    /// not exist as a public product surface — it is reference-slice test scaffolding, wired into the
+    /// contract like the rest of this file.
+    /// </remarks>
+    private static void MapSecureArm(RouteGroupBuilder group) =>
+        group.MapGet("/arms/{armId:guid}/secure", (Guid armId) =>
+                TypedResults.Ok(new SecureArmResponse(armId)))
+            .RequirePrivilege(Privileges.Arm.View, ScopeParameterKind.Arm, "armId")
+            .WithName("GetSecureArm")
+            .WithSummary("Read an arm-scoped resource, gated by the privilege substrate")
+            .WithDescription(
+                $"Requires `{Privileges.Arm.View}`, scoped to the arm named in the path. Anonymous " +
+                "callers get 401; an authenticated caller who lacks the privilege, or who holds it " +
+                "only over a different arm, gets 403 with a generic body naming neither the privilege " +
+                "nor whether the arm exists.")
+            .Produces<SecureArmResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
@@ -158,3 +202,7 @@ public sealed class ReferenceEndpoints : IEndpointModule
 /// </param>
 /// <param name="IsAuthenticated">Whether the request carried an authenticated identity.</param>
 public sealed record WhoAmIResponse(string? UserId, bool IsAuthenticated);
+
+/// <summary>The arm-scoped resource <c>GetSecureArm</c> returns once the privilege check passes.</summary>
+/// <param name="ArmId">The arm named in the request path — the resolved scope target.</param>
+public sealed record SecureArmResponse(Guid ArmId);

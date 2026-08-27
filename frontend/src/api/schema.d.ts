@@ -1,0 +1,627 @@
+/**
+ * GENERATED — DO NOT EDIT.
+ *
+ * Produced from `contracts/openapi.json` by `openapi-typescript`. Regenerate with
+ * `npm run generate:api` in frontend/ — never hand-edit this file. See
+ * `src/api/README.md` for the pipeline and CLAUDE.md §3/§4.4 for why.
+ */
+
+export interface paths {
+    "/api/v1/reference/ping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check that the API is reachable
+         * @description Echoes the supplied name with the server's UTC time and the API version. Useful as a smoke test of routing, serialisation and the request pipeline. Requires no authentication and touches no database.
+         */
+        get: operations["Ping"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sample records, newest first
+         * @description Returns one page of records in the standard pagination envelope. `page` is 1-based and defaults to 1; `pageSize` defaults to 20 and is capped at 100. A `pageSize` above the cap is REJECTED with 422 rather than silently reduced, so a client paging through results cannot skip rows while believing it read everything.
+         */
+        get: operations["ListSampleRecords"];
+        put?: never;
+        /**
+         * Create a sample record
+         * @description Creates a record and returns 201 with a `Location` header. The label must be unique among live (not soft-deleted) records; a duplicate returns 409. Runs inside a transaction that is rolled back if the command fails.
+         */
+        post: operations["CreateSampleRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Return the calling user's identity
+         * @description Anonymous. Reports whatever identity the request carries — null and false while no authentication mechanism is wired (see TASK-0003) — without requiring one.
+         */
+        get: operations["WhoAmI"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/arms/{armId}/secure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an arm-scoped resource, gated by the privilege substrate
+         * @description Requires `arm.view`, scoped to the arm named in the path. Anonymous callers get 401; an authenticated caller who lacks the privilege, or who holds it only over a different arm, gets 403 with a generic body naming neither the privilege nor whether the arm exists.
+         */
+        get: operations["GetSecureArm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
+export type webhooks = Record<string, never>;
+export interface components {
+    schemas: {
+        /**
+         * @description REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.
+         * @example {
+         *       "label": "Term 1 timetable draft",
+         *       "note": "Carried over from the previous academic year."
+         *     }
+         */
+        CreateSampleRecordCommand: {
+            /**
+             * @description A short label for the record. Required, unique among live records.
+             * @example Term 1 timetable draft
+             */
+            label: string;
+            /**
+             * @description An optional free-text note.
+             * @example Carried over from the previous academic year.
+             */
+            note: null | string;
+        };
+        /**
+         * @description Response to a successful CreateSampleRecordCommand.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+         *     }
+         */
+        CreateSampleRecordResponse: {
+            /**
+             * @description The new record's opaque identifier. Returned in the body as well as in the `Location`
+             *     header, so a client need not parse the URL to learn it.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+        };
+        /**
+         * @description An RFC 9457 problem response for a validation failure, returned with status 422. Extends the standard problem shape with `errors`: an object keyed by request property name, whose values are the messages for that property, suitable for attaching to form fields. A 400 (rather than 422) means the request itself could not be parsed.
+         * @example {
+         *       "type": "urn:schoolmanagement:error:request.validation_failed",
+         *       "title": "Validation failed",
+         *       "status": 422,
+         *       "detail": "One or more validation errors occurred.",
+         *       "instance": "/api/v1/reference/records",
+         *       "errorCode": "request.validation_failed",
+         *       "traceId": "0af7651916cd43dd8448eb211c80319c",
+         *       "errors": {
+         *         "Label": [
+         *           "Label is required."
+         *         ],
+         *         "PageSize": [
+         *           "PageSize must be at most 100."
+         *         ]
+         *       }
+         *     }
+         */
+        HttpValidationProblemDetails: {
+            /** @example urn:schoolmanagement:error:sample_record.label_taken */
+            type?: null | string;
+            /** @example Conflict with current state */
+            title?: null | string;
+            /**
+             * Format: int32
+             * @example 409
+             */
+            status?: null | number | string;
+            /** @example A record with that label already exists. */
+            detail?: null | string;
+            /** @example /api/v1/reference/records */
+            instance?: null | string;
+            /**
+             * @example {
+             *       "Label": [
+             *         "Label is required."
+             *       ],
+             *       "PageSize": [
+             *         "PageSize must be at most 100."
+             *       ]
+             *     }
+             */
+            errors?: {
+                [key: string]: string[];
+            };
+        };
+        /**
+         * @description The one pagination response envelope for the whole API. Consistency here is what lets the
+         *     frontend write a single generic paging hook instead of one per endpoint.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "label": "Term 1 timetable draft",
+         *           "note": "Carried over from the previous academic year.",
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "modifiedAtUtc": null
+         *         }
+         *       ],
+         *       "page": 2,
+         *       "pageSize": 20,
+         *       "totalCount": 137,
+         *       "totalPages": 7,
+         *       "hasNextPage": true,
+         *       "hasPreviousPage": true
+         *     }
+         */
+        PagedResultOfSampleRecordDto: {
+            /**
+             * @description The page of items. Empty (never null) when the page is past the end.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "label": "Term 1 timetable draft",
+             *         "note": "Carried over from the previous academic year.",
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "modifiedAtUtc": null
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["SampleRecordDto"][];
+            /**
+             * Format: int32
+             * @description The 1-based page number that produced this response.
+             * @example 2
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description The page size that produced this response, after clamping.
+             * @example 20
+             */
+            pageSize: number | string;
+            /**
+             * Format: int64
+             * @description Total matching rows across all pages. long because a table can exceed
+             *     int rows, and discovering that in production is not the moment to find out.
+             * @example 137
+             */
+            totalCount: number | string;
+            /**
+             * Format: int32
+             * @description Total number of pages available at this page size. Zero when there are no rows.
+             * @example 7
+             */
+            totalPages?: number | string;
+            /**
+             * @description Whether a page after this one exists.
+             * @example true
+             */
+            hasNextPage?: boolean;
+            /**
+             * @description Whether a page before this one exists.
+             * @example true
+             */
+            hasPreviousPage?: boolean;
+        };
+        /**
+         * @description Response to a PingQuery. Confirms the service is reachable and that its clock,
+         *     serialisation, and API version are what the caller expects.
+         * @example {
+         *       "message": "Hello, Ada.",
+         *       "serverTimeUtc": "2026-08-03T09:30:00+00:00",
+         *       "apiVersion": "1.0"
+         *     }
+         */
+        PingResponse: {
+            /**
+             * @description A greeting echoing the supplied name.
+             * @example Hello, Ada.
+             */
+            message: string;
+            /**
+             * Format: date-time
+             * @description Server time when the request was handled. Always UTC with an explicit offset (ISO-8601), per the
+             *     repo-wide rule that timestamps cross the wire as DateTimeOffset and are converted
+             *     to a local zone only in the UI.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            serverTimeUtc: string;
+            /**
+             * @description The API version that served the request, matching the URL segment — useful when a client is
+             *     unsure which version a proxy routed it to.
+             * @example 1.0
+             */
+            apiVersion: string;
+        };
+        /**
+         * @description An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` extension member — it is stable — and never on `detail`, which is human-readable prose that may be reworded. `traceId` identifies this specific occurrence in the server logs; quote it when reporting a problem. `type` is a stable URN of the form `urn:schoolmanagement:error:<code>`.
+         * @example {
+         *       "type": "urn:schoolmanagement:error:sample_record.label_taken",
+         *       "title": "Conflict with current state",
+         *       "status": 409,
+         *       "detail": "A record with that label already exists.",
+         *       "instance": "/api/v1/reference/records",
+         *       "errorCode": "sample_record.label_taken",
+         *       "traceId": "0af7651916cd43dd8448eb211c80319c"
+         *     }
+         */
+        ProblemDetails: {
+            /** @example urn:schoolmanagement:error:sample_record.label_taken */
+            type?: null | string;
+            /** @example Conflict with current state */
+            title?: null | string;
+            /**
+             * Format: int32
+             * @example 409
+             */
+            status?: null | number | string;
+            /** @example A record with that label already exists. */
+            detail?: null | string;
+            /** @example /api/v1/reference/records */
+            instance?: null | string;
+        };
+        /**
+         * @description REFERENCE SLICE — read model for a sample record.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "label": "Term 1 timetable draft",
+         *       "note": "Carried over from the previous academic year.",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "modifiedAtUtc": null
+         *     }
+         */
+        SampleRecordDto: {
+            /**
+             * @description Opaque identifier. A STRING on the wire even though it is a GUID in the database, per the
+             *     repo-wide rule that IDs are opaque to clients — that way the storage key type can change without
+             *     breaking them.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description The record's short label.
+             * @example Term 1 timetable draft
+             */
+            label: string;
+            /**
+             * @description The optional note, or `null` if none was supplied.
+             * @example Carried over from the previous academic year.
+             */
+            note: null | string;
+            /**
+             * Format: date-time
+             * @description When the record was created. UTC, ISO-8601 with offset.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+            /**
+             * Format: date-time
+             * @description When the record was last modified, or `null` if never.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            modifiedAtUtc: null | string;
+        };
+        /**
+         * @description The arm-scoped resource `GetSecureArm` returns once the privilege check passes.
+         * @example {
+         *       "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+         *     }
+         */
+        SecureArmResponse: {
+            /**
+             * Format: uuid
+             * @description The arm named in the request path — the resolved scope target.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            armId: string;
+        };
+        /**
+         * @description The calling user's identity, as the API sees it.
+         * @example {
+         *       "userId": "subject-identifier-from-your-identity-provider",
+         *       "isAuthenticated": true
+         *     }
+         */
+        WhoAmIResponse: {
+            /**
+             * @description The caller's stable identifier, or `null` when the request is anonymous.
+             * @example subject-identifier-from-your-identity-provider
+             */
+            userId: null | string;
+            /**
+             * @description Whether the request carried an authenticated identity.
+             * @example true
+             */
+            isAuthenticated: boolean;
+        };
+    };
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+    Ping: {
+        parameters: {
+            query: {
+                name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PingResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSampleRecords: {
+        parameters: {
+            query?: {
+                page?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResultOfSampleRecordDto"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSampleRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSampleRecordCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateSampleRecordResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    WhoAmI: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhoAmIResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSecureArm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecureArmResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+}

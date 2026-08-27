@@ -1,16 +1,16 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE_URL } from '@/config/env-values';
+import { buildHandlersFromContract } from './openapi-handlers';
 
 /**
- * Default MSW handlers.
+ * Default MSW handlers, derived from `contracts/openapi.json` (see
+ * `./openapi-handlers.ts`) rather than hand-written, so mocks cannot drift
+ * from the contract. Each covers the happy path for one operation.
  *
- * Empty by design — there are no endpoints in `contracts/openapi.json` yet.
- * Once the contract exists, derive handlers from it rather than hand-writing
- * them, so mocks cannot drift from the real shapes.
- *
- * Per-test overrides go through `server.use(...)`, not this array.
+ * Per-test overrides go through `server.use(...)`, not this array — that is
+ * how error scenarios (`422`, `401`, `409`, …) get exercised.
  */
-export const handlers = [];
+export const handlers = buildHandlersFromContract(API_BASE_URL);
 
 /** Builds an absolute URL against the configured API base, for use in handlers. */
 export const apiUrl = (path: string): string =>

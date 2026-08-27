@@ -1,54 +1,49 @@
-using System.Net;
 using System.Text.Json;
-using SchoolManagement.IntegrationTests.Infrastructure;
 
-namespace SchoolManagement.IntegrationTests;
+namespace SchoolManagement.ArchitectureTests;
 
 /// <summary>
 /// Enforces the OpenAPI documentation rules mechanically, against the real generated document.
 /// </summary>
 /// <remarks>
+/// <para>
 /// "Document your endpoints" as a written rule decays. These tests make it a build gate: an endpoint
 /// without a summary, or a DTO without an example, fails here. The frontend generates a typed client
 /// from this document, so a gap in it becomes a gap in every consumer.
+/// </para>
+/// <para>
+/// MOVED HERE FROM <c>SchoolManagement.IntegrationTests</c> (TASK-0009). Every one of these tests asserts
+/// a property of the generated DOCUMENT — none touches the database or a request handler. They used to
+/// reach the document by starting the application under <c>WebApplicationFactory</c> and fetching
+/// <c>/openapi/v1.json</c> over HTTP, which coupled them to database availability for no reason: on
+/// 2026-08-26 that coupling let <c>EverySchema_HasAnExample</c> skip silently on a machine with no
+/// reachable PostgreSQL, and a missing <c>SecureArmResponse</c> example reached the COMMITTED contract
+/// undetected as a result. Reading the build-generated document directly — see
+/// <see cref="OpenApiDocument"/> — removes the database from the picture entirely, so these run on every
+/// machine, every time.
+/// </para>
 /// </remarks>
-public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
+public sealed class OpenApiContractTests
 {
-    private async Task<JsonDocument> GetDocumentAsync()
-    {
-        var response = await Client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);
-
-        response.StatusCode.ShouldBe(
-            HttpStatusCode.OK,
-            "The OpenAPI document endpoint must be reachable in Development.");
-
-        return await ReadJsonAsync(response);
-    }
+    private static JsonElement Document => OpenApiDocument.Root;
 
     [Fact]
-    public async Task Document_DescribesTheReferenceEndpoints()
+    public void Document_DescribesTheReferenceEndpoints()
     {
-        RequireDatabase();
-
-        using var document = await GetDocumentAsync();
-        var paths = document.RootElement.GetProperty("paths");
+        var paths = Document.GetProperty("paths");
 
         paths.TryGetProperty("/api/v1/reference/ping", out _).ShouldBeTrue();
         paths.TryGetProperty("/api/v1/reference/records", out _).ShouldBeTrue();
     }
 
     [Fact]
-    public async Task Document_UsesConcreteVersionSegmentsNotRouteTemplates()
+    public void Document_UsesConcreteVersionSegmentsNotRouteTemplates()
     {
-        RequireDatabase();
-
         // URL-segment versioning routes on "/api/v{version:apiVersion}". Left unprocessed, the document
         // would contain a literal "{version}" placeholder and a generated client would either take a
         // pointless version argument or call an unescaped URL. VersionedPathDocumentTransformer fixes it;
         // this test proves the fix is still in place.
-        using var document = await GetDocumentAsync();
-
-        foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
+        foreach (var path in Document.GetProperty("paths").EnumerateObject())
         {
             path.Name.ShouldNotContain(
                 "{version}",
@@ -58,14 +53,11 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EveryOperation_HasASummaryDescriptionAndOperationId()
+    public void EveryOperation_HasASummaryDescriptionAndOperationId()
     {
-        RequireDatabase();
-
-        using var document = await GetDocumentAsync();
         var failures = new List<string>();
 
-        foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
+        foreach (var path in Document.GetProperty("paths").EnumerateObject())
         {
             foreach (var operation in path.Value.EnumerateObject())
             {
@@ -89,16 +81,13 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EveryOperation_DocumentsItsErrorResponses()
+    public void EveryOperation_DocumentsItsErrorResponses()
     {
-        RequireDatabase();
-
         // An operation that only documents 200 tells a client author nothing about what can go wrong, so
         // they write no error handling. Every operation must declare at least one non-2xx response.
-        using var document = await GetDocumentAsync();
         var failures = new List<string>();
 
-        foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
+        foreach (var path in Document.GetProperty("paths").EnumerateObject())
         {
             foreach (var operation in path.Value.EnumerateObject())
             {
@@ -120,14 +109,11 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EverySchema_HasADescription()
+    public void EverySchema_HasADescription()
     {
-        RequireDatabase();
-
-        using var document = await GetDocumentAsync();
         var failures = new List<string>();
 
-        foreach (var schema in document.RootElement.GetProperty("components").GetProperty("schemas").EnumerateObject())
+        foreach (var schema in Document.GetProperty("components").GetProperty("schemas").EnumerateObject())
         {
             // Descriptions come from XML doc comments, which is why CS1591 is an error in Api and
             // Application: a missing /// is a missing description here.
@@ -143,16 +129,13 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EverySchema_HasAnExample()
+    public void EverySchema_HasAnExample()
     {
-        RequireDatabase();
-
         // Descriptions say what a field means; examples say what a VALUE looks like, which is what a
         // client author actually needs for dates, IDs and formats. Register new DTOs in OpenApiExamples.
-        using var document = await GetDocumentAsync();
         var failures = new List<string>();
 
-        foreach (var schema in document.RootElement.GetProperty("components").GetProperty("schemas").EnumerateObject())
+        foreach (var schema in Document.GetProperty("components").GetProperty("schemas").EnumerateObject())
         {
             if (!schema.Value.TryGetProperty("example", out _))
             {
@@ -166,16 +149,13 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EveryDateTimeProperty_HasAnExample()
+    public void EveryDateTimeProperty_HasAnExample()
     {
-        RequireDatabase();
-
         // Date formats are the single most misread part of any contract. SchemaExampleTransformer has a
         // backstop for this, so a failure here means the backstop was removed.
-        using var document = await GetDocumentAsync();
         var failures = new List<string>();
 
-        foreach (var schema in document.RootElement.GetProperty("components").GetProperty("schemas").EnumerateObject())
+        foreach (var schema in Document.GetProperty("components").GetProperty("schemas").EnumerateObject())
         {
             if (!schema.Value.TryGetProperty("properties", out var properties))
             {
@@ -199,12 +179,9 @@ public sealed class OpenApiContractTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task Document_HasApiLevelDocumentation()
+    public void Document_HasApiLevelDocumentation()
     {
-        RequireDatabase();
-
-        using var document = await GetDocumentAsync();
-        var info = document.RootElement.GetProperty("info");
+        var info = Document.GetProperty("info");
 
         info.GetProperty("title").GetString().ShouldBe("School Management API");
         info.GetProperty("version").GetString().ShouldBe("1.0");

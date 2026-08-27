@@ -208,6 +208,35 @@ The repository is not a git repository. The secret-scan and contract-drift gates
 and the entire CI workflow assume version control. `git init` was not run: remote and branching choices
 are the human's.
 
+*(Superseded — resolved 2026-08-08, see `STATE.md` Decisions. Left in place rather than deleted so the
+paragraph trail is not rewritten; §1's append-only rule applies here too.)*
+
+### 3.8 BLOCKING the "Vulnerable dependencies" gate — `SSH.NET` 2025.1.0, High severity — PRE-EXISTING, unrelated to TASK-0002
+
+`dotnet list package --vulnerable --include-transitive` reports **GHSA-q939-rpr3-3284 (High)** against
+`SSH.NET 2025.1.0`, a transitive dependency of `Testcontainers.PostgreSql 4.13.0` (via `Docker.DotNet`,
+used for the SSH exec path against remote Docker hosts — not a path this project's test fixture uses,
+which only ever talks to a local daemon or an externally supplied `POSTGRES_TEST_CONNECTION`).
+
+**Found while running `./scripts/ci.ps1` for TASK-0002** (privilege register and authorisation
+enforcement). Verified pre-existing and NOT introduced by that card: `git status`/`git diff` show no
+`.csproj` or `Directory.Packages.props` change from TASK-0002, and the package graph is unchanged. It
+would fail this gate identically on `main` before TASK-0002's commits.
+
+Not fixed here because upgrading `Testcontainers.PostgreSql` (or pinning `SSH.NET` directly, the way
+§2.11 pins `Microsoft.OpenApi`) is a dependency change with its own blast radius — the integration-test
+harness — and is outside a card scoped to the authorisation substrate. Per root `CLAUDE.md` §8,
+dependency changes need their own justification in a task card.
+
+**Not marked as an accepted risk** — that is a security-posture call for the orchestrator/human, not
+mine to make unilaterally while implementing an unrelated card. Two ways to close this:
+1. Check whether a newer `Testcontainers.PostgreSql` resolves a patched `SSH.NET`, and bump if so.
+2. If no patched version exists yet, pin `SSH.NET` to a fixed version via central transitive pinning
+   (same mechanism as §2.11), or explicitly accept the risk here with a named owner and a review date.
+
+Until one of those happens, `./scripts/ci.ps1`'s "Vulnerable dependencies" gate fails locally and in CI.
+This is the one gate TASK-0002 could not turn green — every other gate passes.
+
 ---
 
 ## 4. Defects found by the first real integration run

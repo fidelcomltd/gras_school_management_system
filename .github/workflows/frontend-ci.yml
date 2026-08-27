@@ -1,0 +1,88 @@
+# Frontend quality gates. Mirrors the gate list recorded in .agent/STATE.md; keep the two in step.
+#
+# Unlike backend-ci.yml there is no single wrapper script to delegate to — `npm run verify` chains
+# four of the five gates, and the contract drift check is deliberately kept OUT of it (see below).
+
+name: frontend-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'contracts/**'          # a contract change must re-run the client drift check
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'contracts/**'
+      - '.github/workflows/frontend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read                # least privilege: the workflow only needs to read the repo
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        # No fetch-depth: 0 here. Unlike the backend there is no commit-scanning step; a shallow
+        # clone is sufficient and faster. The drift check diffs working-tree files, not history.
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Pinned to the version the team actually develops on, so CI cannot pass on a runtime
+          # nobody runs locally. Raising it is a deliberate decision, not a drift: frontend/HANDOFF.md
+          # decision 2 pins React Router to 7.x precisely because 8.x needs Node >= 22.22.0, so a
+          # bump here and that pin must be revisited together.
+          node-version: '22.21.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        # `npm ci`, never `npm install`: it installs exactly the committed lockfile and fails if
+        # package.json and the lockfile disagree. That is the point — an install that silently
+        # resolves something new would make every gate below test a tree nobody reviewed.
+        #
+        # This also stands as the check on the scoped `overrides` entry for openapi-typescript's
+        # TypeScript peer range (STATE.md Decisions 2026-08-26). If that override stops working,
+        # ERESOLVE surfaces here rather than on a developer's machine.
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        # oxlint, configured with jsx-a11y / import / promise plugins and a11y rules as errors.
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Contract drift — generated client is current
+        # Kept as its own step, deliberately, rather than folded into `npm run verify`.
+        #
+        # This is CLAUDE.md §4.4 check 2, and it fails for a different REASON than the four gates
+        # above: not "the frontend is broken" but "the committed contract moved and src/api/ has not
+        # caught up". That is expected and correct in the window between a backend contract
+        # promotion landing and the frontend regenerating against it — and it must be loud, because
+        # a stale generated client is exactly the drift this whole pipeline exists to catch.
+        #
+        # Fix: `npm run generate:api` and commit the result. Never hand-edit src/api/schema.d.ts.
+        run: npm run check:api-drift

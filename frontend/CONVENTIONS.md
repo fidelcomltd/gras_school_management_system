@@ -29,6 +29,26 @@ Package manager is **npm**. `pnpm` is not installed on this machine.
 
 Adding a dependency needs a justification in the task card. No `latest` ranges.
 
+**`openapi-typescript` and the TypeScript peer range.** `openapi-typescript@7.13.0` declares
+`peerDependencies: { typescript: "^5.x" }`; this repo runs TypeScript 6.0.3 (see above), which
+a plain `npm ci` rejects with `ERESOLVE`. The tool only reaches for `typescript` internally for
+AST/printer helpers that did not change in a way that matters between the 5.x and 6.x majors —
+confirmed by generating, typechecking and building against it. Rather than relaxing peer
+checking repo-wide (an `.npmrc` `legacy-peer-deps=true` would also silently let a genuine
+future conflict — e.g. a library that really does need React 18 — install broken instead of
+erroring), `package.json` carries a scoped fix instead:
+
+```json
+"overrides": {
+  "openapi-typescript": { "typescript": "$typescript" }
+}
+```
+
+`$typescript` pins *only* what `openapi-typescript` resolves for its own `typescript` peer to
+this repo's own `typescript` devDependency range, so it tracks a future TS upgrade
+automatically. Every other package's peer dependencies are still checked normally. Revisit
+(and drop this override) once `openapi-typescript` ships a TS 6-aware peer range upstream.
+
 ---
 
 ## 2. TypeScript

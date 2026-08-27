@@ -229,6 +229,18 @@ dotnet_diagnostic.CS1591.severity = error
 [src/SchoolManagement.Application/**.cs]
 dotnet_diagnostic.CS1591.severity = error
 
+# CA1034 ("do not nest public types") is inverted for the privilege register. Privileges.Admin.View,
+# Privileges.Result.ScoreEnter and so on are the intended call shape — grouped by module the way spec
+# 4.4's register itself is grouped — and a flat 93-member class with a Module prefix baked into every
+# constant name (PrivilegesAdminView) reads worse at every call site for no gain in discoverability.
+[src/SchoolManagement.Domain/Security/Privileges.cs]
+dotnet_diagnostic.CA1034.severity = none
+
+# Same rationale, for the closed set of ScopeResolution outcomes: ScopeResolution.ResolvedArm(armId)
+# reads as a discriminated union at the call site, which is the point of the pattern.
+[src/SchoolManagement.Application/Abstractions/Authorization/ScopeResolution.cs]
+dotnet_diagnostic.CA1034.severity = none
+
 # CA1040 ("avoid empty interfaces") is inverted in this folder. The empty marker interfaces here
 # are not accidental abstraction — they ARE the enforcement mechanism. Constraining a behaviour to
 # IBaseCommand is what makes the DI container physically unable to wrap a query in a transaction,

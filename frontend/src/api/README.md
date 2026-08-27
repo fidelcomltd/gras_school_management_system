@@ -1,35 +1,111 @@
-# `src/api/` — reserved for the generated contract client
+# `src/api/` — the OpenAPI client layer
 
-**Empty on purpose. Do not hand-write anything here.**
+Two files, two different rules.
 
-The root [`CLAUDE.md`](../../../CLAUDE.md) §3 makes `contracts/openapi.json` the single
-source of truth for the HTTP boundary, and §7 reserves this directory for code generated
-from it. Every file that lands here will carry a `// GENERATED — DO NOT EDIT` header, and
-§4.4 runs a drift check that regenerates into a temp path and diffs against this folder.
-A hand edit fails that check.
+| File | Origin | Rule |
+|---|---|---|
+| [`schema.d.ts`](./schema.d.ts) | **Generated.** `openapi-typescript` against the committed `contracts/openapi.json`. | Never hand-edit. Carries a `// GENERATED — DO NOT EDIT` header; §4.4's drift check enforces this. |
+| [`client.ts`](./client.ts) | **Hand-written.** | Reviewed like any other source file. |
 
-## Why it is still empty
+This mirrors what `frontend/HANDOFF.md` decision 3 originally set out: the generated layer
+supplies *types*, the hand-written layer supplies *transport*. `client.ts` is the thin seam
+between them — it adds no HTTP behaviour of its own.
 
-`contracts/openapi.json` does not exist yet — the backend has not been built, so there is
-nothing to generate from. See [`contracts/README.md`](../../../contracts/README.md).
+## Pipeline
 
-## What goes where in the meantime
+```
+contracts/openapi.json  (committed, backend-owned, never hand-edited)
+        │  npm run generate:api
+        ▼
+src/api/schema.d.ts     (generated `paths` / `components` / `operations` types)
+        │  imported by
+        ▼
+src/api/client.ts       (apiGet / apiPost — typed wrappers over @/lib/http)
+        │  called by
+        ▼
+src/features/<tag>/api.ts   (TanStack Query hooks — none yet, see src/features/README.md)
+```
 
-| Concern | Location |
-|---|---|
-| Generated request/response **types** | here, once the contract exists |
-| Axios instance, verb helpers, error normalisation | [`src/lib/http/`](../lib/http/) — hand-written, reviewed |
-| Per-endpoint TanStack Query hooks | `src/features/<tag>/api.ts` |
+### Regenerating
 
-This split is deliberate and was agreed with the orchestrator: the generated layer supplies
-*types*, the hand-written layer supplies *transport*. Feature hooks compose the two. That
-satisfies both "no raw axios outside the http layer" and "nothing in `src/api/` is
-hand-edited".
+```sh
+npm run generate:api     # writes src/api/schema.d.ts from ../contracts/openapi.json
+npm run check:api-drift  # regenerates to a temp path and diffs; non-zero exit on drift
+```
 
-## When the contract lands
+Both scripts share `scripts/openapi-schema.mjs` so they can never disagree about what
+"current" means. `check:api-drift` is CLAUDE.md §4.4 check 2 and must run in CI (see below) —
+it is what turns a stale or hand-edited `schema.d.ts` into a build failure instead of a
+silent guess.
 
-1. Add the generator (`openapi-typescript` is the orchestrator's recommendation) as a
-   devDependency and wire an `npm run generate:api` script.
-2. Generate into this directory from the **committed** document, never from a live server.
-3. Replace hand-written interfaces in `src/features/*/types.ts` with imports from here.
-4. Derive the MSW handlers in `src/test/msw/handlers.ts` from the same document.
+Run `generate:api` any time `contracts/openapi.json` changes, then commit the result. Do
+this from the **committed** document only — never point the generator at a live server
+(CLAUDE.md §3).
+
+## `client.ts` — why a typed helper and not a second HTTP stack
+
+`openapi-fetch`, NSwag and Kiota were all rejected (`STATE.md` Decisions, 2026-08-26)
+because the frontend already owns a working axios transport with auth interceptors and a
+single-flight refresh seam in [`src/lib/http/`](../lib/http/). Running a second runtime HTTP
+client alongside it would duplicate that seam and give a feature two different ways to make
+a request.
+
+`apiGet`/`apiPost` in `client.ts` call straight through to `getRequest`/`postRequest` from
+`@/lib/http` — same axios instance, same interceptors, same `ApiError` normalisation. All
+they add is generic type parameters, keyed by path, that resolve against `schema.d.ts`:
+
+```ts
+import { apiGet } from '@/api/client';
+
+// `result` is inferred as PingResponse — never asserted with `as` or hand-typed.
+const result = await apiGet('/api/v1/reference/ping', { name: 'Ada' });
+```
+
+Passing a path outside `contracts/openapi.json`, or a query/body shape the contract doesn't
+declare for that path, is a compile error. This is the mechanism that makes "the frontend
+cannot call the backend without guessing across the boundary" (CLAUDE.md §3) enforced by the
+type checker rather than by convention.
+
+`GetPath`/`PostPath` cover the methods in use today. Extend `client.ts` with `apiPut` /
+`apiPatch` / `apiDelete` the same way when a feature needs them — same shape, same pattern.
+
+## Feature code
+
+`src/features/<tag>/api.ts` hooks call `apiGet`/`apiPost` (or the plain verb helpers in
+`@/lib/http` for anything not yet worth a typed wrapper), never `axios` or `fetch` directly.
+See [`src/features/README.md`](../features/README.md).
+
+## Tests: MSW handlers derived from the contract
+
+[`src/test/msw/openapi-handlers.ts`](../test/msw/openapi-handlers.ts) reads the same
+`contracts/openapi.json` at test time and builds one default MSW handler per operation, each
+answering its documented success status with the schema's own `example` payload.
+[`src/test/msw/handlers.ts`](../test/msw/handlers.ts) exports the result as the default
+handler set. A mock can no longer describe a response shape the contract doesn't.
+
+Per-test overrides — error responses, pagination edge cases, anything not "the happy path" —
+still go through `server.use(...)` with `problemResponse` from `handlers.ts`, exactly as
+before. Only the *defaults* are contract-derived now.
+
+## Boundary enforcement
+
+[`src/test/http-boundary.test.ts`](../test/http-boundary.test.ts) fails if any raw `axios`
+import or `fetch(` call appears outside `src/lib/http/` — CLAUDE.md §4.4 check 3. `client.ts`
+itself is scanned like any other file; it stays clean because it only imports the verb
+helpers, never axios.
+
+## What CI should run (frontend, root-owned)
+
+```sh
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npm run check:api-drift
+```
+
+The first four are `npm run verify`. `check:api-drift` is listed separately because it is a
+*contract* gate (CLAUDE.md §9's "Contract" row), not a frontend-quality gate — it fails when
+`schema.d.ts` disagrees with the committed `contracts/openapi.json`, which can happen even
+when every other frontend gate is green (e.g. the backend regenerated the contract and this
+package wasn't updated to match).

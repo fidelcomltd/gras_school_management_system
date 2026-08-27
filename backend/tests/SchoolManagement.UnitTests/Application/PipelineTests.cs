@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SchoolManagement.Application;
+using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Behaviors;
@@ -31,6 +32,14 @@ public sealed class PipelineTests
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(Substitute.For<IUnitOfWork>());
         services.AddSingleton(Substitute.For<ISampleRecordRepository>());
+
+        // TASK-0002: IScopeResolver (registered by AddApplication) depends on these two ports, which
+        // Infrastructure implements. This container only wires the Application layer, so — same
+        // treatment as IUnitOfWork/ISampleRecordRepository above — they are stubbed here for the
+        // pipeline-wiring check alone.
+        services.AddSingleton(Substitute.For<IPupilArmOfRecordLookup>());
+        services.AddSingleton(Substitute.For<IResultSetArmLookup>());
+
         services.AddOptions<PipelineOptions>();
 
         services.AddApplication();

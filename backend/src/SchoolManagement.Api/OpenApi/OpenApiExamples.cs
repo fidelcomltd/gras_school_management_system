@@ -106,6 +106,12 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(SecureArmResponse)] = $$"""
+            {
+              "armId": "{{ExampleId}}"
+            }
+            """,
+
         // The error contract matters more to a client author than any success shape: it is what they
         // have to handle and cannot easily provoke on demand. Both framework types are given examples
         // showing the extension members this API adds — errorCode and traceId — which a consumer would

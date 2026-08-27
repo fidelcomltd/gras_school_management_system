@@ -10,21 +10,30 @@ namespace SchoolManagement.IntegrationTests;
 public sealed class SecurityAndErrorContractTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     [Fact]
-    public async Task AnEndpointWithNoAuthorizationMetadata_Returns401()
+    public async Task WhoAmI_IsAnonymous_BecauseTheBootGuardNoLongerAllowsABareFallbackOnlyRoute()
     {
         RequireDatabase();
 
-        // THE MOST IMPORTANT TEST IN THIS FILE. /whoami declares no [Authorize] and no .AllowAnonymous():
-        // it is protected purely by the fallback policy. A 200 here would mean an endpoint nobody
-        // remembered to secure is public, which is the failure mode the fallback policy exists to remove.
+        // TASK-0002 CHANGE. Before the boot-time privilege-declaration guard existed, /whoami
+        // deliberately declared no [Authorize] and no .AllowAnonymous(), relying purely on the
+        // deny-by-default fallback policy, to prove a route nobody remembered to secure is still
+        // secured at runtime. The guard (spec 9.2) now makes exactly that pattern a STARTUP failure —
+        // see PrivilegeDeclarationGuardTests in the unit test project for the proof that a route
+        // declaring neither AllowAnonymous nor a privilege cannot register at all. /whoami is
+        // therefore now explicitly .AllowAnonymous(), per the TASK-0002 task card's own instruction
+        // for this exact situation. The deny-by-default guarantee itself is proven elsewhere now:
+        // statically by the boot guard, and at runtime by
+        // AnUnknownRoute_Returns401NotFound_BecauseOfTheFallbackPolicy below (anything unmapped is
+        // still denied) and by PrivilegeAuthorizationTests (a mapped, privilege-declared route still
+        // rejects an anonymous caller with 401).
         var response = await Client.GetAsync(
             new Uri("/api/v1/reference/whoami", UriKind.Relative),
             TestContext.Current.CancellationToken);
 
-        response.StatusCode.ShouldBe(
-            HttpStatusCode.Unauthorized,
-            "Endpoints must be protected by default. A 200 means the authorisation fallback policy is " +
-            "not in effect and every unmarked endpoint in the application is public.");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("isAuthenticated").GetBoolean().ShouldBeFalse();
     }
 
     [Fact]

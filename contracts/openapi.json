@@ -222,7 +222,7 @@
           "Reference"
         ],
         "summary": "Return the calling user's identity",
-        "description": "Requires authentication. Included to demonstrate — and test — that endpoints are protected by default: this endpoint declares no authorisation metadata of its own and is secured by the fallback policy. While no identity provider is configured it always returns 401.",
+        "description": "Anonymous. Reports whatever identity the request carries — null and false while no authentication mechanism is wired (see TASK-0003) — without requiring one.",
         "operationId": "WhoAmI",
         "responses": {
           "200": {
@@ -231,6 +231,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WhoAmIResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reference/arms/{armId}/secure": {
+      "get": {
+        "tags": [
+          "Reference"
+        ],
+        "summary": "Read an arm-scoped resource, gated by the privilege substrate",
+        "description": "Requires `arm.view`, scoped to the arm named in the path. Anonymous callers get 401; an authenticated caller who lacks the privilege, or who holds it only over a different arm, gets 403 with a generic body naming neither the privilege nor whether the arm exists.",
+        "operationId": "GetSecureArm",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecureArmResponse"
                 }
               }
             }
@@ -631,6 +674,25 @@
           "note": "Carried over from the previous academic year.",
           "createdAtUtc": "2026-08-03T09:30:00+00:00",
           "modifiedAtUtc": null
+        }
+      },
+      "SecureArmResponse": {
+        "required": [
+          "armId"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm named in the request path — the resolved scope target.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The arm-scoped resource `GetSecureArm` returns once the privilege check passes.",
+        "example": {
+          "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
         }
       },
       "WhoAmIResponse": {

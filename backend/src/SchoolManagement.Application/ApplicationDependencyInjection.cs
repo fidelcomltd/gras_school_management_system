@@ -2,7 +2,9 @@ using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Authorization;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Messaging;
 
@@ -29,6 +31,10 @@ public static class ApplicationDependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<ISender, Sender>();
+
+        // TASK-0002: server-side scope resolution (spec 4.2.1), consumed by the Api project's
+        // privilege authorization handler.
+        services.AddScoped<IScopeResolver, ScopeResolver>();
 
         AddPipelineBehaviors(services);
 

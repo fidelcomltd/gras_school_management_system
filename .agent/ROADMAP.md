@@ -67,7 +67,7 @@ structure and grading scale and must be restated before use.
 
 | Task | Title | Owner | Spec | Notes |
 |---|---|---|---|---|
-| — | Weekly report entities, entry grid, publication | BE+FE | 20 §6.10, 23 §G | **Needs Open question 9 answered first** |
+| — | Weekly report entities, entry grid, publication | BE+FE | 20 §6.10, 23 §G | Unblocked 2026-08-26. Parent's Comment: teacher-transcribed, **optional**, never blocks save/submit/publish. Portal read-only. |
 
 ## Phase 5 — pins and the public portal
 
