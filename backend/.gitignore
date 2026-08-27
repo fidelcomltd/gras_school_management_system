@@ -41,6 +41,12 @@ secrets.json
 artifacts/openapi/
 *.openapi.local.json
 
+## Local gate runner (TASK-0008) — resolves POSTGRES_TEST_CONNECTION outside the repo tree and
+## runs a gate script. Copied from the committed scripts/local-env.template.ps1; see
+## README.md "Configuration and secrets". Exact path, not a wildcard, so nothing else under
+## scripts/ — including the template itself — is caught by this rule.
+scripts/local-env.ps1
+
 ## IDE / editor
 .vs/
 .vscode/*

@@ -38,8 +38,14 @@ regex = '''(?i)\b(api[_-]?key|apikey|bearer|access[_-]?token|client[_-]?secret)\
 tags = ["credentials"]
 
 # ── Allow-list ───────────────────────────────────────────────────────────────────────────────────
+#
+# TASK-0011 (2026-08-27): migrated the single legacy `[allowlist]` table to the `[[allowlists]]`
+# array-of-tables form. Same fields, same global (no targetRules) behaviour for this first entry —
+# gitleaks refuses to load a config that mixes `[allowlist]` and `[[allowlists]]`, and the
+# `targetRules` mechanism used below (to scope a fix to one rule instead of a path) only exists on
+# the plural form. Nothing in this first block changed in meaning.
 
-[allowlist]
+[[allowlists]]
 description = "Paths and values that are deliberately not secrets"
 
 paths = [
@@ -69,7 +75,72 @@ regexes = [
   '''ci_password''',
 
   # The documented shape of a connection string in comments and docs — placeholders, not values.
+  # NOTE (TASK-0011): kept for whichever other rule they were meant for, but they were never doing
+  # anything for `postgres-connection-string-with-password` specifically — see the targeted block
+  # below for why, and for the entries that actually clear that rule's findings.
   '''Username=<user>;Password=<pw>''',
   '''Password=\.\.\.''',
   '''<your connection string>''',
+]
+
+# TASK-0011 (2026-08-27), Family A — `postgres-connection-string-with-password` flagged 5
+# documented placeholder connection strings (backend/README.md x2, the appsettings template,
+# DesignTimeDbContextFactory.cs, and one CI service-container credential now only in git history).
+# See backend/docs/ASSUMPTIONS.md §3.9 for the full inventory.
+#
+# Chose a **rule-scoped allowlist over `stopwords`**, and it has to be `regexTarget = "match"`, not
+# the default: this rule's regex has one capture group, `(host|server)` — purely to make `Host=` and
+# `Server=` both accepted — but gitleaks' rule is "no `secretGroup` set -> use the first non-empty
+# capture group as the finding's Secret". So every finding's Secret from this rule is literally the
+# four-or-six-letter word "Host" or "Server", never the connection string. `stopwords` and the
+# default allowlist target both match against Secret, not the full text — confirmed by reading
+# gitleaks' own source (detect/detect.go): `a.ContainsStopWord(finding.Secret)` is unconditional, and
+# the default `allowlistTarget` is also `finding.Secret`. Neither could ever see "YOUR_PASSWORD" or
+# "<pw>" no matter what was listed, and this is also why the pre-existing global entries just above
+# (`ci_user`, `ci_password`, `Username=<user>;Password=<pw>`, `Password=\.\.\.`) never actually
+# suppressed anything for this rule — they were dead on arrival, the same untested-first-draft
+# problem as the rule itself. `regexTarget = "match"` points this allowlist at gitleaks' full regex
+# Match instead (the whole `Host=...;...;Password=...` string), which is what these regexes need.
+#
+# Each regex below is anchored to one specific, literal placeholder token (case-insensitive) rather
+# than a broad shape, so a real password does not accidentally read as one of these — a real
+# credential would have to equal the literal string "YOUR_PASSWORD", "<pw>", "...", "***", or
+# "ci_password" to be suppressed, not merely resemble one. Proof this still catches a realistic fake
+# leak is in TASK-0011's Log / STATE.md.
+[[allowlists]]
+description = '''Documented placeholder connection-string shapes for postgres-connection-string-with-password (TASK-0011) — see the comment above this block.'''
+targetRules = ["postgres-connection-string-with-password"]
+regexTarget = "match"
+regexes = [
+  '''(?i)username\s*=\s*your_user\b''',
+  '''(?i)password\s*=\s*your_password\b''',
+  '''(?i)username\s*=\s*<user>''',
+  '''(?i)password\s*=\s*<pw>''',
+  '''(?i)username\s*=\s*\.\.\.''',
+  '''(?i)password\s*=\s*\.\.\.''',
+  '''(?i)username\s*=\s*\*\*\*''',
+  '''(?i)password\s*=\s*\*\*\*''',
+  # The CI service-container credential (backend/ci/github-actions-backend.yml, history only — the
+  # path was later renamed/replaced). Restates the intent already on record for `ci_user`/
+  # `ci_password` above, which never reached this rule for the Secret-target reason explained above.
+  '''(?i)username\s*=\s*ci_user;password\s*=\s*ci_password\b''',
+]
+
+# TASK-0011 (2026-08-27), Family B — the default `generic-api-key` rule (from `useDefault`, not a
+# rule we define) reads any sufficiently long/high-entropy hex string as a possible API key, which
+# cannot be told apart from a SHA-256 integrity digest by looking at the string alone. Two options
+# per the task card: teach the rule about hex digests, or scope a path allowlist to the two files
+# that publish one on purpose. Chose the **path-scoped allowlist**: we do not own `generic-api-key`'s
+# regex (it ships with gitleaks via `useDefault`), so redeclaring it here to add hex-digest awareness
+# would fork it and could silently drift from upstream on the next gitleaks version; a general
+# "64 hex characters is never a key" rule is also false in general — some real API keys are exactly
+# that shape. `contracts/CONTRACT.lock` and `.agent/STATE.md` are the only two places this hash is
+# published, and both are known, specific, and unrelated to any other secret this rule should still
+# catch there.
+[[allowlists]]
+description = '''SHA-256 contract-hash publication points for generic-api-key (TASK-0011) — see the comment above this block.'''
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)contracts/CONTRACT\.lock$''',
+  '''(^|/)\.agent/STATE\.md$''',
 ]

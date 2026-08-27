@@ -20,7 +20,7 @@ at a product.
 | .NET SDK | 10.0.100+ | Pinned in [global.json](global.json). `dotnet --version` to check. |
 | PostgreSQL | 17.x | Any reachable instance. Not needed to build or to run unit tests. |
 | Container runtime | any | Docker Desktop or Podman. Optional — only for the integration tests. |
-| gitleaks | 8.x | Optional — only for the local secret-scan gate. |
+| gitleaks | 8.x | **Required.** Install with `winget install --id Gitleaks.Gitleaks` (or see [gitleaks](https://github.com/gitleaks/gitleaks)). Without it, `ci.ps1`'s "Secret scan" gate prints a warning and does not run — a green run on a machine without gitleaks has not actually been scanned. CI always has it; this closes the same gap locally. |
 
 Nothing else. No global tools to install: `dotnet-ef` is pinned as a local tool in
 [dotnet-tools.json](dotnet-tools.json) and restored by `dotnet tool restore`.
@@ -148,6 +148,10 @@ export POSTGRES_TEST_CONNECTION="Host=localhost;Port=5432;Database=schoolmanagem
 # with no configuration at all.
 ```
 
+Re-exporting that variable by hand every session is exactly the ergonomics gap `./scripts/local-env.ps1`
+solves — see "Configuration and secrets" → "`POSTGRES_TEST_CONNECTION` is the one exception" below for
+the one-command version.
+
 ---
 
 ## Quality gates
@@ -201,6 +205,44 @@ is committed and documents **every** key the service reads, with every value emp
 Configuration is validated at **startup** (`ValidateOnStart`), so a bad value stops the process at
 boot with a message naming the key — rather than surfacing as a 500 on whichever request first
 touches it, possibly hours after deployment.
+
+### `POSTGRES_TEST_CONNECTION` is the one exception, and it is deliberate
+
+Every other secret goes through the precedence chain above. This one does not, and cannot:
+[`DatabaseAvailability.cs`](tests/SchoolManagement.IntegrationTests/Infrastructure/DatabaseAvailability.cs)
+reads it straight from the process environment with `Environment.GetEnvironmentVariable`, on purpose,
+so the integration-test harness behaves **identically** locally and in CI (CI supplies the same
+variable from a service container). It bypasses `IConfiguration` entirely, which means
+`dotnet user-secrets` — the normal answer to "where does a secret go?" — cannot reach it: user-secrets
+only feeds the Api/Infrastructure host's configuration, and the test harness never builds that host's
+configuration to read it from.
+
+So it needs its own local, git-ignored home. Use the one-command runner:
+
+```powershell
+# One-time setup — copy the template, which documents every source it checks.
+cp scripts/local-env.template.ps1 scripts/local-env.ps1
+
+# Resolves POSTGRES_TEST_CONNECTION, then runs ci.ps1 (or pass -Gate <script> for another one).
+./scripts/local-env.ps1
+```
+
+[`scripts/local-env.template.ps1`](scripts/local-env.template.ps1) is committed and documents every
+source it checks, in priority order, with **no real credential** — the recommended one is a file
+**outside this repository entirely**, `$HOME/.gras/pg-test.txt`, so there is never a working-tree copy
+to protect. Your own copy, `scripts/local-env.ps1`, is git-ignored by an exact path (not a wildcard,
+so the template itself is never accidentally caught) — verify with
+`git check-ignore -v scripts/local-env.ps1` (shows a rule) and
+`git check-ignore -v scripts/local-env.template.ps1` (shows nothing, exits non-zero). The script never
+prints the resolved connection string, on either success or failure — only whether it resolved and
+which source it came from, the same rule `ci.ps1`'s own "Tests" gate already follows for this
+variable.
+
+This is still local-only, same as `appsettings.Development.json`: **not** a `.env` file loaded by the
+application. A `.env` would still live inside the repository directory, protected only by a
+`.gitignore` line; `POSTGRES_TEST_CONNECTION` is read only by the test process's own environment and
+by design never flows through anything the app's configuration system — or a `.env` loader — would
+touch.
 
 ---
 

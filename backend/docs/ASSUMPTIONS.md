@@ -211,31 +211,111 @@ are the human's.
 *(Superseded — resolved 2026-08-08, see `STATE.md` Decisions. Left in place rather than deleted so the
 paragraph trail is not rewritten; §1's append-only rule applies here too.)*
 
-### 3.8 BLOCKING the "Vulnerable dependencies" gate — `SSH.NET` 2025.1.0, High severity — PRE-EXISTING, unrelated to TASK-0002
+### 3.8 RESOLVED (TASK-0007) — `SSH.NET` 2025.1.0, High severity, cleared by Option 1 (bump)
 
-`dotnet list package --vulnerable --include-transitive` reports **GHSA-q939-rpr3-3284 (High)** against
+`dotnet list package --vulnerable --include-transitive` reported **GHSA-q939-rpr3-3284 (High)** against
 `SSH.NET 2025.1.0`, a transitive dependency of `Testcontainers.PostgreSql 4.13.0` (via `Docker.DotNet`,
 used for the SSH exec path against remote Docker hosts — not a path this project's test fixture uses,
 which only ever talks to a local daemon or an externally supplied `POSTGRES_TEST_CONNECTION`).
 
 **Found while running `./scripts/ci.ps1` for TASK-0002** (privilege register and authorisation
-enforcement). Verified pre-existing and NOT introduced by that card: `git status`/`git diff` show no
-`.csproj` or `Directory.Packages.props` change from TASK-0002, and the package graph is unchanged. It
-would fail this gate identically on `main` before TASK-0002's commits.
+enforcement). Verified pre-existing and NOT introduced by that card: `git status`/`git diff` showed no
+`.csproj` or `Directory.Packages.props` change from TASK-0002, and the package graph was unchanged. It
+would have failed this gate identically on `main` before TASK-0002's commits.
 
-Not fixed here because upgrading `Testcontainers.PostgreSql` (or pinning `SSH.NET` directly, the way
-§2.11 pins `Microsoft.OpenApi`) is a dependency change with its own blast radius — the integration-test
-harness — and is outside a card scoped to the authorisation substrate. Per root `CLAUDE.md` §8,
-dependency changes need their own justification in a task card.
+**Fixed by TASK-0007, Option 1 — the first option tried, and it worked.** Bumped
+`Testcontainers.PostgreSql` `4.13.0` → `4.14.0` in `Directory.Packages.props`. That version resolves
+`Docker.DotNet.Enhanced` `4.3.3` (a rename/fork of the plain `Docker.DotNet` the 4.13.0 line used),
+which in turn resolves `SSH.NET` `2026.0.0` — past the patched line, clearing the advisory. Confirmed
+with `dotnet list package --vulnerable --include-transitive`: zero vulnerable packages across all seven
+projects, including `SchoolManagement.IntegrationTests`. `dotnet restore` and the full `Release` build
+succeeded against the new graph with no code changes required. Options 2 (transitive pin) and 3 (accept
++ allow-list) were not needed and not attempted.
 
-**Not marked as an accepted risk** — that is a security-posture call for the orchestrator/human, not
-mine to make unilaterally while implementing an unrelated card. Two ways to close this:
-1. Check whether a newer `Testcontainers.PostgreSql` resolves a patched `SSH.NET`, and bump if so.
-2. If no patched version exists yet, pin `SSH.NET` to a fixed version via central transitive pinning
-   (same mechanism as §2.11), or explicitly accept the risk here with a named owner and a review date.
+**Not independently verified against a real Docker daemon or `POSTGRES_TEST_CONNECTION`** — neither was
+available in the session that made this change (Docker absent, connection string unset by design; see
+TASK-0007's dispatch). The integration suite compiled and skipped loudly (30 tests, `Skipped: 30`) rather
+than running, exactly as `2.10` describes. `Testcontainers.PostgreSql` 4.14.0 functioning end to end
+against a real container/database is therefore **still open** — the orchestrator is resolving the
+credential separately and TASK-0007 is expected to re-run once one is available. If that re-run finds
+4.14.0 broke the harness, the fallback is Option 2 (pin `SSH.NET` directly the way §2.11 pins
+`Microsoft.OpenApi`) against the 4.13.0 graph.
 
-Until one of those happens, `./scripts/ci.ps1`'s "Vulnerable dependencies" gate fails locally and in CI.
-This is the one gate TASK-0002 could not turn green — every other gate passes.
+### 3.9 RESOLVED by TASK-0011 (found by TASK-0008) — `gitleaks` had never actually run before, and found 9 pre-existing non-secret leaks
+
+TASK-0008 installed `gitleaks` locally (it was previously absent, so `ci.ps1`'s "Secret scan" gate
+always printed a warning and skipped the scan — a green run on any machine without it had not been
+scanned at all). This is the **first time this gate has run for real anywhere**, including CI, since
+CI installs the same tool and would hit the identical result.
+
+`gitleaks detect --source . --config .gitleaks.toml` scans **git history** by default (it read 6
+commits in this run), not just the working tree, so this cannot be fixed by editing the current content
+of the flagged files alone — the earlier commits remain in history regardless. Findings, all pre-existing
+and unrelated to TASK-0008's own changes (verified: none are in `backend/scripts/local-env*.ps1`):
+
+| File | Rule | Note |
+|---|---|---|
+| `backend/README.md` (×2) | `postgres-connection-string-with-password` | Worked, non-secret example connection strings (`Ten-minute start` step 4, `Running the tests`) |
+| `backend/src/SchoolManagement.Api/appsettings.Development.template.json` | `postgres-connection-string-with-password` | The documented shape comment, `Username=<user>;Password=<pw>` |
+| `backend/src/SchoolManagement.Infrastructure/Persistence/DesignTimeDbContextFactory.cs` | `postgres-connection-string-with-password` | Design-time connection-string shape in a code comment |
+| `backend/ci/github-actions-backend.yml` | `postgres-connection-string-with-password` | The CI service-container connection string — disposable, matches the reasoning already in `.gitleaks.toml`'s `ci_user`/`ci_password` allowlist entries, but the full connection-string shape isn't itself allow-listed |
+| `.agent/STATE.md`, `contracts/CONTRACT.lock` (×2 each) | `generic-api-key` | SHA-256 contract hashes — high-entropy hex, not credentials |
+
+None of these are secrets; all are either documented placeholders or content hashes. But every one of
+them is outside `backend/src/**`/`.gitleaks.toml`/`contracts/**`, which TASK-0008 is not scoped or
+permitted to touch, and a git-history scan cannot be cleared by editing current file content in any
+case. Needs an explicit decision — not made here, and not TASK-0008's to make:
+
+1. Add narrowly-targeted `.gitleaks.toml` allowlist regexes for these specific known-safe shapes (the
+   file already does this for `ci_user`/`ci_password`; the connection-string examples and the
+   `CONTRACT.lock`/`STATE.md` hash pattern are the same kind of case), or
+2. Scope `ci.ps1`'s invocation to the working tree only (`--no-git`), trading away the history scan, or
+3. Record it as an accepted, permanent characteristic of a scanner that reads history literally, the way
+   `test_user`/`test_password` already are.
+
+Full `gitleaks` output (paths and rule IDs only, no secret values — `--redact` was used throughout) is
+reproducible with `gitleaks detect --source . --config backend/.gitleaks.toml --redact --no-banner -v`
+from the repo root.
+
+**Resolution (TASK-0011, 2026-08-27):** took option 1 above, narrowing the rule rather than
+excusing the files, and not a `--baseline-path` baseline (rejected by the orchestrator: it would
+freeze all nine as accepted and a careless regeneration later could silently swallow a real leak).
+Both `.gitleaks.toml` fixes are **rule-scoped (`targetRules`), not path-scoped.**
+
+- **Family A** (`postgres-connection-string-with-password`, 5 hits). While building the fix, found
+  the actual reason a naive `stopwords` list would not have worked: the rule's regex has one capture
+  group, `(host|server)` — present only to accept both spellings — and gitleaks' rule is "no
+  `secretGroup` configured → use the first non-empty capture group as the finding's Secret." So this
+  rule's `finding.Secret` was never the connection string, only the literal word `"Host"` or
+  `"Server"` (confirmed by running with `--redact=0` and reading gitleaks' own `detect/detect.go`).
+  `stopwords`, and the default allowlist target, both match against `Secret`. That also explains why
+  the pre-existing global allowlist entries `ci_user`, `ci_password`, `Username=<user>;Password=<pw>`,
+  `Password=\.\.\.` had never actually suppressed anything for this rule — they were dead on arrival,
+  same as the rule itself. Fix: a `[[allowlists]]` block with `targetRules =
+  ["postgres-connection-string-with-password"]` and `regexTarget = "match"` (gitleaks' full regex
+  match, not the broken Secret), with one tightly-anchored, case-insensitive regex per literal
+  placeholder token (`YOUR_USER`, `YOUR_PASSWORD`, `<user>`, `<pw>`, bare `...`, bare `***`, plus the
+  already-documented `ci_user`/`ci_password` pair, needed for the fifth, history-only finding). A real
+  credential would have to equal one of those literal tokens to be suppressed, not merely resemble one.
+- **Family B** (`generic-api-key`, 4 hits, the SHA-256 contract hash). Chose the **path-scoped
+  allowlist** over teaching the rule about hex digests: `generic-api-key` ships with gitleaks
+  (`useDefault`), we don't own its regex, and forking it here risks silent drift on the next gitleaks
+  upgrade; a general "64 hex chars is never a key" rule is also false in general — some real API keys
+  are exactly that shape. Fix: `[[allowlists]]` with `targetRules = ["generic-api-key"]` and `paths`
+  anchored to `contracts/CONTRACT.lock` and `.agent/STATE.md` only.
+- The pre-existing single `[allowlist]` table was converted to the first `[[allowlists]]` entry
+  (same fields, same global/no-`targetRules` behaviour) because gitleaks refuses to load a config
+  that mixes the singular and plural forms, and `targetRules` only exists on the plural form.
+- **Proof the rule still works**, not just that it stopped looking: wrote
+  `Host=ep-still-water-12345.us-east-2.aws.neon.tech;Port=5432;Database=schoolmanagement;
+  Username=neondb_owner;Password=k7Qm2!vRtZx9pLwD3fJa` (fake host, non-placeholder-looking password)
+  to a scratch file **outside the repository** (`$env:TEMP`), ran `gitleaks detect --no-git` against
+  it with the updated config, confirmed `postgres-connection-string-with-password` still fired
+  (`leaks found: 1`, exit code 1), then deleted the scratch file. Immediately after, the real gate
+  (`gitleaks detect --source . --config .gitleaks.toml --redact --no-banner`, run from `backend/`)
+  reported `6 commits scanned` and `no leaks found` — exit code 0. Full output in TASK-0011's Log.
+- No rule was disabled, `--no-git` was not added, and no severity threshold was introduced — all
+  three explicitly ruled out by the task card.
 
 ---
 
