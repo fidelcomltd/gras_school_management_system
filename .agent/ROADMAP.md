@@ -11,16 +11,33 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 
 ## Phase 0 — foundations (no product surface)
 
-| Task | Title | Owner | Spec | Blocked by |
+| Task | Title | Owner | Spec | Status |
 |---|---|---|---|---|
-| TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | — |
-| TASK-0002 | Privilege register and authorisation enforcement | BE | 01 §4.2–4.4, 14 §9.2 | — |
-| TASK-0003 | Admin accounts, authentication, session management | BE | 03 §6.1.11, 14 §9.1 | TASK-0002 |
-| TASK-0004 | OpenAPI client generator + typed API layer + frontend CI | FE | CLAUDE.md §3, §7 | — |
+| TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | queued |
+| TASK-0002 | Privilege register and authorisation enforcement | BE | 01 §4.2–4.4, 14 §9.2 | **done** |
+| TASK-0003 | Admin accounts, authentication, session management | BE | 03 §6.1.11, 14 §9.1 | queued |
+| TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
+| TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
 
-TASK-0002 and TASK-0004 touch disjoint areas and neither alters the committed contract's
-existing paths, so they may be dispatched in parallel — but TASK-0004 must regenerate against
-whatever contract is committed at its start, and re-run drift after TASK-0002 lands.
+### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
+
+None of these were foreseen when the board was drawn on 2026-08-26. Each came out of a gate
+actually being run rather than assumed, and each closes a way the pipeline could lie to us. They are
+cheap, and they are worth finishing before the first product surface, because every later card
+inherits whatever these leave broken.
+
+| Task | Title | Owner | Why it exists | Status |
+|---|---|---|---|---|
+| TASK-0007 | Clear the SSH.NET High advisory | BE | The vulnerable-dependency gate is red, so §9 is unsatisfied and every card closes against a known-failing gate. A red gate nobody can fix stops being information. | queued |
+| TASK-0008 | Durable local home for the test connection string, + local gitleaks | BE | No sanctioned place to keep `POSTGRES_TEST_CONNECTION`, so it gets forgotten — and forgetting it makes the integration tests SKIP while the suite still reports success. Also installs gitleaks, which currently does not run locally at all. | queued |
+| TASK-0009 | Move document-property contract tests off the database | BE | Eight checks needing no database were invisible whenever Postgres was unreachable. That is exactly how TASK-0002's missing example reached the committed contract. | **done** |
+| TASK-0010 | Make OpenAPI document generation deterministic | BE | An incremental build produced a different document than a clean build, from identical source. §3 rests on the contract being reproducible from source. | in-progress |
+
+**The through-line, worth remembering when the next card is tempting to rush:** every one of these
+was a way for a green result to mean nothing. Skipped tests reported as passes, a coverage floor
+that stands down when the suite is incomplete, a secret scan that passes without running, a
+generator that reports work it did not do. The gates were all present and all well-written — the
+failures were in whether they actually executed.
 
 ## Phase 1 — configuration and academic calendar
 

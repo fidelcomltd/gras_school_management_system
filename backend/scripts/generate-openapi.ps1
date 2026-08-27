@@ -50,6 +50,35 @@ $contractsDirectory = Join-Path (Split-Path -Parent $backendRoot) 'contracts'
 $contractDocument = Join-Path $contractsDirectory 'openapi.json'
 $contractLock = Join-Path $contractsDirectory 'CONTRACT.lock'
 
+# Microsoft.Extensions.ApiDescription.Server's GenerateOpenApiDocuments MSBuild target is declared
+# Inputs="$(TargetPath)" Outputs="$(_OpenApiDocumentsCache)" — i.e. it re-runs dotnet-getdocument
+# (which is what actually writes $generatedDocument) only when the compiled assembly is newer than
+# this cache file. Deleting $generatedDocument alone does NOT invalidate that check: the cache file
+# is the target's only tracked output, so on an incremental build where the assembly did not need to
+# be recompiled, the target is skipped and no document is (re)written at all — proven by running this
+# exact sequence: delete the document, leave the cache file, rebuild; the build "succeeds" but the
+# document never reappears (the Test-Path check below then throws, which is correct, but the point is
+# nothing regenerated it).
+# The failure mode this fixes is the inverse and worse: if $generatedDocument was modified by
+# something OTHER than this target (hand-edited, restored from a stash, left over from another
+# branch/config) while the cache file stayed untouched and current, the target is skipped, and the
+# stale/modified file is silently reported below as freshly "Generated" even though the build never
+# looked at it. Reproduced 2026-08-26 (TASK-0010): hand-editing the artefact to drop an example, then
+# running this script incrementally, left the corrupted 25807-byte document in place and printed
+# "==> Generated:" as if nothing were wrong.
+# Deleting the cache file here — not just the document — makes the target's Outputs unconditionally
+# missing, so dotnet-getdocument runs every single time this script does, regardless of whether the
+# assembly changed. The same source therefore always produces the same document; "generated" can no
+# longer mean "left over from before" (root CLAUDE.md §3).
+$openApiCache = Join-Path $backendRoot 'src/SchoolManagement.Api/obj/SchoolManagement.Api.OpenApiFiles.cache'
+
+if (Test-Path $generatedDocument) {
+    Remove-Item $generatedDocument -Force
+}
+if (Test-Path $openApiCache) {
+    Remove-Item $openApiCache -Force
+}
+
 Write-Host '==> Generating OpenAPI document' -ForegroundColor Cyan
 
 $previousFlag = $env:SCHOOLMANAGEMENT_CONTRACT_GENERATION

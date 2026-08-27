@@ -21,6 +21,6 @@ Cards are written just ahead of dispatch, not all at once. The full planned sequ
 | [TASK-0007](TASK-0007.md) | Clear the SSH.NET High advisory blocking the vuln gate | backend-dev | queued |
 | [TASK-0008](TASK-0008.md) | Give the integration-test connection string a durable local home | backend-dev | queued |
 | [TASK-0009](TASK-0009.md) | Move the document-property contract tests off the database | backend-dev | done |
-| [TASK-0010](TASK-0010.md) | Make OpenAPI document generation deterministic | backend-dev | in-progress |
+| [TASK-0010](TASK-0010.md) | Make OpenAPI document generation deterministic | backend-dev | done |
 
 Current status of record is [STATE.md](../STATE.md) `## In flight`, not this table.
