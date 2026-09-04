@@ -96,4 +96,39 @@ public sealed class DependencyDirectionTests
 
         result.ShouldBeSuccessful("Domain must not reach into Application's abstractions.");
     }
+
+    [Fact]
+    public void Api_DoesNotDependOnInfrastructureOutsideComposition()
+    {
+        // The one layering rule that was documented (the Api .csproj header: "references Infrastructure
+        // ONLY to register services in DI") but not enforced — which is exactly how GlobalExceptionHandler
+        // came to call SchoolManagement.Infrastructure.Persistence.PersistenceErrors.TryTranslate directly
+        // from the HTTP pipeline (AUDIT.md S2).
+        //
+        // Two types are exempt, and both are composition/startup wiring rather than request-path code —
+        // neither runs while handling a request:
+        //   - Program.cs: the composition root. Its whole job is wiring Infrastructure's DI
+        //     registrations together, which is the one place naming the assembly is the point.
+        //   - StartupEnvironmentGuard: an IHostedService that inspects Infrastructure's DatabaseOptions
+        //     at StartAsync, before the host accepts traffic, to refuse an unsafe deployed configuration.
+        //     Same category as Program.cs — startup-time composition, not a handler on the pipeline —
+        //     so it gets the same exemption rather than a port for a single boolean flag read once at
+        //     boot. A second exemption here should raise the question of whether the rule needs
+        //     tightening further; it should not grow without noticing.
+        var result = Types.InAssembly(ArchitectureAssemblies.Api)
+            .That()
+            .DoNotHaveName("Program")
+            .And()
+            .DoNotHaveName("StartupEnvironmentGuard")
+            .Should()
+            .NotHaveDependencyOn(ArchitectureAssemblies.InfrastructureNamespace)
+            .GetResult();
+
+        result.ShouldBeSuccessful(
+            "Only Program.cs (the composition root) and StartupEnvironmentGuard (a startup-time host " +
+            "guard, exempt for the same reason) may reference Infrastructure. An endpoint, middleware " +
+            "or handler that needs something Infrastructure provides should depend on an Application " +
+            "abstraction instead, implemented by Infrastructure and injected — see " +
+            "IPersistenceErrorTranslator for the pattern.");
+    }
 }

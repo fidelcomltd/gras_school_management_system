@@ -38,7 +38,7 @@ inherits whatever these leave broken.
 | TASK-0017 | Clear the secret-scan gate TASK-0011's own docs turned red | BE | TASK-0011 proved its rule still fired by committing the fake credential it tested with, re-arming the rule against its own write-up. A gate red for documenting its fix stops being information. | **done** |
 | TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | FE | TASK-0001 S4-S8. The feature README prescribes bypassing the generated client, and `npm run lint` cannot fail on warnings. | **done** |
 | TASK-0018 | Make `local-env.template.ps1` pass switches to the gate script | BE | TASK-0016 added the two switches a local developer most needs (`-NoFailFast`, `-AllowSkipped`) and the only sanctioned wrapper could not pass either: an array splat binds positionally. A gate option nobody can reach is a gate option nobody uses. | **done** |
-| TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | queued |
+| TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | **done** |
 
 **The through-line, worth remembering when the next card is tempting to rush:** every one of these
 was a way for a green result to mean nothing. Skipped tests reported as passes, a coverage floor

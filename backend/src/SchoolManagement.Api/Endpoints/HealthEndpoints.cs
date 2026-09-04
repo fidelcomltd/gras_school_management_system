@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using SchoolManagement.Api.Configuration;
 using SchoolManagement.Infrastructure;
 
 namespace SchoolManagement.Api.Endpoints;
@@ -28,6 +29,15 @@ namespace SchoolManagement.Api.Endpoints;
 /// contract: it is configured in a deployment manifest, and moving it to <c>/api/v2/health</c> would
 /// break every manifest for no benefit. They are also anonymous by necessity — a probe has no
 /// credentials — and deliberately expose no diagnostic detail for that reason.
+/// </para>
+/// <para>
+/// Anonymous plus a real database round trip makes <c>/health/ready</c> a cheap amplifier against the
+/// database unless it is throttled — but throttling a probe at the SAME rate as a normal endpoint
+/// risks rejecting a legitimate check, which reads as "unhealthy" and can trigger a fleet restart.
+/// It runs under its own dedicated, deliberately generous policy
+/// (<see cref="RateLimitingOptions.HealthPolicyName"/>) instead of either extreme.
+/// <c>/health/live</c> needs no such policy: it runs no dependency checks, so it costs nothing to
+/// answer and amplifies nothing.
 /// </para>
 /// </remarks>
 public static class HealthEndpoints
@@ -62,7 +72,12 @@ public static class HealthEndpoints
         })
         .AllowAnonymous()
         .WithTags("Health")
-        .ExcludeFromDescription();
+        .ExcludeFromDescription()
+        // Anonymous AND a real database round trip — see the class remarks on the tension this
+        // resolves. RateLimitingOptions.HealthPermitLimit documents the numbers and the probe
+        // interval they assume. /health/live is not throttled: it runs no dependency checks, so it
+        // is not an amplifier against anything.
+        .RequireRateLimiting(RateLimitingOptions.HealthPolicyName);
     }
 
     /// <summary>

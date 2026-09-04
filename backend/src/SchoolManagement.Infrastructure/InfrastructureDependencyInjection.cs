@@ -93,6 +93,10 @@ public static class InfrastructureDependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        // Stateless, so a singleton is safe even though GlobalExceptionHandler (its only current
+        // consumer) is itself registered as a singleton by AddExceptionHandler.
+        services.AddSingleton<IPersistenceErrorTranslator, PersistenceErrorTranslator>();
+
         // REFERENCE SCAFFOLD — remove with the SampleRecord slice.
         services.AddScoped<ISampleRecordRepository, SampleRecordRepository>();
 

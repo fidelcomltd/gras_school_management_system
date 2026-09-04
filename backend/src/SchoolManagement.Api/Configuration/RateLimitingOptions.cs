@@ -44,6 +44,31 @@ public sealed class RateLimitingOptions
 
     /// <summary>Length of the sensitive policy's window, in seconds. Default 60.</summary>
     public int SensitiveWindowSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// The policy applied to <c>/health/ready</c>. Deliberately separate from
+    /// <see cref="DefaultPolicyName"/> — see <see cref="HealthPolicyName"/>'s remarks.
+    /// </summary>
+    public const string HealthPolicyName = "health";
+
+    /// <summary>
+    /// Requests permitted per window under the health policy. Default 120 (2/second sustained).
+    /// </summary>
+    /// <remarks>
+    /// Sized for a probe, not a client: it must never reject a legitimate readiness check, because a
+    /// rejected probe reads as "unhealthy" and can trigger a fleet restart (see the remarks on
+    /// <c>HealthEndpoints</c>). The assumed floor is a 5-second probe interval — the tightest of the
+    /// common defaults (Kubernetes' own default is 10s, its allowed minimum is 1s; AWS ALB/NLB's
+    /// minimum is 5s; Docker's default is 30s) — with up to 3 independent probers sharing one
+    /// partition key (a load balancer, an orchestrator's kubelet, and an external uptime monitor can
+    /// all appear to originate from the same address behind a NAT or shared egress). That worst case
+    /// is 3 × (60/5) = 36 requests/minute; 120 leaves more than 3x headroom above it while still
+    /// capping an anonymous, database-touching endpoint far below "unlimited".
+    /// </remarks>
+    public int HealthPermitLimit { get; set; } = 120;
+
+    /// <summary>Length of the health policy's window, in seconds. Default 60.</summary>
+    public int HealthWindowSeconds { get; set; } = 60;
 }
 
 /// <summary>Validates <see cref="RateLimitingOptions"/> at startup.</summary>
@@ -60,6 +85,8 @@ internal sealed class RateLimitingOptionsValidator : IValidateOptions<RateLimiti
         Check(nameof(RateLimitingOptions.WindowSeconds), options.WindowSeconds, 1, 3_600);
         Check(nameof(RateLimitingOptions.SensitivePermitLimit), options.SensitivePermitLimit, 1, 100_000);
         Check(nameof(RateLimitingOptions.SensitiveWindowSeconds), options.SensitiveWindowSeconds, 1, 3_600);
+        Check(nameof(RateLimitingOptions.HealthPermitLimit), options.HealthPermitLimit, 1, 1_000_000);
+        Check(nameof(RateLimitingOptions.HealthWindowSeconds), options.HealthWindowSeconds, 1, 3_600);
 
         if (options.QueueLimit is < 0 or > 10_000)
         {

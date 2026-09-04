@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-04 by orchestrator · size budget 12 KB, see `## Reading this file`
+Last reconciled: 2026-09-05 by orchestrator · size budget 12 KB, see `## Reading this file`
 
 ## Product
 
@@ -82,14 +82,14 @@ portal:    no authentication in the account sense — pin validation only (spec 
 
 ## In flight
 
-Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0016, 0017, 0018 —
-closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
+Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013,
+0014, 0015, 0016, 0017, 0018 — closure notes and reopen history in
+[decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0003 | Admin accounts, authentication and session management | backend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
-| TASK-0015 | Backend scaffold conformance fixes from the §6 audit | backend-dev | queued |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
@@ -99,54 +99,51 @@ Index only, newest last. **Full text:** [decisions/2026-Q3.md](decisions/2026-Q3
 `## Log` of the card each entry names. Bootstrap decisions (2026-07-27 to 2026-08-08) live there
 too and are still in force.
 
-- 2026-08-27 Four decisions — gitleaks rule narrowed by human approval; the gate suite honest end to end on one verified live run; the test-DB credential split deliberate; TASK-0001 closed, both scaffolds exceeding spec. Full text: `decisions/2026-Q3.md:156-158`.
-- 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions`/`## Known drift` reduced to indexes, §6/§7 given one home each.
-- 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode`/`traceId`; client regenerated against b287da03…; an `ApiError.code` bug fixed as a consequence.
-- 2026-09-04 TASK-0016 CLOSED — gates fail fast and fail honestly; two of its own defects were hidden by its own fixtures. Lesson: fixtures must reproduce the real artefact's shape, names included. Full text: `decisions/2026-Q3.md:299,319`.
-- 2026-09-04 TASK-0017 closed — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`; 2026-08-27 "honest end to end" holds again, undone-then-restored, never rewritten.
-- 2026-09-04 **TASK-0013 decided Option B (human sign-off) and CLOSED** — idempotency deferred; `ASSUMPTIONS.md` §2.14 plus a `TODO(TASK-0013)` in `ReferenceEndpoints.cs`. Zero behaviour change, contract byte-identical. Lesson: XML doc comments are contract content here, so a documentation-only backend diff still needs a hash check. Full text: `decisions/2026-Q3.md`.
-- 2026-09-04 Sequencing: Phase 0b now finishes with TASK-0015 alone, before TASK-0003 opens the first product surface.
-- 2026-09-04 TASK-0014 CLOSED — §7 audit S4-S7; no documented route around the generated client any more, and that rule is now a test. S8 `src/shared/` still open (question 11). Full text: `decisions/2026-Q3.md:335`.
-- 2026-09-04 TASK-0018 CLOSED — `-GateArgs` splats as a hashtable, so switches bind by name; `-NoFailFast`/`-AllowSkipped` work locally at last. Drift entry struck.
+- 2026-08-27 Four decisions (gitleaks, gate honesty, DB-credential split, TASK-0001 close) — `decisions/2026-Q3.md:156-158`.
+- 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions`/`## Known drift` reduced to indexes, §6/§7 given one home.
+- 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode`/`traceId`; client regenerated; an `ApiError.code` bug fixed as a consequence.
+- 2026-09-04 TASK-0016 CLOSED — gates fail fast and honestly. Lesson: fixtures must reproduce the real artefact's shape, names included. `decisions/2026-Q3.md:299,319`.
+- 2026-09-04 TASK-0017 CLOSED — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`.
+- 2026-09-04 **TASK-0013 Option B (human sign-off), CLOSED** — idempotency deferred, see the drift trigger below. Lesson: XML doc comments are contract content here, so even a docs-only backend diff needs a hash check.
+- 2026-09-04 Sequencing: Phase 0b ends with TASK-0015; TASK-0003 opens the first product surface.
+- 2026-09-04 TASK-0014 CLOSED — §7 audit S4-S7; no route around the generated client, and that rule is now a test. `decisions/2026-Q3.md:335`.
+- 2026-09-04 TASK-0018 CLOSED — `-GateArgs` splats as a hashtable, so switches bind by name.
+- 2026-09-04 **TASK-0015 CLOSED — Phase 0b complete.** §6 audit S1-S3: health rate-limit policy, `IPersistenceErrorTranslator` port, Api→Infrastructure arch test, stale-artefact check. Reopened twice in review, both times because a criterion was met in letter while the thing it protects stayed unenforced. Lesson: ask what deleting the new line would break, not whether it was written.
+- 2026-09-05 **Open question 11 RESOLVED (human): follow §7.** Screens go under `src/features/<feature>/`; `react-hook-form`+zod at the first form; Playwright at the first flow — all three at TASK-0003's frontend half, which therefore splits. Proviso "only where it buys better structure" means no bulk rename of the working scaffold: `src/shared/` appears when something genuinely shared needs it, and `src/screens/` retires with `scaffold-status`. `decisions/2026-Q3.md`.
 
 ## Known drift
 
-Index only. **Full text:** [drift/2026-Q3.md](drift/2026-Q3.md) — find an entry there by its date.
-Read the entries your card names, not all of them.
+Split by whether it can bite a dispatch. **Live triggers** are below in full — check them before
+every dispatch. Everything else is an accepted deviation with no trigger: named and dated here,
+full text in [drift/2026-Q3.md](drift/2026-Q3.md) only, found by its date.
 
-- 2026-08-08 Backend implementation landed with no task card and no boundary review. Audited retroactively by TASK-0001.
-- 2026-08-26 The frontend scaffold likewise landed with no task card. Also audited by TASK-0001.
-- 2026-08-26 `frontend/src/lib/auth/` implements bearer-token auth, against the cookie sign-off. Known-wrong code awaiting TASK-0003 frontend half.
-- 2026-08-26 `frontend/src/screens/scaffold-status/` is a demo, not a feature. Delete when the first real screen lands.
-- 2026-08-26 Two dependency bumps are being watched rather than assumed benign (`oxlint` 1.76.0 → 1.80.0 among them).
-- 2026-08-26 TASK-0002 left `IPupilArmOfRecordLookup` and `IResultSetArmLookup` as Application abstractions with Infrastructure registrations.
-- 2026-08-26 The reference slice sits in the committed contract in four places, none of them product endpoints.
-- 2026-08-26 A process lesson recorded but deliberately not acted on — orchestrator read, backend-dev concurring.
-- 2026-08-26 **Staging and dev-test databases share one role and one password.** Both Neon strings use the same credential.
-- 2026-08-27 **`Docker.DotNet.Enhanced` is unverified in practice and unverifiable on this machine** — TASK-0007 transitive consequence.
-- 2026-08-27 TASK-0011 Family B allowlist leaves one narrow gap, measured rather than assumed.
-- 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies** (`backend/docs/ASSUMPTIONS.md`).
-- 2026-08-27 **The frontend tree has no `src/shared/`**, which §7 and §2 both name. See Open question 11.
-- 2026-09-04 **`Format` runs before `Build` per TASK-0016's card but measures SLOWER** (~30s vs 4.2s), contradicting cheapest-first. Accepted, not reordered. Covers the generate-OpenAPI gate's position too.
+**Live triggers**
 
-- 2026-09-04 **No `Idempotency-Key` mechanism, and mutating endpoints do not accept the header** — §6 and spec §9.8.2 both require it. Deferred deliberately (Option B, human sign-off). Owner `backend-dev`; orchestrator fires the trigger. **Trigger: the first card implementing ANY retry-duplicable mutation builds the mechanism first** — §9.8.2's four named operations are examples, not the whole list. Check this before dispatching TASK-0003 and TASK-0005. Full text: `drift/2026-Q3.md` and `backend/docs/ASSUMPTIONS.md` §2.14.
+- 2026-09-04 **No `Idempotency-Key` mechanism; mutating endpoints do not accept the header** — §6 and spec §9.8.2 require it. Deferred (Option B, human sign-off). **Trigger: the first card implementing ANY retry-duplicable mutation builds it first** — §9.8.2's four operations are examples, not the whole list. Check before TASK-0003 and TASK-0005. Owner `backend-dev`. `ASSUMPTIONS.md` §2.14.
+- 2026-09-04 **No test asserts a 429; the default and sensitive rate-limit policies are unverified.** `ApiTestFixture.cs:124` claimed a dedicated test existed — it did not. TASK-0015 fixed the claim and covered the health policy only. **Trigger: TASK-0003**, first real user of `SensitivePolicyName`; login rate limiting is a security control, so it lands with a rejection test or not at all. Owner `backend-dev`.
+- 2026-09-04 **The Api→Infrastructure arch test exempts `StartupEnvironmentGuard` as well as `Program.cs`** — it reads `DatabaseOptions` at `StartAsync`. Accepted as startup composition, not request-path code. **Trigger: a THIRD exemption must argue for itself or the type gets a port** — the rule must not erode one name at a time. Owner `backend-dev`.
+- 2026-08-26 **`frontend/src/lib/auth/` implements bearer-token auth, against the cookie sign-off.** Known-wrong code. **Trigger: TASK-0003's frontend half**, which replaces it. Owner `frontend-dev`.
+- 2026-08-26 `frontend/src/screens/scaffold-status/` is a demo, not a feature. **Trigger: delete it when the first real screen lands** (TASK-0003), which also retires `src/screens/` per the 2026-09-05 decision. Owner `frontend-dev`.
+- 2026-08-26 **Staging and dev-test databases share one role and one password.** Both Neon strings use the same credential. **Trigger: deployment** — see Open question 5. Owner human.
+- 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies.** **Trigger: ratify or revert** — the question is open and unowned; decide it before §6 is cited against a card. `backend/docs/ASSUMPTIONS.md` §2.2.
 
-Eight resolved or struck entries live in the archive only.
+**Accepted, no trigger** — archive-only, `grep` the date in `drift/2026-Q3.md`: 2026-08-08 backend
+landed uncarded (audited, TASK-0015 closed its should-fixes) · 2026-08-26 two dependency bumps
+watched not assumed benign · 2026-08-26 TASK-0002's `IPupilArmOfRecordLookup`/`IResultSetArmLookup`
+as Application abstractions · 2026-08-26 the reference slice sits in the committed contract in four
+places · 2026-08-26 a process lesson recorded and deliberately not acted on · 2026-08-27
+`Docker.DotNet.Enhanced` unverified on this machine · 2026-08-27 TASK-0011's Family B allowlist gap,
+measured · 2026-09-04 `Format` runs before `Build` though it measures slower.
+
+Ten resolved or struck entries live in the archive only, including 2026-08-27 `src/shared/`
+(resolved 2026-09-05).
 
 ## Open questions
 
 Live only. The nine resolved questions are in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 5. **Production database target** undecided. Not blocking until deployment.
-11. **Where do frontend screens live, and are three 2026-08-03 deviations still intended?**
-    Raised by TASK-0001. (a) §7 puts screens under `src/features/<feature>/`; the scaffold has a
-    top-level `src/screens/` and no `src/shared/`, so the first real screen has no agreed home.
-    (b) `react-hook-form` is absent, yet §7 mandates it plus a zod resolver. (c) Playwright is
-    absent, yet §7 mandates it for auth, the primary create path and one failure path. All three
-    are called deliberate in `frontend/HANDOFF.md` — written **2026-08-03, before the product
-    specification landed**, so they were chosen without knowing what gets built. Each becomes
-    binding the moment a screen, a form or a flow exists, i.e. at the TASK-0003 frontend half.
-    Not blocking today. Needs a human call, not an agent call.
+11. RESOLVED 2026-09-05 — follow §7. See `## Decisions`, and `decisions/2026-Q3.md`.
 
 ## Reading this file
 

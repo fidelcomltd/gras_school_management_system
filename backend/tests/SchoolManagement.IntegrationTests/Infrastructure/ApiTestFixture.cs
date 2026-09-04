@@ -120,9 +120,21 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 // No telemetry export: there is no collector, and failing exports would flood the output.
                 [$"{ObservabilityOptions.SectionName}:{nameof(ObservabilityOptions.OtlpEndpoint)}"] = "",
 
-                // High enough that a test suite hitting the same endpoint repeatedly is not throttled.
-                // The rate limiter itself is verified by a dedicated test that sets its own limit.
+                // High enough that a test suite hitting the same endpoint repeatedly is not throttled
+                // under the DEFAULT policy. Nothing in this suite verifies rejection under the default
+                // or sensitive policies yet — that gap is recorded as drift, TASK-0003 is the trigger
+                // (login is the sensitive policy's first real user). Do not read the line below as
+                // covering this one too: it does not.
                 [$"{RateLimitingOptions.SectionName}:{nameof(RateLimitingOptions.PermitLimit)}"] = "10000",
+
+                // /health/ready runs under its own policy (RateLimitingOptions.HealthPolicyName), not
+                // the default one raised above, so it needs its own headroom for the same reason — this
+                // is the shared fixture's limit, kept high so every OTHER test's health checks are never
+                // throttled. HealthRateLimitTests is the one place that policy is actually verified: it
+                // builds its own client via WithWebHostBuilder with this narrowed to something small
+                // enough to trip on purpose.
+                [$"{RateLimitingOptions.SectionName}:{nameof(RateLimitingOptions.HealthPermitLimit)}"] =
+                    "10000",
             });
         });
     }

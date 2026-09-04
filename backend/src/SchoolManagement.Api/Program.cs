@@ -210,6 +210,21 @@ builder.Services.AddRateLimiter(rateLimiter =>
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
+
+    // Deliberately generous and deliberately separate from the default policy — see
+    // RateLimitingOptions.HealthPermitLimit's remarks for the numbers and the probe interval they
+    // assume. Applied only to /health/ready (HealthEndpoints.cs); /health/live does no dependency
+    // work and stays unthrottled.
+    rateLimiter.AddPolicy(RateLimitingOptions.HealthPolicyName, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ResolveRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = configured.HealthPermitLimit,
+                Window = TimeSpan.FromSeconds(configured.HealthWindowSeconds),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
 });
 
 var app = builder.Build();

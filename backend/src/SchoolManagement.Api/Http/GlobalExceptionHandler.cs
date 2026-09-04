@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
+using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Domain.Common;
-using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Api.Http;
 
@@ -23,7 +23,8 @@ namespace SchoolManagement.Api.Http;
 internal sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     IHostEnvironment environment,
-    ILogger<GlobalExceptionHandler> logger)
+    ILogger<GlobalExceptionHandler> logger,
+    IPersistenceErrorTranslator persistenceErrorTranslator)
     : IExceptionHandler
 {
     /// <inheritdoc />
@@ -73,7 +74,7 @@ internal sealed class GlobalExceptionHandler(
 
         // A recognised database constraint failure becomes the same 4xx a handler would have returned.
         // Anything else is an unexpected fault.
-        var translated = PersistenceErrors.TryTranslate(exception);
+        var translated = persistenceErrorTranslator.TryTranslate(exception);
 
         if (translated is not null)
         {
