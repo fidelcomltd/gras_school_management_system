@@ -361,6 +361,9 @@
         }
       },
       "HttpValidationProblemDetails": {
+        "required": [
+          "traceId"
+        ],
         "type": "object",
         "properties": {
           "type": {
@@ -417,6 +420,14 @@
                 "PageSize must be at most 100."
               ]
             }
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "Stable, machine-readable error code. Clients branch on this, never on `detail`. Absent when this response was produced directly by the framework rather than by this API's own result mapping."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem."
           }
         },
         "additionalProperties": false,
@@ -569,6 +580,9 @@
         }
       },
       "ProblemDetails": {
+        "required": [
+          "traceId"
+        ],
         "type": "object",
         "properties": {
           "type": {
@@ -608,6 +622,14 @@
               "string"
             ],
             "example": "/api/v1/reference/records"
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "Stable, machine-readable error code. Clients branch on this, never on `detail`. Absent when this response was produced directly by the framework (for example a model-binding failure or an authentication challenge) rather than by this API's own result mapping."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem."
           }
         },
         "additionalProperties": false,

@@ -51,18 +51,24 @@ describe('normalizeError — status mapping', () => {
 
 describe('normalizeError — RFC 9457 problem documents', () => {
   const problem: ProblemDetails = {
-    type: 'https://errors.gra.school/student-not-enrolled',
+    type: 'urn:schoolmanagement:error:student.not_enrolled',
     title: 'Student not enrolled',
     status: 409,
     detail: 'This student is not enrolled for the selected term.',
+    errorCode: 'student.not_enrolled',
+    traceId: '0af7651916cd43dd8448eb211c80319c',
   };
 
   it('prefers the server detail as the user-facing message', () => {
     expect(normalizeError(axiosErrorWithStatus(409, problem)).message).toBe(problem.detail);
   });
 
-  it('exposes the problem type as a stable machine-readable code', () => {
-    expect(normalizeError(axiosErrorWithStatus(409, problem)).code).toBe(problem.type);
+  it('exposes the problem document errorCode as the stable machine-readable code', () => {
+    expect(normalizeError(axiosErrorWithStatus(409, problem)).errorCode).toBe(problem.errorCode);
+  });
+
+  it('exposes the problem document traceId for support correlation', () => {
+    expect(normalizeError(axiosErrorWithStatus(409, problem)).traceId).toBe(problem.traceId);
   });
 
   it('falls back to the title when there is no detail', () => {
@@ -75,9 +81,21 @@ describe('normalizeError — RFC 9457 problem documents', () => {
     expect(error.message).toMatch(/conflicts with the current state/i);
   });
 
+  it('leaves errorCode undefined for a problem response the framework produced directly', () => {
+    // e.g. a model-binding 400 or a middleware 401 — no errorCode, per the contract.
+    const { errorCode: _errorCode, ...withoutErrorCode } = problem;
+    const error = normalizeError(axiosErrorWithStatus(401, withoutErrorCode));
+    expect(error.errorCode).toBeUndefined();
+    // The fallback path a caller uses instead: branch on `kind`, not `errorCode`.
+    expect(error.isUnauthorized).toBe(true);
+  });
+
   it('surfaces field errors for a validation failure', () => {
     const error = normalizeError(
-      axiosErrorWithStatus(422, { errors: { admissionNumber: ['Already in use.'] } }),
+      axiosErrorWithStatus(422, {
+        traceId: problem.traceId,
+        errors: { admissionNumber: ['Already in use.'] },
+      }),
     );
     expect(error.fieldErrors).toEqual({ admissionNumber: ['Already in use.'] });
   });

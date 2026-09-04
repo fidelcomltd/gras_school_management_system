@@ -77,6 +77,7 @@ describe('error handling', () => {
         problemResponse(404, {
           type: 'https://errors.gra.school/term-not-found',
           detail: 'No term with that identifier.',
+          errorCode: 'term.not_found',
         }),
       ),
     );
@@ -86,7 +87,7 @@ describe('error handling', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).message).toBe('No term with that identifier.');
     expect((error as ApiError).kind).toBe('notFound');
-    expect((error as ApiError).code).toBe('https://errors.gra.school/term-not-found');
+    expect((error as ApiError).errorCode).toBe('term.not_found');
   });
 
   it('never lets a raw Axios error escape', async () => {

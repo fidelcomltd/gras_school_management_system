@@ -49,6 +49,7 @@ public static class OpenApiSetup
             options.AddDocumentTransformer<ApiInfoDocumentTransformer>();
             options.AddDocumentTransformer<VersionedPathDocumentTransformer>();
             options.AddSchemaTransformer<SchemaExampleTransformer>();
+            options.AddSchemaTransformer<ProblemDetailsSchemaTransformer>();
         });
 
         return services;

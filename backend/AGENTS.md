@@ -205,6 +205,13 @@ A task is done only when **all** of these hold. Do not report completion otherwi
 - [ ] Contract regenerated if any endpoint or DTO changed
 - [ ] No new `TODO`/`FIXME` without a `TASK-####` reference
 - [ ] No secret, credential, or real connection string anywhere in the tree
+- [ ] **If your task card, log, or docs write-up quotes a credential-shaped string as proof of
+      anything** (e.g. demonstrating that a gitleaks rule still fires), re-run
+      `./scripts/ci.ps1` — or at minimum the Secret scan gate — **after that write-up is
+      finalized**, not only after the code change. The scanner reads the whole tree, documentation
+      included; a green run taken before the write-up is committed proves nothing about the commit
+      that actually ships. This is what closed TASK-0011 green and then re-armed the rule it had
+      just fixed — see TASK-0017.
 - [ ] **Gate output pasted into your report.** "Should pass" is not a result
 
 If you cannot finish something, say exactly what and why. A partial change reported as complete costs

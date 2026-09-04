@@ -52,8 +52,8 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: 228ae57fd80c22f7e0511a665efce5d4722bb3280c66f5e3f4c96fff53795a65
-regenerated: 2026-08-26 · generator Microsoft.Extensions.ApiDescription.Server/10.0.10, SDK 10.0.100
+openapi.json sha256: b287da0394da7d25ced6f25c50da761b5135b4c0557ea64ac839fdd69ae09f2c
+regenerated: 2026-09-04 · generator Microsoft.Extensions.ApiDescription.Server/10.0.10, SDK 10.0.100
 api version: v1 · the document holds exactly four paths:
           `/api/v1/reference/ping|records|whoami|arms/{armId}/secure`. `/health/live` and
           `/health/ready` are `.ExcludeFromDescription()` and are NOT in it (`ASSUMPTIONS.md` §2.9).
@@ -78,14 +78,13 @@ portal:    no authentication in the account sense — pin validation only (spec 
 
 ## In flight
 
-Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011 — closure
-notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
+Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0017 —
+closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0003 | Admin accounts, authentication and session management | backend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
-| TASK-0012 | Declare the problem-detail extension members in the contract | backend-dev, then frontend-dev | queued |
 | TASK-0013 | Decide and implement idempotency for retryable mutations | backend-dev | queued |
 | TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | frontend-dev | queued |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | backend-dev | queued |
@@ -106,6 +105,10 @@ on 2026-09-04.
 - 2026-08-27 Test-database credential split confirmed deliberate — a least-privilege role, not `neondb_owner`, backs `POSTGRES_TEST_CONNECTION`.
 - 2026-08-27 TASK-0001 closed — both scaffolds audited rule by rule against §6/§7; both materially exceed spec.
 - 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions` and `## Known drift` reduced to indexes, whole-file contract reads dropped from the dev agents, §6/§7 given one home each.
+- 2026-09-04 TASK-0012 backend half done — problem schemas declare `errorCode`/`traceId` (both closed, `traceId` required, `errorCode` not); frontend half still queued.
+- 2026-09-04 TASK-0012 frontend half done — schema.d.ts regenerated against hash b287da03…; http-error.ts adapted (typed errorCode?/traceId, no cast, presence-checked fallback); verify+drift green.
+- 2026-09-04 TASK-0012 CLOSED on a fully green combined run — problem schemas now declare `errorCode` (optional, honestly) and `traceId` (required); client regenerated; the pre-existing `ApiError.code`-from-`problem.type` bug fixed as a consequence.
+- 2026-09-04 TASK-0017 closed — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`; 2026-08-27 "honest end to end" holds again, undone-then-restored, never rewritten.
 
 ## Known drift
 
@@ -121,15 +124,15 @@ Read the entries your card names, not all of them.
 - 2026-08-26 The reference slice sits in the committed contract in four places, none of them product endpoints.
 - 2026-08-26 A process lesson recorded but deliberately not acted on — orchestrator read, backend-dev concurring.
 - 2026-08-26 **Staging and dev-test databases share one role and one password.** Both Neon strings use the same credential.
-- 2026-08-27 **The local `Secret scan` gate is red for reasons unrelated to any pending card**, found by TASK-0008 installing gitleaks.
 - 2026-08-27 **`Docker.DotNet.Enhanced` is unverified in practice and unverifiable on this machine** — TASK-0007 transitive consequence.
 - 2026-08-27 **`ci.ps1` coverage gate recognises skipped tests but not FAILED ones** — it printed `PASS` on a run with failures.
 - 2026-08-27 TASK-0011 Family B allowlist leaves one narrow gap, measured rather than assumed.
 - 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies** (`backend/docs/ASSUMPTIONS.md`).
 - 2026-08-27 **The frontend tree has no `src/shared/`**, which §7 and §2 both name. See Open question 11.
 
-Four entries resolved or struck (`AUDIT.md` staleness, tracked `obj/`, the SSH.NET gate, the
-missing `SecureArmResponse` example) live in the archive only.
+Six entries resolved or struck (`AUDIT.md` staleness, tracked `obj/`, the SSH.NET gate, the
+missing `SecureArmResponse` example, and both `Secret scan` red-gate entries) live in the archive
+only.
 
 ## Open questions
 

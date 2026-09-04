@@ -179,6 +179,127 @@ public sealed class OpenApiContractTests
     }
 
     [Fact]
+    public void ProblemSchemas_DeclareErrorCodeAndTraceId()
+    {
+        // TASK-0012 / AUDIT.md B1: the API attaches errorCode and traceId to every problem response
+        // (ResultExtensions.cs, GlobalExceptionHandler.cs, Program.cs's CustomizeProblemDetails), and the
+        // schema's own description tells a client to branch on errorCode — so both members must be
+        // declared, not left as undeclared extension data forbidden by additionalProperties: false.
+        // traceId is attached centrally to EVERY problem response, including framework-produced ones, so
+        // it is required. errorCode is attached only by this API's own result mapping and exception
+        // handler, so a framework-produced problem response (a model-binding 400, an auth 401) can lack
+        // it — it must NOT be required.
+        var schemas = Document.GetProperty("components").GetProperty("schemas");
+        var failures = new List<string>();
+
+        foreach (var schemaName in new[] { "ProblemDetails", "HttpValidationProblemDetails" })
+        {
+            var schema = schemas.GetProperty(schemaName);
+
+            if (!schema.TryGetProperty("properties", out var properties) ||
+                !properties.TryGetProperty("errorCode", out var errorCode) ||
+                !HasNonEmpty(errorCode, "description"))
+            {
+                failures.Add($"{schemaName}: missing a declared, described 'errorCode' property");
+            }
+
+            if (!properties.TryGetProperty("traceId", out var traceId) || !HasNonEmpty(traceId, "description"))
+            {
+                failures.Add($"{schemaName}: missing a declared, described 'traceId' property");
+            }
+
+            var required = schema.TryGetProperty("required", out var requiredElement)
+                ? requiredElement.EnumerateArray().Select(entry => entry.GetString()).ToArray()
+                : [];
+
+            if (!required.Contains("traceId"))
+            {
+                failures.Add($"{schemaName}: 'traceId' must be required — it is attached centrally to every response");
+            }
+
+            if (required.Contains("errorCode"))
+            {
+                failures.Add(
+                    $"{schemaName}: 'errorCode' must NOT be required — framework-produced problem " +
+                    "responses (model binding, auth middleware) never carry it");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            $"Problem-detail schemas must declare both extension members correctly.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, failures.Select(failure => "  - " + failure)));
+    }
+
+    [Fact]
+    public void EverySchemaExample_ValidatesAgainstItsOwnSchema()
+    {
+        // An example that a client cannot actually receive is worse than no example: it teaches a wrong
+        // shape. This is a structural check, not a full JSON Schema validator — it asserts exactly what a
+        // "closed" object schema promises: every required property is present, and (when
+        // additionalProperties is false) every member of the example is one the schema actually declares.
+        // This is what EveryOperation_DocumentsItsErrorResponses did not catch for TASK-0012 / B1: both
+        // problem schemas' examples carried errorCode and traceId while additionalProperties: false and
+        // no matching declared property made that example invalid against its own schema.
+        var failures = new List<string>();
+
+        foreach (var schema in Document.GetProperty("components").GetProperty("schemas").EnumerateObject())
+        {
+            if (!schema.Value.TryGetProperty("example", out var example) ||
+                example.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            ValidateObjectExample(schema.Name, schema.Value, example, failures);
+        }
+
+        failures.ShouldBeEmpty(
+            $"Every schema's example must validate against its own schema.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, failures.Select(failure => "  - " + failure)));
+    }
+
+    private static void ValidateObjectExample(
+        string schemaName,
+        JsonElement schema,
+        JsonElement example,
+        List<string> failures)
+    {
+        var properties = schema.TryGetProperty("properties", out var propertiesElement)
+            ? propertiesElement
+            : default;
+
+        var allowsAdditionalProperties =
+            !schema.TryGetProperty("additionalProperties", out var additionalProperties) ||
+            additionalProperties.ValueKind != JsonValueKind.False;
+
+        if (!allowsAdditionalProperties)
+        {
+            foreach (var member in example.EnumerateObject())
+            {
+                if (properties.ValueKind != JsonValueKind.Object || !properties.TryGetProperty(member.Name, out _))
+                {
+                    failures.Add(
+                        $"{schemaName}: example carries '{member.Name}', which the schema does not " +
+                        "declare and additionalProperties: false forbids");
+                }
+            }
+        }
+
+        if (schema.TryGetProperty("required", out var required))
+        {
+            foreach (var requiredProperty in required.EnumerateArray())
+            {
+                var name = requiredProperty.GetString();
+
+                if (name is not null && !example.TryGetProperty(name, out _))
+                {
+                    failures.Add($"{schemaName}: example is missing required property '{name}'");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Document_HasApiLevelDocumentation()
     {
         var info = Document.GetProperty("info");

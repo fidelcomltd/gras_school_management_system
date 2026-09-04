@@ -1,17 +1,22 @@
 import axios from 'axios';
+import type { components } from '@/api/schema';
 
 /**
- * RFC 9457 problem document. The backend spec commits to returning this shape
- * for every error, with a stable machine-readable `type`.
+ * RFC 9457 problem document, straight from the generated contract types — not
+ * hand-duplicated. Covers every error response; `HttpValidationProblemDetails`
+ * additionally carries field-keyed `errors` for a 422.
+ *
+ * `errorCode` is declared but NOT required by the contract: a problem response
+ * the framework produces directly (model binding, auth middleware) never passes
+ * through this API's own result mapping, so it genuinely carries no `errorCode`.
+ * Callers must presence-check it, never assert it non-null.
  */
-export interface ProblemDetails {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  /** Field-keyed validation messages, as emitted by the validation filter. */
-  errors?: Record<string, string[]>;
+export type ProblemDetails = components['schemas']['ProblemDetails'];
+export type ValidationProblemDetails = components['schemas']['HttpValidationProblemDetails'];
+type AnyProblemDetails = ProblemDetails | ValidationProblemDetails;
+
+function fieldErrorsOf(problem: AnyProblemDetails): Record<string, string[]> | undefined {
+  return 'errors' in problem ? problem.errors : undefined;
 }
 
 export type ApiErrorKind =
@@ -60,7 +65,7 @@ function kindForStatus(status: number): ApiErrorKind {
   return 'unknown';
 }
 
-function isProblemDetails(body: unknown): body is ProblemDetails {
+function isProblemDetails(body: unknown): body is AnyProblemDetails {
   return typeof body === 'object' && body !== null && !Array.isArray(body);
 }
 
@@ -73,19 +78,28 @@ function isProblemDetails(body: unknown): body is ProblemDetails {
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | undefined;
-  /** Stable machine-readable code from the problem document's `type`, when present. */
-  readonly code: string | undefined;
+  /**
+   * The problem document's stable, machine-readable `errorCode` — branch on
+   * this, never on `message`/`detail`. Genuinely absent when the response was
+   * produced directly by the framework rather than this API's own result
+   * mapping (a model-binding 400, a 401 from auth middleware): callers must
+   * presence-check it and fall back to `kind` for those, not assume it is set.
+   */
+  readonly errorCode: string | undefined;
+  /** Correlation id for this response occurrence; quote it when reporting a problem. */
+  readonly traceId: string | undefined;
   readonly fieldErrors: Readonly<Record<string, string[]>> | undefined;
-  readonly problem: ProblemDetails | undefined;
+  readonly problem: AnyProblemDetails | undefined;
 
   constructor(
     message: string,
     init: {
       kind: ApiErrorKind;
       status?: number | undefined;
-      code?: string | undefined;
+      errorCode?: string | undefined;
+      traceId?: string | undefined;
       fieldErrors?: Record<string, string[]> | undefined;
-      problem?: ProblemDetails | undefined;
+      problem?: AnyProblemDetails | undefined;
       cause?: unknown;
     },
   ) {
@@ -93,7 +107,8 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.kind = init.kind;
     this.status = init.status;
-    this.code = init.code;
+    this.errorCode = init.errorCode;
+    this.traceId = init.traceId;
     this.fieldErrors = init.fieldErrors;
     this.problem = init.problem;
   }
@@ -132,11 +147,14 @@ export function normalizeError(error: unknown): ApiError {
     // Prefer the server's own wording, but never surface a bare status line.
     const message = problem?.detail?.trim() || problem?.title?.trim() || MESSAGE_BY_KIND[kind];
 
+    // `errorCode` is a presence check, not an assertion — the contract deliberately
+    // leaves it unset for framework-produced problem responses (see `ApiError.errorCode`).
     return new ApiError(message, {
       kind,
       status,
-      code: problem?.type,
-      fieldErrors: problem?.errors,
+      errorCode: problem?.errorCode,
+      traceId: problem?.traceId,
+      fieldErrors: problem && fieldErrorsOf(problem),
       problem,
       cause: error,
     });

@@ -4,6 +4,7 @@ export {
   normalizeError,
   type ApiErrorKind,
   type ProblemDetails,
+  type ValidationProblemDetails,
 } from './http-error';
 export {
   deleteRequest,

@@ -19,7 +19,14 @@ export const apiUrl = (path: string): string =>
 /** RFC 9457 problem document, matching what the backend returns on error. */
 export function problemResponse(
   status: number,
-  body: { type?: string; title?: string; detail?: string; errors?: Record<string, string[]> } = {},
+  body: {
+    type?: string;
+    title?: string;
+    detail?: string;
+    errors?: Record<string, string[]>;
+    errorCode?: string;
+    traceId?: string;
+  } = {},
 ) {
   return HttpResponse.json(
     { status, title: body.title ?? 'Error', ...body },

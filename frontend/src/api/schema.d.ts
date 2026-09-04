@@ -175,6 +175,10 @@ export interface components {
             errors?: {
                 [key: string]: string[];
             };
+            /** @description Stable, machine-readable error code. Clients branch on this, never on `detail`. Absent when this response was produced directly by the framework rather than by this API's own result mapping. */
+            errorCode?: string;
+            /** @description Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem. */
+            traceId: string;
         };
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
@@ -303,6 +307,10 @@ export interface components {
             detail?: null | string;
             /** @example /api/v1/reference/records */
             instance?: null | string;
+            /** @description Stable, machine-readable error code. Clients branch on this, never on `detail`. Absent when this response was produced directly by the framework (for example a model-binding failure or an authentication challenge) rather than by this API's own result mapping. */
+            errorCode?: string;
+            /** @description Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem. */
+            traceId: string;
         };
         /**
          * @description REFERENCE SLICE — read model for a sample record.

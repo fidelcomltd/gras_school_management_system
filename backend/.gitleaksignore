@@ -1,0 +1,48 @@
+# gitleaks fingerprint ignore file for the backend.
+#
+# Picked up automatically: `gitleaks detect`'s `-i/--gitleaks-ignore-path` defaults to `.`, the
+# current working directory, and `backend/scripts/ci.ps1` does `Push-Location $backendRoot` before
+# running the secret-scan gate — so this file must live at `backend/.gitleaksignore`, not the repo
+# root. A root-level file is read by nothing and the gate stays red while looking unfixed.
+#
+# IMPORTANT — these fingerprints are only immutable because the scan runs in GIT MODE (no
+# `--no-git`). A git-mode fingerprint is `<commit>:<file>:<rule>:<line>`, anchored to immutable
+# commit content, so an entry can never drift onto different content or mask a finding it was not
+# written for. If the scan mode ever changes — `--no-git`, or gitleaks' newer `dir` command — the
+# commit segment disappears and a fingerprint degrades to `<file>:<rule>:<line>` against MUTABLE
+# working-tree content, at which point an entry here could silently suppress an unrelated real
+# secret that later lands at the same path/rule/line. TASK-0016 is expected to rewrite these gate
+# scripts: whoever does that MUST re-derive every fingerprint below against the new mode rather
+# than carrying this file forward unchanged.
+#
+# TASK-0017 (2026-09-04): TASK-0011 narrowed `postgres-connection-string-with-password` and then,
+# in the course of proving the narrowed rule still fires, committed the proof — a realistic fake
+# connection string — into its own task card, its own run log, and backend/docs/ASSUMPTIONS.md.
+# Because the secret scan runs against git history, editing those lines today does not clear the
+# finding; the strings stay reachable at the commits below. Rewriting that history was rejected
+# (out of scope, non-negotiable) to fix a scanner finding on a credential that was never real.
+#
+# Both fake credentials were checked against the real out-of-repo test connection string before
+# this file was written: neither shares its host nor its password. Full reasoning:
+# .agent/tasks/TASK-0017.md and backend/docs/ASSUMPTIONS.md §3.9.
+#
+# Five findings, two invented credentials, four commits (two identical hits in each of two
+# commits' logged proof, plus the two ASSUMPTIONS.md/TASK-0011.md narrative copies):
+
+# TASK-0011's own run log quoting its proof-the-rule-still-fires connection string (Neon-shaped,
+# fake host `ep-still-water-12345...`, invented password).
+5a2cb1cb275841d74b6540a41fdb31a8c33b73ba:.agent/tasks/logs/TASK-0011.log.md:postgres-connection-string-with-password:56
+
+# Same run log, second quotation of the same invented Neon-shaped string later in the file.
+5a2cb1cb275841d74b6540a41fdb31a8c33b73ba:.agent/tasks/logs/TASK-0011.log.md:postgres-connection-string-with-password:119
+
+# backend/docs/ASSUMPTIONS.md §3.9's write-up of the same proof (Neon-shaped, fake host, invented
+# password) — the write-up this task card exists to stop from re-arming the rule it documents.
+faa8e1c5b9d1a31b05357f7094a45bd49e8f55aa:backend/docs/ASSUMPTIONS.md:postgres-connection-string-with-password:310
+
+# TASK-0011's task card quoting the same Neon-shaped proof string.
+faa8e1c5b9d1a31b05357f7094a45bd49e8f55aa:.agent/tasks/TASK-0011.md:postgres-connection-string-with-password:147
+
+# TASK-0011's task card, second invented string (`db-prod-7.internal.example`, unrelated invented
+# password) — a second illustrative example in the same write-up, not a second real leak.
+faa8e1c5b9d1a31b05357f7094a45bd49e8f55aa:.agent/tasks/TASK-0011.md:postgres-connection-string-with-password:210
