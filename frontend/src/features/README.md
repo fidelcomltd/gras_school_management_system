@@ -21,71 +21,67 @@ use the first; if it carries none, that is a contract defect — raise it, do no
 ```
 src/features/<tag>/
   api.ts      # query & mutation hooks — one hook per endpoint, no exceptions
-  types.ts    # request/response interfaces, *Variables types, the query-key enum
+  types.ts    # query-key enum, *Variables types, contract-derived re-exports (no hand-typed DTOs)
   store.ts    # optional; Zustand store for client state tied to these hooks
   components/ # optional; only if a component is shared across screens in this feature
 ```
 
 ## `types.ts`
 
-Holds the query-key enum, the variables types for mutations, and — until `src/api/` is
-generated — hand-written request/response interfaces.
+Holds the query-key enum and the variables types for mutations. **Not** hand-written
+request/response interfaces — those already exist, generated, in `src/api/schema.d.ts`.
+Re-export the ones this feature needs by indexing `components['schemas']` so the type stays
+locked to the contract instead of a copy that can drift from it:
 
 ```ts
-export enum StudentsKeys {
-  List = 'students.list',
-  Detail = 'students.detail',
-  Create = 'students.create',
-  UpdateProfile = 'students.updateProfile',
+import type { components } from '@/api/schema';
+
+export enum SampleRecordsKeys {
+  List = 'sampleRecords.list',
+  Create = 'sampleRecords.create',
 }
 
-export interface IStudentListItem {
-  id: string;
-  fullName: string;
-  admissionNumber: string;
-}
-
-export interface IUpdateStudentProfileVariables {
-  studentId: string;
-  payload: IUpdateStudentProfileRequest;
-}
+/** Contract-derived — never hand-typed. Source of truth: src/api/schema.d.ts. */
+export type SampleRecordDto = components['schemas']['SampleRecordDto'];
+export type CreateSampleRecordCommand = components['schemas']['CreateSampleRecordCommand'];
 ```
+
+The worked example below is the real `/api/v1/reference/records` endpoint — the only one
+`contracts/openapi.json` currently declares (its `Reference` tag is test scaffolding, not a
+product tag; see `STATE.md ## Contract`). Follow the identical shape for the first real
+feature — swap the path, the schema names, and the folder name for the tag you're
+implementing.
 
 ## `api.ts`
 
-One hook per endpoint. Hooks call the verb helpers from `@/lib/http` and nothing else — no
-`axios`, no `fetch`.
+One hook per endpoint. Hooks call `apiGet`/`apiPost` from `@/api/client` and nothing else — no
+`getRequest`/`postRequest` from `@/lib/http` directly, no `axios`, no `fetch`. Going through
+`client.ts` is what makes the response type inferred rather than asserted; see
+`src/api/README.md` for why the plain verb helpers are not a sanctioned fallback.
 
 ```ts
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRequest, putRequest } from '@/lib/http';
-import { StudentsKeys, type IStudentListItem, type IUpdateStudentProfileVariables } from './types';
+import { apiGet, apiPost } from '@/api/client';
+import { SampleRecordsKeys, type CreateSampleRecordCommand } from './types';
 
-const BASE = '/api/v1/Students';
+const PATH = '/api/v1/reference/records';
 
-/** Invalidation is centralised so every mutation invalidates the same keys. */
-function useStudentInvalidation() {
-  const queryClient = useQueryClient();
-  return (studentId: string) => {
-    void queryClient.invalidateQueries({ queryKey: [StudentsKeys.Detail, studentId] });
-    void queryClient.invalidateQueries({ queryKey: [StudentsKeys.List] });
-  };
-}
-
-export function useStudents() {
+export function useSampleRecords(page?: number, pageSize?: number) {
   return useQuery({
-    queryKey: [StudentsKeys.List],
-    queryFn: ({ signal }) => getRequest<IStudentListItem[]>(BASE, { signal }),
+    // `data` here is inferred as PagedResultOfSampleRecordDto — never asserted.
+    queryKey: [SampleRecordsKeys.List, page, pageSize],
+    queryFn: ({ signal }) => apiGet(PATH, { page, pageSize }, { signal }),
   });
 }
 
-export function useUpdateStudentProfile() {
-  const invalidateStudent = useStudentInvalidation();
+export function useCreateSampleRecord() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationKey: [StudentsKeys.UpdateProfile],
-    mutationFn: ({ studentId, payload }: IUpdateStudentProfileVariables) =>
-      putRequest<void, IUpdateStudentProfileRequest>(`${BASE}/${studentId}`, payload),
-    onSuccess: (_data, { studentId }) => invalidateStudent(studentId),
+    mutationKey: [SampleRecordsKeys.Create],
+    mutationFn: (payload: CreateSampleRecordCommand) => apiPost(PATH, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [SampleRecordsKeys.List] });
+    },
   });
 }
 ```
@@ -94,7 +90,8 @@ export function useUpdateStudentProfile() {
 
 - **Never** `queryClient.invalidateQueries()` with no key. Invalidate precisely.
 - **Never** an inline string query key. It goes in the enum in `types.ts`.
-- Pass TanStack's `signal` through to the verb helper so cancelled queries abort in flight.
+- Pass TanStack's `signal` through to `apiGet`/`apiPost`'s `options` so cancelled queries
+  abort in flight.
 - Server state is not copied into `useState` or a Zustand store. `store.ts` is for client
   state only — filters, selection, wizard step.
 - Every data view handles four states: loading, empty, error, unauthorized.

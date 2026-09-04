@@ -71,9 +71,16 @@ type checker rather than by convention.
 
 ## Feature code
 
-`src/features/<tag>/api.ts` hooks call `apiGet`/`apiPost` (or the plain verb helpers in
-`@/lib/http` for anything not yet worth a typed wrapper), never `axios` or `fetch` directly.
-See [`src/features/README.md`](../features/README.md).
+`src/features/<tag>/api.ts` hooks call `apiGet`/`apiPost` and nothing else — never the plain
+verb helpers in `@/lib/http` directly, never `axios` or `fetch`. A feature hook that skips
+`client.ts` skips schema inference too, which is exactly the "hand-typed interface that can
+drift from the contract" §3 rules out.
+
+If a feature needs a method `client.ts` doesn't cover yet (`PUT`/`PATCH`/`DELETE` — only `GET`
+and `POST` are wired today), add `apiPut`/`apiPatch`/`apiDelete` to `client.ts` first, following
+the exact shape of `apiGet`/`apiPost` above, then call that from the feature. There is no
+sanctioned path from feature code straight to `@/lib/http`'s verb helpers — the one seam that
+would bypass schema inference is closed. See [`src/features/README.md`](../features/README.md).
 
 ## Tests: MSW handlers derived from the contract
 

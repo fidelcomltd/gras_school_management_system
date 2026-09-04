@@ -11,9 +11,8 @@ page where a parent enters a registration number and an access pin to read or do
 published result. Parents have no accounts.
 
 Authoritative spec: `product-specification/` (revision 3.1), `index.md` is the entry point. The
-school's `.docx` is revision 1 and is **not** authoritative. Out of scope
-(`00-document-overview.md` 3.2): fees/payments, HR/payroll, timetabling, standalone attendance,
-messaging/SMS, library/transport, CBT, parent accounts.
+school's `.docx` is revision 1 and is **not** authoritative. The out-of-scope list is
+`00-document-overview.md` 3.2 — read it there, it is not restated here (§13).
 
 ## Layout
 backend:  ./backend — solution `SchoolManagement.slnx`. Api / Application / Domain /
@@ -22,7 +21,7 @@ backend:  ./backend — solution `SchoolManagement.slnx`. Api / Application / Do
           Conventions: `backend/AGENTS.md`. Deviations: `backend/docs/ASSUMPTIONS.md`.
 frontend: ./frontend — Vite 8 / React 19 / TypeScript 6, package `gra-school-portal`, npm
           (lockfile committed). Design tokens, Base UI primitives, axios transport in
-          `src/lib/http/`, TanStack Query, Zustand, MSW, 129 tests green. `src/features/` is
+          `src/lib/http/`, TanStack Query, Zustand, MSW, 130 tests green. `src/features/` is
           EMPTY and reserved. Real top-level paths per §2: `src/api/ src/app/ src/components/
           src/config/ src/features/ src/lib/ src/screens/ src/stores/ src/test/` — there is
           **no `src/shared/`** despite §7 and §2 (Open question 11). Conventions:
@@ -49,7 +48,7 @@ backend:  `./backend/scripts/ci.ps1` — ten gates cheapest-first, STOPS at the 
           (CI's mode); `Failed > 0`/`Skipped > 0` exit non-zero, the latter unless
           `-AllowSkipped`. Ends in a fixed `SUMMARY` block — paste it alone to satisfy §9.
           Verdict: `scripts/lib/gate-summary.ps1`, self-tested in `scripts/tests/`.
-          `scripts/local-env.ps1` resolves the DB but cannot pass switches (TASK-0018).
+          `scripts/local-env.ps1` resolves the DB and passes `-GateArgs` switches through.
           CI: `.github/workflows/backend-ci.yml`.
 frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:api-drift`
           (§4.4 check 2, deliberately not folded into `verify`). oxlint, not ESLint.
@@ -83,17 +82,15 @@ portal:    no authentication in the account sense — pin validation only (spec 
 
 ## In flight
 
-Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0016, 0017 —
+Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0014, 0016, 0017, 0018 —
 closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0003 | Admin accounts, authentication and session management | backend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
-| TASK-0013 | Decide and implement idempotency for retryable mutations | backend-dev | queued |
-| TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | frontend-dev | queued |
+| TASK-0013 | Idempotency — Option B, defer with a binding record | backend-dev | queued |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | backend-dev | queued |
-| TASK-0018 | Make local-env.ps1 pass switches through to the gate script | backend-dev | queued |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
@@ -103,14 +100,15 @@ Index only, newest last. **Full text:** [decisions/2026-Q3.md](decisions/2026-Q3
 `## Log` of the card each entry names. Bootstrap decisions (2026-07-27 to 2026-08-08) live there
 too and are still in force.
 
-- 2026-08-27 TASK-0011 — human approved narrowing the gitleaks rule rather than adding a baseline.
-- 2026-08-27 TASK-0007, 0008 and 0011 closed on one verified live run — the gate suite honest end to end for the first time: vuln gate green, secret scan real, coverage enforced on a complete run.
-- 2026-08-27 Test-database credential split confirmed deliberate — a least-privilege role, not `neondb_owner`, backs `POSTGRES_TEST_CONNECTION`.
-- 2026-08-27 TASK-0001 closed — both scaffolds audited rule by rule against §6/§7; both materially exceed spec.
+- 2026-08-27 Four decisions — gitleaks rule narrowed by human approval (TASK-0011); the gate suite honest end to end on one verified live run (0007/0008/0011); the test-database credential split confirmed deliberate; TASK-0001 closed with both scaffolds exceeding spec. Full text: `decisions/2026-Q3.md:156-158` and each card's `## Log`.
 - 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions` and `## Known drift` reduced to indexes, whole-file contract reads dropped from the dev agents, §6/§7 given one home each.
 - 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode` (optional) and `traceId` (required); client regenerated against b287da03…; `ApiError.code`-from-`problem.type` bug fixed as a consequence.
 - 2026-09-04 TASK-0016 CLOSED — gates fail fast and fail honestly (`Failed > 0`/`Skipped > 0` exit non-zero), verified live by orchestrator. Two of its own defects were hidden by its fixtures: a skip line naming the trx file not the suite, and `-AllowSkipped` never working (a dot-sourced `param()` block clobbers the caller's switch). Fixtures must reproduce the real artefact's shape, names included.
 - 2026-09-04 TASK-0017 closed — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`; 2026-08-27 "honest end to end" holds again, undone-then-restored, never rewritten.
+- 2026-09-04 **TASK-0013 decided Option B** — idempotency deferred with a binding record, human sign-off. Trigger: the first card implementing any of spec 9.8.2's four operations builds the mechanism first. No contract movement.
+- 2026-09-04 Sequencing confirmed: finish Phase 0b (TASK-0018, 0014, then 0013, 0015) before TASK-0003 opens the first product surface.
+- 2026-09-04 TASK-0014 CLOSED — §7 audit S4-S7. The READMEs no longer document a route around the generated client (S4, the point of the card); lint enforces `--max-warnings=0`; `httpClient` unexported and that rule is now a test. Test count 130/15. S8 `src/shared/` still open (question 11).
+- 2026-09-04 TASK-0018 CLOSED — `-GateArgs` converts to a hashtable before splatting, so switches bind by name; `-NoFailFast`/`-AllowSkipped` reachable locally at last. 21-assertion self-test. Its drift entry is struck.
 
 ## Known drift
 
@@ -131,10 +129,8 @@ Read the entries your card names, not all of them.
 - 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies** (`backend/docs/ASSUMPTIONS.md`).
 - 2026-08-27 **The frontend tree has no `src/shared/`**, which §7 and §2 both name. See Open question 11.
 - 2026-09-04 **`Format` runs before `Build` per TASK-0016's card but measures SLOWER** (~30s vs 4.2s), contradicting cheapest-first. Accepted, not reordered. Covers the generate-OpenAPI gate's position too.
-- 2026-09-04 **`local-env.ps1` cannot pass switches to the gate script** (array splat binds positionally), so `-NoFailFast`/`-AllowSkipped` are unreachable locally. Owning card TASK-0018.
 
-Seven resolved or struck entries live in the archive only — including the 2026-08-27 `ci.ps1`
-failed-vs-skipped defect, closed 2026-09-04 by TASK-0016.
+Eight resolved or struck entries live in the archive only.
 
 ## Open questions
 
@@ -153,10 +149,6 @@ Live only. The nine resolved questions are in [decisions/2026-Q3.md](decisions/2
 
 ## Reading this file
 
-**Budget: 12 KB.** Every subagent loads this file on session start, so its size is multiplied by
-every dispatch. The cap is on **bytes, not lines** — the old ~200-line cap read green at 36 KB
-because 45 "one-line" entries averaged 550 bytes each.
-
-When a section grows past the budget: move the full text to `decisions/` or `drift/` and leave a
-one-line index entry pointing there. Never delete — archive. Closed cards leave the `## In flight`
-table. Check `wc -c .agent/STATE.md` before appending.
+**Budget: 12 KB, in bytes.** `wc -c .agent/STATE.md` before appending. Over it, archive a section's
+full text to `decisions/` or `drift/` and leave a one-line index entry — never delete. Rationale and
+the rest of the rules: CLAUDE.md §4.1 and §13.

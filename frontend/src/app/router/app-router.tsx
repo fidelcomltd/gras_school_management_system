@@ -26,12 +26,14 @@ const router = createBrowserRouter([
     path: '*',
     element: (
       <AppShell>
-        <div className="flex flex-col items-start gap-2">
-          <h1 className="font-display text-2xl font-semibold text-foreground">Page not found</h1>
-          <p className="text-sm text-muted-foreground">
-            The address you followed does not match any screen in the portal.
-          </p>
-        </div>
+        <ErrorBoundary>
+          <div className="flex flex-col items-start gap-2">
+            <h1 className="font-display text-2xl font-semibold text-foreground">Page not found</h1>
+            <p className="text-sm text-muted-foreground">
+              The address you followed does not match any screen in the portal.
+            </p>
+          </div>
+        </ErrorBoundary>
       </AppShell>
     ),
   },

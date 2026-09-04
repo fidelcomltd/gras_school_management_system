@@ -1,4 +1,3 @@
-export { httpClient } from './http-client';
 export {
   ApiError,
   normalizeError,

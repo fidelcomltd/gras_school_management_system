@@ -72,7 +72,13 @@
     is one command.
 
 .PARAMETER GateArgs
-    Extra arguments passed through to the gate script unchanged.
+    Extra arguments passed through to the gate script, as flat tokens exactly like you would type
+    them for the gate script itself — e.g. '-NoFailFast', '-AllowSkipped', or '-Configuration','Debug'.
+    A switch is any token immediately followed by another '-token' or by nothing; anything else is
+    read as that switch's value. This wrapper does NOT itself validate switch names against the gate
+    script — an unrecognised name is passed straight through so the GATE SCRIPT's own parameter
+    binder rejects it loudly (see ConvertTo-SplattableGateArguments below for why this has to be a
+    hashtable rather than the array PowerShell would otherwise splat positionally).
 
 .EXAMPLE
     ./scripts/local-env.ps1
@@ -81,12 +87,68 @@
 .EXAMPLE
     ./scripts/local-env.ps1 -Gate generate-openapi.ps1
     Resolves POSTGRES_TEST_CONNECTION, then runs a different gate script instead.
+
+.EXAMPLE
+    ./scripts/local-env.ps1 -GateArgs '-NoFailFast'
+    Runs ci.ps1 with the -NoFailFast switch.
+
+.EXAMPLE
+    ./scripts/local-env.ps1 -GateArgs '-NoFailFast','-AllowSkipped'
+    Runs ci.ps1 with both switches at once.
+
+.EXAMPLE
+    ./scripts/local-env.ps1 -GateArgs '-Configuration','Debug'
+    Runs ci.ps1 with a name/value pair.
+
+.EXAMPLE
+    ./scripts/local-env.ps1 -GateArgs '-NoFailFast','-Configuration','Debug'
+    Both forms combined in one call.
 #>
 [CmdletBinding()]
 param(
     [string]$Gate = 'ci.ps1',
     [string[]]$GateArgs = @()
 )
+
+function ConvertTo-SplattableGateArguments {
+    <#
+    Converts the flat -GateArgs token list ('-NoFailFast', '-Configuration', 'Debug', ...) into an
+    [ordered] hashtable, because splatting a HASHTABLE binds by parameter NAME while splatting an
+    ARRAY binds POSITIONALLY — that asymmetry is the entire TASK-0018 bug: `& $scriptPath @GateArgs`
+    with $GateArgs as a [string[]] sent '-NoFailFast' to ci.ps1's first POSITIONAL parameter
+    (Configuration) instead of being read as a switch.
+
+    Each token starting with '-' is a parameter name. It is read as a switch (bound to $true) unless
+    immediately followed by a token that does NOT itself start with '-', in which case that next
+    token is consumed as its value instead — this matches every real ci.ps1 parameter (a
+    ValidateSet string, a ranged non-negative int, and three switches) without this wrapper having
+    to know ci.ps1's parameter names or types. A name the gate script does not declare is still
+    passed through unresolved: this function does not validate against the gate script, so the gate
+    script's OWN parameter binder is what rejects an unknown or misused name, loudly, rather than
+    this wrapper swallowing it into a false success.
+    #>
+    param([string[]]$Tokens)
+
+    $result = [ordered]@{}
+    $i = 0
+    while ($i -lt $Tokens.Count) {
+        $token = $Tokens[$i]
+        if ($token -notmatch '^-') {
+            throw "Malformed -GateArgs: expected a parameter name starting with '-', got '$token'."
+        }
+        $name = $token.Substring(1)
+        $next = if ($i + 1 -lt $Tokens.Count) { $Tokens[$i + 1] } else { $null }
+        if ($null -ne $next -and $next -notmatch '^-') {
+            $result[$name] = $next
+            $i += 2
+        }
+        else {
+            $result[$name] = $true
+            $i += 1
+        }
+    }
+    return $result
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -135,5 +197,6 @@ if (-not (Test-Path $scriptPath)) {
     throw "No such gate script: '$scriptPath'"
 }
 
-& $scriptPath @GateArgs
+$gateArguments = ConvertTo-SplattableGateArguments -Tokens $GateArgs
+& $scriptPath @gateArguments
 exit $LASTEXITCODE

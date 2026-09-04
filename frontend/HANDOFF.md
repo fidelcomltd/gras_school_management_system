@@ -16,10 +16,10 @@
 | Auth | In-memory bearer token, backend-reported expiry, scheduled logout, single-flight refresh seam (`src/lib/auth/`) |
 | State | TanStack Query defaults, Zustand theme + session status stores |
 | Shell | App shell, router, per-route error boundary, theme toggle |
-| Tests | 120 tests across 12 files, all green |
+| Tests | 130 tests across 15 files, all green |
 | Docs | `README.md`, `CONVENTIONS.md`, `src/api/README.md`, `src/features/README.md` |
 
-**Gates:** `typecheck` ✓ `lint` ✓ (zero warnings) `test` ✓ 120/120 `build` ✓
+**Gates:** `typecheck` ✓ `lint` ✓ (zero warnings) `test` ✓ 130/130 `build` ✓
 
 Bundle after vendor splitting: 48.9 kB app + ~554 kB vendor (~196 kB gzip total).
 

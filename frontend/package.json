@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "oxlint",
+    "lint": "oxlint --max-warnings=0",
     "lint:fix": "oxlint --fix",
     "test": "vitest run",
     "test:watch": "vitest",
