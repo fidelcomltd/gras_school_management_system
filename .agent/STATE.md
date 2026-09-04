@@ -22,7 +22,7 @@ backend:  ./backend — solution `SchoolManagement.slnx`. Api / Application / Do
           Conventions: `backend/AGENTS.md`. Deviations: `backend/docs/ASSUMPTIONS.md`.
 frontend: ./frontend — Vite 8 / React 19 / TypeScript 6, package `gra-school-portal`, npm
           (lockfile committed). Design tokens, Base UI primitives, axios transport in
-          `src/lib/http/`, TanStack Query, Zustand, MSW, 124 tests green. `src/features/` is
+          `src/lib/http/`, TanStack Query, Zustand, MSW, 129 tests green. `src/features/` is
           EMPTY and reserved. Real top-level paths per §2: `src/api/ src/app/ src/components/
           src/config/ src/features/ src/lib/ src/screens/ src/stores/ src/test/` — there is
           **no `src/shared/`** despite §7 and §2 (Open question 11). Conventions:
@@ -43,8 +43,13 @@ docker ABSENT (integration tests use hosted Neon Postgres via `POSTGRES_TEST_CON
 CI uses a service-container Postgres) · psql ABSENT · git 2.51.1.windows.1
 
 ## Gate commands
-backend:  `./backend/scripts/ci.ps1` — restore, build -warnaserror, format --verify-no-changes,
-          tests + coverage, coverage floor, vulnerable-package scan, gitleaks, OpenAPI drift.
+backend:  `./backend/scripts/ci.ps1` — ten gates cheapest-first, STOPS at the first failure:
+          restore, format, build -warnaserror, generate-OpenAPI, unit+arch tests, integration
+          tests, coverage floor, vulnerable packages, gitleaks, drift. `-NoFailFast` runs all
+          (CI's mode); `Failed > 0`/`Skipped > 0` exit non-zero, the latter unless
+          `-AllowSkipped`. Ends in a fixed `SUMMARY` block — paste it alone to satisfy §9.
+          Verdict: `scripts/lib/gate-summary.ps1`, self-tested in `scripts/tests/`.
+          `scripts/local-env.ps1` resolves the DB but cannot pass switches (TASK-0018).
           CI: `.github/workflows/backend-ci.yml`.
 frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:api-drift`
           (§4.4 check 2, deliberately not folded into `verify`). oxlint, not ESLint.
@@ -78,7 +83,7 @@ portal:    no authentication in the account sense — pin validation only (spec 
 
 ## In flight
 
-Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0017 —
+Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0016, 0017 —
 closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
@@ -88,26 +93,23 @@ closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md)
 | TASK-0013 | Decide and implement idempotency for retryable mutations | backend-dev | queued |
 | TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | frontend-dev | queued |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | backend-dev | queued |
-| TASK-0016 | Make the gate suites fail fast and fail honestly | backend-dev, then frontend-dev | queued |
+| TASK-0018 | Make local-env.ps1 pass switches through to the gate script | backend-dev | queued |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
 
-Index only, newest last. **Full text and reasoning:** [decisions/2026-Q3.md](decisions/2026-Q3.md)
-and the `## Log` of the card each entry names. Bootstrap decisions (2026-07-27 to 2026-08-08) are
-in the same file and still in force, as are the six 2026-08-27 infra-card entries condensed out
-on 2026-09-04.
+Index only, newest last. **Full text:** [decisions/2026-Q3.md](decisions/2026-Q3.md) and the
+`## Log` of the card each entry names. Bootstrap decisions (2026-07-27 to 2026-08-08) live there
+too and are still in force.
 
 - 2026-08-27 TASK-0011 — human approved narrowing the gitleaks rule rather than adding a baseline.
-- 2026-08-27 TASK-0007, 0008 and 0011 all closed on one verified live run — `ALL GATES PASSED`, integration suite genuinely executed.
-- 2026-08-27 The gate suite is honest end to end for the first time — vuln gate green, secret scan real, coverage enforced on a complete run.
+- 2026-08-27 TASK-0007, 0008 and 0011 closed on one verified live run — the gate suite honest end to end for the first time: vuln gate green, secret scan real, coverage enforced on a complete run.
 - 2026-08-27 Test-database credential split confirmed deliberate — a least-privilege role, not `neondb_owner`, backs `POSTGRES_TEST_CONNECTION`.
 - 2026-08-27 TASK-0001 closed — both scaffolds audited rule by rule against §6/§7; both materially exceed spec.
 - 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions` and `## Known drift` reduced to indexes, whole-file contract reads dropped from the dev agents, §6/§7 given one home each.
-- 2026-09-04 TASK-0012 backend half done — problem schemas declare `errorCode`/`traceId` (both closed, `traceId` required, `errorCode` not); frontend half still queued.
-- 2026-09-04 TASK-0012 frontend half done — schema.d.ts regenerated against hash b287da03…; http-error.ts adapted (typed errorCode?/traceId, no cast, presence-checked fallback); verify+drift green.
-- 2026-09-04 TASK-0012 CLOSED on a fully green combined run — problem schemas now declare `errorCode` (optional, honestly) and `traceId` (required); client regenerated; the pre-existing `ApiError.code`-from-`problem.type` bug fixed as a consequence.
+- 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode` (optional) and `traceId` (required); client regenerated against b287da03…; `ApiError.code`-from-`problem.type` bug fixed as a consequence.
+- 2026-09-04 TASK-0016 CLOSED — gates fail fast and fail honestly (`Failed > 0`/`Skipped > 0` exit non-zero), verified live by orchestrator. Two of its own defects were hidden by its fixtures: a skip line naming the trx file not the suite, and `-AllowSkipped` never working (a dot-sourced `param()` block clobbers the caller's switch). Fixtures must reproduce the real artefact's shape, names included.
 - 2026-09-04 TASK-0017 closed — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`; 2026-08-27 "honest end to end" holds again, undone-then-restored, never rewritten.
 
 ## Known drift
@@ -125,14 +127,14 @@ Read the entries your card names, not all of them.
 - 2026-08-26 A process lesson recorded but deliberately not acted on — orchestrator read, backend-dev concurring.
 - 2026-08-26 **Staging and dev-test databases share one role and one password.** Both Neon strings use the same credential.
 - 2026-08-27 **`Docker.DotNet.Enhanced` is unverified in practice and unverifiable on this machine** — TASK-0007 transitive consequence.
-- 2026-08-27 **`ci.ps1` coverage gate recognises skipped tests but not FAILED ones** — it printed `PASS` on a run with failures.
 - 2026-08-27 TASK-0011 Family B allowlist leaves one narrow gap, measured rather than assumed.
 - 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies** (`backend/docs/ASSUMPTIONS.md`).
 - 2026-08-27 **The frontend tree has no `src/shared/`**, which §7 and §2 both name. See Open question 11.
+- 2026-09-04 **`Format` runs before `Build` per TASK-0016's card but measures SLOWER** (~30s vs 4.2s), contradicting cheapest-first. Accepted, not reordered. Covers the generate-OpenAPI gate's position too.
+- 2026-09-04 **`local-env.ps1` cannot pass switches to the gate script** (array splat binds positionally), so `-NoFailFast`/`-AllowSkipped` are unreachable locally. Owning card TASK-0018.
 
-Six entries resolved or struck (`AUDIT.md` staleness, tracked `obj/`, the SSH.NET gate, the
-missing `SecureArmResponse` example, and both `Secret scan` red-gate entries) live in the archive
-only.
+Seven resolved or struck entries live in the archive only — including the 2026-08-27 `ci.ps1`
+failed-vs-skipped defect, closed 2026-09-04 by TASK-0016.
 
 ## Open questions
 

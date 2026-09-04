@@ -5,18 +5,22 @@
 .DESCRIPTION
     Gates, in order (cheapest and most likely to fail first, so feedback is fast):
 
-      1. restore
-      2. build with warnings as errors
-      3. dotnet format --verify-no-changes
-      4. generate the OpenAPI document (no database — SchoolManagement.ArchitectureTests reads it)
-      5. tests with coverage collection
-      6. coverage threshold
-      7. dependency vulnerability scan
-      8. secret scan (skipped with a warning if gitleaks is not installed)
-      9. OpenAPI contract drift
+      1.  restore
+      2.  dotnet format --verify-no-changes
+      3.  build with warnings as errors
+      4.  generate the OpenAPI document (no database — SchoolManagement.ArchitectureTests reads it)
+      5.  unit + architecture tests, with coverage collection
+      6.  integration tests, with coverage collection
+      7.  coverage threshold (also verdicts the test run itself — see -AllowSkipped below)
+      8.  dependency vulnerability scan
+      9.  secret scan (skipped with a warning if gitleaks is not installed)
+      10. OpenAPI contract drift
 
-    Every gate runs even after one fails, then the script exits non-zero with a summary. Stopping at
-    the first failure means a contributor fixes one thing, pushes, and waits to discover the next.
+    By default the script stops at the FIRST failing gate: a contributor fixes one thing, pushes,
+    and finds out about the next thing rather than waiting through a database round trip to learn a
+    typecheck was broken all along. Pass -NoFailFast to run every gate regardless and summarise at
+    the end instead — this is what CI wants, since it would rather see the full picture in one run
+    than re-trigger per fix.
 
 .PARAMETER Configuration
     Build configuration. Defaults to Release, matching CI.
@@ -28,8 +32,22 @@
     Skip the OpenAPI drift check. For the rare case where the contract is being changed deliberately
     in the same commit and has not been promoted yet.
 
+.PARAMETER AllowSkipped
+    Do not fail the run when the test suite reports skipped/not-executed tests (for example,
+    integration tests skipping because POSTGRES_TEST_CONNECTION is not set). The skip is still
+    reported, by suite name, and the coverage floor is still not enforced against an incomplete
+    run — only whether a skip fails the SCRIPT changes. Without this switch, a skipped suite is a
+    non-zero exit (CLAUDE.md §13: a skipped suite is not a passing suite).
+
+.PARAMETER NoFailFast
+    Run every gate even after one fails, then exit non-zero with a summary, instead of stopping at
+    the first failure. This is the CI workflow's mode.
+
 .EXAMPLE
     ./scripts/ci.ps1
+
+.EXAMPLE
+    ./scripts/ci.ps1 -NoFailFast -AllowSkipped
 #>
 [CmdletBinding()]
 param(
@@ -39,7 +57,11 @@ param(
     [ValidateRange(0, 100)]
     [int]$CoverageThreshold = 60,
 
-    [switch]$SkipContractDrift
+    [switch]$SkipContractDrift,
+
+    [switch]$AllowSkipped,
+
+    [switch]$NoFailFast
 )
 
 Set-StrictMode -Version Latest
@@ -48,7 +70,40 @@ $ErrorActionPreference = 'Continue'
 $backendRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $backendRoot
 
+# One implementation of "what does this batch of .trx files mean" — shared with the self-test under
+# backend/scripts/tests, which exercises these same functions against fixture .trx files.
+. (Join-Path $PSScriptRoot 'lib/gate-summary.ps1')
+
 $failures = [System.Collections.Generic.List[string]]::new()
+$gateVerdicts = [System.Collections.Generic.List[string]]::new()
+$script:testCountsLine = $null
+$script:coverageLine = $null
+
+function Write-FinalSummary {
+    # A FIXED block: one line per gate that ran, plus the test and coverage numbers when they were
+    # produced. Pasting this block alone is meant to satisfy CLAUDE.md §9 — no scrolling the log.
+    Write-Host ''
+    Write-Host '════════════════════════════════════════════════' -ForegroundColor Cyan
+    Write-Host 'SUMMARY' -ForegroundColor Cyan
+    foreach ($line in $gateVerdicts) {
+        Write-Host "  $line"
+    }
+    if ($script:testCountsLine) {
+        Write-Host "  $($script:testCountsLine)"
+    }
+    if ($script:coverageLine) {
+        Write-Host "  $($script:coverageLine)"
+    }
+    Write-Host ''
+
+    if ($failures.Count -gt 0) {
+        Write-Host "FAILED GATES ($($failures.Count)):" -ForegroundColor Red
+        $failures | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    }
+    else {
+        Write-Host 'ALL GATES PASSED' -ForegroundColor Green
+    }
+}
 
 function Invoke-Gate {
     param(
@@ -65,15 +120,30 @@ function Invoke-Gate {
             throw "exit code $LASTEXITCODE"
         }
         Write-Host "PASS: $Name" -ForegroundColor Green
+        $gateVerdicts.Add("PASS: $Name")
     }
     catch {
         Write-Host "FAIL: $Name -- $($_.Exception.Message)" -ForegroundColor Red
         $failures.Add($Name)
+        $gateVerdicts.Add("FAIL: $Name -- $($_.Exception.Message)")
+
+        if (-not $NoFailFast) {
+            # Cheapest-first ordering only pays off if a failure actually stops the run here. The
+            # `finally` block below still runs (Pop-Location) because `exit` unwinds through it.
+            Write-FinalSummary
+            exit 1
+        }
     }
 }
 
 try {
     Invoke-Gate 'Restore' { dotnet restore --nologo }
+
+    Invoke-Gate 'Format' {
+        # No build needed first: `dotnet format` only needs the restored package graph, not built
+        # output, so it can run ahead of Build per the cheapest-first ordering.
+        dotnet format --verify-no-changes --no-restore
+    }
 
     Invoke-Gate 'Build (warnings as errors)' {
         # TreatWarningsAsErrors is already set in Directory.Build.props; passing it again makes the
@@ -81,17 +151,13 @@ try {
         dotnet build --no-restore --configuration $Configuration --nologo -warnaserror
     }
 
-    Invoke-Gate 'Format' {
-        dotnet format --verify-no-changes --no-restore
-    }
-
     Invoke-Gate 'Generate OpenAPI document (no database)' {
         # SchoolManagement.ArchitectureTests reads this artefact directly instead of starting the
         # application (TASK-0009 moved the document-property contract tests off the database, since
-        # none of them ever touched it), so it must exist before the Tests gate runs below. This is the
-        # ONLY call to generate-openapi.ps1 in this script: the "OpenAPI contract drift" gate further
-        # down reuses the same file rather than regenerating it, so there is exactly one path to this
-        # document, not two.
+        # none of them ever touched it), so it must exist before the test gates run below. This is
+        # the ONLY call to generate-openapi.ps1 in this script: the "OpenAPI contract drift" gate
+        # further down reuses the same file rather than regenerating it, so there is exactly one
+        # path to this document, not two.
         & (Join-Path $PSScriptRoot 'generate-openapi.ps1') -Configuration $Configuration | Out-Null
         if ($LASTEXITCODE -ne 0) {
             throw 'Document generation failed.'
@@ -99,23 +165,42 @@ try {
         $global:LASTEXITCODE = 0
     }
 
-    Invoke-Gate 'Tests' {
-        # Integration tests SKIP when no PostgreSQL is reachable — they never silently pass. To run them
-        # here, set POSTGRES_TEST_CONNECTION or make a container runtime available. CI must do one of
-        # those, or the suite it is guarding is much smaller than it looks.
+    Invoke-Gate 'Unit & architecture tests' {
+        # Cleared here, once, before the FIRST test run: stale reports from a previous run would
+        # otherwise be merged into this one and report coverage for code that no longer exists. The
+        # integration-tests gate below deliberately does NOT clear this directory again — both gates
+        # deposit into it so the coverage-threshold gate's ReportGenerator merge sees both.
+        Remove-Item -Recurse -Force './artifacts/coverage' -ErrorAction SilentlyContinue
+
+        $projects = @(
+            'tests/SchoolManagement.UnitTests/SchoolManagement.UnitTests.csproj'
+            'tests/SchoolManagement.ArchitectureTests/SchoolManagement.ArchitectureTests.csproj'
+        )
+
+        $exitCode = 0
+        foreach ($project in $projects) {
+            dotnet test $project --no-build --configuration $Configuration --nologo `
+                --settings coverlet.runsettings `
+                --results-directory './artifacts/coverage' `
+                --logger 'trx'
+            if ($LASTEXITCODE -ne 0) {
+                $exitCode = $LASTEXITCODE
+            }
+        }
+        $global:LASTEXITCODE = $exitCode
+    }
+
+    Invoke-Gate 'Integration tests' {
+        # These SKIP when no PostgreSQL is reachable — they never silently pass. To run them here,
+        # set POSTGRES_TEST_CONNECTION or make a container runtime available. CI must do one of
+        # those, or the suite it is guarding is much smaller than it looks. A skip now fails the
+        # script (see the Coverage threshold gate below) unless -AllowSkipped is passed.
         if (-not $env:POSTGRES_TEST_CONNECTION) {
             Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
             Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
         }
 
-        # Cleared first: stale reports from a previous run would otherwise be merged into this one and
-        # report coverage for code that no longer exists.
-        Remove-Item -Recurse -Force './artifacts/coverage' -ErrorAction SilentlyContinue
-
-        # No fixed trx filename. Each of the three test projects writes its own results file, so a fixed
-        # name makes them overwrite each other — leaving one arbitrary project's results and a skipped
-        # count that silently understates reality.
-        dotnet test --no-build --configuration $Configuration --nologo `
+        dotnet test 'tests/SchoolManagement.IntegrationTests/SchoolManagement.IntegrationTests.csproj' --no-build --configuration $Configuration --nologo `
             --settings coverlet.runsettings `
             --results-directory './artifacts/coverage' `
             --logger 'trx'
@@ -125,7 +210,7 @@ try {
         $reports = @(Get-ChildItem './artifacts/coverage' -Recurse -Filter 'coverage.cobertura.xml' -ErrorAction SilentlyContinue)
 
         if ($reports.Count -eq 0) {
-            throw 'No coverage report was produced. Did the test gate fail?'
+            throw 'No coverage report was produced. Did an earlier test gate fail?'
         }
 
         # THE REPORTS MUST BE MERGED, NOT SAMPLED. Each test project emits its own cobertura file, and
@@ -167,55 +252,49 @@ try {
         Write-Host ("Line coverage:   {0:N2}%" -f $lineRate)
         Write-Host ("Branch coverage: {0:N2}%" -f $branchRate)
 
-        # ── Was the suite actually complete? ──────────────────────────────────────────────────────
-        # This matters more than the number. When no PostgreSQL is available the integration tests
-        # SKIP, so the entire HTTP layer — endpoints, middleware, the pipeline end to end, OpenAPI
-        # transformers — is never executed and coverage is structurally low. Enforcing the floor then
-        # would fail for a reason unrelated to code quality, and the predictable response would be to
-        # lower the floor until it passed, which destroys the gate for everyone.
+        # ── Was the suite actually complete, and did it pass? ─────────────────────────────────────
+        # Delegated to gate-summary.ps1 (dot-sourced above), so this exists in exactly one place —
+        # the self-test under backend/scripts/tests exercises these same functions against fixture
+        # .trx files. Summed across EVERY trx in the directory: one file per test project run above.
         #
-        # So: enforce the floor only when the suite was complete, and when it was not, report the
-        # number and say plainly that it was NOT enforced. Never silently pass a floor that was not
-        # checked.
-        # Summed across EVERY trx: one file per test project, and it is the integration project's skips
-        # that matter here. Reading a single file would miss them entirely.
-        #
-        # DERIVED as total - passed - failed, NOT read from the `notExecuted` counter. xunit v3's dynamic
-        # skips (Assert.Skip) do not increment notExecuted in the VSTest trx: the integration project
-        # reports total=31, passed=0, failed=0, notExecuted=0. Trusting notExecuted would silently
-        # conclude the suite was complete and enforce a floor against a partial run.
-        # -LiteralPath, not positional: when two test projects finish in the same second the VSTest
-        # logger disambiguates with a literal "[1]" suffix (...HH_mm_ss[1].trx), and PowerShell's
-        # provider path resolution treats unbracketed square brackets as a wildcard character class.
-        # Without -LiteralPath that bracketed filename fails to resolve and Get-Content throws a
-        # confusing "parameter 'Raw' not found" error instead of a path-not-found one. TASK-0002
-        # hit this while adding a fourth trx-producing run; unrelated to the authorisation work itself.
-        $skipped = 0
-        foreach ($trx in Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue) {
-            [xml]$results = Get-Content -LiteralPath $trx.FullName -Raw
-            $counters = $results.TestRun.ResultSummary.Counters
+        # A FAILED test used to read as a pass here: this gate runs even when an earlier test gate
+        # already failed, under -NoFailFast (CI's mode) — printing "PASS: Coverage threshold" over a
+        # run with real test failures is exactly the defect this closes
+        # (`.agent/drift/2026-Q3.md`, 2026-08-27: 30 integration tests FAILED yet this line printed
+        # PASS at 60.48% line coverage). A SKIPPED suite now fails the script too, unless
+        # -AllowSkipped is passed — a skipped suite is not a passing suite.
+        $testSummary = Get-TrxSummary -ResultsDirectory './artifacts/coverage'
+        $verdict = Get-TestRunVerdict -Summary $testSummary -AllowSkipped:$AllowSkipped
 
-            $notRun = [int]$counters.total - [int]$counters.passed - [int]$counters.failed
-            if ($notRun -gt 0) {
-                $skipped += $notRun
-            }
+        $script:testCountsLine = "Tests: total={0} passed={1} failed={2} skipped={3}" -f `
+            $testSummary.Totals.Total, $testSummary.Totals.Passed, $testSummary.Totals.Failed, $testSummary.Totals.Skipped
+        $script:coverageLine = "Coverage: line={0:N2}% branch={1:N2}%" -f $lineRate, $branchRate
+
+        foreach ($message in $verdict.Messages) {
+            Write-Host $message -ForegroundColor Yellow
         }
 
-        if ($skipped -gt 0) {
-            Write-Host ''
-            Write-Host "COVERAGE FLOOR NOT ENFORCED: $skipped test(s) were skipped, so the suite was" -ForegroundColor Yellow
-            Write-Host 'incomplete and this number is not comparable to the floor. The integration tests' -ForegroundColor Yellow
-            Write-Host 'need PostgreSQL — set POSTGRES_TEST_CONNECTION or start a container runtime, then' -ForegroundColor Yellow
-            Write-Host 'this gate will measure and enforce properly. CI supplies a database, so the floor' -ForegroundColor Yellow
-            Write-Host 'IS enforced there (and a separate CI step fails if anything was skipped).' -ForegroundColor Yellow
-            $global:LASTEXITCODE = 0
-            return
+        if (-not $verdict.Passed) {
+            throw 'Test run was not clean (failed and/or skipped tests) - see the messages above.'
         }
 
         # THE THRESHOLD IS A FLOOR, NOT A GOAL. It exists to catch a collapse — someone deleting a test
         # project, or a large untested subsystem landing at once. Chasing the number produces tests that
         # execute code without asserting anything about it, which is worse than no test because it looks
         # like cover. Judge a pull request on whether its behaviour is tested, not on whether this moved.
+        if ($testSummary.Totals.Skipped -gt 0) {
+            # Only reachable with -AllowSkipped (otherwise the verdict above already threw). The
+            # floor still must not be judged against an incomplete run — only whether a skip fails
+            # the SCRIPT changed, not whether the floor is enforced against a partial run.
+            Write-Host ''
+            Write-Host 'COVERAGE FLOOR NOT ENFORCED: the suite above was incomplete (see the skip message(s)' -ForegroundColor Yellow
+            Write-Host 'above), so this number is not comparable to the floor. The integration tests need' -ForegroundColor Yellow
+            Write-Host 'PostgreSQL — set POSTGRES_TEST_CONNECTION or start a container runtime, then drop' -ForegroundColor Yellow
+            Write-Host '-AllowSkipped and this gate will measure and enforce properly.' -ForegroundColor Yellow
+            $global:LASTEXITCODE = 0
+            return
+        }
+
         if ($lineRate -lt $CoverageThreshold) {
             throw ("Line coverage {0:N2}% is below the {1}% floor." -f $lineRate, $CoverageThreshold)
         }
@@ -254,6 +333,7 @@ try {
     if ($SkipContractDrift) {
         Write-Host ''
         Write-Host 'SKIPPED: OpenAPI contract drift (explicitly requested)' -ForegroundColor Yellow
+        $gateVerdicts.Add('SKIP: OpenAPI contract drift (explicitly requested)')
     }
     else {
         Invoke-Gate 'OpenAPI contract drift' {
@@ -292,16 +372,12 @@ try {
         }
     }
 
-    Write-Host ''
-    Write-Host '════════════════════════════════════════════════' -ForegroundColor Cyan
+    Write-FinalSummary
 
     if ($failures.Count -gt 0) {
-        Write-Host "FAILED GATES ($($failures.Count)):" -ForegroundColor Red
-        $failures | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
         exit 1
     }
 
-    Write-Host 'ALL GATES PASSED' -ForegroundColor Green
     exit 0
 }
 finally {

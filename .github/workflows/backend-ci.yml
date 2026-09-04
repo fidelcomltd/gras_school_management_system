@@ -88,6 +88,13 @@ jobs:
         working-directory: backend
         run: dotnet tool restore
 
+      - name: Self-test the gate-summary trx parser
+        working-directory: backend
+        shell: pwsh
+        # Runs before the real gates so a broken parser fails fast, cheaply, on fixtures alone —
+        # not after a full build and a database round trip.
+        run: ./scripts/tests/gate-summary.tests.ps1
+
       - name: Run all quality gates
         working-directory: backend
         shell: pwsh
@@ -96,7 +103,9 @@ jobs:
           # Supplying this makes the integration tests RUN rather than skip. Host is 'localhost' because
           # the service container's port is published to the runner.
           POSTGRES_TEST_CONNECTION: 'Host=localhost;Port=5432;Database=schoolmanagement_ci;Username=ci_user;Password=ci_password'
-        run: ./scripts/ci.ps1 -Configuration Release
+        # -NoFailFast: CI wants the full picture from one run rather than stopping at the first
+        # failing gate, so a contributor sees every problem instead of re-triggering per fix.
+        run: ./scripts/ci.ps1 -Configuration Release -NoFailFast
 
       - name: Assert the integration tests were not skipped
         if: always()
