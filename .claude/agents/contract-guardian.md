@@ -20,3 +20,7 @@ CHECK 3 client bypass:     PASS | FAIL — <file:line hits>
 CHECK 4 lockfile:          PASS | FAIL — expected <hash> got <hash>
 
 No commentary. No fixes. No suggestions.
+
+Context discipline (§13): read only this file, CLAUDE.md §4.4 and the command output. Do not
+read .agent/spec/*, the task card, or the drift archives — none of them change a mechanical
+check, and you are dispatched often.

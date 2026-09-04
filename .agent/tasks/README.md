@@ -10,17 +10,16 @@ spec revision does not silently invalidate a card.
 Cards are written just ahead of dispatch, not all at once. The full planned sequence lives in
 [ROADMAP.md](../ROADMAP.md); a row there without a TASK id is planned, not yet carded.
 
-| Card | Title | Owner | Status |
-|---|---|---|---|
-| [TASK-0001](TASK-0001.md) | Re-audit both scaffolds against §6/§7 | reviewer | queued |
-| [TASK-0002](TASK-0002.md) | Privilege register and authorisation enforcement | backend-dev | done |
-| [TASK-0003](TASK-0003.md) | Admin accounts, authentication, session management | backend-dev | queued |
-| [TASK-0004](TASK-0004.md) | OpenAPI client generator and typed API layer | frontend-dev | done |
-| [TASK-0005](TASK-0005.md) | School settings: identity, reg number, config versioning | backend-dev | queued |
-| [TASK-0006](TASK-0006.md) | Regenerate the frontend client against the TASK-0002 contract | frontend-dev | done |
-| [TASK-0007](TASK-0007.md) | Clear the SSH.NET High advisory blocking the vuln gate | backend-dev | queued |
-| [TASK-0008](TASK-0008.md) | Give the integration-test connection string a durable local home | backend-dev | queued |
-| [TASK-0009](TASK-0009.md) | Move the document-property contract tests off the database | backend-dev | done |
-| [TASK-0010](TASK-0010.md) | Make OpenAPI document generation deterministic | backend-dev | done |
+**Status of record is [STATE.md](../STATE.md) `## In flight`.** This file used to carry a
+duplicate status table; it was deleted on 2026-09-04 because it had already drifted, and a fact
+with two homes has none.
 
-Current status of record is [STATE.md](../STATE.md) `## In flight`, not this table.
+## Size cap — ~120 lines per card
+
+A card is a brief for one agent, not a transcript (CLAUDE.md §13). The implementing agent reads
+its card in full on every dispatch, so length is charged again on every re-dispatch.
+
+When a closed card's `## Log` has outgrown the card, move the log to
+[`logs/TASK-####.log.md`](logs/) and leave a pointer. Eight cards were trimmed this way on
+2026-09-04; nothing was deleted. `## Goal`, `## Contract delta`, `## Acceptance criteria` and
+`## Out of scope` stay in the card — they are what the agent is held to.

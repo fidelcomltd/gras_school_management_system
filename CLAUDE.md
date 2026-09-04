@@ -85,12 +85,17 @@ Single shared file. **Every** subagent reads it as the first action of its sessi
 
 - `## Layout` — real paths, package manager, framework versions
 - `## Contract` — current `openapi.json` hash, generator tool + version, last regeneration timestamp
-- `## In flight` — open task cards, owner, status (`queued` / `in-progress` / `review` / `blocked` / `done`)
-- `## Decisions` — dated one-line architectural decisions with rationale (append-only; never rewrite history)
-- `## Open questions` — anything awaiting a human answer
-- `## Known drift` — deviations from spec that are accepted for now, each with an owning task card
+- `## In flight` — **open** task cards only, owner, status (`queued` / `in-progress` / `review` / `blocked` / `done`). Closed cards leave the table and are listed by ID.
+- `## Decisions` — dated one-line index entries, full text in the archive (append-only; never rewrite history)
+- `## Open questions` — anything awaiting a human answer, live ones only
+- `## Known drift` — deviations from spec that are accepted for now, each with an owning task card, indexed the same way
 
-Keep it under ~200 lines. When `## Decisions` grows past that, archive older entries to `.agent/decisions/YYYY-QN.md` and leave a pointer.
+**Cap: 12 KB — bytes, not lines.** A line cap does not bound cost; the old "~200 lines" limit read
+green at 36 KB. Check `wc -c .agent/STATE.md` before appending.
+
+When a section outgrows the cap, **archive rather than delete**: full text to
+`.agent/decisions/YYYY-QN.md` or `.agent/drift/YYYY-QN.md`, one-line index entry left behind. An
+agent then reads the entries its own card names, not all of them.
 
 ### 4.2 Task card format — `.agent/tasks/TASK-0042.md`
 
@@ -176,70 +181,19 @@ Distinct from agent-session sync above: the *application's* own sessions must be
 
 ## 6. Backend specification — .NET 10 REST API
 
-**Structure & style**
-- Minimal APIs grouped per feature (`MapGroup`), endpoints thin — no business logic in the handler.
-- Layering: `Api → Application → Domain`, `Infrastructure` implements `Application` interfaces. `Domain` references nothing.
-- `<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<ImplicitUsings>enable</ImplicitUsings>`, analyzers on, `.editorconfig` committed.
-- `record` types for DTOs; entities are classes with private setters and no public parameterless constructors where avoidable.
-
-**HTTP semantics**
-- `TypedResults` everywhere (never bare `Results.Ok` with an untyped body) so the OpenAPI document is accurate.
-- Errors return RFC 9457 `ProblemDetails` with a stable machine-readable `type`/error code. A global exception handler maps domain exceptions → status codes; handlers never catch broadly.
-- Correct codes: `201` + `Location` on create, `204` on delete/no-body update, `409` on conflict, `422` on validation failure (or `400` — pick one and be consistent), `429` when rate-limited.
-- Collection endpoints are **always** paginated with a consistent envelope (`items`, `nextCursor` or `page`/`pageSize`/`total`). No unbounded list endpoints.
-- Mutating endpoints that can be retried accept an `Idempotency-Key`.
-
-**Data**
-- EF Core with PostgreSQL. Explicit migrations, reviewed, never auto-applied on startup in production.
-- `AsNoTracking()` for all read paths; projections to DTO in the query — never load entities to map them in memory.
-- No lazy loading. Explicit `Include` or projection.
-- Never expose entities over HTTP. Never accept entities as request bodies.
-- Schema changes affecting an existing column follow the expand/contract pattern (add nullable → backfill → constrain), not an in-place tighten.
-
-**Cross-cutting**
-- `CancellationToken` accepted and propagated on every async path. `async` all the way down; no `.Result`, no `.Wait()`, no `async void`.
-- Validation via FluentValidation registered as an endpoint filter, executed before the handler.
-- Options pattern with `ValidateOnStart()`; no `IConfiguration` string indexing in business code.
-- Structured logging (Serilog or `ILogger` with message templates — never string interpolation into log messages). OpenTelemetry traces/metrics. Correlation ID propagated from an inbound header and returned in the response.
-- No secrets in `appsettings.json`. User secrets locally, environment/secret store in deployment.
-- Health checks: `/health/live` and `/health/ready` (ready includes DB).
-- Rate limiting middleware on public endpoints.
-
-**Testing**
-- xUnit. Integration tests via `WebApplicationFactory` against a real Postgres (Testcontainers), not an in-memory provider.
-- Every endpoint gets at least: happy path, validation failure, unauthorized, not-found.
-- Unit tests cover domain rules and use-case branching. No tests asserting on mock call counts as a substitute for behaviour.
+The body moved to [.agent/spec/backend.md](.agent/spec/backend.md) on 2026-09-04, so that only
+`backend-dev` loads it instead of every session paying for it. **That file is §6** and is binding
+in full — every "§6" reference in this repo resolves there. Concrete recipes implementing it:
+`backend/AGENTS.md`. Accepted deviations: `backend/docs/ASSUMPTIONS.md`.
 
 ---
 
 ## 7. Frontend specification — React web app
 
-**Structure & style**
-- TypeScript `strict: true`, `noUncheckedIndexedAccess: true`. No `any`; no non-null `!` without an adjacent comment justifying it. `// @ts-ignore` is a blocker.
-- Feature-first folders under `src/features/<feature>/` (`components/`, `hooks/`, `api/`, `types.ts`). **Promotion discipline:** code lives in the feature that owns it until a *second* feature needs it, then it moves to `src/shared/` in its own commit — never pre-emptively.
-- No barrel `index.ts` re-export chains beyond one level.
-- Functional components, hooks only. Colocate tests next to source.
-
-**Data layer**
-- All server communication goes through the generated client in `src/api/`. **Zero** raw `fetch`/`axios` calls to the API elsewhere in the tree.
-- TanStack Query for all server state. Centralised query-key factory per feature — no inline string keys. Explicit `staleTime`. Mutations invalidate precisely, not `queryClient.invalidateQueries()` with no key.
-- Server state never duplicated into `useState`/global store. Client state (UI, forms, filters) is separate and local by default.
-- Zod validation at the network boundary only, for anything the generated types can't guarantee. Not re-validating trusted internal shapes.
-- Loading, empty, error, and unauthorized are **four required states** for every data view. A component that only handles success is incomplete.
-
-**UI & correctness**
-- Forms: react-hook-form + zod resolver. Validation rules mirror the backend's; where they diverge, the backend is authoritative and the client must handle the server-side rejection gracefully.
-- Error boundaries per route. A failed query never blanks the app.
-- Accessibility is not optional: semantic elements, labelled inputs, keyboard-reachable interactive elements, visible focus, `aria-live` for async status. No `div` with `onClick` standing in for a button.
-- No layout shift on data arrival — reserve space or use skeletons.
-- Env config via typed, validated env module. No hardcoded API hosts.
-- No secrets or privileged logic in the bundle. Authorization decisions are backend-enforced; the UI only *hides*, it never *protects*.
-
-**Testing**
-- Vitest + React Testing Library, queried by role/label — not by test ID unless there is no accessible handle.
-- MSW for network mocking, handlers derived from the OpenAPI document so mocks cannot drift from the contract.
-- Playwright for the critical flows: auth, the primary create path, and one failure path.
-- Tests assert user-visible behaviour, not implementation details.
+The body moved to [.agent/spec/frontend.md](.agent/spec/frontend.md) on 2026-09-04, so that only
+`frontend-dev` loads it. **That file is §7** and is binding in full — every "§7" reference in this
+repo resolves there. Concrete conventions implementing it: `frontend/CONVENTIONS.md`. Deliberate
+omissions on record: `frontend/HANDOFF.md`.
 
 ---
 
@@ -273,6 +227,10 @@ Contract:  regenerate openapi.json → diff must be empty
 ```
 
 A subagent reporting success without pasting gate output has not finished. Re-dispatch.
+
+**"Pasting gate output"** means each gate's summary line plus every failing line in full — not the
+whole log. `Failed: 0, Passed: 178, Skipped: 0` and the coverage line are the evidence; restore
+chatter is not. A run with anything **skipped is not a passing run** (§13).
 
 ---
 
@@ -317,3 +275,22 @@ Next:         <the single next task card, or the question blocking you>
 ```
 
 Keep it to that. No restating the task, no summarising your own process.
+
+---
+
+## 13. Context budget
+
+Every rule above is paid once per agent session, and again on every re-dispatch. **Lazy loading,
+not less information:** detail sits behind a pointer, read on demand by the one agent that needs
+it. Rigour comes from §4.4's mechanical checks, not from an agent having read everything.
+
+- **Read the slice, not the file.** Never load `contracts/openapi.json` whole — `jq` the paths your card names. Same for the archives: read the drift and decision entries your card names.
+- **One home per rule.** §6 is `.agent/spec/backend.md`, §7 is `.agent/spec/frontend.md`; neither dev loads the other's. A rule restated in two files gets deleted from one.
+- **Archive, never delete.** Full text to `.agent/decisions/` or `.agent/drift/`, one-line index entry behind.
+- **Cards cap at ~120 lines**, `STATE.md` at 12 KB (§4.1), both in bytes/lines checked before appending.
+- **Cheapest gate first, stop at the first failure.** A broken typecheck should surface in seconds, not after a Postgres spin-up. Owned by TASK-0016.
+- **A skipped suite is not a passing suite.** This project's costliest defect was a false close on a silently skipping suite, not a large file. Gates exit non-zero on `Skipped > 0`.
+- **Report the summary line plus failing lines** (§9). Never a whole log.
+- **Dispatch hygiene:** one card per dispatch; `git diff --stat` before the full diff; mechanical work to `contract-guardian` on Haiku; never send a subagent after what one `grep` finds; parallel only under §4.3.
+
+Measurements and reasoning behind each rule: `.agent/decisions/2026-Q3.md`.
