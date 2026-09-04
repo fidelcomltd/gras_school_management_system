@@ -13,7 +13,7 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 
 | Task | Title | Owner | Spec | Status |
 |---|---|---|---|---|
-| TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | queued |
+| TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | **done** |
 | TASK-0002 | Privilege register and authorisation enforcement | BE | 01 §4.2–4.4, 14 §9.2 | **done** |
 | TASK-0003 | Admin accounts, authentication, session management | BE | 03 §6.1.11, 14 §9.1 | queued |
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
@@ -28,10 +28,15 @@ inherits whatever these leave broken.
 
 | Task | Title | Owner | Why it exists | Status |
 |---|---|---|---|---|
-| TASK-0007 | Clear the SSH.NET High advisory | BE | The vulnerable-dependency gate is red, so §9 is unsatisfied and every card closes against a known-failing gate. A red gate nobody can fix stops being information. | queued |
-| TASK-0008 | Durable local home for the test connection string, + local gitleaks | BE | No sanctioned place to keep `POSTGRES_TEST_CONNECTION`, so it gets forgotten — and forgetting it makes the integration tests SKIP while the suite still reports success. Also installs gitleaks, which currently does not run locally at all. | queued |
+| TASK-0007 | Clear the SSH.NET High advisory | BE | The vulnerable-dependency gate is red, so §9 is unsatisfied and every card closes against a known-failing gate. A red gate nobody can fix stops being information. | **done** |
+| TASK-0008 | Durable local home for the test connection string, + local gitleaks | BE | No sanctioned place to keep `POSTGRES_TEST_CONNECTION`, so it gets forgotten — and forgetting it makes the integration tests SKIP while the suite still reports success. Also installs gitleaks, which currently does not run locally at all. | **done** |
 | TASK-0009 | Move document-property contract tests off the database | BE | Eight checks needing no database were invisible whenever Postgres was unreachable. That is exactly how TASK-0002's missing example reached the committed contract. | **done** |
-| TASK-0010 | Make OpenAPI document generation deterministic | BE | An incremental build produced a different document than a clean build, from identical source. §3 rests on the contract being reproducible from source. | in-progress |
+| TASK-0010 | Make OpenAPI document generation deterministic | BE | An incremental build produced a different document than a clean build, from identical source. §3 rests on the contract being reproducible from source. | **done** |
+| TASK-0011 | Make the secret-scan gate pass for the right reason | BE | Installing gitleaks (TASK-0008) made the gate execute for the first time ever; it found 9 non-secrets tripping an untested rule. A gate that had never run was reporting PASS. | **done** |
+| TASK-0012 | Declare the problem-detail extension members in the contract | BE+FE | TASK-0001 blocker B1. The contract forbids the `errorCode`/`traceId` every error response carries, and the closed type has already reached `schema.d.ts`. Blocks TASK-0003 frontend. | queued |
+| TASK-0013 | Decide and implement idempotency for retryable mutations | BE | TASK-0001 blocker B2. §6 requires `Idempotency-Key`; it appears nowhere, undocumented. Spec 9.8.2 needs it by Phase 2. Decide-now, not fix-now. | queued |
+| TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | FE | TASK-0001 S4-S8. The feature README prescribes bypassing the generated client, and `npm run lint` cannot fail on warnings. | queued |
+| TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | queued |
 
 **The through-line, worth remembering when the next card is tempting to rush:** every one of these
 was a way for a green result to mean nothing. Skipped tests reported as passes, a coverage floor
