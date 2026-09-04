@@ -32,6 +32,21 @@ namespace SchoolManagement.Api.Endpoints;
 /// means the deny-by-default fallback policy protects the endpoint.</item>
 /// <item>A rate-limiting policy.</item>
 /// </list>
+/// <para>
+/// TODO(TASK-0013): mutating endpoints in this file do NOT yet accept an <c>Idempotency-Key</c>
+/// header, though root <c>CLAUDE.md</c> §6 requires it for any mutating endpoint that can be
+/// retried. This is a deliberate, human-approved deferral — Option B — recorded in
+/// <c>docs/ASSUMPTIONS.md</c> §2.14, not an oversight: no product mutating endpoint exists yet, so
+/// building the mechanism now would have no real caller to validate its hard parts (key storage,
+/// request fingerprinting, replay) against. It does not belong on this list of five things as a
+/// sixth, because it is not yet true of anything below. The first task card implementing any
+/// mutating operation a retry could duplicate — spec §9.8.2 names pupil registration, pin
+/// generation, promotion commit and result publication as examples, not an exhaustive list —
+/// implements the idempotency mechanism first, before that operation ships. Anyone copying
+/// <see cref="MapCreateSampleRecord"/> as a template for a new mutating endpoint must read
+/// <c>ASSUMPTIONS.md</c> §2.14 and confirm the new endpoint either isn't retry-duplicable or the
+/// trigger has already fired — do not inherit the gap silently.
+/// </para>
 /// </remarks>
 public sealed class ReferenceEndpoints : IEndpointModule
 {
@@ -110,6 +125,10 @@ public sealed class ReferenceEndpoints : IEndpointModule
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
+                // TODO(TASK-0013): this is the create-endpoint template every future POST is copied
+                // from, and it does not read/require an Idempotency-Key. See the class <remarks>
+                // above and docs/ASSUMPTIONS.md §2.14 before copying this shape for a real mutating
+                // endpoint — check whether the §9.8.2 trigger has fired first.
                 var result = await sender.SendAsync(command, cancellationToken);
 
                 // 201 with a Location header pointing at the created resource. The response body also

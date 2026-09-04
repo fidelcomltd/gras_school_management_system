@@ -82,14 +82,13 @@ portal:    no authentication in the account sense — pin validation only (spec 
 
 ## In flight
 
-Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0014, 0016, 0017, 0018 —
+Open cards only. Closed: TASK-0001, 0002, 0004, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0016, 0017, 0018 —
 closure notes and reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0003 | Admin accounts, authentication and session management | backend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
-| TASK-0013 | Idempotency — Option B, defer with a binding record | backend-dev | queued |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | backend-dev | queued |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
@@ -100,15 +99,15 @@ Index only, newest last. **Full text:** [decisions/2026-Q3.md](decisions/2026-Q3
 `## Log` of the card each entry names. Bootstrap decisions (2026-07-27 to 2026-08-08) live there
 too and are still in force.
 
-- 2026-08-27 Four decisions — gitleaks rule narrowed by human approval (TASK-0011); the gate suite honest end to end on one verified live run (0007/0008/0011); the test-database credential split confirmed deliberate; TASK-0001 closed with both scaffolds exceeding spec. Full text: `decisions/2026-Q3.md:156-158` and each card's `## Log`.
-- 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions` and `## Known drift` reduced to indexes, whole-file contract reads dropped from the dev agents, §6/§7 given one home each.
-- 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode` (optional) and `traceId` (required); client regenerated against b287da03…; `ApiError.code`-from-`problem.type` bug fixed as a consequence.
-- 2026-09-04 TASK-0016 CLOSED — gates fail fast and fail honestly (`Failed > 0`/`Skipped > 0` exit non-zero), verified live by orchestrator. Two of its own defects were hidden by its fixtures: a skip line naming the trx file not the suite, and `-AllowSkipped` never working (a dot-sourced `param()` block clobbers the caller's switch). Fixtures must reproduce the real artefact's shape, names included.
+- 2026-08-27 Four decisions — gitleaks rule narrowed by human approval; the gate suite honest end to end on one verified live run; the test-DB credential split deliberate; TASK-0001 closed, both scaffolds exceeding spec. Full text: `decisions/2026-Q3.md:156-158`.
+- 2026-09-04 **Context budget restructured** — this file capped in bytes, `## Decisions`/`## Known drift` reduced to indexes, §6/§7 given one home each.
+- 2026-09-04 TASK-0012 CLOSED — problem schemas declare `errorCode`/`traceId`; client regenerated against b287da03…; an `ApiError.code` bug fixed as a consequence.
+- 2026-09-04 TASK-0016 CLOSED — gates fail fast and fail honestly; two of its own defects were hidden by its own fixtures. Lesson: fixtures must reproduce the real artefact's shape, names included. Full text: `decisions/2026-Q3.md:299,319`.
 - 2026-09-04 TASK-0017 closed — secret scan restored via fingerprint-pinned `backend/.gitleaksignore`; 2026-08-27 "honest end to end" holds again, undone-then-restored, never rewritten.
-- 2026-09-04 **TASK-0013 decided Option B** — idempotency deferred with a binding record, human sign-off. Trigger: the first card implementing any of spec 9.8.2's four operations builds the mechanism first. No contract movement.
-- 2026-09-04 Sequencing confirmed: finish Phase 0b (TASK-0018, 0014, then 0013, 0015) before TASK-0003 opens the first product surface.
-- 2026-09-04 TASK-0014 CLOSED — §7 audit S4-S7. The READMEs no longer document a route around the generated client (S4, the point of the card); lint enforces `--max-warnings=0`; `httpClient` unexported and that rule is now a test. Test count 130/15. S8 `src/shared/` still open (question 11).
-- 2026-09-04 TASK-0018 CLOSED — `-GateArgs` converts to a hashtable before splatting, so switches bind by name; `-NoFailFast`/`-AllowSkipped` reachable locally at last. 21-assertion self-test. Its drift entry is struck.
+- 2026-09-04 **TASK-0013 decided Option B (human sign-off) and CLOSED** — idempotency deferred; `ASSUMPTIONS.md` §2.14 plus a `TODO(TASK-0013)` in `ReferenceEndpoints.cs`. Zero behaviour change, contract byte-identical. Lesson: XML doc comments are contract content here, so a documentation-only backend diff still needs a hash check. Full text: `decisions/2026-Q3.md`.
+- 2026-09-04 Sequencing: Phase 0b now finishes with TASK-0015 alone, before TASK-0003 opens the first product surface.
+- 2026-09-04 TASK-0014 CLOSED — §7 audit S4-S7; no documented route around the generated client any more, and that rule is now a test. S8 `src/shared/` still open (question 11). Full text: `decisions/2026-Q3.md:335`.
+- 2026-09-04 TASK-0018 CLOSED — `-GateArgs` splats as a hashtable, so switches bind by name; `-NoFailFast`/`-AllowSkipped` work locally at last. Drift entry struck.
 
 ## Known drift
 
@@ -129,6 +128,8 @@ Read the entries your card names, not all of them.
 - 2026-08-27 **Validation runs as a mediator pipeline behaviour, not the endpoint filter §6 specifies** (`backend/docs/ASSUMPTIONS.md`).
 - 2026-08-27 **The frontend tree has no `src/shared/`**, which §7 and §2 both name. See Open question 11.
 - 2026-09-04 **`Format` runs before `Build` per TASK-0016's card but measures SLOWER** (~30s vs 4.2s), contradicting cheapest-first. Accepted, not reordered. Covers the generate-OpenAPI gate's position too.
+
+- 2026-09-04 **No `Idempotency-Key` mechanism, and mutating endpoints do not accept the header** — §6 and spec §9.8.2 both require it. Deferred deliberately (Option B, human sign-off). Owner `backend-dev`; orchestrator fires the trigger. **Trigger: the first card implementing ANY retry-duplicable mutation builds the mechanism first** — §9.8.2's four named operations are examples, not the whole list. Check this before dispatching TASK-0003 and TASK-0005. Full text: `drift/2026-Q3.md` and `backend/docs/ASSUMPTIONS.md` §2.14.
 
 Eight resolved or struck entries live in the archive only.
 

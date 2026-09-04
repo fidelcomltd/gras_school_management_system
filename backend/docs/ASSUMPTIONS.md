@@ -142,6 +142,56 @@ and the integration-test harness all work end to end.
 **Delete it with the first real aggregate** — the entity, its configuration, repository, endpoints, DTOs,
 examples and tests, plus a migration dropping the table.
 
+### 2.14 No `Idempotency-Key` mechanism exists yet — DEVIATION
+
+Root `CLAUDE.md` §6 (`.agent/spec/backend.md`) requires: **"Mutating endpoints that can be retried
+accept an `Idempotency-Key`."** Verified: zero occurrences of `Idempotency` in any `.cs`, `.csproj`,
+`.md` or `.ps1` under `backend/`, apart from `dotnet ef migrations script --idempotent` in
+`README.md`. No middleware, no endpoint filter, no key store, no test. This is a deviation from §6's
+letter, recorded here rather than fixed today.
+
+**Why deferred rather than built (Option B, human sign-off 2026-09-04):** no product mutating
+endpoint exists yet, so a mechanism built now would have no real caller to validate its hard parts
+against — key storage, request fingerprinting, and the retention/purge rule §9.9 cares about. The
+risk that made this a blocker was never the missing mechanism; it was `ReferenceEndpoints.cs`
+silently teaching its absence to every future POST copied from it as the template. That risk is
+closed by the documented TODO in that file's class-level `<remarks>` (this task's Deliverable 2), not
+by building the filter early against no real requirements.
+
+**Owner:** `backend-dev` implements the mechanism, on the trigger below. The orchestrator is
+accountable for firing that trigger at dispatch time — i.e. for not opening a mutating-endpoint task
+card without first checking this entry.
+
+**Trigger, stated so it cannot be read narrowly:** the first task card implementing **any** mutating
+operation that a retry could duplicate builds the idempotency mechanism first, before the operation
+itself ships. Spec `product-specification/14-non-functional-requirements.md` §9.8.2 names four
+examples explicitly — pupil registration, pin generation, promotion commit, and result publication —
+but its own wording is "Idempotency keys on **every** mutating endpoint that a retry could
+duplicate, in particular pupil registration, pin generation, promotion commit and result
+publication." The four are examples, not an exhaustive list; a future mutating endpoint outside
+those four that a retry could duplicate is equally in scope and does not get a pass for not being on
+the list.
+
+The requirement is concrete and dated, not hypothetical: `product-specification/10-module-access-pins.md:180`
+already specifies `POST /pin-batches` as requiring an idempotency key ("Idempotency key required, per
+9.8.2, so a retry cannot double-generate a batch."), so the first of the four named triggers is
+already written into the product spec with its own endpoint.
+
+**What the implementing card will have to decide** (not re-derived from scratch when the trigger
+fires):
+- **Key storage and its retention/purge rule.** §9.9's data-protection retention table governs what
+  may be retained and for how long — a stored idempotency record (key, fingerprint, response body)
+  is itself data that needs a purge rule, not an indefinite table.
+- **Request fingerprinting**, so a reused key submitted with a different payload is rejected rather
+  than silently replaying an unrelated stored response.
+- **Stored-response replay** on a genuine repeat (same key, same fingerprint) — return the original
+  response rather than re-executing the mutation.
+
+Cross-references: `TASK-0013` (this decision); `.agent/AUDIT.md` finding **B2** (original finding);
+`ReferenceEndpoints.cs` class `<remarks>` (the documented TODO). **Cost to change:** none yet — no
+mutating endpoint exists to retrofit. Cost grows by one endpoint for every mutating route added
+before the trigger fires and is not honoured.
+
 ---
 
 ## 3. Open — a human must decide or supply
