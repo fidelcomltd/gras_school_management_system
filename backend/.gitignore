@@ -18,6 +18,14 @@ coverage*.info
 *.trx
 TestResults/
 
+## Carve-out: hand-authored .trx FIXTURES for gate-summary.tests.ps1 / local-env.tests.ps1 are
+## committed test data, not build output — the *.trx rule above must not eat them (TASK-0022:
+## they were silently untracked, so the self-test that guards CI's gate parser was never
+## capable of running on a fresh checkout). Scoped to this one directory only, so real test
+## output (artifacts/coverage/*.trx, TestResults/*.trx) stays ignored — verify with
+## `git check-ignore` after adding a fixture, never assume.
+!scripts/tests/fixtures/**/*.trx
+
 ## Local secrets and environment — NEVER commit these.
 ## Real values live in dotnet user-secrets (local) or the secret store (deployed).
 ## See README.md "Configuration and secrets".

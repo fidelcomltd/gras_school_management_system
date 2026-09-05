@@ -67,6 +67,16 @@ if (-not (Test-Path -LiteralPath $fakeGate)) {
 $script:failures = [System.Collections.Generic.List[string]]::new()
 $script:assertionCount = 0
 
+# Resolve the PowerShell host THIS process is itself running under, rather than hardcoding
+# `powershell.exe` — that only exists on Windows, and CI runs suites like this one under `pwsh` on
+# ubuntu-latest, where the executable is not present at all. `$IsCoreCLR` / `$IsWindows` are
+# UNDEFINED in Windows PowerShell 5.1 and `Set-StrictMode -Version Latest` (above) throws on an
+# undefined variable reference, so they cannot be used to branch here. `(Get-Process -Id
+# $PID).Path` is populated identically by both 5.1 (-> ...\WindowsPowerShell\v1.0\powershell.exe)
+# and pwsh (-> the pwsh binary, wherever it is installed) and is exactly the executable a
+# child-process re-invocation needs.
+$script:hostExecutable = (Get-Process -Id $PID).Path
+
 function Assert-True {
     param(
         [Parameter(Mandatory)][bool]$Condition,
@@ -104,7 +114,7 @@ function Invoke-LocalEnvProcess {
     $previousPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & powershell.exe -NoProfile -NonInteractive -Command $command 2>&1 | Out-String
+        $output = & $script:hostExecutable -NoProfile -NonInteractive -Command $command 2>&1 | Out-String
     }
     finally {
         $ErrorActionPreference = $previousPreference

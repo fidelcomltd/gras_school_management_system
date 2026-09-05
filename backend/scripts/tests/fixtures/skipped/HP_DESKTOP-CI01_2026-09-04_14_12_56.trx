@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture for backend/scripts/tests/gate-summary.tests.ps1: reproduces the real xunit v3 dynamic-skip
+  shape (Assert.Skip) — total=31, passed=0, failed=0, notExecuted=0. xunit v3 does not increment
+  notExecuted for a dynamic skip, which is why Get-TrxSummary derives Skipped as
+  total - passed - failed rather than trusting that counter. A fully-skipped project still writes
+  TestDefinitions (the test starts, then calls Assert.Skip), confirmed against a real no-database
+  run on this machine (artifacts/coverage/HP_DESKTOP-GPLBVV9_2026-09-04_14_12_56.trx).
+
+  Filename and <UnitTest storage="..."> are shaped like REAL VSTest output on purpose (a realistic
+  <user>_<machine>_<timestamp>.trx name, carrying no project name at all) so the self-test proves
+  Get-SuiteName reads the suite from inside the file, not from a filename a real trx never has.
+  Not a real dotnet test output — hand-authored.
+-->
+<TestRun id="33333333-3333-3333-3333-333333333333" name="fixture-skipped" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>
+    <UnitTest name="SchoolManagement.IntegrationTests.Endpoints.WhoAmIEndpointTests.Get_ReturnsIdentity" storage="c:\users\hp\desktop\web-apps\school-management-proj\backend\tests\schoolmanagement.integrationtests\bin\release\net10.0\schoolmanagement.integrationtests.dll" id="b2c3d4e5-6789-01bc-def2-234567890abc">
+      <Execution id="3fd72da3-8ccc-4b6d-b479-fca57da334a6" />
+    </UnitTest>
+  </TestDefinitions>
+  <ResultSummary outcome="Completed">
+    <Counters total="31" executed="0" passed="0" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture for backend/scripts/tests/gate-summary.tests.ps1: same real xunit v3 dynamic-skip shape
+  as fixtures/skipped/ (total=31, passed=0, failed=0, notExecuted=0), but with a Unix-style
+  <UnitTest storage="..."> path (forward slashes, no drive letter) — what a real .trx written by
+  `dotnet test` on Linux CI (ubuntu-latest) looks like, as opposed to fixtures/skipped/'s
+  Windows-authored backslash path.
+
+  This exists because Get-SuiteName used to delegate to [System.IO.Path]::GetFileNameWithoutExtension,
+  whose separator set is OS-conditional: Windows recognizes both '/' and '\', Unix recognizes ONLY
+  '/'. A Windows-style storage path is silently mis-parsed when the *runtime* is Unix, and (by the
+  same logic, reversed) nothing on this fixture depended on which OS the currently-running test
+  host is; both fixtures must parse identically on both hosts. Not a real dotnet test output;
+  hand-authored.
+-->
+<TestRun id="44444444-4444-4444-4444-444444444444" name="fixture-skipped-unix" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>
+    <UnitTest name="SchoolManagement.IntegrationTests.Endpoints.WhoAmIEndpointTests.Get_ReturnsIdentity" storage="/home/runner/work/school-management-proj/school-management-proj/backend/tests/schoolmanagement.integrationtests/bin/release/net10.0/schoolmanagement.integrationtests.dll" id="c3d4e5f6-7890-12cd-ef34-34567890abcd">
+      <Execution id="4ad83eb4-9ddd-5c7e-c58a-adb68eb445b7" />
+    </UnitTest>
+  </TestDefinitions>
+  <ResultSummary outcome="Completed">
+    <Counters total="31" executed="0" passed="0" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+  </ResultSummary>
+</TestRun>

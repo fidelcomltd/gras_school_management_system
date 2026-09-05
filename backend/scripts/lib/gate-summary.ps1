@@ -77,7 +77,22 @@ function Get-SuiteName {
         return $FallbackName
     }
 
-    $suite = [System.IO.Path]::GetFileNameWithoutExtension($storage)
+    # Split on '/' AND '\' explicitly rather than delegating to [System.IO.Path]. That type's
+    # separator set is OS-conditional: Windows recognizes both '/' and '\', but Unix recognizes
+    # ONLY '/' — a backslash there is just an ordinary filename character. `storage` is written by
+    # whichever OS ran the tests, so a .trx produced on a Windows dev box (backslash paths) can be
+    # parsed on Linux CI, and vice versa. Delegating to System.IO.Path would silently return the
+    # entire mangled path instead of the leaf project name on whichever host's separator convention
+    # didn't match the .trx's origin.
+    $leaf = (@($storage -split '[\\/]'))[-1]
+    if ([string]::IsNullOrWhiteSpace($leaf)) {
+        return $FallbackName
+    }
+
+    # Strip only the LAST extension (mirrors GetFileNameWithoutExtension), not every dot — a suite
+    # name itself may contain no dots, but do not assume that; only ever remove one trailing
+    # ".ext" segment.
+    $suite = $leaf -replace '\.[^.\\/]+$', ''
     if ([string]::IsNullOrWhiteSpace($suite)) {
         return $FallbackName
     }
