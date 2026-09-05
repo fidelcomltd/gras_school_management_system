@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture for backend/scripts/tests/gate-summary.tests.ps1: reproduces the 2026-08-27 run recorded
+  in .agent/drift/2026-Q3.md, where ci.ps1 printed "PASS: Coverage threshold (60%)" at 60.48% line
+  coverage on a run where 30 integration tests FAILED.
+
+  Filename and <UnitTest storage="..."> are shaped like REAL VSTest output on purpose (a realistic
+  <user>_<machine>_<timestamp>.trx name, carrying no project name at all) so the self-test proves
+  Get-SuiteName reads the suite from inside the file, not from a filename a real trx never has.
+  Not a real dotnet test output — hand-authored.
+-->
+<TestRun id="22222222-2222-2222-2222-222222222222" name="fixture-failed" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>
+    <UnitTest name="SchoolManagement.IntegrationTests.Endpoints.WhoAmIEndpointTests.Get_ReturnsIdentity" storage="c:\users\hp\desktop\web-apps\school-management-proj\backend\tests\schoolmanagement.integrationtests\bin\release\net10.0\schoolmanagement.integrationtests.dll" id="a1b2c3d4-5678-90ab-cdef-1234567890ab">
+      <Execution id="2fd72da3-8ccc-4b6d-b479-fca57da334a5" />
+    </UnitTest>
+  </TestDefinitions>
+  <ResultSummary outcome="Failed">
+    <Counters total="30" executed="30" passed="0" failed="30" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+  </ResultSummary>
+</TestRun>

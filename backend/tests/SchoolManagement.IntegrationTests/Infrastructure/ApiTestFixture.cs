@@ -114,18 +114,28 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 // slow, confusing one.
                 [$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.MaxRetryCount)}"] = "0",
 
+                // TASK-0003: CookieSession is now the real, implemented mechanism. It authenticates
+                // nobody without a valid session cookie — same anonymous-by-default behaviour every
+                // other test in this shared fixture already relies on — so switching the default here
+                // does not change any of them; only auth-specific test classes present a real cookie.
                 [$"{ApiAuthenticationOptions.SectionName}:{nameof(ApiAuthenticationOptions.Mode)}"] =
-                    AuthenticationModes.Placeholder,
+                    AuthenticationModes.CookieSession,
 
                 // No telemetry export: there is no collector, and failing exports would flood the output.
                 [$"{ObservabilityOptions.SectionName}:{nameof(ObservabilityOptions.OtlpEndpoint)}"] = "",
 
                 // High enough that a test suite hitting the same endpoint repeatedly is not throttled
-                // under the DEFAULT policy. Nothing in this suite verifies rejection under the default
-                // or sensitive policies yet — that gap is recorded as drift, TASK-0003 is the trigger
-                // (login is the sensitive policy's first real user). Do not read the line below as
-                // covering this one too: it does not.
+                // under the DEFAULT policy.
                 [$"{RateLimitingOptions.SectionName}:{nameof(RateLimitingOptions.PermitLimit)}"] = "10000",
+
+                // TASK-0003: sign-in and password now run under the SENSITIVE policy (its first real
+                // users), and the auth integration test suite calls both repeatedly, from one shared
+                // host, from what the limiter sees as one IP — same reasoning as PermitLimit above.
+                // AuthRateLimitTests is the one place this policy is actually verified: like
+                // HealthRateLimitTests, it builds its own client via WithWebHostBuilder with this
+                // narrowed to something small enough to trip on purpose.
+                [$"{RateLimitingOptions.SectionName}:{nameof(RateLimitingOptions.SensitivePermitLimit)}"] =
+                    "10000",
 
                 // /health/ready runs under its own policy (RateLimitingOptions.HealthPolicyName), not
                 // the default one raised above, so it needs its own headroom for the same reason — this

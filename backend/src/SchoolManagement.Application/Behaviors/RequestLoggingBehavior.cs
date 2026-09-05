@@ -51,13 +51,15 @@ internal sealed class RequestLoggingBehavior<TRequest, TResponse>(
             var response = await continuation(cancellationToken);
             var elapsed = (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
 
-            if (response.IsFailure)
+            // Guarded + hoisted to locals for the same reason as the cancellation branch below
+            // (CA1873): `response.Error.Type.ToString()` is a computed argument handed to a static
+            // [LoggerMessage] method, so the analyzer cannot tell it is only evaluated when Warning
+            // logging is enabled unless the computation happens inside the IsEnabled guard.
+            if (response.IsFailure && logger.IsEnabled(LogLevel.Warning))
             {
-                BehaviorLog.RequestFailed(
-                    logger,
-                    requestName,
-                    response.Error.Code,
-                    response.Error.Type.ToString());
+                var errorCode = response.Error.Code;
+                var errorType = response.Error.Type.ToString();
+                BehaviorLog.RequestFailed(logger, requestName, errorCode, errorType);
             }
 
             BehaviorLog.HandledRequest(
@@ -71,11 +73,19 @@ internal sealed class RequestLoggingBehavior<TRequest, TResponse>(
         catch (OperationCanceledException)
         {
             // A cancelled request is expected traffic (client navigated away, gateway timed out).
-            // Logged at Information so it is visible but does not pollute the error rate.
-            BehaviorLog.RequestCancelled(
-                logger,
-                requestName,
-                (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds);
+            // Logged at Information so it is visible but does not pollute the error rate. Guarded
+            // so the Stopwatch computation itself is skipped when Information logging is disabled
+            // (CA1873). The guard alone is not sufficient: BehaviorLog.RequestCancelled is a static
+            // [LoggerMessage] method that takes `logger` as a PARAMETER, so the analyzer cannot tie
+            // `logger.IsEnabled(...)` to the call the way it can for an instance method call on
+            // `logger` directly. Hoisting the computation to a local INSIDE the guard — the same
+            // shape the success path above already uses for `elapsed` — is what satisfies it.
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                var elapsedMs = (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
+                BehaviorLog.RequestCancelled(logger, requestName, elapsedMs);
+            }
+
             throw;
         }
     }

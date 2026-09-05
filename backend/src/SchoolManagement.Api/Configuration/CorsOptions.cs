@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using SchoolManagement.Api.Security;
 
 namespace SchoolManagement.Api.Configuration;
 
@@ -45,7 +46,15 @@ public sealed class CorsOptions
 }
 
 /// <summary>Validates <see cref="CorsOptions"/> at startup.</summary>
-internal sealed class CorsOptionsValidator : IValidateOptions<CorsOptions>
+/// <remarks>
+/// Cross-checks against <see cref="ApiAuthenticationOptions"/> (second-pass review HIGH 3): CLAUDE.md
+/// §5's "one coherent set" was previously only a comment, and the shipped configuration itself
+/// contradicted it (<c>AllowCredentials: false</c> while <c>Authentication:Mode</c> was
+/// <c>CookieSession</c>) — exactly the failure mode a browser reports as a silent CORS error rather
+/// than a clear one, so it needs mechanical enforcement rather than a reviewer catching it by reading.
+/// </remarks>
+internal sealed class CorsOptionsValidator(IOptions<ApiAuthenticationOptions> authenticationOptions)
+    : IValidateOptions<CorsOptions>
 {
     /// <inheritdoc />
     public ValidateOptionsResult Validate(string? name, CorsOptions options)
@@ -99,6 +108,22 @@ internal sealed class CorsOptionsValidator : IValidateOptions<CorsOptions>
                 $"'{key}' is empty. Credentialed cross-origin requests require an explicit origin " +
                 "list. If this service is called only from the same origin, set AllowCredentials to " +
                 "false.");
+        }
+
+        if (!options.AllowCredentials &&
+            string.Equals(
+                authenticationOptions.Value.Mode,
+                AuthenticationModes.CookieSession,
+                StringComparison.Ordinal))
+        {
+            failures.Add(
+                $"'{CorsOptions.SectionName}:{nameof(CorsOptions.AllowCredentials)}' is false while " +
+                $"'{ApiAuthenticationOptions.SectionName}:{nameof(ApiAuthenticationOptions.Mode)}' is " +
+                "'CookieSession' (root CLAUDE.md §5: CORS, SameSite/Secure and credentials mode are " +
+                "one coherent set). A browser silently discards the session cookie on a credentialed " +
+                "cross-origin response unless the server echoes " +
+                "'Access-Control-Allow-Credentials: true' — sign-in would appear to succeed and then " +
+                "every subsequent request would be anonymous. Set AllowCredentials to true.");
         }
 
         if (options.PreflightMaxAgeSeconds is < 0 or > 86_400)

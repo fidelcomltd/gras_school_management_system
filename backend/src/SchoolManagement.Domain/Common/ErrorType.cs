@@ -28,4 +28,10 @@ public enum ErrorType
 
     /// <summary>The caller is authenticated but not permitted. Maps to HTTP 403.</summary>
     Forbidden = 5,
+
+    /// <summary>
+    /// The account is locked (spec 6.1.11). Maps to HTTP 423. TASK-0003: fires only when the
+    /// submitted password was correct — see <c>SignInCommandHandler</c>.
+    /// </summary>
+    Locked = 6,
 }

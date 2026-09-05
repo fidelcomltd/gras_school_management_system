@@ -13,6 +13,12 @@ dist-ssr
 *.local
 coverage
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Real environment files. `.env.example` IS committed — see CONVENTIONS.md §4.
 .env
 .env.*

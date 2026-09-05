@@ -1,0 +1,46 @@
+<Project>
+
+  <!--
+    TASK-0026. Imported LAST (after the .NET SDK's own targets) — the only point from which the
+    SDK's implicit analyzer items can be removed and replaced. Nothing else belongs in this file;
+    everything else stays in Directory.Build.props.
+
+    WHY THIS EXISTS: Microsoft.NET.Sdk.Analyzers.targets (inside the SDK install, NOT this repo)
+    unconditionally adds the SDK's OWN bundled Microsoft.CodeAnalysis.(CSharp.)NetAnalyzers.dll as
+    Analyzer items (IsImplicitlyDefined="true") whenever EnableNETAnalyzers is true, regardless of
+    any PackageReference to the same package ID. A plain
+    `PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers"` (Directory.Build.props) does
+    NOT supersede it: the pinned NuGet package (10.0.100) ships no build/props/targets asset of
+    its own, so nothing wires its DLLs into the compiler automatically.
+
+    VERIFIED on this machine, not assumed: `dotnet build -v:diag`, grepping the actual csc.exe
+    analyzer switches on its command line, showed ONLY the SDK-install paths
+    (under sdk/10.0.100/Sdks/Microsoft.NET.Sdk/analyzers) both before and after adding the bare
+    PackageReference alone — the pinned copy under %PkgMicrosoft_CodeAnalysis_NetAnalyzers% never
+    appeared until the Remove/Include below were added. Re-run that check after any SDK or package
+    bump to confirm this still holds; the mechanism is not a documented, versioned contract.
+  -->
+
+  <!--
+    A static ItemGroup (outside a Target) cannot batch a Remove by item metadata: MSBuild raises
+    MSB4191 ("reference to custom metadata not allowed in this condition") because static
+    evaluation has no per-item batching pass. This has to run as a Target, before compilation but
+    after the SDK's own analyzer wiring has already populated the Analyzer item list
+    (BeforeTargets="CoreCompile" is late enough; the SDK's items are added at project-evaluation
+    time, well before CoreCompile).
+  -->
+  <Target Name="PinNetAnalyzers" BeforeTargets="CoreCompile" Condition="'$(Language)' == 'C#'">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)"
+                Condition="'%(Analyzer.IsImplicitlyDefined)' == 'true' And
+                           ('%(Analyzer.Filename)' == 'Microsoft.CodeAnalysis.NetAnalyzers' Or
+                            '%(Analyzer.Filename)' == 'Microsoft.CodeAnalysis.CSharp.NetAnalyzers')" />
+
+      <Analyzer Include="$(PkgMicrosoft_CodeAnalysis_NetAnalyzers)\analyzers\dotnet\Microsoft.CodeAnalysis.NetAnalyzers.dll"
+                Condition="'$(PkgMicrosoft_CodeAnalysis_NetAnalyzers)' != '' And '$(EnableNETAnalyzers)' == 'true'" />
+      <Analyzer Include="$(PkgMicrosoft_CodeAnalysis_NetAnalyzers)\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll"
+                Condition="'$(PkgMicrosoft_CodeAnalysis_NetAnalyzers)' != '' And '$(EnableNETAnalyzers)' == 'true'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -63,6 +63,16 @@ function Assert-True {
     }
 }
 
+# Resolve the PowerShell host THIS process is itself running under, rather than hardcoding
+# `powershell.exe` — that only exists on Windows, and CI runs this suite under `pwsh` on
+# ubuntu-latest, where the executable simply is not there. `$IsCoreCLR` / `$IsWindows` are
+# UNDEFINED in Windows PowerShell 5.1 and `Set-StrictMode -Version Latest` (above) throws on an
+# undefined variable reference, so they cannot be used to branch here. `(Get-Process -Id
+# $PID).Path` is populated identically by both 5.1 (-> ...\WindowsPowerShell\v1.0\powershell.exe)
+# and pwsh (-> the pwsh binary, wherever it is installed) and is exactly the executable a
+# child-process re-invocation needs.
+$script:hostExecutable = (Get-Process -Id $PID).Path
+
 function Invoke-GateSummaryProcess {
     # Runs gate-summary.ps1 as its OWN process, not dot-sourced, so $LASTEXITCODE below reflects
     # the real `exit 0` / `exit 1` in the script — exactly what a contributor or CI observes.
@@ -76,7 +86,7 @@ function Invoke-GateSummaryProcess {
         $arguments += '-AllowSkipped'
     }
 
-    $output = & powershell.exe @arguments 2>&1 | Out-String
+    $output = & $script:hostExecutable @arguments 2>&1 | Out-String
     [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output   = $output
@@ -111,6 +121,18 @@ Assert-True (-not $skipped.Output.Contains($skippedTrxName)) "skipped fixture: S
 $skippedAllowed = Invoke-GateSummaryProcess -ResultsDirectory (Join-Path $fixtures 'skipped') -AllowSkipped
 Assert-True ($skippedAllowed.ExitCode -eq 0) "skipped fixture: exit code is 0 with -AllowSkipped (got $($skippedAllowed.ExitCode)). Output:`n$($skippedAllowed.Output)"
 
+# ── (d) the same skip shape, but with a Unix-style (forward-slash) storage path — what a real
+# .trx written by `dotnet test` on Linux CI actually looks like, as opposed to (c)'s Windows-
+# authored backslash path. Get-SuiteName must derive the identical suite name from both shapes,
+# on WHICHEVER host is running this suite right now (CLAUDE.md §13 standing lesson: a fixture
+# must reproduce the real artefact's shape, and CI's real artefact is this one).
+$skippedUnix = Invoke-GateSummaryProcess -ResultsDirectory (Join-Path $fixtures 'skipped-unix')
+Assert-True ($skippedUnix.ExitCode -ne 0) "skipped-unix fixture: exit code is non-zero without -AllowSkipped (got $($skippedUnix.ExitCode)). Output:`n$($skippedUnix.Output)"
+Assert-True ($skippedUnix.Output -match 'schoolmanagement\.integrationtests') "skipped-unix fixture: SKIPPED line names the project (schoolmanagement.integrationtests), derived from a forward-slash storage path. Output:`n$($skippedUnix.Output)"
+
+$skippedUnixAllowed = Invoke-GateSummaryProcess -ResultsDirectory (Join-Path $fixtures 'skipped-unix') -AllowSkipped
+Assert-True ($skippedUnixAllowed.ExitCode -eq 0) "skipped-unix fixture: exit code is 0 with -AllowSkipped (got $($skippedUnixAllowed.ExitCode)). Output:`n$($skippedUnixAllowed.Output)"
+
 # ── Also exercise the functions in-process (dot-sourced), since that is how ci.ps1 uses them ────
 . $gateSummary
 
@@ -133,6 +155,11 @@ $skippedVerdictDefault = Get-TestRunVerdict -Summary $skippedSummary
 Assert-True (-not $skippedVerdictDefault.Passed) 'in-process: Get-TestRunVerdict fails a skipped run by default.'
 $skippedVerdictAllowed = Get-TestRunVerdict -Summary $skippedSummary -AllowSkipped
 Assert-True ($skippedVerdictAllowed.Passed) 'in-process: Get-TestRunVerdict passes a skipped run with -AllowSkipped.'
+
+$skippedUnixSummary = Get-TrxSummary -ResultsDirectory (Join-Path $fixtures 'skipped-unix')
+Assert-True ($skippedUnixSummary.Totals.Skipped -eq 31) "in-process: skipped-unix fixture derives Skipped=31 from total-passed-failed (got $($skippedUnixSummary.Totals.Skipped))."
+Assert-True ($skippedUnixSummary.Files[0].Suite -eq 'schoolmanagement.integrationtests') "in-process: Get-TrxSummary derives Suite='schoolmanagement.integrationtests' from a FORWARD-SLASH storage path (got '$($skippedUnixSummary.Files[0].Suite)') - this is the assertion that catches [System.IO.Path]::GetFileNameWithoutExtension's OS-conditional separator handling."
+Assert-True ($skippedUnixSummary.Files[0].Suite -eq $skippedSummary.Files[0].Suite) 'in-process: Windows-style and Unix-style storage paths derive the SAME suite name.'
 
 Write-Host ''
 if ($script:failures.Count -gt 0) {

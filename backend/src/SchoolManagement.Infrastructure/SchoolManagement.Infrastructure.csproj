@@ -29,6 +29,8 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <!-- TASK-0003: Argon2id password hashing (spec 9.1). -->
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
     <!-- Design-time only: enables `dotnet ef migrations add`. Not shipped at runtime. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

@@ -2,6 +2,29 @@
 
 **Session:** 2026-08-03 · frontend agent · scaffold only, zero feature code.
 
+**2026-09-05 — three deviations below superseded.** Open question 11 (open since this session,
+2026-08-27) asked whether to follow §7's `src/features/` structure, `react-hook-form`+zod, and
+Playwright, all deliberately skipped here. The human resolved it 2026-09-05: **follow §7**, with
+the proviso "as long as it will lead to a better file and codebase structure" — full text in
+`.agent/decisions/2026-Q3.md` (2026-09-05 entry). TASK-0020 implements the resolution. The
+reasoning below is **not wrong for its time** — it was written before the product specification
+existed, so these were genuinely open questions rather than oversights — and is left in place
+for the record. Specifically now superseded:
+
+- **"Deliberately not done" below: "No Playwright" and "No `react-hook-form`."** Both are now
+  added (TASK-0020):
+  `react-hook-form` 7.87.0 + `@hookform/resolvers` 5.9.1, and `@playwright/test` 1.63.0 with a
+  CI job and one smoke spec (`e2e/smoke.spec.ts`). No form and no real E2E flow exist yet — both
+  still wait on TASK-0021 having something to build against.
+- **Directory layout / "Feature grouping = OpenAPI tag" (decision 5).** Still true for the
+  server-state part of a feature folder, but `src/features/<feature>/` is now also where the
+  screen itself lives, per §7's feature-first mandate — see `CONVENTIONS.md` §4 "Feature
+  folders". `src/screens/` is deprecated (kept only for `scaffold-status/` until TASK-0021
+  deletes it) rather than the ongoing home for screens this scaffold assumed.
+- **Open question 1 (auth mechanism)** is untouched by this — it was resolved separately
+  2026-08-26 (cookie session, see root `CLAUDE.md` §5 / `STATE.md`) and is TASK-0021's to
+  implement, not TASK-0020's.
+
 ---
 
 ## What exists
@@ -73,12 +96,17 @@ Bundle after vendor splitting: 48.9 kB app + ~554 kB vendor (~196 kB gzip total)
 - **No feature UI, no business logic** — the scope boundary you set.
 - **No sign-in screen, navigation, or user model** — all need the contract and a product
   decision on information architecture.
-- **No Playwright.** Root `CLAUDE.md` §7 wants E2E on auth, the primary create path, and one
-  failure path. There is no flow to test yet.
+- ~~**No Playwright.**~~ **Superseded 2026-09-05, added TASK-0020** — see the note at the top
+  of this file. Root `CLAUDE.md` §7 wants E2E on auth, the primary create path, and one failure
+  path; there was no flow to test yet at scaffold time, and there still isn't one — TASK-0020
+  only lands the harness and a smoke placeholder (`e2e/smoke.spec.ts`).
 - **No CI workflow.** Root-level CI is orchestrator-owned. Gate commands for `STATE.md`:
   `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` (or `npm run verify`).
-- **No `react-hook-form`.** Needed for the first real form; not installed because nothing
-  uses it, and dependency additions want a task card.
+  (The frontend CI workflow itself now exists — `.github/workflows/frontend-ci.yml`, landed
+  between this session and TASK-0020 — this bullet is scaffold-time history, not current state.)
+- ~~**No `react-hook-form`.**~~ **Superseded 2026-09-05, added TASK-0020** — see the note at
+  the top of this file. `react-hook-form` 7.87.0 + `@hookform/resolvers` 5.9.1 are installed;
+  no form is built yet, same reasoning as originally written below.
 - **No crest asset.** The logo was not in the repo, so `AppShell` renders a placeholder
   wordmark. Drop the real file into `public/` and swap it.
 - **`src/screens/scaffold-status/`** is a live demonstration of the tokens and primitives.

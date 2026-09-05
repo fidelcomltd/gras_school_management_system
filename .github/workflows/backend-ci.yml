@@ -65,6 +65,16 @@ jobs:
           # Read from backend/global.json so the SDK version has exactly one source of truth.
           global-json-file: backend/global.json
 
+      - name: Report the resolved SDK
+        working-directory: backend
+        # TASK-0024: which SDK CI actually used was, until now, something we INFERRED. `global.json`
+        # said 10.0.100 with `rollForward: latestFeature`, which silently let CI take a newer
+        # feature band than any developer had — and feature bands, not patches, carry new analyzer
+        # versions. That is how CA2025 and CA1873 failed here while Format and Build were green on
+        # every local machine. `rollForward` is now `latestPatch`, and this step makes the resolved
+        # version visible in the log so the next divergence is read, not deduced.
+        run: dotnet --version
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
@@ -77,7 +87,14 @@ jobs:
       - name: Install gitleaks
         run: |
           set -euo pipefail
-          version="8.28.0"
+          # MUST match the version developers run locally, and STATE.md records the pin.
+          # TASK-0024: at 8.28.0 this gate reported 15 leaks on a tree that 8.30.1 reports clean —
+          # same repo, same 21 commits, same .gitleaks.toml. TASK-0011's `[[allowlists]]` +
+          # `regexTarget = "match"` fix is not honoured identically by 8.28.0, so the older binary
+          # sees 15 non-secrets it was explicitly taught to ignore. A scanner whose verdict depends
+          # on which machine ran it is not a gate. Bumping this without bumping local (or vice
+          # versa) re-creates exactly that split.
+          version="8.30.1"
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
             -o /tmp/gitleaks.tar.gz
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks

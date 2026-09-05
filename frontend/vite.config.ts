@@ -34,6 +34,18 @@ export default defineConfig({
     css: true,
     restoreMocks: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Hermetic test environment: the suite must not depend on a developer's
+    // untracked `frontend/.env`. These are the same six VITE_* variables
+    // env-values.ts validates, given deliberately obvious test values so the
+    // suite is unaffected by whether a real `.env` exists (TASK-0023).
+    env: {
+      VITE_APP_NAME: 'Test Portal',
+      VITE_APP_ENV: 'development',
+      VITE_API_BASE_URL: 'http://test.invalid',
+      VITE_API_TIMEOUT_MS: '5000',
+      VITE_AUTH_EXPIRY_LEEWAY_SECONDS: '30',
+      VITE_ENABLE_DEV_TOOLS: 'true',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

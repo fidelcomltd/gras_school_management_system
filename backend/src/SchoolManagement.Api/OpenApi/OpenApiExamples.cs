@@ -1,5 +1,8 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
+using SchoolManagement.Application.Auth;
+using SchoolManagement.Application.Auth.ChangePassword;
+using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -99,16 +102,52 @@ internal static class OpenApiExamples
             }
             """,
 
-        [typeof(WhoAmIResponse)] = """
-            {
-              "userId": "subject-identifier-from-your-identity-provider",
-              "isAuthenticated": true
-            }
-            """,
-
         [typeof(SecureArmResponse)] = $$"""
             {
               "armId": "{{ExampleId}}"
+            }
+            """,
+
+        [typeof(CsrfTokenResponse)] = """
+            {
+              "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
+            }
+            """,
+
+        [typeof(SignInCommand)] = """
+            {
+              "email": "admin@example.com",
+              "password": "correct horse battery staple 9"
+            }
+            """,
+
+        [typeof(ChangePasswordCommand)] = """
+            {
+              "currentPassword": "correct horse battery staple 9",
+              "newPassword": "another horse battery staple 4"
+            }
+            """,
+
+        [typeof(EffectivePrivilegeDto)] = """
+            {
+              "privilege": "admin.view",
+              "scope": "SchoolWide",
+              "armIds": []
+            }
+            """,
+
+        [typeof(AuthSessionResponse)] = $$"""
+            {
+              "accountId": "{{ExampleId}}",
+              "email": "admin@example.com",
+              "staffName": "Chisom Maxwell",
+              "isSuperAdmin": true,
+              "mustChangePassword": false,
+              "effectivePrivileges": [
+                { "privilege": "admin.view", "scope": "SchoolWide", "armIds": [] }
+              ],
+              "sessionExpiresAt": "{{CanonicalTimestamp}}",
+              "sessionAbsoluteExpiresAt": "{{CanonicalTimestamp}}"
             }
             """,
 

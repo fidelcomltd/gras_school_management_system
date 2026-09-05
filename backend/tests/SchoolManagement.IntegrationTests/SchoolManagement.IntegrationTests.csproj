@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Bogus" />
+    <!-- FakeTimeProvider: needed to fast-forward past the idle timeout without a real 30-minute wait. -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
 </Project>

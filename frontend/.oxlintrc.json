@@ -58,5 +58,13 @@
       }
     }
   ],
-  "ignorePatterns": ["dist", "coverage", "node_modules", "src/api/schema.d.ts", "scripts/**"]
+  "ignorePatterns": [
+    "dist",
+    "coverage",
+    "node_modules",
+    "src/api/schema.d.ts",
+    "scripts/**",
+    "playwright-report",
+    "test-results"
+  ]
 }

@@ -80,6 +80,11 @@ internal static class ResultExtensions
             extensions["errors"] = validationError.Failures;
         }
 
+        if (error is LockedError lockedError)
+        {
+            extensions["lockedUntil"] = lockedError.LockedUntilUtc;
+        }
+
         return TypedResults.Problem(
             detail: error.Description,
             statusCode: statusCode,

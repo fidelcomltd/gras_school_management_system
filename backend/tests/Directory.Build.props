@@ -19,6 +19,26 @@
       enforcement in tests is worth an unread XML file in bin/.
     -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!--
+      TASK-0026. DECLARED, not inherited: xunit.v3 is Microsoft.Testing.Platform (MTP)-native, and
+      xunit.runner.visualstudio (also referenced below) is the classic VSTest adapter bridge, so a
+      test project referencing both can run `dotnet test` either way, and WHICH one actually runs
+      is decided by this property. Its default lives in the Microsoft.Testing.Platform.MSBuild
+      package (a transitive dependency of xunit.v3, not pinned in Directory.Packages.props, see the
+      Testing item group there for why), not in this repo, so leaving it unset means the
+      invocation mode silently follows whatever that package's resolved version defaults to.
+
+      Forced to `false` (classic VSTest bridge) because that is the mode `ci.ps1` already assumes:
+      its settings, logger trx, and results-directory arguments are VSTest CLI switches, and VSTest
+      bridge mode is what this machine's SDK 10.0.100 actually runs today (verified: `dotnet test`
+      with exactly ci.ps1's arguments against SchoolManagement.UnitTests produces the classic
+      "Results File: ...trx" and "Attachments: ...coverage.cobertura.xml" VSTest console output).
+      Flipping this to `true` would require rewriting ci.ps1 (and CI) for MTP-native arguments
+      instead, out of this card's scope and unnecessary since VSTest bridge already produces both
+      the .trx that §9 depends on and coverlet's coverage output.
+    -->
+    <TestingPlatformDotnetTestSupport>false</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <ItemGroup Label="Test framework — same everywhere so no project drifts">

@@ -1,6 +1,10 @@
-# `src/features/` — server-state modules
+# `src/features/` — feature-first home for screens and their server-state modules
 
-Empty. No feature code exists yet; this file defines the shape the first one takes.
+Empty. No feature code exists yet; this file defines the shape the first one takes, and
+`CONVENTIONS.md` §4 "Feature folders" has the full convention (what belongs here, what stays
+shared, and why the router is unaffected by this layout — it's React Router 7 in library mode,
+not file-based routing). This file covers the server-state part of a feature folder in detail;
+a feature folder also holds the screen component itself and any components/hooks local to it.
 
 ## Grouping rule
 

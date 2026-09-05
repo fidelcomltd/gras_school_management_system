@@ -1,18 +1,23 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using SchoolManagement.Api.Configuration;
+using SchoolManagement.Application.Abstractions.Identity;
 
 namespace SchoolManagement.Api.Security;
 
 /// <summary>
-/// Wires authentication. Currently a placeholder scheme — see <see cref="AuthenticationModes"/>.
+/// Wires authentication. See <see cref="AuthenticationModes"/> for the mode this branches on.
 /// </summary>
 public static class AuthenticationSetup
 {
     /// <summary>The placeholder scheme's name.</summary>
     public const string PlaceholderScheme = "Placeholder";
+
+    /// <summary>TASK-0003's real scheme name — see <see cref="CookieSessionAuthenticationHandler"/>.</summary>
+    public const string CookieSessionScheme = "CookieSession";
 
     /// <summary>
     /// Registers the configured authentication scheme and the authorisation policies.
@@ -47,12 +52,54 @@ public static class AuthenticationSetup
             services.AddHostedService<StartupEnvironmentGuard>();
         }
 
-        services
-            .AddAuthentication(PlaceholderScheme)
-            .AddScheme<AuthenticationSchemeOptions, PlaceholderAuthenticationHandler>(
-                PlaceholderScheme,
-                displayName: "Placeholder (no authentication configured)",
-                configureOptions: null);
+        // Read directly rather than through IOptions: authentication schemes must be registered
+        // before the service provider exists, matching how CORS/RateLimiting sections are read in
+        // Program.cs.
+        var mode = configuration
+            .GetSection(ApiAuthenticationOptions.SectionName)
+            .Get<ApiAuthenticationOptions>()?.Mode ?? AuthenticationModes.Placeholder;
+
+        if (string.Equals(mode, AuthenticationModes.CookieSession, StringComparison.Ordinal))
+        {
+            services
+                .AddAuthentication(CookieSessionScheme)
+                .AddScheme<CookieSessionAuthenticationSchemeOptions, CookieSessionAuthenticationHandler>(
+                    CookieSessionScheme,
+                    displayName: "Cookie session (TASK-0003)",
+                    configureOptions: null);
+        }
+        else
+        {
+            services
+                .AddAuthentication(PlaceholderScheme)
+                .AddScheme<AuthenticationSchemeOptions, PlaceholderAuthenticationHandler>(
+                    PlaceholderScheme,
+                    displayName: "Placeholder (no authentication configured)",
+                    configureOptions: null);
+        }
+
+        // Backs CsrfTokenService's authenticated tokens — see that class's remarks for why Data
+        // Protection stands in for a hand-rolled HMAC-over-a-secret construction.
+        //
+        // SetApplicationName is set explicitly (second-pass review MEDIUM 5) so the key ring is keyed
+        // to a stable, deployment-independent name rather than Data Protection's own default (derived
+        // from the content root path), which can differ between two processes that are supposed to be
+        // the same application — e.g. two container instances built from the same image but started
+        // with a different working directory.
+        //
+        // KEY PERSISTENCE IS DELIBERATELY NOT CONFIGURED HERE. With no explicit persistence provider,
+        // ASP.NET Core stores keys wherever its default applies for the current host (a local
+        // directory, or an ephemeral in-memory ring in some container/hosting scenarios) — meaning a
+        // second replica, or a restarted process without a mounted, persisted key path, will not share
+        // or retain keys. Every outstanding CSRF token becomes unverifiable when that happens (a
+        // clean, generic 403 csrf.invalid — not a security hole, just a forced re-fetch of
+        // /auth/csrf). This is genuinely a DEPLOYMENT decision (where keys live, whether there is more
+        // than one replica) and Open question 5 (production target) is unresolved, so it is tracked as
+        // accepted drift rather than guessed at here. Configure a persistence provider
+        // (`PersistKeysToFileSystem`, `PersistKeysToAzureBlobStorage`, etc.) once that decision lands.
+        services.AddDataProtection().SetApplicationName("SchoolManagement");
+        services.AddSingleton<CsrfTokenService>();
+        services.AddScoped<ICurrentSession, HttpCurrentSession>();
 
         services.AddAuthorization(AuthorizationPolicies.Configure);
 

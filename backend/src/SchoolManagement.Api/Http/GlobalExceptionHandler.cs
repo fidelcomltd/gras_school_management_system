@@ -40,7 +40,16 @@ internal sealed class GlobalExceptionHandler(
         // reporting — it is someone closing a browser tab.
         if (httpContext.RequestAborted.IsCancellationRequested && exception is OperationCanceledException)
         {
-            ApiLog.RequestAborted(logger, httpContext.Request.Path);
+            // CA1873: `httpContext.Request.Path` is a PathString, so passing it where the
+            // [LoggerMessage] method expects `string` invokes PathString's implicit conversion —
+            // an evaluation the analyzer wants skipped when Debug logging (this call's level) is
+            // disabled. Guarded and hoisted to a local, same shape as the rest of this file.
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                string requestPath = httpContext.Request.Path;
+                ApiLog.RequestAborted(logger, requestPath);
+            }
+
             return true;
         }
 
@@ -53,7 +62,13 @@ internal sealed class GlobalExceptionHandler(
         // against the service's error rate and page somebody.
         if (exception is BadHttpRequestException badRequest)
         {
-            ApiLog.RejectedMalformedRequest(logger, httpContext.Request.Path, badRequest.StatusCode);
+            // CA1873 — see the RequestAborted guard above for why this needs both the guard and the
+            // explicitly-typed local (PathString's implicit conversion to string).
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                string requestPath = httpContext.Request.Path;
+                ApiLog.RejectedMalformedRequest(logger, requestPath, badRequest.StatusCode);
+            }
 
             return await WriteProblemAsync(
                 httpContext,
@@ -89,7 +104,13 @@ internal sealed class GlobalExceptionHandler(
                 includeExceptionDetail: false).ConfigureAwait(false);
         }
 
-        ApiLog.UnhandledException(logger, httpContext.Request.Path, exception);
+        // CA1873 — see the RequestAborted guard above for why this needs both the guard and the
+        // explicitly-typed local (PathString's implicit conversion to string).
+        if (logger.IsEnabled(LogLevel.Error))
+        {
+            string requestPath = httpContext.Request.Path;
+            ApiLog.UnhandledException(logger, requestPath, exception);
+        }
 
         var failure = Error.Failure(
             "server.unexpected_error",

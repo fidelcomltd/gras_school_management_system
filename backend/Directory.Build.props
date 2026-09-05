@@ -16,7 +16,16 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest-All</AnalysisLevel>
+    <!--
+      Pinned to a version number, not `latest` (TASK-0026). `latest` resolves to whichever value
+      the resolved SDK's own Microsoft.NET.Sdk.Analyzers.targets hard-codes as
+      `_LatestAnalysisLevel` for THAT SDK build, which is documented in that file as changing
+      across patches of the same feature band. `10.0` fixes the rule SET; the explicit
+      Microsoft.CodeAnalysis.NetAnalyzers PackageReference below fixes the rule CODE. `All` is
+      unchanged: every rule category this repo already enforced still fires, only its version is
+      no longer "whatever is installed".
+    -->
+    <AnalysisLevel>10.0-All</AnalysisLevel>
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
 
     <!-- Required so the OpenAPI generator can read /// comments off contracts (§F). -->
@@ -43,6 +52,9 @@
   <ItemGroup>
     <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
     <PackageReference Include="Roslynator.Formatting.Analyzers" PrivateAssets="all" />
+    <!-- Supersedes the SDK-bundled copy so the analyzer running is the pinned one (see the
+         version pin's comment in Directory.Packages.props for why this exists). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

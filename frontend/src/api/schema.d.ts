@@ -7,6 +7,126 @@
  */
 
 export interface paths {
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issue a CSRF token
+         * @description Sets the `__Host-XSRF-TOKEN` cookie and returns the same value in the response body. Call on app load, including a reload while already signed in — the cookie is bound to the caller's current session when one is live, and to an anonymous subject otherwise, so this never invalidates an existing session's ability to mutate. Also call it once before sign-in: sign-in is itself CSRF-protected, so this is what bootstraps the pair. Echo the returned value verbatim in an `X-CSRF-Token` header on every subsequent mutating `/auth/*` request; axios does this automatically via its `xsrfCookieName`/`xsrfHeaderName` configuration.
+         */
+        get: operations["GetCsrfToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with email and password
+         * @description Requires an `X-CSRF-Token` header matching the `__Host-XSRF-TOKEN` cookie from `GET /auth/csrf`. On success, sets the `__Host-Session` cookie and rotates the CSRF cookie to one bound to the new session. Rate-limited under the sensitive policy (spec 6.1.11). A wrong password, an unknown email, and a locked account given a wrong password all return the identical generic 401 body — `423` fires ONLY when the submitted password is correct and the account is currently locked, so only the real account holder ever learns that.
+         */
+        post: operations["SignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sign-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out
+         * @description Revokes the current session if one exists. Always `204`, including when called with no session or an already-dead one — a repeat sign-out is naturally idempotent. Still requires a valid CSRF token.
+         */
+        post: operations["SignOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report the caller's own account and session state
+         * @description Replaces `GET /api/v1/reference/whoami` (removed). Always `200` once authenticated — including while `mustChangePassword` is true, which is how the frontend learns the flag on a hard reload rather than only right after sign-in.
+         */
+        get: operations["GetMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Proactively extend the session's idle window
+         * @description Extends the idle timeout ahead of expiry; does not rotate the session token (spec 9.1 rotates only on privilege and password change). Call this BEFORE a session goes stale — all three 401 variants are terminal here too, so a reactive 401 from any endpoint should route straight to sign-in rather than calling this. Subject to the must-change-password gate: returns `403 auth.password_change_required` while that flag is set, unlike `me`.
+         */
+        post: operations["RefreshSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the caller's own password
+         * @description Requires the current password (a re-authentication check for a sensitive action, spec 9.1). Rotates the session token and revokes every OTHER active session for the account (spec 6.1.11) — this session survives. Rejects a new password matching any of the last five hashes. Rate-limited under the sensitive policy: `currentPassword` is an online guessing surface too.
+         */
+        post: operations["ChangePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/ping": {
         parameters: {
             query?: never;
@@ -51,26 +171,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/reference/whoami": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Return the calling user's identity
-         * @description Anonymous. Reports whatever identity the request carries — null and false while no authentication mechanism is wired (see TASK-0003) — without requiring one.
-         */
-        get: operations["WhoAmI"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/reference/arms/{armId}/secure": {
         parameters: {
             query?: never;
@@ -95,6 +195,102 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Shared response shape returned by `sign-in`, `me`, `refresh` and `password`
+         *     (approved contract delta §0), so the frontend never needs a second round trip to learn its own
+         *     state after any of the four.
+         * @example {
+         *       "accountId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "email": "admin@example.com",
+         *       "staffName": "Chisom Maxwell",
+         *       "isSuperAdmin": true,
+         *       "mustChangePassword": false,
+         *       "effectivePrivileges": [
+         *         {
+         *           "privilege": "admin.view",
+         *           "scope": "SchoolWide",
+         *           "armIds": []
+         *         }
+         *       ],
+         *       "sessionExpiresAt": "2026-08-03T09:30:00+00:00",
+         *       "sessionAbsoluteExpiresAt": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        AuthSessionResponse: {
+            /**
+             * @description Opaque identifier (root CLAUDE.md §8 — never parsed by the client).
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            accountId: string;
+            /**
+             * @description The account's login identifier.
+             * @example admin@example.com
+             */
+            email: string;
+            /**
+             * @description Display name.
+             * @example Chisom Maxwell
+             */
+            staffName: string;
+            /**
+             * @description Whether the flag-bypass privilege path applies (TASK-0003 §1).
+             * @example true
+             */
+            isSuperAdmin: boolean;
+            /**
+             * @description Whether the forced-change gate currently applies to this account.
+             * @example false
+             */
+            mustChangePassword: boolean;
+            /**
+             * @description The caller's resolved effective privilege set. For this card, populated only via the
+             *     bool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.
+             * @example [
+             *       {
+             *         "privilege": "admin.view",
+             *         "scope": "SchoolWide",
+             *         "armIds": []
+             *       }
+             *     ]
+             */
+            effectivePrivileges: components["schemas"]["EffectivePrivilegeDto"][];
+            /**
+             * Format: date-time
+             * @description The sooner of the session's idle and absolute deadlines, recomputed on every response.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            sessionExpiresAt: string;
+            /**
+             * Format: date-time
+             * @description The session's fixed absolute deadline (spec 6.1.11's 8-hour cap), set once at sign-in.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            sessionAbsoluteExpiresAt: string;
+        };
+        /**
+         * @description Self-service password change (spec 6.1.11, spec 6.1.14). Approved contract delta:
+         *     `POST /api/v1/auth/password`. The account comes from the caller's own session — this is never
+         *     how another account's password is changed (that is `admin.password.reset`, TASK-0019).
+         * @example {
+         *       "currentPassword": "correct horse battery staple 9",
+         *       "newPassword": "another horse battery staple 4"
+         *     }
+         */
+        ChangePasswordCommand: {
+            /**
+             * @description Must match the account's current password (re-authentication for a
+             *                 sensitive action).
+             * @example correct horse battery staple 9
+             */
+            currentPassword: string;
+            /**
+             * @description Must satisfy spec 6.1.11's composition rule and must not match any of the
+             *                 last int AuthPolicy.PasswordHistoryLimit hashes (checked in the handler, which needs the
+             *                 password hasher — not expressible as a synchronous FluentValidation rule).
+             * @example another horse battery staple 4
+             */
+            newPassword: string;
+        };
         /**
          * @description REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.
          * @example {
@@ -127,6 +323,43 @@ export interface components {
              * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
              */
             id: string;
+        };
+        /**
+         * @description Response to `GET /api/v1/auth/csrf`.
+         * @example {
+         *       "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
+         *     }
+         */
+        CsrfTokenResponse: {
+            /**
+             * @description Opaque token — also set as the `__Host-XSRF-TOKEN` cookie. Echo verbatim in an `X-CSRF-Token`
+             *     header on every mutating `/auth/*` request.
+             * @example CfDJ8N-example-opaque-csrf-token-value
+             */
+            csrfToken: string;
+        };
+        /**
+         * @description One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant
+         *                 minus its session id — that field is server-internal and never crosses the wire.
+         * @example {
+         *       "privilege": "admin.view",
+         *       "scope": "SchoolWide",
+         *       "armIds": []
+         *     }
+         */
+        EffectivePrivilegeDto: {
+            /**
+             * @description The canonical privilege code.
+             * @example admin.view
+             */
+            privilege: string;
+            /** @description Whether this grant applies school-wide or over a named list of arms. */
+            scope: components["schemas"]["ScopeType"];
+            /**
+             * @description The arms this grant covers. Empty when Scope is school-wide.
+             * @example []
+             */
+            armIds: string[];
         };
         /**
          * @description An RFC 9457 problem response for a validation failure, returned with status 422. Extends the standard problem shape with `errors`: an object keyed by request property name, whose values are the messages for that property, suitable for attaching to form fields. A 400 (rather than 422) means the request itself could not be parsed.
@@ -354,6 +587,13 @@ export interface components {
             modifiedAtUtc: null | string;
         };
         /**
+         * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
+         *     or a list of specific arms in a specific session."
+         * @example SchoolWide
+         * @enum {unknown}
+         */
+        ScopeType: "SchoolWide" | "ArmList";
+        /**
          * @description The arm-scoped resource `GetSecureArm` returns once the privilege check passes.
          * @example {
          *       "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
@@ -368,23 +608,30 @@ export interface components {
             armId: string;
         };
         /**
-         * @description The calling user's identity, as the API sees it.
+         * @description Signs an administrator in (spec 6.1.11, spec 9.1). Approved contract delta:
+         *     `POST /api/v1/auth/sign-in`.
          * @example {
-         *       "userId": "subject-identifier-from-your-identity-provider",
-         *       "isAuthenticated": true
+         *       "email": "admin@example.com",
+         *       "password": "correct horse battery staple 9"
          *     }
          */
-        WhoAmIResponse: {
+        SignInCommand: {
             /**
-             * @description The caller's stable identifier, or `null` when the request is anonymous.
-             * @example subject-identifier-from-your-identity-provider
+             * @description The account's login identifier. SignInCommandValidator DOES
+             *                 check this is a well-formed email address — that check runs (and can reject) before the Argon2id
+             *                 verify, but it does not reopen spec 6.1.11's timing concern: format validation happens identically
+             *                 whether or not any account with that shape of address exists, so it cannot distinguish "known
+             *                 email" from "unknown email" the way the Argon2id verify's presence/absence would.
+             * @example admin@example.com
              */
-            userId: null | string;
+            email: string;
             /**
-             * @description Whether the request carried an authenticated identity.
-             * @example true
+             * @description The submitted plaintext password. Never logged (redacted by field name — see
+             *                 `RedactSensitivePropertiesEnricher` — and never included in the request-logging behaviour's
+             *                 output in the first place, since that behaviour logs only the request TYPE name).
+             * @example correct horse battery staple 9
              */
-            isAuthenticated: boolean;
+            password: string;
         };
     };
     responses: never;
@@ -395,6 +642,297 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    GetCsrfToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CsrfTokenResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SignIn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SignOut: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RefreshSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangePassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Ping: {
         parameters: {
             query: {
@@ -545,35 +1083,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    WhoAmI: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WhoAmIResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
                 headers: {
                     [name: string]: unknown;
                 };

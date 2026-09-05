@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Scalar.AspNetCore;
+using SchoolManagement.Api.Bootstrap;
 using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Endpoints;
 using SchoolManagement.Api.Http;
@@ -9,6 +10,7 @@ using SchoolManagement.Api.OpenApi;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Infrastructure;
 
@@ -38,6 +40,42 @@ if (isDevelopment)
 }
 
 builder.Configuration.AddEnvironmentVariables();
+
+// TASK-0003, spec 6.1.6: the ONE off-the-wire seam that creates the first admin account. Checked and
+// dispatched before ANY web-hosting concern is wired — no Kestrel, no authentication scheme, no
+// endpoint — so this can never become reachable over HTTP no matter what else changes below.
+//
+// The DI composition lives HERE rather than inside BootstrapAdminAccountCli: Program.cs is the one
+// exempt composition root allowed to reference Infrastructure directly
+// (DependencyDirectionTests.Api_DoesNotDependOnInfrastructureOutsideComposition) — a second exemption
+// is exactly the erosion that test's own remarks warn against, so the CLI type stays Infrastructure-free
+// and only receives an already-resolved ISender.
+if (args.Length > 0 && string.Equals(args[0], BootstrapAdminAccountCli.CommandName, StringComparison.Ordinal))
+{
+    var bootstrapServices = new ServiceCollection();
+
+    bootstrapServices.AddLogging();
+    bootstrapServices.AddSingleton(TimeProvider.System);
+    bootstrapServices.AddSingleton<ICurrentUser, NoOneCurrentUser>();
+    bootstrapServices.AddApplication();
+
+    // No live host, so ASP.NET Core's ValidateOnStart hosted service never runs — a misconfigured
+    // connection string surfaces as an ordinary connection failure on first use instead, which is an
+    // acceptable trade-off for a one-shot console command.
+    bootstrapServices.AddInfrastructure(builder.Configuration, validateOnStart: false);
+
+#pragma warning disable ASP0000 // Building a ServiceProvider from application code.
+    // Justified: this is a stand-alone console command, not the web application. There is no
+    // "application code" DI container to prefer here — the whole point is running the mediator
+    // pipeline WITHOUT building the web host (no Kestrel, no middleware, one process, one exit).
+    await using var bootstrapProvider = bootstrapServices.BuildServiceProvider();
+#pragma warning restore ASP0000
+    await using var bootstrapScope = bootstrapProvider.CreateAsyncScope();
+
+    return await BootstrapAdminAccountCli
+        .RunAsync(args, bootstrapScope.ServiceProvider.GetRequiredService<ISender>())
+        .ConfigureAwait(false);
+}
 
 // Is this process running only to emit the OpenAPI document? Generation STARTS the host to read its
 // route metadata, so every ValidateOnStart check would otherwise demand a configured database and a
@@ -260,6 +298,12 @@ app.UseCors(CorsOptions.PolicyName);
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+// TASK-0003: spec 6.1.6's forced-change gate. AFTER authentication (needs the claim it reads),
+// BEFORE authorization (this is account state, not a privilege decision — see the middleware's
+// remarks for why it does not belong inside PrivilegeAuthorizationHandler).
+app.UseMiddleware<MustChangePasswordGateMiddleware>();
+
 app.UseAuthorization();
 
 // ── Endpoints ────────────────────────────────────────────────────────────────────────────────
@@ -301,7 +345,12 @@ if (isDevelopment)
 // remarks for why this, unlike StartupEnvironmentGuard, is not gated on validateOnStart.
 PrivilegeDeclarationGuard.Validate(app);
 
+// TASK-0003 boot-time guard: a mutating route with no CSRF check and no explicit exemption is a
+// startup failure, not a live hole — see CsrfDeclarationGuard's remarks.
+CsrfDeclarationGuard.Validate(app);
+
 await app.RunAsync().ConfigureAwait(false);
+return 0;
 
 // ── Local helpers ────────────────────────────────────────────────────────────────────────────
 

@@ -10,33 +10,6 @@ namespace SchoolManagement.IntegrationTests;
 public sealed class SecurityAndErrorContractTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     [Fact]
-    public async Task WhoAmI_IsAnonymous_BecauseTheBootGuardNoLongerAllowsABareFallbackOnlyRoute()
-    {
-        RequireDatabase();
-
-        // TASK-0002 CHANGE. Before the boot-time privilege-declaration guard existed, /whoami
-        // deliberately declared no [Authorize] and no .AllowAnonymous(), relying purely on the
-        // deny-by-default fallback policy, to prove a route nobody remembered to secure is still
-        // secured at runtime. The guard (spec 9.2) now makes exactly that pattern a STARTUP failure —
-        // see PrivilegeDeclarationGuardTests in the unit test project for the proof that a route
-        // declaring neither AllowAnonymous nor a privilege cannot register at all. /whoami is
-        // therefore now explicitly .AllowAnonymous(), per the TASK-0002 task card's own instruction
-        // for this exact situation. The deny-by-default guarantee itself is proven elsewhere now:
-        // statically by the boot guard, and at runtime by
-        // AnUnknownRoute_Returns401NotFound_BecauseOfTheFallbackPolicy below (anything unmapped is
-        // still denied) and by PrivilegeAuthorizationTests (a mapped, privilege-declared route still
-        // rejects an anonymous caller with 401).
-        var response = await Client.GetAsync(
-            new Uri("/api/v1/reference/whoami", UriKind.Relative),
-            TestContext.Current.CancellationToken);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        using var document = await ReadJsonAsync(response);
-        document.RootElement.GetProperty("isAuthenticated").GetBoolean().ShouldBeFalse();
-    }
-
-    [Fact]
     public async Task AnAnonymousEndpoint_IsReachableWithoutCredentials()
     {
         RequireDatabase();

@@ -201,12 +201,12 @@ public sealed class PrivilegeAuthorizationTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
-    private Task<HttpResponseMessage> SendAsAsync(string userId, Guid armId)
+    private async Task<HttpResponseMessage> SendAsAsync(string userId, Guid armId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, SecureArmUrl(armId));
         request.Headers.Add(UserIdHeader, userId);
 
-        return _client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await _client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private static Uri SecureArmUrl(Guid armId) =>
