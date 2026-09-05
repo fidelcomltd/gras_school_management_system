@@ -48,7 +48,11 @@ describe('env-values schema', () => {
 });
 
 describe('exported constants', () => {
-  it('loads the real .env without throwing', () => {
+  it('loads under the configured test env without throwing', () => {
+    // vite.config.ts's `test.env` supplies these six VITE_* variables so this
+    // module loads the same way in CI (no `frontend/.env` present) as on a
+    // developer machine (TASK-0023). This asserts the module-scope load
+    // succeeds and exports sane constants, not that a real `.env` exists.
     expect(APP_ENV).toBeTruthy();
     expect(API_BASE_URL).toMatch(/^https?:\/\//);
   });

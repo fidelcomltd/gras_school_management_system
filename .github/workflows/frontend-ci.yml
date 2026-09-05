@@ -62,6 +62,18 @@ jobs:
         # ERESOLVE surfaces here rather than on a developer's machine.
         run: npm ci
 
+      - name: Provide .env for the build
+        # `.env` is gitignored, so a runner has none. `vite build` does NOT fail without it — it
+        # inlines `import.meta.env.VITE_*` as `undefined` and emits a bundle that throws on boot,
+        # so the Build gate would go green while producing something unusable. Copying the
+        # committed example is safe: .env.example is explicitly non-secret ("Nothing secret
+        # belongs here" — every VITE_ value is shipped to the browser anyway).
+        #
+        # The UNIT TESTS deliberately do not depend on this file. TASK-0023 gives vitest an
+        # explicit `test.env`, so `npm run test` passes with no `.env` present at all. If this
+        # step ever becomes load-bearing for the Test gate, that is a regression.
+        run: cp .env.example .env
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -104,6 +116,13 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Provide .env for the build
+        # Required here for a different reason than in quality-gates: playwright.config.ts's
+        # webServer runs `npm run build && npm run preview`, so without this the spec loads a page
+        # whose first module throws and every assertion fails for a reason that has nothing to do
+        # with the behaviour under test.
+        run: cp .env.example .env
 
       - name: Install Playwright browsers
         # Chromium only — the one project configured in playwright.config.ts. `--with-deps`
