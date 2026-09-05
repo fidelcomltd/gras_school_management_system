@@ -95,17 +95,15 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 [decisions/2026-Q3.md](decisions/2026-Q3.md) and the card's `## Log`. Approved contract deltas:
 `decisions/2026-Q3-contract-deltas.md`.
 
-- 2026-09-04 **TASK-0013 Option B (human sign-off): idempotency deferred**, trigger armed — see `## Known drift`. Lesson: XML doc comments are contract content, so a docs-only backend diff still needs a hash check.
 - 2026-09-04 **STANDING LESSON (0010/0011/0015/0016, again in 0022): a check that cannot be shown to fail is not a check.** Break what it guards, watch it go red, then accept it. Corollaries: fixtures must match the real artefact; a comment claiming coverage is not coverage.
-- 2026-09-05 **TASK-0003 SPLIT** into 0003 (auth), 0019 (idempotency + admin accounts), 0020 (frontend §7), 0021 (cookie seam). Idempotency trigger fires on 0019; 0003's bootstrap stays off the wire as a CLI command.
-- 2026-09-05 **TASK-0003 CLOSED** — six `/api/v1/auth/*` endpoints, `3b518bd9…`, 245/245 green. **Reopened four times, always the same shape: the feature worked and its test passed while the RULE went unenforced.** Full note in `decisions/2026-Q3.md`.
 - 2026-09-05 **TASK-0022: three stacked CI defects; the third means the gate self-test had NEVER been able to run in CI** — fixtures were `*.trx`-ignored, never committed. Found only by raising PR #9. Lesson: reviewing the DIFF, not the agent's report, found it. Full note in `decisions/2026-Q3.md`.
 - 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — `src/features/<feature>/`, react-hook-form+zod, Playwright; no bulk rename, `src/shared/` waits. Done by TASK-0020. Full note in `decisions/2026-Q3.md`.
 
 **Closed-card records** — archive-only, `grep` the ID in `decisions/2026-Q3.md`: 2026-08-27 four
 decisions (gitleaks, gate honesty, DB-credential split, TASK-0001 close) · TASK-0012 problem-schema
-extension members · TASK-0014 §7 audit S4-S7 · TASK-0017 secret scan restored · TASK-0018
-`-GateArgs` splat · TASK-0020 §7 structure/form/E2E mandates adopted.
+extension members · TASK-0013 idempotency deferred (Option B) · TASK-0014 §7 audit S4-S7 ·
+TASK-0017 secret scan restored · TASK-0018 `-GateArgs` splat · TASK-0020 §7 structure/form/E2E
+mandates adopted · TASK-0003 auth split into 0019/0020/0021 then closed (245/245, reopened 4×).
 
 ## Known drift
 
@@ -115,6 +113,7 @@ in [drift/2026-Q3.md](drift/2026-Q3.md), found by date.
 
 **Live triggers**
 
+- 2026-09-05 **The committed client is STALE against the committed contract; never recorded when TASK-0003 closed.** `schema.d.ts` still declares `/reference/whoami` (removed as BREAKING) and none of the six `/auth/*` paths, so **`check:api-drift` FAILS and `frontend-ci` cannot go green until it is regenerated** — loud by design (§4.4 check 2), but unrecorded. **Trigger: TASK-0021.** Owner `frontend-dev`.
 - 2026-09-04 **No `Idempotency-Key` mechanism; mutating endpoints do not accept the header** — §6 and spec §9.8.2 require it. Deferred (Option B, human sign-off). **Trigger: the first card implementing ANY retry-duplicable mutation builds it first** — §9.8.2's four operations are examples, not the whole list. **Assigned to TASK-0019**; re-check before TASK-0005. `ASSUMPTIONS.md` §2.14.
 - 2026-09-05 **Three accepted auth exposures (TASK-0003):** DP key ring unpersisted, so a restart or second replica 403s outstanding CSRF cookies — **trigger: deployment (Q5)**; bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` opens a DbContext only when the account exists (timing asymmetry). Owner `backend-dev`.
 - 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0019.** Owner `backend-dev`.
