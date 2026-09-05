@@ -19,12 +19,11 @@ backend:  ./backend — solution `SchoolManagement.slnx`. Api / Application / Do
           First real domain is `Domain/Auth/` (TASK-0003); `/api/v1/reference/*` and `/health/*`
           remain scaffolding. Conventions: `backend/AGENTS.md`. Deviations: `docs/ASSUMPTIONS.md`.
 frontend: ./frontend — Vite 8 / React 19 / TypeScript 6, package `gra-school-portal`, npm
-          (lockfile committed). Design tokens, Base UI primitives, axios transport in
-          `src/lib/http/`, TanStack Query, Zustand, MSW, react-hook-form + zod, Playwright.
-          130 unit tests + 2 e2e green. Top-level: `src/api/ app/ components/ config/ features/
-          lib/ screens/ stores/ test/`. `src/features/<feature>/` is the documented home for
-          screens (`CONVENTIONS.md` §4), still EMPTY — TASK-0021 is its first user. `src/screens/`
-          is deprecated; `src/shared/` deliberately does not exist yet (2026-09-05 decision).
+          (lockfile committed). Design tokens, Base UI, axios transport in `src/lib/http/`,
+          TanStack Query, Zustand, MSW, react-hook-form + zod, Playwright. Top-level: `src/api/
+          app/ components/ config/ features/ lib/ screens/ stores/ test/`. `features/<feature>/`
+          is the documented home for screens (`CONVENTIONS.md` §4), still EMPTY — TASK-0021 is
+          its first user. `screens/` deprecated; `shared/` deliberately absent (2026-09-05).
           Conventions: `CONVENTIONS.md`, `HANDOFF.md`, `src/api/README.md`.
 contract generator: Microsoft.Extensions.ApiDescription.Server/10.0.10 via
           `backend/scripts/generate-openapi.ps1 -Promote` — the ONLY sanctioned way
@@ -55,11 +54,11 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
 openapi.json sha256: 3b518bd951b386b270ca35b1398c515a3c9bad3fe0eba4f6c89382ede0565185
           `X-CSRF-Token` is a required header parameter on exactly the four mutating auth
           operations, emitted by the same call that wires enforcement.
-regenerated: 2026-09-05 · Microsoft.Extensions.ApiDescription.Server/10.0.10, SDK 10.0.100
+regenerated: 2026-09-05 (generator + SDK under `## Layout`)
 api version: v1 · nine paths: `/api/v1/auth/{csrf,sign-in,sign-out,me,refresh,password}` and
-          `/api/v1/reference/{ping,records,arms/{armId}/secure}`. `/reference/whoami` REMOVED by
-          TASK-0003 (breaking, zero callers). `/health/*` are `.ExcludeFromDescription()`, not in
-          it (`ASSUMPTIONS.md` §2.9). `/reference/*` is scaffolding. History: `decisions/2026-Q3.md`.
+          `/api/v1/reference/{ping,records,arms/{armId}/secure}`. `/health/*` are
+          `.ExcludeFromDescription()`, not in it (`ASSUMPTIONS.md` §2.9). `/reference/*` is
+          scaffolding. History (incl. `whoami` removal): `decisions/2026-Q3.md`.
 
 ## Auth decision
 mechanism: **HttpOnly cookie session + CSRF token.** Human sign-off 2026-08-26 per §5. Token
@@ -83,6 +82,7 @@ Open cards only. Closed: TASK-0001, 0002, 0003, 0004, 0006-0018, 0020 — closur
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
+| TASK-0022 | Cross-platform gate self-test + fixture tracking | backend-dev | done, UNCOMMITTED |
 | TASK-0019 | Idempotency substrate, then admin account management | backend-dev | queued |
 | TASK-0021 | Cookie auth seam and the sign-in screen | frontend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
@@ -95,11 +95,12 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 [decisions/2026-Q3.md](decisions/2026-Q3.md) and the card's `## Log`. Approved contract deltas:
 `decisions/2026-Q3-contract-deltas.md`.
 
-- 2026-09-04 **TASK-0013 Option B (human sign-off): idempotency deferred**, trigger armed — see `## Known drift`. Lesson: XML doc comments are contract content here, so even a docs-only backend diff needs a hash check.
-- 2026-09-04 **STANDING LESSON (TASK-0010, 0011, 0015, 0016): a check that cannot be shown to fail is not a check.** Break what it guards and watch it go red before accepting it. Corollaries: fixtures must reproduce the real artefact's shape; a comment claiming coverage is not coverage.
-- 2026-09-05 **TASK-0003 SPLIT** into 0003 (auth/sessions), 0019 (idempotency + admin accounts), 0020 (frontend §7, closed), 0021 (cookie seam). Account creation is the retry-duplicable mutation, so the idempotency trigger fires on 0019; 0003's bootstrap stays off the wire as a CLI command.
-- 2026-09-05 **TASK-0003 CLOSED** — six `/api/v1/auth/*` endpoints, contract `3b518bd9…`, 245/245 gates green. BREAKING only in removing `/reference/whoami` (zero callers). Rulings embedded: Super Admin is a flag bypass (6.1.7 over 4.2.2); `423` only when the password is correct. **Reopened four times, always the same shape: the feature worked and its test passed while the RULE went unenforced.** Landed as one ~1443-line diff instead of three seams; the second-pass review that bought found three HIGH defects 237 passing tests were blind to.
-- 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — screens under `src/features/<feature>/`, `react-hook-form`+zod, Playwright. Proviso "only where it buys better structure": no bulk rename; `src/shared/` waits; `src/screens/` retires with `scaffold-status`. Done by TASK-0020.
+- 2026-09-04 **TASK-0013 Option B (human sign-off): idempotency deferred**, trigger armed — see `## Known drift`. Lesson: XML doc comments are contract content, so a docs-only backend diff still needs a hash check.
+- 2026-09-04 **STANDING LESSON (0010/0011/0015/0016, again in 0022): a check that cannot be shown to fail is not a check.** Break what it guards, watch it go red, then accept it. Corollaries: fixtures must match the real artefact; a comment claiming coverage is not coverage.
+- 2026-09-05 **TASK-0003 SPLIT** into 0003 (auth), 0019 (idempotency + admin accounts), 0020 (frontend §7), 0021 (cookie seam). Idempotency trigger fires on 0019; 0003's bootstrap stays off the wire as a CLI command.
+- 2026-09-05 **TASK-0003 CLOSED** — six `/api/v1/auth/*` endpoints, `3b518bd9…`, 245/245 green. **Reopened four times, always the same shape: the feature worked and its test passed while the RULE went unenforced.** Full note in `decisions/2026-Q3.md`.
+- 2026-09-05 **TASK-0022: three stacked CI defects; the third means the gate self-test had NEVER been able to run in CI** — fixtures were `*.trx`-ignored, never committed. Found only by raising PR #9. Lesson: reviewing the DIFF, not the agent's report, found it. Full note in `decisions/2026-Q3.md`.
+- 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — `src/features/<feature>/`, react-hook-form+zod, Playwright; no bulk rename, `src/shared/` waits. Done by TASK-0020. Full note in `decisions/2026-Q3.md`.
 
 **Closed-card records** — archive-only, `grep` the ID in `decisions/2026-Q3.md`: 2026-08-27 four
 decisions (gitleaks, gate honesty, DB-credential split, TASK-0001 close) · TASK-0012 problem-schema
@@ -115,8 +116,10 @@ in [drift/2026-Q3.md](drift/2026-Q3.md), found by date.
 **Live triggers**
 
 - 2026-09-04 **No `Idempotency-Key` mechanism; mutating endpoints do not accept the header** — §6 and spec §9.8.2 require it. Deferred (Option B, human sign-off). **Trigger: the first card implementing ANY retry-duplicable mutation builds it first** — §9.8.2's four operations are examples, not the whole list. **Assigned to TASK-0019**; re-check before TASK-0005. `ASSUMPTIONS.md` §2.14.
-- 2026-09-05 **Three accepted auth exposures (TASK-0003):** Data Protection key ring unpersisted, so a restart or a second replica 403s outstanding CSRF cookies — **trigger: deployment (Open question 5)**; the bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` opens a DbContext only on the account-exists path, a timing asymmetry. Owner `backend-dev`.
+- 2026-09-05 **Three accepted auth exposures (TASK-0003):** DP key ring unpersisted, so a restart or second replica 403s outstanding CSRF cookies — **trigger: deployment (Q5)**; bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` opens a DbContext only when the account exists (timing asymmetry). Owner `backend-dev`.
 - 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0019.** Owner `backend-dev`.
+- 2026-09-05 **`scripts/local-env.ps1` is UNTRACKED** (per-dev copy of `local-env.template.ps1`); this machine's predates TASK-0018 and still splats `GateArgs` positionally — the bug TASK-0018 fixed *in the template only*. Nothing detects copy-vs-template drift. **Trigger: any dispatch running gates via the wrapper** — call `ci.ps1` directly. Needs a card.
+- 2026-09-05 **`gate-summary.tests.ps1:101,:108` are near-unfalsifiable** — `-match` substring passes even against a mangled path; only in-process `-eq` caught the TASK-0022 mutation. **Trigger: next card touching that suite.**
 - 2026-09-04 **The DEFAULT rate-limit policy has no 429 test.** Health covered by TASK-0015, sensitive by TASK-0003. Owner `backend-dev`, no trigger.
 - 2026-09-04 **The Api→Infrastructure arch test exempts `StartupEnvironmentGuard` as well as `Program.cs`** (it reads `DatabaseOptions` at `StartAsync`). **Trigger: a THIRD exemption must argue for itself or the type gets a port** — the rule must not erode one name at a time.
 - 2026-08-26 **`frontend/src/lib/auth/` is bearer-token auth, against the cookie sign-off.** Known-wrong. **Trigger: TASK-0021**, which deletes it. Owner `frontend-dev`.
@@ -126,13 +129,10 @@ in [drift/2026-Q3.md](drift/2026-Q3.md), found by date.
 
 - 2026-09-05 **`SameSite=Lax` on both auth cookies assumes frontend and API share a registrable domain** (TASK-0003 delta). Cross-site needs `SameSite=None` and a different CSRF posture — not a one-line tweak. **Trigger: the deployment decision (Open question 5).** Owner human + `backend-dev`.
 
-**Accepted, no trigger** — archive-only, `grep` the date in `drift/2026-Q3.md`: 2026-08-08 backend
-landed uncarded (audited, TASK-0015 closed its should-fixes) · 2026-08-26 two dependency bumps
-watched not assumed benign · 2026-08-26 TASK-0002's `IPupilArmOfRecordLookup`/`IResultSetArmLookup`
-as Application abstractions · 2026-08-26 the reference slice sits in the committed contract
-in four places · 2026-08-26 a process lesson recorded and deliberately not acted on · 2026-08-27
-`Docker.DotNet.Enhanced` unverified on this machine · 2026-08-27 TASK-0011's Family B allowlist gap,
-measured · 2026-09-04 `Format` runs before `Build` though it measures slower.
+**Accepted, no trigger** — 8 entries, archive-only; `grep` the date in `drift/2026-Q3.md`:
+2026-08-08 backend landed uncarded · 2026-08-26 ×4 (dep bumps; TASK-0002 Application ports;
+reference slice in the contract ×4 places; a process lesson not acted on) · 2026-08-27 ×2
+(`Docker.DotNet.Enhanced` unverified; TASK-0011 Family B gap) · 2026-09-04 `Format` before `Build`.
 
 Ten resolved or struck entries live in the archive only, including 2026-08-27 `src/shared/`
 (resolved 2026-09-05).
@@ -146,6 +146,5 @@ Live only. The nine resolved questions are in [decisions/2026-Q3.md](decisions/2
 
 ## Reading this file
 
-**Budget: 12 KB, in bytes.** `wc -c .agent/STATE.md` before appending. Over it, archive full text
-to `decisions/` or `drift/` and leave a one-line index entry — never delete. Rules: CLAUDE.md
-§4.1 and §13.
+**Budget: 12 KB, bytes.** `wc -c` before appending. Over it, archive full text to `decisions/` or
+`drift/`, leave a one-line index — never delete. Rules: CLAUDE.md §4.1, §13.
