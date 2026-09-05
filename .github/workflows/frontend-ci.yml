@@ -86,3 +86,44 @@ jobs:
         #
         # Fix: `npm run generate:api` and commit the result. Never hand-edit src/api/schema.d.ts.
         run: npm run check:api-drift
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright browsers
+        # Chromium only — the one project configured in playwright.config.ts. `--with-deps`
+        # also installs the OS packages the browser needs on a bare Ubuntu runner.
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E — smoke spec
+        # playwright.config.ts's webServer builds and serves the app itself, so this is the
+        # one gate that runs against the actual production bundle rather than source.
+        run: npm run test:e2e
+
+      - name: Upload Playwright report (always, for a legible failure)
+        # §7/TASK-0020: failure output must be legible in CI. The HTML report bundles the
+        # trace (captured on first retry) and the screenshot (captured on every failure);
+        # `if: always()` means it uploads on a red run, not just a green one.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7

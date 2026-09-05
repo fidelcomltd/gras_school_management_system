@@ -21,8 +21,10 @@ conflicts with the root [`CLAUDE.md`](../CLAUDE.md), raise it rather than pickin
 | HTTP transport | Axios, wrapped | never called directly outside `src/lib/http/` |
 | Client state | Zustand 5 | |
 | Validation | Zod 4 | |
+| Forms | react-hook-form + `@hookform/resolvers` (zod) | added TASK-0020, mandated by §7; first form is TASK-0021 |
 | Routing | React Router 7 | v8 requires Node ≥22.22; this machine has 22.21 |
 | Tests | Vitest + RTL + MSW | |
+| E2E | Playwright | added TASK-0020; `frontend/e2e/`, see §12 |
 | Lint | oxlint | config in `.oxlintrc.json` |
 
 Package manager is **npm**. `pnpm` is not installed on this machine.
@@ -105,21 +107,58 @@ src/
     feedback/   error boundary
     theme/      theme toggle
   config/       env-values.ts — the only reader of import.meta.env
-  features/     server-state modules, one folder per OpenAPI tag. See src/features/README.md
+  features/     feature-first home for screens and their server-state modules, one folder
+                per feature. See src/features/README.md and "Feature folders" below.
   lib/
     auth/       auth-session.ts — the only place a token lives
     http/       axios client, verb helpers, error normalisation
     query/      TanStack Query client defaults
     utils/      cn()
-  screens/      one folder per screen; screen-local components in its own components/
+  screens/      DEPRECATED (2026-09-05). Holds only `scaffold-status/`, a demo, deleted when
+                the first real screen lands (TASK-0021). New screens go in `src/features/`.
   stores/       Zustand stores for cross-screen client state
   styles/       brand.css (ramps), semantic.css (tokens), index.css (entry)
   test/         setup, render helpers, MSW server
 ```
 
 **Component placement (§8 of the brief):** used by more than one screen → `src/components/`.
-Used by exactly one screen → that screen's own `components/` folder. Promote only when a
-*second* consumer appears, and promote in its own commit — never pre-emptively.
+Used by exactly one screen → that screen's own feature folder. Promote only when a *second*
+consumer appears, and promote in its own commit — never pre-emptively. `src/shared/` does not
+exist and is not created speculatively — it appears in the commit that promotes the first thing
+genuinely shared across features, per the 2026-09-05 resolution of Open question 11. Until then,
+`src/components/`, `src/lib/`, and `src/stores/` continue to serve that role and are **not**
+bulk-renamed into a `src/shared/` that would just be a second address for the same code.
+
+### Feature folders
+
+`src/features/<feature>/` is a **convention, not a migration** — the directory is currently
+empty and reserved; nothing existing moves into it. It is where every *new* screen and its
+server-state code lands, starting with TASK-0021.
+
+```
+src/features/<feature>/
+  <feature>-screen.tsx   # the screen component this feature owns, wired into app-router.tsx
+  components/            # components used only within this feature's screen(s)
+  hooks/                 # non-server-state hooks local to this feature
+  api.ts                 # TanStack Query hooks, one per endpoint — see src/features/README.md
+  types.ts               # query-key enum + contract-derived type re-exports, never hand-typed DTOs
+  store.ts               # optional; Zustand store for this feature's client-only state
+```
+
+What belongs here: everything a feature needs that nothing else does — its screen, its
+screen-local components, its query/mutation hooks, its own client-state store. What does not:
+the generated contract client (`src/api/`, never touched by hand), the design-system primitives
+(`src/components/ui/`), the app shell and other components already shared across screens
+(`src/components/layout/`, `src/components/feedback/`, `src/components/theme/`), the HTTP/query
+transport (`src/lib/`), and anything a *second* feature comes to need — that is what
+`src/shared/` is for, created in the commit that first needs it, never in advance.
+
+**Routing is unaffected by this layout.** The router is React Router 7 used as a library,
+not a file-based router: routes are declared explicitly in
+[`src/app/router/app-router.tsx`](src/app/router/app-router.tsx) against the path constants in
+[`src/app/router/paths.ts`](src/app/router/paths.ts). Moving a screen into
+`src/features/<feature>/` changes nothing about its URL — a route only exists once it is added
+to `app-router.tsx` and `paths.ts` by hand.
 
 ---
 
@@ -276,8 +315,16 @@ Every session writes tests for what it built and runs them green before reportin
 - Colocate: `button.tsx` → `button.test.tsx`.
 - `npm test` typechecks nothing — run `npm run typecheck` too. `npm run verify` does both.
 
-Not yet set up: Playwright. The root `CLAUDE.md` §7 wants E2E for auth, the primary create
-path, and one failure path. Add it when there is a flow to test.
+**E2E — Playwright**, added TASK-0020, config at [`playwright.config.ts`](playwright.config.ts),
+specs in [`e2e/`](e2e/). Runs against the **production build** (`vite build` + `vite preview`),
+not the dev server — `playwright.config.ts`'s `webServer` handles both, so `npm run test:e2e` is
+self-contained. Trace on first retry, screenshot on every failure, both collected into
+`playwright-report/` and `test-results/` (gitignored).
+
+§7 wants E2E for auth, the primary create path, and one failure path — none of which exist yet,
+so `e2e/smoke.spec.ts` is a placeholder asserting the current shell (page title, the scaffold
+heading, the not-found fallback for an unknown route) rather than those three flows. It is
+replaced, not added to, once TASK-0021's sign-in flow exists to test instead.
 
 ---
 
@@ -289,10 +336,14 @@ npm run lint          # oxlint — currently zero warnings; keep it that way
 npm run test          # vitest run
 npm run build         # tsc -b && vite build
 npm run verify        # all four, in order
+npm run test:e2e      # playwright test — NOT part of verify; builds + serves the app itself
 ```
 
-All four must pass before a task card closes, and the output must be shown — a report of
-success without pasted output is not finished.
+All four `verify` gates must pass before a task card closes, and the output must be shown — a
+report of success without pasted output is not finished. `test:e2e` is a fifth, separate gate
+(its own CI job, `e2e` in `.github/workflows/frontend-ci.yml`) kept out of `verify` because it
+builds and boots a server rather than running in-process, the same reason `check:api-drift` is
+kept out.
 
 ---
 
@@ -304,8 +355,10 @@ Do not treat these as oversights:
 - `src/features/` is empty — no feature work has been authorised.
 - No sign-in screen, no navigation, no user model — all need the contract and a product
   decision.
-- No Playwright, no CI workflow, no icon library, no form library. `react-hook-form` +
-  `@hookform/resolvers` will be needed for the first real form; it is not installed because
-  nothing uses it yet.
+- No icon library.
+- `react-hook-form` + `@hookform/resolvers`, and Playwright with a CI job, were added in
+  TASK-0020 (§7 mandate, Open question 11 resolved 2026-09-05 — see `frontend/HANDOFF.md`).
+  Still absent: any actual form, and any E2E spec beyond the `e2e/smoke.spec.ts` placeholder —
+  both wait on TASK-0021 having a real screen and flow to build against.
 - `src/screens/scaffold-status/` is a demonstration. **Delete it** when the first real
   screen lands.
