@@ -49,6 +49,23 @@ public record Error(string Code, string Description, ErrorType Type)
     /// <summary>Creates an authorisation failure (HTTP 403).</summary>
     public static Error Forbidden(string code, string description) =>
         new(code, description, ErrorType.Forbidden);
+
+    /// <summary>Creates a locked-account failure (HTTP 423). Prefer <see cref="LockedError"/> directly
+    /// when the response needs to carry <c>lockedUntil</c>.</summary>
+    public static Error Locked(string code, string description) =>
+        new(code, description, ErrorType.Locked);
+}
+
+/// <summary>
+/// A locked-account failure (spec 6.1.11) carrying the timestamp the lock expires at, so the
+/// response can attach it as a <c>lockedUntil</c> extension member.
+/// </summary>
+/// <param name="LockedUntilUtc">When the lockout ends.</param>
+public sealed record LockedError(DateTimeOffset LockedUntilUtc)
+    : Error(LockedErrorCode, "This account is temporarily locked after too many failed attempts.", ErrorType.Locked)
+{
+    /// <summary>The stable error code for a lockout response.</summary>
+    public const string LockedErrorCode = "auth.account_locked";
 }
 
 /// <summary>

@@ -45,6 +45,7 @@ internal static class ApiProblem
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.Unauthenticated => StatusCodes.Status401Unauthorized,
         ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+        ErrorType.Locked => StatusCodes.Status423Locked,
         ErrorType.Failure => StatusCodes.Status500InternalServerError,
 
         // An unmapped member reaching here is a bug, not a client error. 500 is the honest answer:
@@ -61,6 +62,7 @@ internal static class ApiProblem
         ErrorType.Conflict => "Conflict with current state",
         ErrorType.Unauthenticated => "Authentication required",
         ErrorType.Forbidden => "Access denied",
+        ErrorType.Locked => "Account locked",
         ErrorType.Failure => "An unexpected error occurred",
         _ => "An unexpected error occurred",
     };

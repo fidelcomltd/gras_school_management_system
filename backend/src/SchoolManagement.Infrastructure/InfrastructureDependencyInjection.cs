@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Infrastructure.Auth;
 using SchoolManagement.Infrastructure.Authorization;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
@@ -102,13 +104,32 @@ public static class InfrastructureDependencyInjection
 
         services.AddScoped<ISecretProvider, ConfigurationSecretProvider>();
 
-        // TASK-0002 authorization seams. See the remarks on each type: role/assignment persistence
-        // and the audit log module do not exist yet, so these are safe (deny-by-default / logging)
-        // stand-ins that a later module replaces.
-        services.AddScoped<IEffectivePrivilegeProvider, NullEffectivePrivilegeProvider>();
+        // TASK-0003: real (super-admin-flag-only) implementation, replacing
+        // NullEffectivePrivilegeProvider — see the class remarks. TASK-0019 replaces this again once
+        // real role/assignment persistence exists for non-super-admin accounts.
+        services.AddScoped<IEffectivePrivilegeProvider, SuperAdminFlagEffectivePrivilegeProvider>();
         services.AddScoped<IAuthorizationAuditSink, LoggingAuthorizationAuditSink>();
         services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
         services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
+
+        // TASK-0003: authentication and session management (spec 6.1.11, spec 9.1). Bound the same
+        // way DatabaseOptions is above — the Api project's AddValidatedOptions helper is off-limits
+        // here (Infrastructure must not depend on Api; see DependencyDirectionTests.NothingDependsOnApi).
+        var argon2Options = services
+            .AddOptions<Argon2Options>()
+            .Bind(configuration.GetSection(Argon2Options.SectionName));
+
+        if (validateOnStart)
+        {
+            argon2Options.ValidateOnStart();
+        }
+
+        services.AddSingleton<IValidateOptions<Argon2Options>, Argon2OptionsValidator>();
+
+        services.AddScoped<IPasswordHasher, Argon2idPasswordHasher>();
+        services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
+        services.AddScoped<IAdminSessionRepository, AdminSessionRepository>();
+        services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

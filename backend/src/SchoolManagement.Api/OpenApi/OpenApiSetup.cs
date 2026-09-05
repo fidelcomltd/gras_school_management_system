@@ -48,6 +48,8 @@ public static class OpenApiSetup
         {
             options.AddDocumentTransformer<ApiInfoDocumentTransformer>();
             options.AddDocumentTransformer<VersionedPathDocumentTransformer>();
+            options.AddDocumentTransformer<AuthSecuritySchemeDocumentTransformer>();
+            options.AddOperationTransformer<CsrfHeaderOperationTransformer>();
             options.AddSchemaTransformer<SchemaExampleTransformer>();
             options.AddSchemaTransformer<ProblemDetailsSchemaTransformer>();
         });

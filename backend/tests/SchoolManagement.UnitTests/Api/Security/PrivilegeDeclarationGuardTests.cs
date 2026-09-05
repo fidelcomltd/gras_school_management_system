@@ -29,6 +29,19 @@ public sealed class PrivilegeDeclarationGuardTests
     }
 
     [Fact]
+    public void Validate_PassesForARouteDeclaringRequireAuthenticatedCallerOnly()
+    {
+        // TASK-0003's third category: an authenticated-caller-only route with no privilege to check
+        // (GET /auth/me, POST /auth/refresh, POST /auth/password) — see AuthenticatedCallerRequirementExtensions.
+        var app = WebApplication.CreateBuilder().Build();
+
+        app.MapGet("/auth/me", () => Results.Ok())
+            .RequireAuthenticatedCaller();
+
+        Should.NotThrow(() => PrivilegeDeclarationGuard.Validate(app));
+    }
+
+    [Fact]
     public void Validate_ThrowsAndNamesTheRoute_WhenARouteDeclaresNeitherAPrivilegeNorAnonymous()
     {
         var app = WebApplication.CreateBuilder().Build();

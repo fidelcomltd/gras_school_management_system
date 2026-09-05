@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SchoolManagement.IntegrationTests.Infrastructure;
 
@@ -9,8 +10,16 @@ namespace SchoolManagement.IntegrationTests.Infrastructure;
 [Collection(ApiTestCollectionDefinition.Name)]
 public abstract class IntegrationTestBase(ApiTestFixture fixture) : IAsyncLifetime
 {
-    /// <summary>JSON options matching the API's wire format, so deserialisation in tests behaves like a client's.</summary>
-    protected static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    /// <summary>
+    /// JSON options matching the API's wire format, so deserialisation in tests behaves like a
+    /// client's. The string-enum converter mirrors Program.cs's global registration — enums (for
+    /// example TASK-0003's <c>ScopeType</c> on <c>effectivePrivileges</c>) cross the wire as names,
+    /// per root CLAUDE.md §8.
+    /// </summary>
+    protected static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     /// <summary>The shared application fixture.</summary>
     protected ApiTestFixture Fixture { get; } = fixture;

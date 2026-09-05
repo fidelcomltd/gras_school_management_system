@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SchoolManagement.Application;
+using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Behaviors;
@@ -39,6 +41,16 @@ public sealed class PipelineTests
         // pipeline-wiring check alone.
         services.AddSingleton(Substitute.For<IPupilArmOfRecordLookup>());
         services.AddSingleton(Substitute.For<IResultSetArmLookup>());
+
+        // TASK-0003: the Auth/* handlers depend on these Application abstractions, all implemented
+        // by Infrastructure (or the Api layer, for the two Identity ports) — same treatment as the
+        // TASK-0002 stubs above, needed only so this Application-only container can construct them.
+        services.AddSingleton(Substitute.For<IEffectivePrivilegeProvider>());
+        services.AddSingleton(Substitute.For<IAdminAccountRepository>());
+        services.AddSingleton(Substitute.For<IAdminSessionRepository>());
+        services.AddSingleton(Substitute.For<IPasswordHasher>());
+        services.AddSingleton(Substitute.For<ICurrentUser>());
+        services.AddSingleton(Substitute.For<ICurrentSession>());
 
         services.AddOptions<PipelineOptions>();
 

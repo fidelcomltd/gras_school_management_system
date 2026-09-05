@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Authorization;
-using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
@@ -65,7 +64,6 @@ public sealed class ReferenceEndpoints : IEndpointModule
         MapPing(group);
         MapListSampleRecords(group);
         MapCreateSampleRecord(group);
-        MapWhoAmI(group);
         MapSecureArm(group);
     }
 
@@ -138,6 +136,11 @@ public sealed class ReferenceEndpoints : IEndpointModule
                     response));
             })
             .AllowAnonymous()
+            // TASK-0003 CsrfDeclarationGuard: this reference scaffold is deleted with the SampleRecord
+            // slice (TASK-0013), so it takes the explicit exemption rather than RequireCsrfToken() —
+            // adding real CSRF to code already scheduled for deletion would move the contract for no
+            // lasting reason. Do not copy this exemption for a real mutating endpoint.
+            .ExemptFromCsrfRequirement("Reference scaffold, deleted with the sample-record slice (TASK-0013).")
             .WithName("CreateSampleRecord")
             .WithSummary("Create a sample record")
             .WithDescription(
@@ -149,41 +152,6 @@ public sealed class ReferenceEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
-
-    /// <summary>
-    /// Reports the calling user's identity. Anonymous by necessity as of TASK-0002 — see the remarks.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// TASK-0002 CHANGE. Before the boot-time privilege-declaration guard (spec 9.2) existed, this
-    /// endpoint deliberately declared NO authorisation metadata of its own, relying solely on the
-    /// deny-by-default fallback policy, to prove that policy actually protects a route nobody
-    /// remembered to secure. The guard now makes that exact pattern a startup failure: every mapped
-    /// route must either call <c>RequirePrivilege(...)</c> or <c>AllowAnonymous()</c> explicitly, so
-    /// a "protected only by the bare fallback" endpoint can no longer exist in a running application.
-    /// </para>
-    /// <para>
-    /// Per the TASK-0002 task card's own instruction for exactly this situation ("mark it explicitly
-    /// anonymous rather than inventing a privilege for it"), this endpoint is now
-    /// <c>.AllowAnonymous()</c>. It still reports whatever identity the request carries — useful once
-    /// TASK-0003 wires real authentication — it simply no longer requires one. The deny-by-default
-    /// guarantee itself is now proven statically by <c>PrivilegeDeclarationGuardTests</c> (a route
-    /// with neither declaration fails to register) and at runtime by
-    /// <c>SecurityAndErrorContractTests.AnUnknownRoute_Returns401NotFound_BecauseOfTheFallbackPolicy</c>
-    /// (anything unmapped is still denied).
-    /// </para>
-    /// </remarks>
-    private static void MapWhoAmI(RouteGroupBuilder group) =>
-        group.MapGet("/whoami", (ICurrentUser currentUser) =>
-                TypedResults.Ok(new WhoAmIResponse(currentUser.UserId, currentUser.IsAuthenticated)))
-            .AllowAnonymous()
-            .WithName("WhoAmI")
-            .WithSummary("Return the calling user's identity")
-            .WithDescription(
-                "Anonymous. Reports whatever identity the request carries — null and false while no " +
-                "authentication mechanism is wired (see TASK-0003) — without requiring one.")
-            .Produces<WhoAmIResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     /// <summary>
     /// A SCOPABLE PROTECTED endpoint. Exists to prove — and to let the integration tests exercise —
@@ -214,13 +182,6 @@ public sealed class ReferenceEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 }
-
-/// <summary>The calling user's identity, as the API sees it.</summary>
-/// <param name="UserId">
-/// The caller's stable identifier, or <c>null</c> when the request is anonymous.
-/// </param>
-/// <param name="IsAuthenticated">Whether the request carried an authenticated identity.</param>
-public sealed record WhoAmIResponse(string? UserId, bool IsAuthenticated);
 
 /// <summary>The arm-scoped resource <c>GetSecureArm</c> returns once the privilege check passes.</summary>
 /// <param name="ArmId">The arm named in the request path — the resolved scope target.</param>

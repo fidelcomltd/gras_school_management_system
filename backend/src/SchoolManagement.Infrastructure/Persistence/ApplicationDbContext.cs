@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Reference;
 
@@ -37,6 +38,12 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// Internal, not public: only this assembly's repositories may query it.
     /// </summary>
     internal DbSet<SampleRecord> SampleRecords => Set<SampleRecord>();
+
+    /// <summary>TASK-0003. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<AdminAccount> AdminAccounts => Set<AdminAccount>();
+
+    /// <summary>TASK-0003. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<AdminSession> AdminSessions => Set<AdminSession>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

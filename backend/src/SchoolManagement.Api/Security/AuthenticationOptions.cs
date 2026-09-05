@@ -35,8 +35,9 @@ public static class AuthenticationModes
     public const string Placeholder = "Placeholder";
 
     /// <summary>
-    /// HttpOnly cookie session. NOT IMPLEMENTED — the recommended option in the root CLAUDE.md §5 for a
-    /// first-party web app, listed so the intended choice is visible.
+    /// HttpOnly cookie session + CSRF token (TASK-0003). The mechanism root CLAUDE.md §5 recommends
+    /// for a first-party web app, human sign-off 2026-08-26. Implemented by
+    /// <see cref="CookieSessionAuthenticationHandler"/>.
     /// </summary>
     public const string CookieSession = "CookieSession";
 
@@ -66,13 +67,12 @@ internal sealed class ApiAuthenticationOptionsValidator : IValidateOptions<ApiAu
                 $"was '{options.Mode}'. Expected one of: {string.Join(", ", known)}.");
         }
 
-        if (options.Mode is AuthenticationModes.CookieSession or AuthenticationModes.BearerJwt)
+        if (options.Mode is AuthenticationModes.BearerJwt)
         {
             return ValidateOptionsResult.Fail(
-                $"Authentication mode '{options.Mode}' is declared but NOT IMPLEMENTED. Choosing the " +
-                "auth mechanism requires human sign-off (root CLAUDE.md §5) and is tracked in " +
-                "docs/ASSUMPTIONS.md. Implement the scheme in AuthenticationSetup before selecting it, " +
-                "rather than leaving configuration that silently authenticates nobody.");
+                $"Authentication mode '{options.Mode}' is declared but NOT IMPLEMENTED. The chosen " +
+                "mechanism (root CLAUDE.md §5, human sign-off 2026-08-26) is CookieSession — see " +
+                "docs/ASSUMPTIONS.md.");
         }
 
         return ValidateOptionsResult.Success;
