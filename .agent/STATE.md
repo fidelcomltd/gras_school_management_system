@@ -38,11 +38,11 @@ dotnet SDK 10.0.100 · node v22.21.0 · npm 10.9.4 · yarn 1.22.22 · pnpm ABSEN
 docker ABSENT (integration tests use hosted Neon Postgres via `POSTGRES_TEST_CONNECTION`;
 CI uses a service-container Postgres) · psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
 
-**PINNED BOTH WAYS (TASK-0024) — changing one side alone re-breaks CI:** `global.json`
-`rollForward: latestPatch` (feature bands carry new analyzers; `latestFeature` let CI drift) ·
-gitleaks **8.30.1** in `backend-ci.yml` must equal the local version · Node `22.21.0` in
-`frontend-ci.yml`. CI prints `dotnet --version` so the resolved SDK is read, not deduced. · gitleaks 8.30.1
-(CI matches, TASK-0024)
+**PINNED — changing one side alone re-breaks CI (0024, 0026):** `global.json`
+`rollForward: latestPatch` · gitleaks **8.30.1** in `backend-ci.yml` must equal local · Node
+`22.21.0` · **`AnalysisLevel 10.0-All` + `Microsoft.CodeAnalysis.NetAnalyzers` 10.0.100, forced
+over the SDK copy by `backend/Directory.Build.targets`** · `TestingPlatformDotnetTestSupport=false`.
+CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file after any bump.
 
 ## Gate commands
 backend:  `./backend/scripts/ci.ps1` — 10 gates cheapest-first, STOPS at the first failure.
@@ -82,7 +82,7 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0018, 0020, 0022-0025 — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0018, 0020, 0022-0026 — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
@@ -99,14 +99,13 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 [decisions/2026-Q3.md](decisions/2026-Q3.md) and the card's `## Log`. Approved contract deltas:
 `decisions/2026-Q3-contract-deltas.md`.
 
-- 2026-09-04 **STANDING LESSON (0010/0011/0015/0016, again in 0022): a check that cannot be shown to fail is not a check.** Break what it guards, watch it go red, then accept it. Corollaries: fixtures must match the real artefact; a comment claiming coverage is not coverage.
-- 2026-09-05 **TASK-0022: three stacked CI defects; the third means the gate self-test had NEVER been able to run in CI** — fixtures were `*.trx`-ignored, never committed. Found only by raising PR #9. Lesson: reviewing the DIFF, not the agent's report, found it. Full note in `decisions/2026-Q3.md`.
+- **STANDING LESSONS ON GATES** (0010/0011/0015/0016, 0022-0026). **(1) A check that cannot be shown to fail is not a check** — break what it guards, watch it go red, then accept it; fixtures must match the real artefact, and a comment claiming coverage is not coverage. **(2) A gate is only as trustworthy as the reproducibility of its INPUTS** — before trusting green, ask what it reads that is neither committed nor pinned. TASK-0026 satisfied both at once: it made CI's failure reproduce locally, which then exposed 4 more sites. Full notes in `decisions/2026-Q3.md`.
+- 2026-09-05 **TASK-0022: the gate self-test had NEVER been able to run in CI** — its fixtures were `*.trx`-ignored, never committed. Reviewing the DIFF, not the agent's report, is what found it. `decisions/2026-Q3.md`.
 - 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — `src/features/<feature>/`, react-hook-form+zod, Playwright; no bulk rename, `src/shared/` waits. Done by TASK-0020. Full note in `decisions/2026-Q3.md`.
-- 2026-09-05 **STANDING LESSON (0022, 0023, 0024 ×2 — all found by PR #9): a gate is only as trustworthy as the reproducibility of its INPUTS.** Four defects, one shape — something the gates read was not committed and not version-pinned, so "green locally" and "green in CI" were never the same claim. **Before trusting a green gate, ask what it reads that is neither committed nor pinned.** Full note in `decisions/2026-Q3.md`.
-- 2026-09-05 **TASK-0023/0024/0025 closed**: hermetic vitest `test.env`; SDK + gitleaks pinned both ways and CA2025/CA1873 fixed not suppressed; client regenerated. Contract unmoved. Full notes in `decisions/2026-Q3.md`.
+- 2026-09-05 **TASK-0023/0024/0025/0026 closed**: hermetic vitest `test.env`; SDK, gitleaks, analyzer VERSION and test bridge all pinned; 6 CA1873 + 1 CA2025 fixed not suppressed; client regenerated. **`AnalysisLevel: latest-All` was the real culprit — `latest` means "whatever SDK is installed", so the rule set was a property of the machine.** Contract unmoved throughout. Full notes in `decisions/2026-Q3.md`.
 
 **Closed-card records** — archive-only, `grep` the ID in `decisions/2026-Q3.md`: 0001, 0003, 0012,
-0013, 0014, 0017, 0018, 0020, 0022-0025, plus 2026-08-27's four decisions (gitleaks, gate honesty,
+0013, 0014, 0017, 0018, 0020, 0022-0026, plus 2026-08-27's four decisions (gitleaks, gate honesty,
 DB-credential split, TASK-0001 close).
 
 ## Known drift
@@ -118,7 +117,7 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 **Live triggers**
 
 - 2026-09-05 **`vite build` succeeds with NO `.env` and emits a bundle that throws on boot** (inlines `VITE_*` as `undefined`), so Build goes green on something unusable. CI copies `.env.example` to mask it; nothing checks env at build time. Unowned. **Trigger: any card touching build or deployment.**
-- 2026-09-05 **`RequestLoggingBehavior`'s SUCCESS path hoists elapsed-time to a local** — satisfies CA1873 without skipping the work when logging is off, unlike the cancellation branch TASK-0024 guarded. **Trigger: next card touching it.** Owner `backend-dev`.
+- 2026-09-05 **`Microsoft.Testing.Platform.MSBuild` is an unpinned transitive floor; `backend/` has NO NuGet lock file.** Pinning it broke restore. **Trigger: next `xunit.v3` upgrade.** `drift/2026-Q3.md`.
 - 2026-09-04 **No `Idempotency-Key` mechanism.** Deferred (Option B, human sign-off). **Trigger: the first card implementing ANY retry-duplicable mutation builds it first** — §9.8.2's four operations are EXAMPLES, not the list. **Assigned to TASK-0019**; re-check before TASK-0005. `ASSUMPTIONS.md` §2.14.
 - 2026-09-05 **Three accepted auth exposures (TASK-0003):** unpersisted DP key ring (**trigger: deployment, Q5**); bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` timing asymmetry. Owner `backend-dev`. Full text: `drift/2026-Q3.md`.
 - 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0019.** Owner `backend-dev`.
@@ -135,8 +134,8 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 **Accepted, no trigger** — 8 entries, archive-only; `grep` the date in `drift/2026-Q3.md`:
 2026-08-08 · 2026-08-26 ×4 · 2026-08-27 ×2 · 2026-09-04.
 
-Eleven resolved/struck entries are archive-only — latest: the stale-client trigger, struck
-2026-09-05 by TASK-0025.
+Twelve resolved/struck entries are archive-only — latest: the `RequestLoggingBehavior` CA1873 note,
+struck 2026-09-05 by TASK-0026.
 
 ## Open questions
 
