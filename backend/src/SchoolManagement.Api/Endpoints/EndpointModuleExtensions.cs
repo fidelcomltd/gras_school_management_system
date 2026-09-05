@@ -64,10 +64,12 @@ public static class EndpointModuleExtensions
         }
 
         // Logged at startup so "is my endpoint registered?" is answerable from the logs. A module that
-        // silently fails to be discovered is otherwise invisible until a 404 appears.
-        ApiLog.RegisteredEndpointModules(
-            logger,
-            modules.Length,
-            string.Join(", ", modules.Select(module => module.GetType().Name)));
+        // silently fails to be discovered is otherwise invisible until a 404 appears. Guarded (CA1873):
+        // the joined module-name string is a computed argument, hoisted to a local inside the guard.
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            var moduleNames = string.Join(", ", modules.Select(module => module.GetType().Name));
+            ApiLog.RegisteredEndpointModules(logger, modules.Length, moduleNames);
+        }
     }
 }

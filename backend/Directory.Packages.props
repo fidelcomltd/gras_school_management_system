@@ -16,6 +16,26 @@
   <ItemGroup Label="Analysers">
     <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
     <PackageVersion Include="Roslynator.Formatting.Analyzers" Version="4.15.0" />
+    <!--
+      TASK-0026. Pins the analyzer CODE, not just the ruleset `AnalysisLevel` selects from it.
+
+      Without this, `EnableNETAnalyzers` runs whatever copy of Microsoft.CodeAnalysis.NetAnalyzers
+      ships INSIDE the resolved .NET SDK (under Sdks/Microsoft.NET.Sdk/analyzers/ in the SDK
+      install), which is a property of the machine, not the repo. Worse,
+      `Microsoft.NET.Sdk.Analyzers.targets` (in that same SDK) hard-codes `_LatestAnalysisLevel`
+      per SDK BUILD, and its own comment says that value is bumped as the platform matures, which
+      can land in a later 10.0.1xx patch — i.e. WITHIN the feature band `global.json`'s
+      `rollForward: latestPatch` (TASK-0024) already tolerates. Verified on this machine (SDK
+      10.0.100) with `dotnet build -getProperty:EffectiveAnalysisLevel`: `AnalysisLevel=latest-All`
+      resolves to `9.0`, not `10.0`, so `latest` is not even internally consistent with this being
+      a net10.0 TFM, let alone stable across a CI SDK patch.
+
+      An explicit PackageReference to this package (Directory.Build.props) supersedes the
+      SDK-bundled copy, so the rule IMPLEMENTATIONS running are the ones named here on every
+      machine. Version matches the SDK feature band `global.json` pins (10.0.1xx, GA), rather
+      than floating with whichever patch resolves.
+    -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.100" />
   </ItemGroup>
 
   <ItemGroup Label="Application layer">
@@ -115,6 +135,20 @@
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!--
+      NOT pinned here (tried, reverted, TASK-0026): xunit.v3 3.2.2 pulls in xunit.v3.core.mtp-v1,
+      which depends on "Microsoft.Testing.Platform.MSBuild": "1.9.1" as a floor, not an exact pin,
+      and this repo has no NuGet lock file (packages.lock.json) anywhere, so a future restore could
+      resolve a higher version. That version is also what decides TestingPlatformDotnetTestSupport's
+      default (see tests/Directory.Build.props, where it is set explicitly instead). Adding an
+      explicit PackageVersion entry here to pin it the same way as the Microsoft.OpenApi entry
+      below broke restore on this machine (NETSDK1013, empty TargetFramework) because promoting it
+      from implicit-transitive to centrally-pinned makes its buildMultiTargeting assets import
+      unconditionally, including into the SDK's outer cross-targeting evaluation pass (which always
+      runs with an empty TargetFramework, even for a single-TFM project). Left floating; the
+      explicit property in tests/Directory.Build.props is the actual, verified-working fix for the
+      behaviour that matters.
+    -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
