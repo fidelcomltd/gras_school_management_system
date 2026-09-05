@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-05 by orchestrator · size budget 12 KB, see `## Reading this file`
+Last reconciled: 2026-09-06 by orchestrator · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -102,6 +102,7 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 - **STANDING LESSONS ON GATES** (0010/0011/0015/0016, 0022-0026). **(1) A check that cannot be shown to fail is not a check** — break what it guards, watch it go red, then accept it; fixtures must match the real artefact, and a comment claiming coverage is not coverage. **(2) A gate is only as trustworthy as the reproducibility of its INPUTS** — before trusting green, ask what it reads that is neither committed nor pinned. TASK-0026 satisfied both at once: it made CI's failure reproduce locally, which then exposed 4 more sites. Full notes in `decisions/2026-Q3.md`.
 - 2026-09-05 **TASK-0022: the gate self-test had NEVER been able to run in CI** — its fixtures were `*.trx`-ignored, never committed. Reviewing the DIFF, not the agent's report, is what found it. `decisions/2026-Q3.md`.
 - 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — `src/features/<feature>/`, react-hook-form+zod, Playwright; no bulk rename, `src/shared/` waits. Done by TASK-0020. Full note in `decisions/2026-Q3.md`.
+- 2026-09-06 **STATE.md size cap REMOVED (human directive).** The 12 KB byte budget is gone from §4.1, §13, this file, and both dev subagent prompts. Rationale for keeping it — a line cap let this file reach 36 KB unnoticed — is preserved in `decisions/2026-Q3.md`; what replaces the cap is the archive discipline alone (long sections move to `decisions/`/`drift/` with a one-line index). **No agent may now defer, trim, or skip a STATE.md append to save bytes** — that behaviour blocked TASK-0003's reconciliation and is exactly what the removal is meant to end.
 - 2026-09-05 **TASK-0023/0024/0025/0026 closed**: hermetic vitest `test.env`; SDK, gitleaks, analyzer VERSION and test bridge all pinned; 6 CA1873 + 1 CA2025 fixed not suppressed; client regenerated. **`AnalysisLevel: latest-All` was the real culprit — `latest` means "whatever SDK is installed", so the rule set was a property of the machine.** Contract unmoved throughout. Full notes in `decisions/2026-Q3.md`.
 
 **Closed-card records** — archive-only, `grep` the ID in `decisions/2026-Q3.md`: 0001, 0003, 0012,
@@ -147,5 +148,6 @@ Live only; ten resolved questions are in `decisions/2026-Q3.md`.
 
 ## Reading this file
 
-**Budget: 12 KB, bytes.** `wc -c` before appending. Over it, archive full text to `decisions/` or
-`drift/`, leave a one-line index — never delete. Rules: CLAUDE.md §4.1, §13.
+**No size cap** (removed 2026-09-06). Append what the ledger needs; never trim or defer an entry to
+hit a byte target. When a section grows long, archive full text to `decisions/` or `drift/` and
+leave a one-line index — never delete. Rules: CLAUDE.md §4.1, §13.

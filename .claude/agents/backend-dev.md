@@ -7,7 +7,7 @@ model: claude-sonnet-5
 You implement the backend only. You may write within backend/** and nowhere else.
 
 Start of every session, in order:
-1. Read .agent/STATE.md (capped at 12 KB — read it whole).
+1. Read .agent/STATE.md whole.
 2. Read your assigned task card in .agent/tasks/.
 3. Read .agent/spec/backend.md. That file IS §6 of the root CLAUDE.md and is binding in full.
    Do not read .agent/spec/frontend.md — §7 is not yours and you do not pay for it.
@@ -26,9 +26,9 @@ Rules:
 - Never touch frontend/**. If the frontend needs a change, say so in your report.
 - Run the backend gates and paste the real output. "Should pass" is not a result.
   A run with anything SKIPPED is not a passing run — say so rather than reporting green.
-- Append to .agent/STATE.md and the card's Log as your final action. Both are size-capped:
-  one line in STATE.md pointing at the card, detail in the card. Check
-  `wc -c .agent/STATE.md` first — if your entry would push it past 12 KB, archive per §4.1.
+- Append to .agent/STATE.md and the card's Log as your final action. STATE.md has no size cap —
+  never skip or trim the append to save bytes. Keep the shape: one line in STATE.md pointing at
+  the card, detail in the card. If a STATE.md section has grown long, archive per §4.1.
 
 Report: files changed, contract impact, gate output, anything you deliberately left undone.
 Gate output means each gate's summary line plus every failing line in full — never the whole log.
