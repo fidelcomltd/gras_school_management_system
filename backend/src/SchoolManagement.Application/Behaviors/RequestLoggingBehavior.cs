@@ -71,11 +71,19 @@ internal sealed class RequestLoggingBehavior<TRequest, TResponse>(
         catch (OperationCanceledException)
         {
             // A cancelled request is expected traffic (client navigated away, gateway timed out).
-            // Logged at Information so it is visible but does not pollute the error rate.
-            BehaviorLog.RequestCancelled(
-                logger,
-                requestName,
-                (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds);
+            // Logged at Information so it is visible but does not pollute the error rate. Guarded
+            // so the Stopwatch computation itself is skipped when Information logging is disabled
+            // (CA1873) — unlike the success path above, this argument is not already sitting in a
+            // local variable, so the analyzer sees (and the runtime would otherwise pay for) an
+            // unconditionally evaluated method call baked into the log call's argument list.
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                BehaviorLog.RequestCancelled(
+                    logger,
+                    requestName,
+                    (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds);
+            }
+
             throw;
         }
     }
