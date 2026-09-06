@@ -320,6 +320,171 @@ names it, and role/scope/session filters are already split to TASK-0028 by the a
 Left out to keep the dispatch bounded rather than gold-plating an untested surface; a future card can
 add it additively.
 
+### 2.17 TASK-0028 dispatch 1 — the privilege register's group `key` is a plain string, not a reflected enum
+
+The approved delta (`decisions/2026-Q3-contract-deltas.md`, entry `TASK-0028` §1) calls
+`PrivilegeGroupDto.Key` a "string enum" with six fixed, lowercase, underscore-separated values
+(`administration`, `settings`, `academic_structure`, `pupils_and_subjects`, `results`,
+`pins_and_reports`). Every existing enum-shaped field in this codebase (`AdminAccountStatus`, for
+example) crosses the wire via a genuine C# `enum` plus the GLOBAL `JsonStringEnumConverter`
+registered once in `Program.cs`, and that converter has no naming policy — it serializes the literal
+PascalCase member name (`"Active"`, `"Suspended"`), never a naming-policy transform. Making
+`PrivilegeModule` a wire-serialized enum with these exact snake_case values would have meant either
+(a) giving `PrivilegeModule`'s own members non-PascalCase names (`academic_structure` as a C#
+identifier — flagged by this repo's naming analysers, since `Warnings are errors`), or (b)
+registering a SECOND, more-specific `JsonStringEnumConverter<PrivilegeModule>` ahead of the global one
+in `Program.cs`, which is a global-serialization-behaviour change to justify for one field, and would
+also have forced every test that deserializes a response containing it (`IntegrationTestBase.
+JsonOptions`, currently a single shared converter list "mirroring Program.cs's global registration")
+to carry a matching special case.
+
+Chose instead: `PrivilegeModule` stays a plain domain enum (grouping key, `GroupBy`, no wire concern
+of its own); `PrivilegeModuleCatalog.KeyFor(module)`/`TitleFor(module)` are static lookup functions
+returning plain `string`s, and the Application-layer handler builds `PrivilegeGroupDto.Key` from
+`KeyFor(...)` directly. The DTO property is `string`, exactly like `ProblemDetails.errorCode` (also a
+fixed, lowercase, dot/underscore-separated vocabulary that is NOT a reflected C# enum in this
+codebase). Verified empirically, not assumed: the generated schema (`generate-openapi.ps1`, no
+`-Promote`) declares `"key": {"type": "string", ...}` with the correct example value, and the
+committed contract's `PrivilegeGroupDto`/`PrivilegeRegisterResponse` examples show the exact
+delta-specified strings. No `Program.cs` change, no shared test-JSON-options change — the smaller
+surface for a niche, closed vocabulary. If a later card wants the OpenAPI document to declare an
+actual `enum: [...]` constraint on this field (rather than an open string, as `errorCode` also is),
+that is a deliberate additive follow-up, not something this dispatch silently ruled out.
+
+### 2.18 TASK-0028 dispatch 1 — pre-existing Secret-scan finding, NOT caused by this dispatch — RESOLVED by TASK-0032, see §2.19
+
+`./scripts/ci.ps1`'s Secret scan gate is red on a clean checkout of this dispatch's starting point,
+independent of anything dispatch 1 touched. `gitleaks detect --source . --config .gitleaks.toml`
+reports 6 `generic-api-key` findings, all matching the same fake 20-character mixed-case
+alphanumeric example password used in `CreateAdminAccountResponse`/
+`ResetAdminAccountPasswordResponse`'s `temporaryPassword` OpenAPI examples (`OpenApiExamples.cs`,
+pre-existing lines — see the two `$$"""..."""` blocks whose response type names those, NOT quoted
+again here: AGENTS.md §5's own warning is that quoting a credential-shaped string as proof re-arms
+the rule against the very commit that quotes it) and its downstream copies in the already-committed
+`contracts/openapi.json` and `frontend/src/api/schema.d.ts`. Every finding's
+`Commit` field names `814b711` or `4170314` — both already on this branch before this dispatch's
+session began (visible in the initial `git log`), and `gitleaks detect`'s git-history mode does not
+scan uncommitted working-tree content, so re-running the scan before and after every file this
+dispatch added or changed reports the identical "32 commits scanned / 6 leaks found", proving this
+dispatch introduces zero new findings. `backend/.gitleaksignore` (TASK-0017's mechanism) has no entry
+for this string/rule yet — it is unaddressed pre-existing debt, not a false positive this dispatch is
+positioned to judge (deciding a fake-vs-real credential and pinning a fingerprint is the kind of
+security-relevant call the TASK-0011/0017 precedent treated as its own reviewed task, not a drive-by
+fix). Not remediated here; recorded in `STATE.md`'s `## Known drift` for the orchestrator.
+
+### 2.19 TASK-0032 — Secret scan: the six §2.18 findings cleared, and the gate made to see the working tree
+
+Two problems, one card: the six findings above, and the fact that `gitleaks detect` on its own
+scans committed history only, so it always fires one dispatch late against the dispatch that
+introduced something, never the dispatch itself. Both closed together because the second changes
+how the first has to be verified — a fix that only clears git-mode findings would immediately
+reopen itself the moment the same still-committed content is scanned by the new working-tree pass.
+
+**Problem 1 remediation chosen: a content-anchored `.gitleaks.toml` allowlist entry ("tighten the
+rule"), not a `.gitleaksignore` fingerprint and not changing the example string.**
+
+- **Why not a `.gitleaksignore` fingerprint (TASK-0017's own mechanism):** a git-mode fingerprint
+  (`<commit>:<file>:<rule>:<line>`) only clears the git-mode scan. This card adds a second,
+  `--no-git` scan of the SAME still-committed files (`OpenApiExamples.cs`,
+  `contracts/openapi.json`, `frontend/src/api/schema.d.ts`) — a no-git-mode fingerprint would need
+  the mutable `<file>:<rule>:<line>` form the ignore file's own header warns against (a later real
+  secret landing at the same path/rule/line would be silently suppressed), and it would mean
+  maintaining the same finding twice, once per scan mode, forever in sync.
+- **Why not changing the example string:** it does not clear the historical findings at all. The
+  six findings are tied to commits `814b711`/`4170314`, already on the branch; `gitleaks detect`
+  (git-mode) re-evaluates every commit's own diff on every run regardless of what the CURRENT file
+  says, so a string change only stops the count from growing on some future commit — the two
+  introducing commits keep failing every future run either way. It would also force a contract
+  regeneration (`generate-openapi.ps1 -Promote`) and a downstream frontend client regeneration for
+  zero net benefit on the actual six findings, against a card whose own header says
+  `Contract impact: none`.
+- **Why a content-anchored allowlist entry instead:** `.gitleaks.toml`'s `[[allowlists]]` with
+  `targetRules = ["generic-api-key"]`, `regexTarget = "match"`, anchored to the literal
+  `temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"` (Family C, added beside Families A/B) suppresses the
+  finding by CONTENT, not by commit or by line, so the same entry clears both the git-mode scan
+  (all history, both commits) and the new `--no-git` scan (current working tree) with one rule,
+  zero contract impact, and no edit to any of the three flagged files. It does not blanket-ignore
+  those files or their paths — a real leaked secret at a different value in any of them still
+  trips every rule, including this one, exactly as `.gitleaks.toml`'s existing Family A/B comments
+  already argue for the same shape of fix.
+
+**Problem 2: `ci.ps1`'s Secret scan gate now runs gitleaks twice.** Pass 1 is the pre-existing
+`gitleaks detect --source . --config .gitleaks.toml --redact --no-banner` (git history — unchanged
+in behaviour, still whole-repo despite `Push-Location backend/`, since git history discovery walks
+up to the repository root regardless of cwd). Pass 2 is new:
+`gitleaks detect --source <repo-root> --no-git --config .gitleaks.toml --redact --no-banner` —
+`--source` is pointed at the repository root explicitly, because `--no-git` has no git repository
+to discover a root from, and leaving it at `.` (i.e. `backend/`) would silently narrow the new
+pass's coverage to `backend/**` alone, missing a secret landing in `contracts/**` or
+`frontend/**`. Chose `--no-git` over `protect --staged`: the latter only sees staged changes, so
+an uncommitted-but-unstaged file (the normal shape of a dispatch's own working tree before it ever
+runs `git add`) would stay invisible — exactly the gap this card exists to close. The gate fails
+if EITHER pass fails.
+
+**Why `--no-git` needs its own path exclusions, and why they are cheap.** `--no-git` walks the
+filesystem directly rather than reading git history, so nothing gitignored is invisible to it the
+way it is to pass 1 — `frontend/node_modules/` alone is large enough that a plain `du -sh` on it did
+not return within two minutes on this machine. Extended the existing "Build output and packages"
+path allowlist (already `bin|obj|artifacts`, `packages/`) with `node_modules/`, `.git/`, and
+`dist|coverage`. Verified this is not merely optimistic: gitleaks' path allowlist is evaluated
+before a file's content is read, so a whole-repo `--no-git` scan with these four extra entries
+completed in **~1-2 seconds**, not by accident — measured directly, both with `Measure-Command`-style
+timing and by watching it fail to finish inside a 120-second tool timeout before the exclusions were
+added (that first attempt was `du -sh`, not gitleaks itself, but same underlying tree).
+
+**A `--no-git` scan of the real repo surfaces findings problem 1 did not name, all pre-existing and
+all cleared the same way (content-anchored allowlist, not fingerprint, not path):**
+
+- **Family D** — the two realistic-fake connection strings TASK-0011 quoted into
+  `.agent/tasks/logs/TASK-0011.log.md` and this file's own §3.9, as proof its narrowed rule still
+  fires. TASK-0017 fingerprinted these for git-mode; that fingerprint does not reach a `--no-git`
+  scan of the same still-committed content, so two more content-anchored regexes (targeting
+  `postgres-connection-string-with-password` only, the exact two literal strings, not a shape) were
+  added. This is not a reversal of TASK-0011's own "no `--no-git`" ruling — that ruling was about
+  not REPLACING the history scan with a working-tree-only one to dodge the history problem;
+  `--no-git` here is an ADDED second pass, and history scanning is unchanged.
+- **Family E** — TASK-0031's own self-test (`backend/scripts/tests/postgres-test-connection.tests.ps1`,
+  uncommitted at the time this card was worked, per the dispatch's own "leave it alone" instruction)
+  plants `selftest-marker-3fae1c` as both host and password to prove a resolved connection string is
+  never echoed to any captured stream — the same intent as the pre-existing `test_user`/
+  `test_password` global stopwords, just literal enough to also trip
+  `postgres-connection-string-with-password` (whose `Secret` is always the literal word `Host`, per
+  Family A's own finding — the existing stopwords never reached this rule either). One
+  content-anchored entry, both rules, added rather than editing TASK-0031's file. Verified: TASK-0031's
+  own self-test still passes 3/3 with this entry in place (the fixture's assertions are about runtime
+  stream capture, not about whether gitleaks itself later allowlists the marker).
+- Both new families are additive to `.gitleaks.toml`'s existing Family A/B, same file, same
+  `[[allowlists]]` shape, each with its own dated comment naming which task and which finding.
+
+**Verification.** `gitleaks detect --source . --config .gitleaks.toml --redact --no-banner`
+(git-mode, run from `backend/`): `32 commits scanned`, `no leaks found`, exit 0. `gitleaks detect
+--source <repo-root> --no-git --config backend/.gitleaks.toml --redact --no-banner` (working tree,
+whole repo): `no leaks found`, exit 0. Both re-run after every `.gitleaks.toml` edit in this card,
+not only once. **Proved the allowlist entries are not overbroad**: planted an unrelated realistic
+fake key (`sk-live-<40 random hex chars>`) in a throwaway uncommitted file under `backend/src/`,
+confirmed `--no-git` still catches it (`leaks found`, exit 1), then deleted the file — the new
+Families C/D/E match only their own specific literal strings, not a shape broad enough to swallow
+a different secret landing nearby.
+
+**New self-test**: `backend/scripts/tests/secret-scan-working-tree.tests.ps1` (hand-rolled, no
+Pester, same style as `gate-summary.tests.ps1` / `postgres-test-connection.tests.ps1`). Builds a
+throwaway `git init` repository (never the real one), plants a fake secret matching this project's
+own `bearer-or-api-key-literal` rule in a file that is deliberately never staged or committed
+(the secret value itself is generated at run time from a fresh GUID, not a literal in the test
+file's own source — a static matching literal committed in a tracked file would be exactly the
+family of finding this card exists to stop introducing). Three assertions: git-mode `detect`
+alone does NOT see it (proving the pre-fix behaviour is real, not asserted from memory), `detect
+--no-git` DOES see it (proving the fix), and a clean uncommitted file passes `--no-git` (proving
+assertion two is not vacuously true for any working tree). `PASSED: 3 assertion(s)`, exit 0.
+
+**Left for the orchestrator, not this card's to edit**: `.github/workflows/backend-ci.yml` should
+gain a "Self-test the secret-scan working-tree branch" step
+(`run: ./scripts/tests/secret-scan-working-tree.tests.ps1`) alongside the two existing self-test
+steps, so this suite does not silently never run in CI — the same gap TASK-0022 found for
+`gate-summary.tests.ps1` and TASK-0031 flagged for its own resolver test. `STATE.md`'s
+`## Known drift` entry for the 2026-08-27 Secret-scan finding and `## Gate commands` are
+orchestrator-owned; this card's ledger entry says what to strike rather than striking it directly.
+
 ---
 
 ## 3. Open — a human must decide or supply

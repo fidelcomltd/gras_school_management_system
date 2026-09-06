@@ -7,6 +7,7 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
@@ -337,6 +338,46 @@ internal static class OpenApiExamples
             {
               "id": "{{ExampleId}}",
               "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+            }
+            """,
+
+        [typeof(PrivilegeDescriptorDto)] = """
+            {
+              "code": "result.score.enter",
+              "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+              "scopable": true
+            }
+            """,
+
+        [typeof(PrivilegeGroupDto)] = """
+            {
+              "key": "results",
+              "title": "Results",
+              "privileges": [
+                {
+                  "code": "result.score.enter",
+                  "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                  "scopable": true
+                }
+              ]
+            }
+            """,
+
+        [typeof(PrivilegeRegisterResponse)] = """
+            {
+              "groups": [
+                {
+                  "key": "results",
+                  "title": "Results",
+                  "privileges": [
+                    {
+                      "code": "result.score.enter",
+                      "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                      "scopable": true
+                    }
+                  ]
+                }
+              ]
             }
             """,
 

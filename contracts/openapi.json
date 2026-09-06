@@ -1271,6 +1271,58 @@
         ]
       }
     },
+    "/api/v1/privileges": {
+      "get": {
+        "tags": [
+          "Privileges"
+        ],
+        "summary": "Read the privilege register, grouped by module",
+        "description": "Every privilege the system understands (spec 4.4), grouped 4.4.1 through 4.4.6 in spec table order. Authenticated only — spec 6.1.14 requires no specific privilege to read this: every signed-in admin needs to see the full menu of privileges to understand what a role can be built from. NOT paged: this is a fixed, compile-time, 93-row register, not a growing list, so the usual cursor-pagination rule (spec 9.5) does not apply. Legacy `guardian.*` aliases never appear here — canonical codes only.",
+        "operationId": "GetPrivilegeRegister",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivilegeRegisterResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reference/ping": {
       "get": {
         "tags": [
@@ -2897,6 +2949,130 @@
           "apiVersion": "1.0"
         }
       },
+      "PrivilegeDescriptorDto": {
+        "required": [
+          "code",
+          "permits",
+          "scopable"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The canonical privilege code, for example `result.score.enter`. Never a legacy\r\n`guardian.*` alias — the register is canonical codes only.",
+            "example": "result.score.enter"
+          },
+          "permits": {
+            "type": "string",
+            "description": "Verbatim spec 4.4 \"Permits\" cell for this row.",
+            "example": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction."
+          },
+          "scopable": {
+            "type": "boolean",
+            "description": "Whether the privilege may be granted over a list of arms rather than school-wide.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row of the privilege register (spec 4.4).",
+        "example": {
+          "code": "result.score.enter",
+          "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+          "scopable": true
+        }
+      },
+      "PrivilegeGroupDto": {
+        "required": [
+          "key",
+          "title",
+          "privileges"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The group's stable key: `administration`, `settings`, `academic_structure`,\r\n`pupils_and_subjects`, `results` or `pins_and_reports`. Crosses the wire as a\r\nplain string (root CLAUDE.md §8) — a client must tolerate a key it does not recognise, since a\r\nseventh group is an additive change.",
+            "example": "results"
+          },
+          "title": {
+            "type": "string",
+            "description": "Verbatim spec 4.4.x section heading, for example \"Academic structure\".",
+            "example": "Results"
+          },
+          "privileges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrivilegeDescriptorDto"
+            },
+            "description": "The group's privileges, in spec table order.",
+            "example": [
+              {
+                "code": "result.score.enter",
+                "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                "scopable": true
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One module group of the privilege register (one of spec 4.4.1 through 4.4.6).",
+        "example": {
+          "key": "results",
+          "title": "Results",
+          "privileges": [
+            {
+              "code": "result.score.enter",
+              "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+              "scopable": true
+            }
+          ]
+        }
+      },
+      "PrivilegeRegisterResponse": {
+        "required": [
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrivilegeGroupDto"
+            },
+            "description": "One entry per module group, in spec section order.",
+            "example": [
+              {
+                "key": "results",
+                "title": "Results",
+                "privileges": [
+                  {
+                    "code": "result.score.enter",
+                    "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                    "scopable": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "The privilege register, grouped 4.4.1 through 4.4.6 in spec table order.",
+        "example": {
+          "groups": [
+            {
+              "key": "results",
+              "title": "Results",
+              "privileges": [
+                {
+                  "code": "result.score.enter",
+                  "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                  "scopable": true
+                }
+              ]
+            }
+          ]
+        }
+      },
       "ProblemDetails": {
         "required": [
           "traceId"
@@ -3351,6 +3527,9 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Privileges"
     },
     {
       "name": "Reference"

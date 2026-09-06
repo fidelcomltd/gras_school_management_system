@@ -11,117 +11,140 @@ namespace SchoolManagement.UnitTests.Domain.Security;
 public sealed class PrivilegeRegistryTests
 {
     /// <summary>
-    /// Every privilege code and its <c>scopable</c> flag, transcribed directly from spec 4.4.1
-    /// through 4.4.6. This is the register's SOURCE, independent of
-    /// <see cref="PrivilegeRegistry.All"/> — do not "simplify" this by referencing the production
-    /// list.
+    /// Every privilege code, its <c>scopable</c> flag, its module group and its verbatim spec 4.4
+    /// "Permits" sentence, transcribed directly from spec 4.4.1 through 4.4.6, IN SPEC TABLE ORDER.
+    /// This is the register's SOURCE, independent of <see cref="PrivilegeRegistry.All"/> — do not
+    /// "simplify" this by referencing the production list. Order matters here: this is what proves
+    /// TASK-0028 dispatch 1's "row for row and in order" acceptance criterion, not just set equality.
     /// </summary>
-    private static readonly (string Code, bool Scopable)[] ExpectedFromSpec =
+    private static readonly (string Code, bool Scopable, PrivilegeModule Module, string Permits)[] ExpectedFromSpec =
     [
         // 4.4.1 Administration and access control — none scopable
-        ("admin.view", false),
-        ("admin.create", false),
-        ("admin.update", false),
-        ("admin.suspend", false),
-        ("admin.deactivate", false),
-        ("admin.password.reset", false),
-        ("admin.session.revoke", false),
-        ("role.view", false),
-        ("role.create", false),
-        ("role.update", false),
-        ("role.delete", false),
-        ("role.assign", false),
-        ("role.scope.assign", false),
-        ("audit.view", false),
-        ("audit.export", false),
+        ("admin.view", false, PrivilegeModule.Administration, "List and open admin accounts."),
+        ("admin.create", false, PrivilegeModule.Administration, "Create an admin account."),
+        ("admin.update", false, PrivilegeModule.Administration, "Edit an admin account's name, email, phone."),
+        ("admin.suspend", false, PrivilegeModule.Administration, "Move an account to suspended and back to active."),
+        ("admin.deactivate", false, PrivilegeModule.Administration,
+            "Move an account to deactivated. Irreversible except by a Super Admin reactivating it."),
+        ("admin.password.reset", false, PrivilegeModule.Administration, "Force a password reset for another account."),
+        ("admin.session.revoke", false, PrivilegeModule.Administration, "Kill another account's active sessions."),
+        ("role.view", false, PrivilegeModule.Administration, "List roles and see their privilege sets."),
+        ("role.create", false, PrivilegeModule.Administration, "Create a role."),
+        ("role.update", false, PrivilegeModule.Administration, "Add or remove privileges from a role."),
+        ("role.delete", false, PrivilegeModule.Administration, "Delete a role that has no active assignments."),
+        ("role.assign", false, PrivilegeModule.Administration, "Assign a role to an account school-wide."),
+        ("role.scope.assign", false, PrivilegeModule.Administration, "Assign a role to an account over a named list of arms."),
+        ("audit.view", false, PrivilegeModule.Administration, "Read the audit log."),
+        ("audit.export", false, PrivilegeModule.Administration, "Export a filtered audit log to CSV."),
 
         // 4.4.2 Settings — none scopable
-        ("settings.view", false),
-        ("settings.identity.update", false),
-        ("settings.abbreviation.update", false),
-        ("settings.regnumber.update", false),
-        ("settings.grading.update", false),
-        ("settings.assessment.update", false),
-        ("settings.traits.update", false),
-        ("settings.resultrules.update", false),
-        ("settings.pin.update", false),
-        ("settings.reset.defaults", false),
+        ("settings.view", false, PrivilegeModule.Settings, "Read every settings page. Read-only."),
+        ("settings.identity.update", false, PrivilegeModule.Settings,
+            "Edit school name, short name, address, phone, email, motto, logo, head teacher name and signature image."),
+        ("settings.abbreviation.update", false, PrivilegeModule.Settings,
+            "Edit the school abbreviation used in registration numbers. Split out from identity because it has consequences identity fields do not."),
+        ("settings.regnumber.update", false, PrivilegeModule.Settings,
+            "Edit serial width, separator and the reset rule for the registration number pattern."),
+        ("settings.grading.update", false, PrivilegeModule.Settings,
+            "Add, edit, remove and reorder grading bands. Reset to seeded defaults."),
+        ("settings.assessment.update", false, PrivilegeModule.Settings,
+            "Add, rename, remove and reorder continuous assessment components, and set the examination maximum."),
+        ("settings.traits.update", false, PrivilegeModule.Settings,
+            "Edit the affective and psychomotor trait lists and the trait rating scale."),
+        ("settings.resultrules.update", false, PrivilegeModule.Settings,
+            "Edit annual computation method and weights, position scope, level position visibility, tie-breaking rule, pass mark, promotion threshold."),
+        ("settings.pin.update", false, PrivilegeModule.Settings,
+            "Edit default pin length, default maximum uses and the character set."),
+        ("settings.reset.defaults", false, PrivilegeModule.Settings,
+            "Restore the grading scale, assessment structure or trait lists to seeded values."),
 
         // 4.4.3 Academic structure
-        ("session.view", false),
-        ("session.create", false),
-        ("session.update", false),
-        ("term.open", false),
-        ("term.close", false),
-        ("promotion.run", false),
-        ("promotion.reverse", false),
-        ("level.view", false),
-        ("level.create", false),
-        ("level.update", false),
-        ("level.deactivate", false),
-        ("level.delete", false),
-        ("arm.view", true),
-        ("arm.create", false),
-        ("arm.update", false),
-        ("arm.formteacher.assign", false),
-        ("arm.delete", false),
-        ("arm.capacity.override", true),
+        ("session.view", false, PrivilegeModule.AcademicStructure, "List sessions and terms."),
+        ("session.create", false, PrivilegeModule.AcademicStructure, "Create a session and its three terms."),
+        ("session.update", false, PrivilegeModule.AcademicStructure,
+            "Edit session and term dates, times school opened, resumption date."),
+        ("term.open", false, PrivilegeModule.AcademicStructure, "Move a term from upcoming to active."),
+        ("term.close", false, PrivilegeModule.AcademicStructure, "Move the active term to closed."),
+        ("promotion.run", false, PrivilegeModule.AcademicStructure, "Run end-of-session promotion for a level or the whole school."),
+        ("promotion.reverse", false, PrivilegeModule.AcademicStructure, "Reverse a promotion batch."),
+        ("level.view", false, PrivilegeModule.AcademicStructure, "List and open class levels."),
+        ("level.create", false, PrivilegeModule.AcademicStructure, "Create a class level and place it in the progression chain."),
+        ("level.update", false, PrivilegeModule.AcademicStructure,
+            "Rename a level, change its section, reorder it, change its next level."),
+        ("level.deactivate", false, PrivilegeModule.AcademicStructure, "Deactivate or reactivate a level."),
+        ("level.delete", false, PrivilegeModule.AcademicStructure, "Hard delete a level that nothing has ever referenced."),
+        ("arm.view", true, PrivilegeModule.AcademicStructure, "List and open arms."),
+        ("arm.create", false, PrivilegeModule.AcademicStructure, "Create an arm under a level for a session, singly or in bulk."),
+        ("arm.update", false, PrivilegeModule.AcademicStructure, "Edit an arm's label, capacity and status."),
+        ("arm.formteacher.assign", false, PrivilegeModule.AcademicStructure, "Set or change the form teacher on an arm."),
+        ("arm.delete", false, PrivilegeModule.AcademicStructure, "Hard delete an arm that has never held an enrolment."),
+        ("arm.capacity.override", true, PrivilegeModule.AcademicStructure, "Enrol a pupil into an arm that is already at capacity."),
 
         // 4.4.4 Pupils, guardians and subjects
-        ("pupil.view", true),
-        ("pupil.create", false),
-        ("pupil.update", true),
-        ("pupil.photo.update", true),
-        ("pupil.status.update", false),
-        ("pupil.transfer", false),
-        ("pupil.import", false),
-        ("pupil.regnumber.correct", false),
-        ("pupil.admission.approve", false),
-        ("pupil.safeguarding.view", true),
-        ("pupil.safeguarding.update", true),
-        ("pupil.document.manage", true),
-        ("contact.create", true),
-        ("contact.update", true),
-        ("weekly.view", true),
-        ("weekly.enter", true),
-        ("weekly.publish", true),
-        ("pupil.delete", false),
-        ("contact.view", true),
-        ("subject.view", true),
-        ("subject.create", false),
-        ("subject.update", false),
-        ("subject.deactivate", false),
-        ("subject.delete", false),
-        ("subject.map", false),
-        ("subject.map.arm", false),
-        ("subject.unmap", false),
+        ("pupil.view", true, PrivilegeModule.PupilsAndSubjects, "List and open pupil records."),
+        ("pupil.create", false, PrivilegeModule.PupilsAndSubjects, "Register a pupil and issue a registration number."),
+        ("pupil.update", true, PrivilegeModule.PupilsAndSubjects, "Edit pupil biographical fields."),
+        ("pupil.photo.update", true, PrivilegeModule.PupilsAndSubjects, "Upload or replace a pupil photograph."),
+        ("pupil.status.update", false, PrivilegeModule.PupilsAndSubjects,
+            "Change status between active, transferred, withdrawn, graduated."),
+        ("pupil.transfer", false, PrivilegeModule.PupilsAndSubjects, "Move a pupil between arms, singly or in bulk."),
+        ("pupil.import", false, PrivilegeModule.PupilsAndSubjects, "Run a bulk import from spreadsheet."),
+        ("pupil.regnumber.correct", false, PrivilegeModule.PupilsAndSubjects, "Correct a wrongly issued registration number."),
+        ("pupil.admission.approve", false, PrivilegeModule.PupilsAndSubjects,
+            "Approve a pending admission, moving it to active and issuing the registration number, per 6.5.11."),
+        ("pupil.safeguarding.view", true, PrivilegeModule.PupilsAndSubjects,
+            "Read the section F health block and the barred-persons list, per 6.5.6 and 6.5.7. Every read is audited. Deliberately withheld from the Bursar and the Auditor."),
+        ("pupil.safeguarding.update", true, PrivilegeModule.PupilsAndSubjects, "Edit the health block and the barred-persons list."),
+        ("pupil.document.manage", true, PrivilegeModule.PupilsAndSubjects,
+            "Tick off and attach files against the section H admission document checklist."),
+        ("contact.create", true, PrivilegeModule.PupilsAndSubjects,
+            "Add a parent, guardian or emergency contact. Replaces `guardian.create`, since one entity now serves all five contact roles per 6.5.5."),
+        ("contact.update", true, PrivilegeModule.PupilsAndSubjects, "Edit a contact. Replaces `guardian.update`."),
+        ("weekly.view", true, PrivilegeModule.PupilsAndSubjects, "List and read weekly report sheets, per 6.10."),
+        ("weekly.enter", true, PrivilegeModule.PupilsAndSubjects, "Write and edit weekly report day notes."),
+        ("weekly.publish", true, PrivilegeModule.PupilsAndSubjects, "Publish or unpublish a week to the parent portal."),
+        ("pupil.delete", false, PrivilegeModule.PupilsAndSubjects, "Soft delete a pupil record that has no result history."),
+        ("contact.view", true, PrivilegeModule.PupilsAndSubjects,
+            "See contact names, phone numbers and relationships across all five roles in 6.5.5. Formerly `guardian.view`; the old name is retained as an alias in the seed data so existing role assignments do not break."),
+        ("subject.view", true, PrivilegeModule.PupilsAndSubjects, "List subjects and see mappings."),
+        ("subject.create", false, PrivilegeModule.PupilsAndSubjects, "Create a subject."),
+        ("subject.update", false, PrivilegeModule.PupilsAndSubjects, "Edit subject name, code, description."),
+        ("subject.deactivate", false, PrivilegeModule.PupilsAndSubjects, "Deactivate or reactivate a subject."),
+        ("subject.delete", false, PrivilegeModule.PupilsAndSubjects, "Hard delete a subject never mapped and never scored."),
+        ("subject.map", false, PrivilegeModule.PupilsAndSubjects, "Map a subject to a level for a session and term."),
+        ("subject.map.arm", false, PrivilegeModule.PupilsAndSubjects, "Create a per-arm exception to a level mapping."),
+        ("subject.unmap", false, PrivilegeModule.PupilsAndSubjects, "End a mapping."),
 
         // 4.4.5 Results
-        ("result.view", true),
-        ("result.score.enter", true),
-        ("result.score.void", true),
-        ("result.trait.enter", true),
-        ("result.attendance.enter", true),
-        ("result.remark.classteacher", true),
-        ("result.remark.headteacher", false),
-        ("result.compute", true),
-        ("result.submit", true),
-        ("result.approve", false),
-        ("result.return", false),
-        ("result.publish", false),
-        ("result.unpublish", false),
-        ("result.annual.compute", false),
-        ("result.print", true),
-        ("promotion.decide", false),
+        ("result.view", true, PrivilegeModule.Results, "Open a score sheet or a computed result."),
+        ("result.score.enter", true, PrivilegeModule.Results,
+            "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction."),
+        ("result.score.void", true, PrivilegeModule.Results,
+            "Void an already entered mark with a stated reason, so that a mapping can be ended or an error unwound."),
+        ("result.trait.enter", true, PrivilegeModule.Results, "Enter affective and psychomotor ratings."),
+        ("result.attendance.enter", true, PrivilegeModule.Results, "Enter times present and times absent per pupil."),
+        ("result.remark.classteacher", true, PrivilegeModule.Results, "Write or edit the class teacher's remark."),
+        ("result.remark.headteacher", false, PrivilegeModule.Results, "Write or edit the head teacher's remark."),
+        ("result.compute", true, PrivilegeModule.Results, "Run computation over a result set."),
+        ("result.submit", true, PrivilegeModule.Results, "Move a result set from Draft to Awaiting Approval."),
+        ("result.approve", false, PrivilegeModule.Results, "Move a result set from Awaiting Approval to Approved."),
+        ("result.return", false, PrivilegeModule.Results, "Return a result set to the class teacher with a reason."),
+        ("result.publish", false, PrivilegeModule.Results, "Publish an approved result set and write the configuration snapshot."),
+        ("result.unpublish", false, PrivilegeModule.Results, "Withdraw a published result set from the parent portal."),
+        ("result.annual.compute", false, PrivilegeModule.Results,
+            "Compute annual cumulative results for an arm once Third Term is published."),
+        ("result.print", true, PrivilegeModule.Results, "Render and download the result PDF from inside the back office."),
+        ("promotion.decide", false, PrivilegeModule.Results, "Override the system-proposed promotion status on a Third Term result."),
 
         // 4.4.6 Pins and reports
-        ("pin.view", false),
-        ("pin.generate", false),
-        ("pin.print", false),
-        ("pin.revoke", false),
-        ("pin.usage.view", false),
-        ("report.view", true),
-        ("report.export", true),
+        ("pin.view", false, PrivilegeModule.PinsAndReports, "List pin batches and open a batch."),
+        ("pin.generate", false, PrivilegeModule.PinsAndReports, "Generate a pin batch."),
+        ("pin.print", false, PrivilegeModule.PinsAndReports, "Render the print run for a batch, which reveals pin plaintext once."),
+        ("pin.revoke", false, PrivilegeModule.PinsAndReports, "Revoke a single pin or a whole batch."),
+        ("pin.usage.view", false, PrivilegeModule.PinsAndReports,
+            "Read the usage report for a pin, including timestamps and truncated source addresses."),
+        ("report.view", true, PrivilegeModule.PinsAndReports, "Open any report in section 10."),
+        ("report.export", true, PrivilegeModule.PinsAndReports, "Export a report to CSV or PDF."),
     ];
 
     [Fact]
@@ -133,18 +156,16 @@ public sealed class PrivilegeRegistryTests
     }
 
     [Fact]
-    public void EveryRegisteredPrivilegeMatchesTheSpecTranscription()
+    public void EveryRegisteredPrivilegeMatchesTheSpecTranscriptionRowForRowInOrder()
     {
+        // Deliberately NOT sorted before comparing: TASK-0028 dispatch 1's acceptance criterion is
+        // that the register matches spec 4.4 row for row AND IN ORDER (groups 4.4.1 -> 4.4.6, rows
+        // in spec table order), not merely that the same set of rows exists somewhere in the list.
         var actual = PrivilegeRegistry.All
-            .Select(definition => (definition.Code, definition.Scopable))
-            .OrderBy(entry => entry.Code, StringComparer.Ordinal)
+            .Select(definition => (definition.Code, definition.Scopable, definition.Module, definition.Permits))
             .ToArray();
 
-        var expected = ExpectedFromSpec
-            .OrderBy(entry => entry.Code, StringComparer.Ordinal)
-            .ToArray();
-
-        actual.ShouldBe(expected);
+        actual.ShouldBe(ExpectedFromSpec);
     }
 
     [Fact]
