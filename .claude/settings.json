@@ -10,7 +10,10 @@
       "Bash(./backend/scripts/generate-openapi.ps1*)",
       "Bash(& \".\\backend\\scripts\\ci.ps1\"*)",
       "Bash(& \".\\backend\\scripts\\local-env.ps1\"*)",
-      "Bash(& \".\\backend\\scripts\\generate-openapi.ps1\"*)"
+      "Bash(& \".\\backend\\scripts\\generate-openapi.ps1\"*)",
+      "PowerShell(./backend/scripts/ci.ps1*)",
+      "PowerShell(./backend/scripts/generate-openapi.ps1*)"
+
     ]
   }
 }

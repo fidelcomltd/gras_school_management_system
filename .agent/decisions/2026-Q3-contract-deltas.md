@@ -579,3 +579,98 @@ unrouted, triggered by the settings-screen frontend card.
   choices in `ASSUMPTIONS.md`.
 - **Seeding**: 6.2.2 seeds the abbreviation as `GRAS`; the migration must ship that row. School
   name, address, phone, email, motto, logo and signature are explicitly NOT seeded.
+
+---
+
+## TASK-0028 — Roles and the privilege register — APPROVED (orchestrator, 2026-09-06)
+
+Additive throughout. No breaking change, so no human sign-off under §3. No session/auth mechanism
+change, so no §5 sign-off. Three new paths take the document from 18 to 21.
+
+Assignments are **not** in this delta — see TASK-0030 and the card's "Why assignments are NOT in
+this card".
+
+### 1. `GET /api/v1/privileges` — the register (dispatch 1)
+
+Authenticated, **no privilege required** (spec 6.1.14 says so explicitly). No CSRF (read). Not
+paged: the register is a fixed 93-row compile-time constant, not a growing list, so §9.5's cursor
+rule does not apply. Deterministic ordering — groups 4.4.1→4.4.6, rows in spec table order.
+
+```
+200 PrivilegeRegisterResponse
+  groups: PrivilegeGroup[]
+      key        string enum — administration | settings | academic_structure |
+                 pupils_and_subjects | results | pins_and_reports
+      title      string — verbatim spec 4.4.x heading, e.g. "Administration and access control"
+      privileges: PrivilegeDescriptor[]
+          code      string — canonical register code, e.g. "pupil.safeguarding.view"
+          permits   string — verbatim spec 4.4 "Permits" cell
+          scopable  boolean
+```
+
+- Legacy `guardian.*` aliases (`PrivilegeAliases`) are **not** in the response. The register is
+  canonical codes only; aliasing is an input concern.
+- `key` crosses as a string (§8) and the client must tolerate unknown members — a seventh module
+  group is an additive change.
+- No `401`-only special casing beyond the standard authenticated-endpoint behaviour.
+
+### 2. `/api/v1/roles` and `/api/v1/roles/{id}` (dispatch 2)
+
+| Op | Privilege | Idempotency-Key | CSRF | Success |
+| --- | --- | --- | --- | --- |
+| `GET /roles` | `role.view` | — | — | 200 cursor page |
+| `POST /roles` | `role.create` | **required** | yes | 201 + `Location` |
+| `GET /roles/{id}` | `role.view` | — | — | 200 |
+| `PATCH /roles/{id}` | `role.update` | accepted | yes | 200 |
+| `DELETE /roles/{id}` | `role.delete` | accepted | yes | 204 |
+
+`POST` requires the key on TASK-0027's `POST /admins` precedent: it creates an independently
+addressable entity, so a retried create must not make two roles.
+
+```
+Role
+  id           string (opaque, §8)
+  name         string 1..60
+  description  string 0..300, nullable
+  isSystem     boolean
+  privileges   string[] — canonical codes, min 1, sorted deterministically
+  status       string enum — active | archived
+
+CreateRoleRequest   name, description?, privileges[]
+UpdateRoleRequest   name?, description?, privileges?, status?   (all optional; absent = unchanged)
+RoleListResponse    items: Role[], nextCursor: string|null      (§9.5, page size 25)
+  query: status? (active|archived; ARCHIVED EXCLUDED BY DEFAULT per §9.4), search?, sort?
+         (whitelist: name | status), direction?, cursor?, pageSize?
+```
+
+### 3. Error codes — all `ProblemDetails` with `errorCode`, closed schema (TASK-0012)
+
+| `errorCode` | Status | When | Message |
+| --- | --- | --- | --- |
+| `role.name_reserved` | 422 | create/rename to `Super Admin`, case-insensitive | 6.1.4 |
+| `role.name_duplicate` | 409 | case-insensitive name collision | 6.1.4 |
+| `role.privileges_empty` | 422 | empty privilege list | 6.1.4 "At least one" |
+| `role.unknown_privilege` | 422 | any code not in the register | **names the offender** (6.1.4) |
+| `role.system_immutable` | **409** | `PATCH`/`DELETE` on an `is_system` role | 6.1.14 fixes 409 |
+| `role.privilege_escalation` | 403 | 6.1.7 rule 2 | verbatim, below |
+
+Rule 2's message is fixed by spec 6.1.7 and must not be rephrased. One offender:
+`You do not hold settings.grading.update and cannot add it to a role.` Several, comma-joined in
+register order: `You do not hold a, b and cannot add them to a role.` Every rejection writes an
+audit event through `ISystemAuditSink` (6.1.7 preamble; log-only per the 2026-09-06 drift entry).
+
+Rule 2 is evaluated against the **added** privileges only — a `PATCH` that leaves an existing
+privilege untouched is not an "add" and is not rejected (spec: "add a privilege to a role that it
+does not itself currently hold"). Removal is unrestricted except on a system role.
+
+### 4. `DELETE` semantics, and the branch this card cannot write
+
+§9.4: a role may be hard-deleted "when no assignment has ever used it", and archived otherwise. No
+assignment table exists, so nothing can ever have referenced a role and `DELETE` hard-deletes
+unconditionally (system roles excepted, 409). Archiving is reachable today only through
+`PATCH { status: "archived" }`. **TASK-0030 must add the has-ever-been-assigned branch** — recorded
+as live drift, not left to be rediscovered.
+
+### 5. Breaking vs additive
+
+Every item above is a new path or a new schema. Nothing existing changes shape. Additive.
