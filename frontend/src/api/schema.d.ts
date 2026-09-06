@@ -191,6 +191,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the school settings
+         * @description Everything in one payload for the settings area (spec 6.2.12). Returns only the `identity` group as of TASK-0005a; later cards extend this same envelope additively with sibling groups.
+         */
+        get: operations["GetSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the school's identity
+         * @description School name, short name, address, phone, email, motto, head teacher name (spec 6.2.3). `timezone` and `abbreviation` are not editable here — timezone is fixed, and the abbreviation has its own endpoint and its own optimistic-concurrency pointer. `expectedVersion` must match the identity group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written, and BOTH the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).
+         */
+        patch: operations["UpdateSchoolIdentity"];
+        trace?: never;
+    };
+    "/api/v1/config-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List configuration-version history, newest first
+         * @description Cursor-paginated per spec 9.5 — never offset. `cursor` is the opaque `nextCursor` from a previous page; omit it for the first page. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListConfigVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-versions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one configuration version in full, including its snapshot
+         * @description Includes the full `snapshot` — the whole serialised configuration as of this save (spec 6.2.9), not only the group that changed.
+         */
+        get: operations["GetConfigVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -292,6 +372,111 @@ export interface components {
             newPassword: string;
         };
         /**
+         * @description The full body of `GET /api/v1/config-versions/{id}`.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "versionNumber": 3,
+         *       "changedGroup": "Identity",
+         *       "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+         *       "reason": null,
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "snapshot": {
+         *         "schoolProfile": {
+         *           "schoolName": "Golden Royal Ark School",
+         *           "shortName": "GRAS",
+         *           "abbreviation": "GRAS",
+         *           "address": "12 Ark Crescent, Lekki, Lagos",
+         *           "phone": "+2348012345678",
+         *           "email": "info@goldenroyalark.example",
+         *           "motto": "Excellence Through Character",
+         *           "headTeacherName": "Chisom Maxwell",
+         *           "timezone": "Africa/Lagos",
+         *           "identityVersionNumber": 3,
+         *           "abbreviationVersionNumber": 0
+         *         }
+         *       }
+         *     }
+         */
+        ConfigVersionDetailDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * Format: int64
+             * @description The globally monotonic version number (spec 6.2.9).
+             * @example 3
+             */
+            versionNumber: number | string;
+            /**
+             * @description Which settings group this save changed.
+             * @example Identity
+             */
+            changedGroup: string;
+            /**
+             * @description The acting administrator's id, or `null` for a system action.
+             * @example 0192f0c4-0000-7000-8000-000000000099
+             */
+            actorAdminId: null | string;
+            /**
+             * @description The reason given for this save, or `null` when the changed group's rule does not
+             *     require one (6.2.10) — always `null` for an `Identity` row.
+             */
+            reason: null | string;
+            /**
+             * Format: date-time
+             * @description When this version was written.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+            /**
+             * @description The whole serialised configuration as of this save (6.2.9) — every group's values at that moment,
+             *     not only the one that changed.
+             */
+            snapshot: components["schemas"]["JsonElement"];
+        };
+        /**
+         * @description One row of `GET /api/v1/config-versions`'s cursor-paged list — everything except the
+         *     snapshot itself, which only the detail endpoint returns.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "versionNumber": 3,
+         *       "changedGroup": "Identity",
+         *       "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        ConfigVersionSummaryDto: {
+            /**
+             * @description Opaque id. Pass to `GET /api/v1/config-versions/{id}` for the full detail.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * Format: int64
+             * @description The globally monotonic version number (spec 6.2.9).
+             * @example 3
+             */
+            versionNumber: number | string;
+            /**
+             * @description Which settings group this save changed.
+             * @example Identity
+             */
+            changedGroup: string;
+            /**
+             * @description The acting administrator's id, or `null` for a system action.
+             * @example 0192f0c4-0000-7000-8000-000000000099
+             */
+            actorAdminId: null | string;
+            /**
+             * Format: date-time
+             * @description When this version was written.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+        };
+        /**
          * @description REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.
          * @example {
          *       "label": "Term 1 timetable draft",
@@ -337,6 +522,43 @@ export interface components {
              * @example CfDJ8N-example-opaque-csrf-token-value
              */
             csrfToken: string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "versionNumber": 3,
+         *           "changedGroup": "Identity",
+         *           "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *         }
+         *       ],
+         *       "nextCursor": "MQ=="
+         *     }
+         */
+        CursorPageOfConfigVersionSummaryDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "versionNumber": 3,
+             *         "changedGroup": "Identity",
+             *         "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["ConfigVersionSummaryDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example MQ==
+             */
+            nextCursor: null | string;
         };
         /**
          * @description One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant
@@ -413,6 +635,25 @@ export interface components {
             /** @description Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem. */
             traceId: string;
         };
+        /**
+         * @description The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.
+         * @example {
+         *       "schoolProfile": {
+         *         "schoolName": "Golden Royal Ark School",
+         *         "shortName": "GRAS",
+         *         "abbreviation": "GRAS",
+         *         "address": "12 Ark Crescent, Lekki, Lagos",
+         *         "phone": "+2348012345678",
+         *         "email": "info@goldenroyalark.example",
+         *         "motto": "Excellence Through Character",
+         *         "headTeacherName": "Chisom Maxwell",
+         *         "timezone": "Africa/Lagos",
+         *         "identityVersionNumber": 3,
+         *         "abbreviationVersionNumber": 0
+         *       }
+         *     }
+         */
+        JsonElement: unknown;
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
          *     frontend write a single generic paging hook instead of one per endpoint.
@@ -608,6 +849,93 @@ export interface components {
             armId: string;
         };
         /**
+         * @description The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of
+         *     TASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups
+         *     (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather
+         *     than a new top-level field, and registration-number/abbreviation get their own group here).
+         * @example {
+         *       "identity": {
+         *         "schoolName": "Golden Royal Ark School",
+         *         "shortName": "GRAS",
+         *         "address": "12 Ark Crescent, Lekki, Lagos",
+         *         "phone": "+2348012345678",
+         *         "email": "info@goldenroyalark.example",
+         *         "motto": "Excellence Through Character",
+         *         "headTeacherName": "Chisom Maxwell",
+         *         "timezone": "Africa/Lagos",
+         *         "versionNumber": 3
+         *       }
+         *     }
+         */
+        SettingsDto: {
+            /** @description The school identity group. */
+            identity: components["schemas"]["SettingsIdentityGroupDto"];
+        };
+        /**
+         * @description The school identity group, both inside SettingsDto and as
+         *     `PATCH /api/v1/settings/identity`'s own success body (spec 6.2.3).
+         * @example {
+         *       "schoolName": "Golden Royal Ark School",
+         *       "shortName": "GRAS",
+         *       "address": "12 Ark Crescent, Lekki, Lagos",
+         *       "phone": "+2348012345678",
+         *       "email": "info@goldenroyalark.example",
+         *       "motto": "Excellence Through Character",
+         *       "headTeacherName": "Chisom Maxwell",
+         *       "timezone": "Africa/Lagos",
+         *       "versionNumber": 3
+         *     }
+         */
+        SettingsIdentityGroupDto: {
+            /**
+             * @description Full school name. Appears in full on the result sheet header.
+             * @example Golden Royal Ark School
+             */
+            schoolName: string;
+            /**
+             * @description Used where the full name will not fit, for example the pin slip.
+             * @example GRAS
+             */
+            shortName: string;
+            /**
+             * @description Multi-line permitted.
+             * @example 12 Ark Crescent, Lekki, Lagos
+             */
+            address: string;
+            /**
+             * @description Nigerian format, normalised to `+234` form.
+             * @example +2348012345678
+             */
+            phone: string;
+            /**
+             * @description Valid email format, stored lower-invariant.
+             * @example info@goldenroyalark.example
+             */
+            email: string;
+            /**
+             * @description `null` when unset. Printed under the school name if present.
+             * @example Excellence Through Character
+             */
+            motto: null | string;
+            /**
+             * @description Printed above the head teacher's signature block.
+             * @example Chisom Maxwell
+             */
+            headTeacherName: string;
+            /**
+             * @description Always `Africa/Lagos`. Fixed; a `PATCH` cannot change it.
+             * @example Africa/Lagos
+             */
+            timezone: string;
+            /**
+             * Format: int32
+             * @description The identity group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next `PATCH`.
+             * @example 3
+             */
+            versionNumber: number | string;
+        };
+        /**
          * @description Signs an administrator in (spec 6.1.11, spec 9.1). Approved contract delta:
          *     `POST /api/v1/auth/sign-in`.
          * @example {
@@ -632,6 +960,65 @@ export interface components {
              * @example correct horse battery staple 9
              */
             password: string;
+        };
+        /**
+         * @description `PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and
+         *             string SchoolProfile.Timezone are deliberately absent from this body — the abbreviation is
+         *             TASK-0005c's own endpoint, and the timezone is fixed and not editable in this version.
+         * @example {
+         *       "schoolName": "Golden Royal Ark School",
+         *       "shortName": "GRAS",
+         *       "address": "12 Ark Crescent, Lekki, Lagos",
+         *       "phone": "08012345678",
+         *       "email": "info@goldenroyalark.example",
+         *       "motto": "Excellence Through Character",
+         *       "headTeacherName": "Chisom Maxwell",
+         *       "expectedVersion": 2
+         *     }
+         */
+        UpdateSchoolIdentityCommand: {
+            /**
+             * @description Full school name.
+             * @example Golden Royal Ark School
+             */
+            schoolName: string;
+            /**
+             * @description Used where the full name will not fit.
+             * @example GRAS
+             */
+            shortName: string;
+            /**
+             * @description Multi-line permitted.
+             * @example 12 Ark Crescent, Lekki, Lagos
+             */
+            address: string;
+            /**
+             * @description Nigerian format — `08012345678` or `+2348012345678`.
+             * @example 08012345678
+             */
+            phone: string;
+            /**
+             * @description Valid email format.
+             * @example info@goldenroyalark.example
+             */
+            email: string;
+            /**
+             * @description `null` to leave the school with no motto.
+             * @example Excellence Through Character
+             */
+            motto: null | string;
+            /**
+             * @description Printed above the head teacher's signature block.
+             * @example Chisom Maxwell
+             */
+            headTeacherName: string;
+            /**
+             * Format: int32
+             * @description The identity group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.identity.stale_version` before anything is written.
+             * @example 2
+             */
+            expectedVersion: number | string;
         };
     };
     responses: never;
@@ -1123,6 +1510,256 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSchoolIdentity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSchoolIdentityCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsIdentityGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListConfigVersions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfConfigVersionSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetConfigVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigVersionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

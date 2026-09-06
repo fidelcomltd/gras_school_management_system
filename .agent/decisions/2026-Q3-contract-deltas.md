@@ -458,3 +458,102 @@ an audit query; it goes to TASK-0028 with the rest of the detail view.
 moves from TASK-0019 to TASK-0027, which is where a per-user-partitioned route first ships. Noted
 there as an acceptance criterion with the trap stated: a 429 test that would still pass under IP
 partitioning does not prove the fix.
+
+---
+
+# TASK-0005 — School settings delta: APPROVED WITH FOUR AMENDMENTS (2026-09-06)
+
+Proposed by `backend-dev` dispatch 1 (delta-only, no code — full text in the card's `## Log`).
+Additive throughout; no existing path changes shape, so no human sign-off is required (§3). The
+card is **SPLIT THREE WAYS** as proposed: TASK-0005a (identity + `config_version` substrate),
+TASK-0005b (uploads), TASK-0005c (registration numbers).
+
+**Verified mechanically before approving**: all five privilege strings exist verbatim in
+TASK-0002's shipped register (`Privileges.cs:76,86,92,95,98`) — `settings.view`,
+`settings.identity.update`, `settings.abbreviation.update`, `settings.regnumber.update`,
+`audit.view`. None invented.
+
+**Verified against the spec, not against the delta**: the preview reading is correct and I had
+expected it to be wrong. Spec 6.2.4 says the preview is built "from the **current** abbreviation,
+separator and serial width" — so taking `separator`/`serialWidth` as unsaved query parameters
+while composing the abbreviation from saved state is exactly right, not an omission.
+
+## Amendment 1 — `serial_reset: continuous` has no counter to read (BLOCKER for 0005c)
+
+`registration_number_counter` is proposed as `admission_year` (PK) + `last_serial_issued`. That
+shape can only express `per_year`. Spec 6.2.4 makes `serial_reset` an enum of **`per_year` OR
+`continuous`**, and under `continuous` the serial does not restart in January — 2027's first
+pupil follows 2026's last. A counter keyed on year alone cannot represent that sequence, so
+`continuous` would silently behave as `per_year`: the setting would appear in the API, be
+accepted, be stored, and do nothing. That is the defect family this project keeps removing —
+a control that reports success and changes no behaviour.
+
+Fix in 0005c: the counter must carry both modes (a sentinel/global partition alongside the
+per-year rows, or an explicit partition key), the preview must compose from whichever partition
+the **currently saved** `serial_reset` selects, and the width-reduction rejection must scan the
+partition that mode actually uses. **A test must set `continuous`, cross a year boundary in
+seeded counter state, and assert the serial does not restart** — a test that only exercises
+`per_year` leaves this unproven.
+
+## Amendment 2 — `abbreviation.issuedCount` cannot be computed by this card, and must not pretend
+
+The delta returns the 6.2.4 dialogue's count ("**412 pupils** already hold registration numbers
+beginning GRAS") as a plain field on `GET /settings`. Correct placement — it must reach the UI
+before the admin types `CHANGE`, so it cannot ride on an error body. But **no pupil or
+registration register exists yet**; nothing in TASK-0005 can count issued numbers. Left as
+drafted, the field ships as a permanent `0` and the dialogue renders "0 pupils already hold…"
+as though it were a fact.
+
+Fix in 0005c: the field is **nullable**, `null` meaning "no register exists to count yet" — never
+`0`, which is a claim. The contract documents it as nullable-until-the-register-exists, and the
+frontend card that renders the dialogue must handle `null` by suppressing the count sentence
+rather than printing a zero. Owner of the wiring: the pupil-registration card, recorded as drift
+with that trigger.
+
+## Amendment 3 — the stale-save message is grading-scale copy; do not reuse it verbatim
+
+6.2.11's optimistic-concurrency sentence names the grading scale specifically ("The grading scale
+was changed by another administrator while you were editing. Reload and make your change again.").
+This card touches identity, abbreviation and registration number — none of them the grading
+scale. Substituting the group name follows the spec's pattern but the resulting sentence is
+**our copy, not the school's spec**. Write it per group, and record it in
+`backend/docs/ASSUMPTIONS.md` as authored copy awaiting confirmation. Do not present invented
+user-facing text as though the spec supplied it.
+
+## Amendment 4 — "logo deleted with no replacement" gets a domain invariant, not an invented route
+
+Open question 4 answered: **do not invent a `DELETE` route.** Spec 6.2.12's own endpoint
+enumeration has no removal route, and 6.2.2 confirms the logo is *not seeded* — so the real rule
+is a set→null transition guard, not a route. Implement it as a domain invariant carrying 6.2.11's
+verbatim message, unit-tested at the domain level. An acceptance criterion whose only proof is an
+HTTP route that does not exist is a vacuous criterion; this makes it testable without inventing
+product surface. Record in `STATE.md ## Known drift` that the removal affordance is currently
+unrouted, triggered by the settings-screen frontend card.
+
+## Confirmed as proposed (no change needed)
+
+- **Concurrency**: client-echoed integer `expectedVersion` per group, compared inside the same
+  transaction as the `config_version` insert, `409` before any write. Two int pointer columns on
+  `school_profile` (identity + abbreviation) rather than a second singleton table for one string
+  field. Loser gets the audit-seam call and no version row — which is what 6.2.11's "both attempts
+  appear in the audit log" actually says.
+- **`config_version`**: one global monotonic ledger, `snapshot` holding the WHOLE serialised
+  configuration on every write (6.2.9's rationale, card note 1). Not a reference. Never updated.
+- **Idempotency**: `Idempotency-Key` **accepted, not required**, on all five mutating routes —
+  consistent with TASK-0019 Part 2's placement of `PATCH /admins/{id}`. The multipart-fingerprint
+  gap found while answering (the fingerprint builder JSON-serialises the bound command and so
+  cannot see uploaded bytes) is real and is **0005b's to resolve by folding in a content hash** —
+  not to rediscover.
+- **`ProblemDetails additionalProperties: false` does not bite this card.** Answered explicitly,
+  with the count moved to `200` data rather than stuffed into `detail`. The `lockedUntil`
+  inaccuracy therefore stays TASK-0027's (`STATE.md ## Known drift`, 2026-09-06).
+- **The two serving endpoints** (`GET /settings/identity/logo/{size}`, `.../signature`) are
+  APPROVED as additions. §9.6 requires uploads be served through a privilege-checked endpoint and
+  spec 6.2.12 lists none — the delta was right to add them rather than assume the silence meant
+  "don't build one".
+- **Abbreviation reason**: non-empty (trimmed), no 10-character floor. 6.2.9's floor is scoped by
+  its own prose to grading/assessment/traits/trait-scale/result-rules, and 6.2.10 confirms
+  abbreviation is never locked and never triggers that warning. Cap the length and record both
+  choices in `ASSUMPTIONS.md`.
+- **Seeding**: 6.2.2 seeds the abbreviation as `GRAS`; the migration must ship that row. School
+  name, address, phone, email, motto, logo and signature are explicitly NOT seeded.

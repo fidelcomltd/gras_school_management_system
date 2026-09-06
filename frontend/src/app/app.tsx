@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ErrorBoundary } from '@/components/feedback/error-boundary';
-import { connectSessionExpiry } from '@/stores/session-store';
+import { ensureCsrfToken } from '@/lib/http';
 import { initTheme } from '@/stores/theme-store';
 import { QueryProvider } from './providers/query-provider';
 import { AppRouter } from './router/app-router';
@@ -11,7 +11,12 @@ import { AppRouter } from './router/app-router';
  */
 export function App() {
   useEffect(() => {
-    const disposers = [initTheme(), connectSessionExpiry()];
+    const disposers = [initTheme()];
+    // Bootstraps the CSRF pair (sign-in is itself CSRF-protected) and, on a hard
+    // reload while already signed in, rotates it to the live session's binding.
+    // A failure here is not fatal — the http layer's single CSRF retry recovers
+    // on the first mutating request either way.
+    void ensureCsrfToken();
     return () => {
       for (const dispose of disposers) dispose();
     };

@@ -6,7 +6,9 @@ Recorded because a scaffold's assumptions are invisible once code is built on th
 assumption turns out to be wrong, twenty files depend on it. Each entry says what was assumed, why, and
 what it would cost to change.
 
-Last updated: 2026-08-03.
+Last updated: 2026-09-06 (§2.15 added — TASK-0005a's authored copy, seed defaults, phone
+normalisation, the identity concurrency design, and two real gaps found while shipping the first
+`config_version` ledger and the first `Idempotency-Key`-declaring route).
 
 ---
 
@@ -142,55 +144,124 @@ and the integration-test harness all work end to end.
 **Delete it with the first real aggregate** — the entity, its configuration, repository, endpoints, DTOs,
 examples and tests, plus a migration dropping the table.
 
-### 2.14 No `Idempotency-Key` mechanism exists yet — DEVIATION
+### 2.14 `Idempotency-Key` mechanism — RESOLVED by TASK-0019, declared per-route from TASK-0027 onward
 
 Root `CLAUDE.md` §6 (`.agent/spec/backend.md`) requires: **"Mutating endpoints that can be retried
-accept an `Idempotency-Key`."** Verified: zero occurrences of `Idempotency` in any `.cs`, `.csproj`,
-`.md` or `.ps1` under `backend/`, apart from `dotnet ef migrations script --idempotent` in
-`README.md`. No middleware, no endpoint filter, no key store, no test. This is a deviation from §6's
-letter, recorded here rather than fixed today.
+accept an `Idempotency-Key`."** This was a deviation as of 2026-09-04 (deferred, Option B, human
+sign-off) because no product mutating endpoint existed yet to validate the mechanism's hard parts
+against. **That deferral is over.** TASK-0019 (2026-09-06) built the substrate: centralised
+storage, request fingerprinting (method + path + caller + normalised body hash), stored-response
+replay with a declared `Idempotency-Replay` response header, `RedactFromIdempotencyReplayAttribute`
+for one-time-display fields, and a 24-hour scheduled purge writing `system.idempotency_purge`
+audit events per §9.9. `RequireIdempotencyKeyExtensions.RequireIdempotencyKey(required:)` is the
+one call site every mutating route attaches through — mirroring `RequireCsrfToken()` in shape.
 
-**Why deferred rather than built (Option B, human sign-off 2026-09-04):** no product mutating
-endpoint exists yet, so a mechanism built now would have no real caller to validate its hard parts
-against — key storage, request fingerprinting, and the retention/purge rule §9.9 cares about. The
-risk that made this a blocker was never the missing mechanism; it was `ReferenceEndpoints.cs`
-silently teaching its absence to every future POST copied from it as the template. That risk is
-closed by the documented TODO in that file's class-level `<remarks>` (this task's Deliverable 2), not
-by building the filter early against no real requirements.
+**What replaces the old deferral, and does not go away:** the requirement is no longer "build the
+mechanism," it is **"declare `Idempotency-Key` per route, at the point that route ships."** §9.8.2's
+four named examples (pupil registration, pin generation, promotion commit, result publication) were
+never the exhaustive list — its own wording is "Idempotency keys on **every** mutating endpoint that
+a retry could duplicate." TASK-0019 itself ships no route that declares the header (it is
+contract-neutral); TASK-0027 (admin accounts, held for §5 sign-off) is the first to call
+`RequireIdempotencyKey` for real and wires the OpenAPI declaration for both the request and
+`Idempotency-Replay` response headers. **Live trigger, current as of 2026-09-06: TASK-0005**
+(school settings) is the next card whose mutating routes must each state, per route, `required`,
+`accepted`, or "excluded, with reason" — the logo/signature uploads and the versioned-config PATCH
+routes are retry-duplicable by the same "duplicate audit-visible row" reasoning TASK-0019's Part 2
+delta applied to `PATCH /admins/{id}` (a converged final state, but a doubled `config_version`/audit
+row on naive retry), not the "genuine duplicate create" reasoning that made `POST /admins` REQUIRED.
 
-**Owner:** `backend-dev` implements the mechanism, on the trigger below. The orchestrator is
-accountable for firing that trigger at dispatch time — i.e. for not opening a mutating-endpoint task
-card without first checking this entry.
+**What the implementing card still has to decide per route, not re-derived from scratch:**
+- Required vs. accepted vs. excluded, argued from what a retry would actually duplicate — not
+  assumed from the four named examples.
+- For a multipart body (a file upload), the existing fingerprint builder
+  (`RequireIdempotencyKeyExtensions.BuildFingerprint`) serialises the bound `IBaseCommand` via
+  `JsonSerializer` — this does not meaningfully capture an `IFormFile`'s bytes. A route accepting
+  the header on a multipart endpoint must decide how the fingerprint incorporates the uploaded
+  content (e.g. a content hash folded in separately) so that a reused key against a *different* file
+  is classified `idempotency.key_conflict` rather than silently replaying the wrong stored image.
 
-**Trigger, stated so it cannot be read narrowly:** the first task card implementing **any** mutating
-operation that a retry could duplicate builds the idempotency mechanism first, before the operation
-itself ships. Spec `product-specification/14-non-functional-requirements.md` §9.8.2 names four
-examples explicitly — pupil registration, pin generation, promotion commit, and result publication —
-but its own wording is "Idempotency keys on **every** mutating endpoint that a retry could
-duplicate, in particular pupil registration, pin generation, promotion commit and result
-publication." The four are examples, not an exhaustive list; a future mutating endpoint outside
-those four that a retry could duplicate is equally in scope and does not get a pass for not being on
-the list.
+Cross-references: `TASK-0013` (original deviation record, now superseded by this entry); `.agent/AUDIT.md`
+finding **B2** (original finding); `TASK-0019`/`TASK-0027` (the mechanism and its first real route);
+`.agent/decisions/2026-Q3-contract-deltas.md` (approved shape). **Cost to change:** none — the
+substrate is built; cost from here is only the discipline of declaring the header on each new
+mutating route, which is now a review-time check (`grep` for a mutating `MapPost`/`MapPatch` missing
+a `RequireIdempotencyKey` call), not an implementation gap. **Update (TASK-0005a, 2026-09-06):**
+TASK-0027 remains held for §5 sign-off, so `PATCH /settings/identity` is the actual first route to
+call `RequireIdempotencyKey` for real — see §2.15.
 
-The requirement is concrete and dated, not hypothetical: `product-specification/10-module-access-pins.md:180`
-already specifies `POST /pin-batches` as requiring an idempotency key ("Idempotency key required, per
-9.8.2, so a retry cannot double-generate a batch."), so the first of the four named triggers is
-already written into the product spec with its own endpoint.
+### 2.15 TASK-0005a — school identity and the append-only `config_version` ledger
 
-**What the implementing card will have to decide** (not re-derived from scratch when the trigger
-fires):
-- **Key storage and its retention/purge rule.** §9.9's data-protection retention table governs what
-  may be retained and for how long — a stored idempotency record (key, fingerprint, response body)
-  is itself data that needs a purge rule, not an indefinite table.
-- **Request fingerprinting**, so a reused key submitted with a different payload is rejected rather
-  than silently replaying an unrelated stored response.
-- **Stored-response replay** on a genuine repeat (same key, same fingerprint) — return the original
-  response rather than re-executing the mutation.
+Decisions made shipping the first product settings surface and the first real `config_version` row,
+plus two gaps the work exposed in shared code nobody had exercised this way before.
 
-Cross-references: `TASK-0013` (this decision); `.agent/AUDIT.md` finding **B2** (original finding);
-`ReferenceEndpoints.cs` class `<remarks>` (the documented TODO). **Cost to change:** none yet — no
-mutating endpoint exists to retrofit. Cost grows by one endpoint for every mutating route added
-before the trigger fires and is not honoured.
+**Authored copy, not spec copy (approved delta amendment 3).** 6.2.11's stale-save sentence names
+the grading scale ("The grading scale was changed by another administrator..."), a group this card
+never touches. `UpdateSchoolIdentityCommandHandler`'s `409 settings.identity.stale_version` message —
+"The school identity was changed by another administrator while you were editing. Reload and make
+your change again." — follows the spec's PATTERN, substituting the group name, but is this project's
+own wording, not a quotation. TASK-0005c's abbreviation and registration-number groups need their own
+equally-authored sentences when they ship; do not copy this one verbatim across groups.
+
+**Nigerian phone number format — first implementation, written for reuse.** Spec 6.2.3 reuses 6.1.3's
+phone rule verbatim ("Nigerian format... Accepts 08012345678 or +2348012345678 and normalises to +234
+form on save. Rejects fewer than 11 digits in the national form"), but 6.1.3's own module (admin
+accounts) has not shipped yet — TASK-0027 is held for §5 sign-off, so there was no existing type to
+copy. `SchoolManagement.Domain.Common.NigerianPhoneNumber` is deliberately placed in `Domain/Common/`
+rather than `Domain/Settings/`, so TASK-0027 reuses it rather than re-deriving the same regex pair.
+Interpreted strictly: exactly `0` + 10 digits, or exactly `+234` + 10 digits; anything else (fewer or
+more digits, a different country code, stray characters) is rejected. This is an authored reading of
+the spec's two named examples, not a literal transcription — flagging in case a softer interpretation
+(stripping spaces/hyphens first, say) was intended.
+
+**Seed defaults for "not seeded" fields are empty string, not `null`.** 6.2.2 lists `school_name`,
+`address`, `phone`, `email`, `motto`, `head_teacher_name` as "Not seeded — admin must supply," but
+6.2.3's own table marks most of them `Req: Yes` (NOT NULL). `SchoolProfileConfiguration.HasData` seeds
+them as `""` rather than leaving the column nullable, so `GET /settings` never 404s before the first
+admin visit — it returns an identity group with empty strings the frontend renders as "not set" (a
+frontend settings-screen decision, not resolved here). `motto` (the one genuinely optional field) is
+seeded `null`, matching its own nullability.
+
+**Both version pointers (`identity_version_number`, `abbreviation_version_number`) start at 0.**
+Interpreted as "installed, never yet saved through a versioned PATCH" — the first real save on a
+group takes its pointer 0→1 AND writes that group's first `config_version` row. 6.2.9's "every SAVE
+writes a new row" reads as scoped to an actual `PATCH`, not to migration-time seeding, so the ledger
+is legitimately empty (`GET /config-versions` returns no rows) until the first admin edit. `0` was
+picked over `1` because it lets `GET /config-versions` being empty mean something real ("nobody has
+ever saved this") rather than a row existing with no matching version-history entry to explain it.
+
+**`config_version.version_number` is a real PostgreSQL `GENERATED ALWAYS AS IDENTITY` column, not an
+application-computed "read the max, add one."** The latter has a genuine two-writer race under
+concurrent saves across different groups (identity save + a future abbreviation save landing in the
+same instant could compute the same next number); a database identity sequence cannot. This is new
+precedent in this codebase — every existing entity's key is a client-generated `Guid`
+(`Guid.CreateVersion7()`), so `ConfigVersion.VersionNumber` is the first EF-mapped property whose
+value the database, not the application, assigns.
+
+**Real gap found #1 — the shared integration-test fixture had no way to keep a `HasData`-seeded
+singleton alive across `ResetDatabaseAsync`.** `school_profile` is the first entity in the whole
+codebase seeded via migration `HasData`; `ApiTestFixture.ResetDatabaseAsync`'s `TRUNCATE ... CASCADE`
+(built for `SampleRecord`/`AdminAccount`/`IdempotencyRecord`, none of which are ever seeded) wipes that
+row on the very first test and it never comes back — every settings test after the first would have
+failed with "sequence contains no elements" from `FirstAsync`, not from anything wrong in the
+production code. Fixed by having `ResetDatabaseAsync` reinsert the exact seed row immediately after
+truncating, rather than teaching every settings test to re-seed itself. If a SECOND `HasData`-seeded
+table is ever added, consider generalising this into a walk over `context.Model.GetEntityTypes()...
+GetSeedData()` rather than a second hand-written `INSERT` — not built now, per this project's own
+"a third exemption must argue for itself" reasoning (`STATE.md` `## Known drift`).
+
+**Real gap found #2 — `SchemaExampleTransformer` could not describe a schema whose only appearance
+in the document is as a property's referenced type.** `ConfigVersionDetailDto.Snapshot` is typed
+`System.Text.Json.JsonElement` (spec 6.2.9's snapshot is genuinely free-form — every future settings
+card adds its own section). `JsonElement` is a framework type with no XML doc comment, so it needs the
+same `OpenApiExamples.DescriptionsByType` treatment `ProblemDetails`/`HttpValidationProblemDetails`
+already use — but adding the entry alone did nothing: `EverySchema_HasADescription` still failed. The
+transformer's description fallback lived inside the `else` branch (the "type-level, no
+`JsonPropertyInfo`" case), and `JsonElement`'s one and only appearance in the whole document is
+reached exclusively through the PROPERTY-context branch, since a type this shape-less generates no
+separate top-level call. Fixed by moving the description fallback outside the property/type branching
+so it runs unconditionally (still guarded by "only when the schema has none already," so an XML doc
+comment still always wins). This was invisible until a real `JsonElement`-typed property existed
+anywhere in the contract — TASK-0005a is that first case.
 
 ---
 

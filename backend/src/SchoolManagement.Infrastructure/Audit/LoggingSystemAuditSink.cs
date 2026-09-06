@@ -22,6 +22,7 @@ internal sealed class LoggingSystemAuditSink(ILogger<LoggingSystemAuditSink> log
         string? entityType,
         string? entityId,
         IReadOnlyDictionary<string, object?>? metadata,
+        string? actorAdminId,
         CancellationToken cancellationToken)
     {
         var metadataJson = metadata is null ? "{}" : JsonSerializer.Serialize(metadata);
@@ -31,6 +32,7 @@ internal sealed class LoggingSystemAuditSink(ILogger<LoggingSystemAuditSink> log
             action,
             entityType ?? "(none)",
             entityId ?? "(none)",
+            actorAdminId ?? "(system)",
             metadataJson);
 
         return Task.CompletedTask;
@@ -47,11 +49,12 @@ internal static partial class SystemAuditLog
     [LoggerMessage(
         EventId = 4000,
         Level = LogLevel.Information,
-        Message = "System audit event: action={Action} entityType={EntityType} entityId={EntityId} metadata={Metadata}")]
+        Message = "System audit event: action={Action} entityType={EntityType} entityId={EntityId} actorAdminId={ActorAdminId} metadata={Metadata}")]
     public static partial void Recorded(
         ILogger logger,
         string action,
         string entityType,
         string entityId,
+        string actorAdminId,
         string metadata);
 }

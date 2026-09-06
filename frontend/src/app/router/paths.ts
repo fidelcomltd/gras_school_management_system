@@ -7,6 +7,7 @@
  */
 export const paths = {
   root: '/',
+  signIn: '/sign-in',
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

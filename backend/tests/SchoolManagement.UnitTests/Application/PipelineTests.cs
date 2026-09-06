@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SchoolManagement.Application;
+using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Identity;
@@ -11,6 +12,7 @@ using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.UnitTests.Application;
@@ -51,6 +53,13 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IPasswordHasher>());
         services.AddSingleton(Substitute.For<ICurrentUser>());
         services.AddSingleton(Substitute.For<ICurrentSession>());
+
+        // TASK-0005a: the Settings/* handlers depend on these ports, implemented by Infrastructure —
+        // same treatment as every other repository stubbed above, needed only so this Application-only
+        // container can construct them.
+        services.AddSingleton(Substitute.For<ISchoolProfileRepository>());
+        services.AddSingleton(Substitute.For<IConfigVersionRepository>());
+        services.AddSingleton(Substitute.For<ISystemAuditSink>());
 
         services.AddOptions<PipelineOptions>();
 

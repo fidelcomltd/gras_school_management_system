@@ -1,17 +1,39 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 
 /**
- * Smoke coverage for the shell as it exists today — no feature, form, or auth flow exists yet
- * (that is TASK-0021), so there is nothing to write §7's auth/create/failure-path specs against.
- * This spec still has to assert something real: the page title from `index.html`, the heading
- * text rendered by `ScaffoldStatusScreen`, and the router's catch-all for an unknown path. Any of
- * the three breaking the build or the copy turns this spec red.
+ * Smoke coverage for the shell. TASK-0021 replaces `ScaffoldStatusScreen` with a
+ * real, protected `/` — this spec's original assertions (the scaffold heading)
+ * break BY DESIGN and are replaced with equivalent ones against what actually
+ * renders now, not deleted or weakened. The auth flow itself (successful
+ * sign-in, a rejected credential) lives in `e2e/auth.spec.ts`; this file only
+ * proves the unauthenticated redirect and the unknown-route fallback, per
+ * ruling 7 with no real backend.
  */
-test('root route renders the portal shell and its heading', async ({ page }) => {
+
+test('an unauthenticated visitor to / is redirected to sign-in, not shown a blank page', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/auth/csrf', (route: Route) =>
+    route.fulfill({ json: { csrfToken: 'e2e-csrf-token' } }),
+  );
+  await page.route('**/api/v1/auth/me', (route: Route) =>
+    route.fulfill({
+      status: 401,
+      json: {
+        type: 'urn:schoolmanagement:error:authentication.required',
+        title: 'Unauthorized',
+        detail: 'Not signed in.',
+        errorCode: 'authentication.required',
+        traceId: 'e2e-trace-id',
+      },
+    }),
+  );
+
   await page.goto('/');
 
+  await expect(page).toHaveURL(/\/sign-in$/);
   await expect(page).toHaveTitle('Golden Royal Ark School Portal');
-  await expect(page.getByRole('heading', { level: 1, name: 'Foundation is in place' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
 });
 
 test('unknown route falls back to the not-found screen, not a blank page', async ({ page }) => {

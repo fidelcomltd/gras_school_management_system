@@ -14,7 +14,7 @@ namespace SchoolManagement.Application.Abstractions.Audit;
 /// </remarks>
 public interface ISystemAuditSink
 {
-    /// <summary>Records one system-initiated audit event.</summary>
+    /// <summary>Records one system-initiated OR admin-attributed audit event.</summary>
     /// <param name="action">The audit action code, for example <c>system.idempotency_purge</c>.</param>
     /// <param name="entityType">The kind of entity affected, or <see langword="null"/>.</param>
     /// <param name="entityId">
@@ -22,11 +22,20 @@ public interface ISystemAuditSink
     /// 6.1.12: "Null for bulk actions, which instead carry a batch id in metadata."
     /// </param>
     /// <param name="metadata">Additional structured detail, safe to log (never PII).</param>
+    /// <param name="actorAdminId">
+    /// TASK-0005a: the acting administrator's id, or <see langword="null"/> for a genuine
+    /// system-initiated action (a background job, a migration) — the same "null means system, never
+    /// a fabricated string" convention <c>ICurrentUser.UserId</c> already documents.
+    /// <see cref="SchoolManagement.Application.Idempotency.IdempotencyPurgeJob"/>'s existing call
+    /// passes <see langword="null"/> explicitly here, unchanged in behaviour; a settings save is the
+    /// first caller to pass a real value.
+    /// </param>
     /// <param name="cancellationToken">Propagated to any underlying write.</param>
     Task RecordAsync(
         string action,
         string? entityType,
         string? entityId,
         IReadOnlyDictionary<string, object?>? metadata,
+        string? actorAdminId,
         CancellationToken cancellationToken);
 }

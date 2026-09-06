@@ -304,6 +304,144 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
 
                     b.ToTable("sample_records", (string)null);
                 });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.ConfigVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorAdminId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_admin_id");
+
+                    b.Property<string>("ChangedGroup")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("changed_group");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot");
+
+                    b.Property<long>("VersionNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version_number");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("VersionNumber"));
+
+                    b.HasKey("Id")
+                        .HasName("pk_config_versions");
+
+                    b.HasIndex("VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_config_versions_version_number_unique");
+
+                    b.ToTable("config_versions", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("abbreviation");
+
+                    b.Property<int>("AbbreviationVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("abbreviation_version_number");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("HeadTeacherName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("head_teacher_name");
+
+                    b.Property<int>("IdentityVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("identity_version_number");
+
+                    b.Property<string>("Motto")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("motto");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("SchoolName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("school_name");
+
+                    b.Property<string>("ShortName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("short_name");
+
+                    b.Property<string>("Timezone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("timezone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_school_profile");
+
+                    b.ToTable("school_profile", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+                            Abbreviation = "GRAS",
+                            AbbreviationVersionNumber = 0,
+                            Address = "",
+                            Email = "",
+                            HeadTeacherName = "",
+                            IdentityVersionNumber = 0,
+                            Phone = "",
+                            SchoolName = "",
+                            ShortName = "",
+                            Timezone = "Africa/Lagos"
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }

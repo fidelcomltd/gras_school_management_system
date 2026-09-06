@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Observability;
 using SchoolManagement.Api.Security;
+using SchoolManagement.Domain.Settings;
 using SchoolManagement.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -193,7 +194,27 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         var truncateSql = string.Concat("TRUNCATE TABLE ", quoted, " RESTART IDENTITY CASCADE;");
 
         await context.Database.ExecuteSqlRawAsync(truncateSql, cancellationToken);
+
+        // TASK-0005a: `school_profile` is the first entity in the codebase seeded via migration
+        // `HasData` — TRUNCATE wipes that row along with everything else, and unlike a normal
+        // migration re-run, EF Core never re-applies seed data on its own. Every integration test
+        // relies on the singleton row existing (ISchoolProfileRepository's contract is "always
+        // exists"), so it is reinserted here rather than in every test that touches settings.
+        await ReseedSchoolProfileAsync(context, cancellationToken);
     }
+
+    /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
+    private static Task<int> ReseedSchoolProfileAsync(ApplicationDbContext context, CancellationToken cancellationToken) =>
+        context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO school_profile
+                (id, school_name, short_name, abbreviation, address, phone, email, motto,
+                 head_teacher_name, timezone, identity_version_number, abbreviation_version_number)
+            VALUES
+                ({SchoolProfile.SingletonId}, '', '', {SchoolProfile.SeededAbbreviation}, '', '', '',
+                 NULL, '', {SchoolProfile.FixedTimezone}, 0, 0)
+            """,
+            cancellationToken);
 
     /// <summary>Creates a scope for resolving application services inside a test.</summary>
     public AsyncServiceScope CreateScope() => Services.CreateAsyncScope();

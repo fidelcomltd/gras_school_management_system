@@ -1,23 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_EXPIRY_LEEWAY_MS } from '@/config/env-values';
 import {
   __resetAuthSession,
-  clearSession,
-  expireSession,
-  getAccessToken,
+  getCsrfToken,
   getSession,
-  isExpired,
-  onSessionExpired,
-  refreshSession,
-  setRefreshHandler,
+  onSessionEnded,
+  registerKeepaliveCaller,
+  setCsrfToken,
   setSession,
+  terminateSession,
+  type AuthSession,
 } from './auth-session';
 
+/** The keepalive SCHEDULE itself is `./auth-session-keepalive.test.ts`. */
+
 const HOUR = 60 * 60 * 1000;
-const sessionIn = (ms: number) => ({ accessToken: 'token-abc', expiresAt: Date.now() + ms });
+const NOW = Date.parse('2026-09-06T09:00:00+00:00');
+
+function sessionEndingIn(idleMs: number, absoluteMs = 8 * HOUR): AuthSession {
+  return {
+    accountId: 'acc-1',
+    email: 'admin@example.com',
+    staffName: 'Chisom Maxwell',
+    isSuperAdmin: true,
+    mustChangePassword: false,
+    effectivePrivileges: [],
+    sessionExpiresAt: new Date(NOW + idleMs).toISOString(),
+    sessionAbsoluteExpiresAt: new Date(NOW + absoluteMs).toISOString(),
+  };
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime(NOW);
   __resetAuthSession();
 });
 
@@ -25,141 +39,92 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('token access', () => {
-  it('returns the token while the session is live', () => {
-    setSession(sessionIn(HOUR));
-    expect(getAccessToken()).toBe('token-abc');
-  });
-
-  it('returns null when there is no session', () => {
-    expect(getAccessToken()).toBeNull();
+describe('session state', () => {
+  it('has no session before one is set', () => {
     expect(getSession()).toBeNull();
   });
 
-  it('withholds a token that is inside the leeway window', () => {
-    // Still valid by the raw clock, but too close to expiry to send safely.
-    setSession(sessionIn(AUTH_EXPIRY_LEEWAY_MS - 1000));
-    expect(isExpired()).toBe(true);
-    expect(getAccessToken()).toBeNull();
-  });
-
-  it('treats an absent session as expired', () => {
-    expect(isExpired(null)).toBe(true);
-  });
-
-  it('forgets the token after clearSession', () => {
-    setSession(sessionIn(HOUR));
-    clearSession();
-    expect(getAccessToken()).toBeNull();
+  it('records the latest session', () => {
+    const session = sessionEndingIn(HOUR);
+    setSession(session);
+    expect(getSession()).toEqual(session);
   });
 });
 
-describe('scheduled expiry', () => {
-  it('notifies listeners when the token lapses', async () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    setSession(sessionIn(HOUR));
-
-    expect(onExpired).not.toHaveBeenCalled();
-    // Async advance: the timer awaits a refresh attempt before giving up, so
-    // the logout lands a microtask after the timer itself fires.
-    await vi.advanceTimersByTimeAsync(HOUR - AUTH_EXPIRY_LEEWAY_MS);
-
-    expect(onExpired).toHaveBeenCalledTimes(1);
-    expect(getAccessToken()).toBeNull();
+describe('CSRF token', () => {
+  it('starts unset', () => {
+    expect(getCsrfToken()).toBeNull();
   });
 
-  it('fires immediately for a session that is already past its leeway', () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    setSession(sessionIn(-1000));
-    expect(onExpired).toHaveBeenCalledTimes(1);
+  it('stores whatever is set, verbatim', () => {
+    setCsrfToken('opaque-token-value');
+    expect(getCsrfToken()).toBe('opaque-token-value');
+  });
+});
+
+describe('terminateSession — the one session-end path', () => {
+  it('clears the session and notifies listeners', () => {
+    setSession(sessionEndingIn(HOUR));
+    const onEnded = vi.fn();
+    onSessionEnded(onEnded);
+
+    terminateSession();
+
+    expect(getSession()).toBeNull();
+    expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
-  it('cancels the previous timer when a new session replaces it', async () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    setSession(sessionIn(HOUR));
-    setSession(sessionIn(4 * HOUR));
+  it('is idempotent: calling it again before a new session starts is a no-op', () => {
+    setSession(sessionEndingIn(HOUR));
+    const onEnded = vi.fn();
+    onSessionEnded(onEnded);
 
-    await vi.advanceTimersByTimeAsync(HOUR);
-    expect(onExpired).not.toHaveBeenCalled();
+    terminateSession();
+    terminateSession();
+    terminateSession();
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
-  it('stops notifying after unsubscribe', async () => {
-    const onExpired = vi.fn();
-    const unsubscribe = onSessionExpired(onExpired);
+  it('collapses several terminations in the same tick into one notification', () => {
+    setSession(sessionEndingIn(HOUR));
+    const onEnded = vi.fn();
+    onSessionEnded(onEnded);
+
+    // Models several concurrent 401s each reacting in the same microtask turn.
+    for (let i = 0; i < 5; i += 1) terminateSession();
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it('is a no-op when there is no active session', () => {
+    const onEnded = vi.fn();
+    onSessionEnded(onEnded);
+
+    terminateSession();
+
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+
+  it('stops notifying after unsubscribe', () => {
+    setSession(sessionEndingIn(HOUR));
+    const onEnded = vi.fn();
+    const unsubscribe = onSessionEnded(onEnded);
     unsubscribe();
 
-    setSession(sessionIn(HOUR));
+    terminateSession();
+
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+
+  it('cancels the pending keepalive timer', async () => {
+    const caller = vi.fn().mockResolvedValue(sessionEndingIn(4 * HOUR));
+    registerKeepaliveCaller(caller);
+
+    setSession(sessionEndingIn(HOUR));
+    terminateSession();
     await vi.advanceTimersByTimeAsync(HOUR);
-    expect(onExpired).not.toHaveBeenCalled();
-  });
 
-  it('renews instead of logging out when a refresh handler succeeds', async () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    setRefreshHandler(vi.fn().mockResolvedValue(sessionIn(4 * HOUR)));
-
-    setSession(sessionIn(HOUR));
-    await vi.advanceTimersByTimeAsync(HOUR - AUTH_EXPIRY_LEEWAY_MS);
-
-    expect(onExpired).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBe('token-abc');
-  });
-});
-
-describe('refresh', () => {
-  it('resolves to null when no handler is registered', async () => {
-    await expect(refreshSession()).resolves.toBeNull();
-  });
-
-  it('runs a single refresh for concurrent callers', async () => {
-    const handler = vi.fn().mockResolvedValue(sessionIn(HOUR));
-    setRefreshHandler(handler);
-
-    const results = await Promise.all([refreshSession(), refreshSession(), refreshSession()]);
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(results.every((session) => session !== null)).toBe(true);
-  });
-
-  it('clears the session when the handler rejects', async () => {
-    setSession(sessionIn(HOUR));
-    setRefreshHandler(vi.fn().mockRejectedValue(new Error('network down')));
-
-    await expect(refreshSession()).resolves.toBeNull();
-    expect(getAccessToken()).toBeNull();
-  });
-
-  it('clears the session when the handler declines to renew', async () => {
-    setSession(sessionIn(HOUR));
-    setRefreshHandler(vi.fn().mockResolvedValue(null));
-
-    await expect(refreshSession()).resolves.toBeNull();
-    expect(getAccessToken()).toBeNull();
-  });
-
-  it('allows a fresh attempt after the in-flight one settles', async () => {
-    const handler = vi.fn().mockResolvedValue(sessionIn(HOUR));
-    setRefreshHandler(handler);
-
-    await refreshSession();
-    await refreshSession();
-
-    expect(handler).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('expireSession', () => {
-  it('tears down the session and notifies', () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    setSession(sessionIn(HOUR));
-
-    expireSession();
-
-    expect(onExpired).toHaveBeenCalledTimes(1);
-    expect(getSession()).toBeNull();
+    expect(caller).not.toHaveBeenCalled();
   });
 });

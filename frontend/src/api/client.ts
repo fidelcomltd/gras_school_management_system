@@ -37,15 +37,27 @@ type SuccessBody<Op> = Op extends { responses: infer R }
   : never;
 
 /**
+ * Normalises `never` to `undefined`. `openapi-typescript` emits a literal
+ * `query?: never` / `requestBody?: never` for an operation that declares
+ * none — distinct from the property being absent — so a plain conditional
+ * match on that position infers `never` itself rather than "nothing to pass".
+ * Tuple-wrapped so this checks for `never` exactly, without a union
+ * distributing across the conditional.
+ */
+type NeverToUndefined<T> = [T] extends [never] ? undefined : T;
+
+/**
  * An operation's query parameters, or `undefined` when it declares none.
  * Matched against an optional `query?:` position so both a required query
  * object (e.g. `ping`) and an optional one (e.g. `records`) resolve to the
  * object's own shape rather than falling through to `undefined`.
  */
-type QueryOf<Op> = Op extends { parameters: { query?: infer Q } } ? Q : undefined;
+type QueryOf<Op> = Op extends { parameters: { query?: infer Q } } ? NeverToUndefined<Q> : undefined;
 
 /** An operation's JSON request body, or `undefined` when it declares none. */
-type RequestBodyOf<Op> = Op extends { requestBody?: { content: infer C } } ? JsonOf<C> : undefined;
+type RequestBodyOf<Op> = Op extends { requestBody?: { content: infer C } }
+  ? NeverToUndefined<JsonOf<C>>
+  : undefined;
 
 /** Paths that declare a GET operation in the contract. */
 export type GetPath = PathsWithMethod<'get'>;

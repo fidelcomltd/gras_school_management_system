@@ -13,3 +13,4 @@ export {
   putRequest,
   type RequestOptions,
 } from './request';
+export { ensureCsrfToken } from './http-client';

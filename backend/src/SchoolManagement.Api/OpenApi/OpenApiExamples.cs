@@ -6,6 +6,7 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
 
@@ -105,6 +106,100 @@ internal static class OpenApiExamples
         [typeof(SecureArmResponse)] = $$"""
             {
               "armId": "{{ExampleId}}"
+            }
+            """,
+
+        [typeof(SettingsIdentityGroupDto)] = """
+            {
+              "schoolName": "Golden Royal Ark School",
+              "shortName": "GRAS",
+              "address": "12 Ark Crescent, Lekki, Lagos",
+              "phone": "+2348012345678",
+              "email": "info@goldenroyalark.example",
+              "motto": "Excellence Through Character",
+              "headTeacherName": "Chisom Maxwell",
+              "timezone": "Africa/Lagos",
+              "versionNumber": 3
+            }
+            """,
+
+        [typeof(SettingsDto)] = """
+            {
+              "identity": {
+                "schoolName": "Golden Royal Ark School",
+                "shortName": "GRAS",
+                "address": "12 Ark Crescent, Lekki, Lagos",
+                "phone": "+2348012345678",
+                "email": "info@goldenroyalark.example",
+                "motto": "Excellence Through Character",
+                "headTeacherName": "Chisom Maxwell",
+                "timezone": "Africa/Lagos",
+                "versionNumber": 3
+              }
+            }
+            """,
+
+        [typeof(UpdateSchoolIdentityCommand)] = """
+            {
+              "schoolName": "Golden Royal Ark School",
+              "shortName": "GRAS",
+              "address": "12 Ark Crescent, Lekki, Lagos",
+              "phone": "08012345678",
+              "email": "info@goldenroyalark.example",
+              "motto": "Excellence Through Character",
+              "headTeacherName": "Chisom Maxwell",
+              "expectedVersion": 2
+            }
+            """,
+
+        [typeof(ConfigVersionSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "versionNumber": 3,
+              "changedGroup": "Identity",
+              "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CursorPage<ConfigVersionSummaryDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "versionNumber": 3,
+                  "changedGroup": "Identity",
+                  "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                }
+              ],
+              "nextCursor": "MQ=="
+            }
+            """,
+
+        [typeof(ConfigVersionDetailDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "versionNumber": 3,
+              "changedGroup": "Identity",
+              "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+              "reason": null,
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "snapshot": {
+                "schoolProfile": {
+                  "schoolName": "Golden Royal Ark School",
+                  "shortName": "GRAS",
+                  "abbreviation": "GRAS",
+                  "address": "12 Ark Crescent, Lekki, Lagos",
+                  "phone": "+2348012345678",
+                  "email": "info@goldenroyalark.example",
+                  "motto": "Excellence Through Character",
+                  "headTeacherName": "Chisom Maxwell",
+                  "timezone": "Africa/Lagos",
+                  "identityVersionNumber": 3,
+                  "abbreviationVersionNumber": 0
+                }
+              }
             }
             """,
 
@@ -212,6 +307,15 @@ internal static class OpenApiExamples
             "the standard problem shape with `errors`: an object keyed by request property name, whose " +
             "values are the messages for that property, suitable for attaching to form fields. A 400 " +
             "(rather than 422) means the request itself could not be parsed.",
+
+        // TASK-0005a: config_versions/{id}'s snapshot is deliberately free-form (spec 6.2.9 — "the
+        // whole serialised configuration," a shape every future settings card adds a new section to),
+        // so it is typed as System.Text.Json.JsonElement rather than a fixed DTO. A framework type
+        // again — see this dictionary's own remarks above.
+        [typeof(System.Text.Json.JsonElement)] =
+            "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, " +
+            "because every settings card adds its own section to the same snapshot shape. Read it as " +
+            "an opaque object; do not assume today's set of keys is complete.",
     };
 
     /// <summary>

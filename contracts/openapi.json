@@ -652,6 +652,363 @@
           }
         }
       }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the school settings",
+        "description": "Everything in one payload for the settings area (spec 6.2.12). Returns only the `identity` group as of TASK-0005a; later cards extend this same envelope additively with sibling groups.",
+        "operationId": "GetSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity": {
+      "patch": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Update the school's identity",
+        "description": "School name, short name, address, phone, email, motto, head teacher name (spec 6.2.3). `timezone` and `abbreviation` are not editable here — timezone is fixed, and the abbreviation has its own endpoint and its own optimistic-concurrency pointer. `expectedVersion` must match the identity group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written, and BOTH the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).",
+        "operationId": "UpdateSchoolIdentity",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSchoolIdentityCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsIdentityGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-versions": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "List configuration-version history, newest first",
+        "description": "Cursor-paginated per spec 9.5 — never offset. `cursor` is the opaque `nextCursor` from a previous page; omit it for the first page. `pageSize` defaults to 25 and is capped at 100.",
+        "operationId": "ListConfigVersions",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfConfigVersionSummaryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-versions/{id}": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read one configuration version in full, including its snapshot",
+        "description": "Includes the full `snapshot` — the whole serialised configuration as of this save (spec 6.2.9), not only the group that changed.",
+        "operationId": "GetConfigVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigVersionDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -765,6 +1122,145 @@
           "newPassword": "another horse battery staple 4"
         }
       },
+      "ConfigVersionDetailDto": {
+        "required": [
+          "id",
+          "versionNumber",
+          "changedGroup",
+          "actorAdminId",
+          "reason",
+          "createdAtUtc",
+          "snapshot"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The globally monotonic version number (spec 6.2.9).",
+            "format": "int64",
+            "example": 3
+          },
+          "changedGroup": {
+            "type": "string",
+            "description": "Which settings group this save changed.",
+            "example": "Identity"
+          },
+          "actorAdminId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The acting administrator's id, or `null` for a system action.",
+            "example": "0192f0c4-0000-7000-8000-000000000099"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The reason given for this save, or `null` when the changed group's rule does not\r\nrequire one (6.2.10) — always `null` for an `Identity` row."
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When this version was written.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "snapshot": {
+            "description": "The whole serialised configuration as of this save (6.2.9) — every group's values at that moment,\r\nnot only the one that changed.",
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The full body of `GET /api/v1/config-versions/{id}`.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "versionNumber": 3,
+          "changedGroup": "Identity",
+          "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+          "reason": null,
+          "createdAtUtc": "2026-08-03T09:30:00+00:00",
+          "snapshot": {
+            "schoolProfile": {
+              "schoolName": "Golden Royal Ark School",
+              "shortName": "GRAS",
+              "abbreviation": "GRAS",
+              "address": "12 Ark Crescent, Lekki, Lagos",
+              "phone": "+2348012345678",
+              "email": "info@goldenroyalark.example",
+              "motto": "Excellence Through Character",
+              "headTeacherName": "Chisom Maxwell",
+              "timezone": "Africa/Lagos",
+              "identityVersionNumber": 3,
+              "abbreviationVersionNumber": 0
+            }
+          }
+        }
+      },
+      "ConfigVersionSummaryDto": {
+        "required": [
+          "id",
+          "versionNumber",
+          "changedGroup",
+          "actorAdminId",
+          "createdAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id. Pass to `GET /api/v1/config-versions/{id}` for the full detail.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The globally monotonic version number (spec 6.2.9).",
+            "format": "int64",
+            "example": 3
+          },
+          "changedGroup": {
+            "type": "string",
+            "description": "Which settings group this save changed.",
+            "example": "Identity"
+          },
+          "actorAdminId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The acting administrator's id, or `null` for a system action.",
+            "example": "0192f0c4-0000-7000-8000-000000000099"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When this version was written.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row of `GET /api/v1/config-versions`'s cursor-paged list — everything except the\r\nsnapshot itself, which only the detail endpoint returns.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "versionNumber": 3,
+          "changedGroup": "Identity",
+          "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+          "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
       "CreateSampleRecordCommand": {
         "required": [
           "label",
@@ -827,6 +1323,53 @@
         "description": "Response to `GET /api/v1/auth/csrf`.",
         "example": {
           "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
+        }
+      },
+      "CursorPageOfConfigVersionSummaryDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigVersionSummaryDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "versionNumber": 3,
+                "changedGroup": "Identity",
+                "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+                "createdAtUtc": "2026-08-03T09:30:00+00:00"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page.",
+            "example": "MQ=="
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\r\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\r\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "versionNumber": 3,
+              "changedGroup": "Identity",
+              "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+              "createdAtUtc": "2026-08-03T09:30:00+00:00"
+            }
+          ],
+          "nextCursor": "MQ=="
         }
       },
       "EffectivePrivilegeDto": {
@@ -951,6 +1494,24 @@
             "PageSize": [
               "PageSize must be at most 100."
             ]
+          }
+        }
+      },
+      "JsonElement": {
+        "description": "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.",
+        "example": {
+          "schoolProfile": {
+            "schoolName": "Golden Royal Ark School",
+            "shortName": "GRAS",
+            "abbreviation": "GRAS",
+            "address": "12 Ark Crescent, Lekki, Lagos",
+            "phone": "+2348012345678",
+            "email": "info@goldenroyalark.example",
+            "motto": "Excellence Through Character",
+            "headTeacherName": "Chisom Maxwell",
+            "timezone": "Africa/Lagos",
+            "identityVersionNumber": 3,
+            "abbreviationVersionNumber": 0
           }
         }
       },
@@ -1229,6 +1790,115 @@
           "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
         }
       },
+      "SettingsDto": {
+        "required": [
+          "identity"
+        ],
+        "type": "object",
+        "properties": {
+          "identity": {
+            "description": "The school identity group.",
+            "$ref": "#/components/schemas/SettingsIdentityGroupDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of\r\nTASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups\r\n(logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather\r\nthan a new top-level field, and registration-number/abbreviation get their own group here).",
+        "example": {
+          "identity": {
+            "schoolName": "Golden Royal Ark School",
+            "shortName": "GRAS",
+            "address": "12 Ark Crescent, Lekki, Lagos",
+            "phone": "+2348012345678",
+            "email": "info@goldenroyalark.example",
+            "motto": "Excellence Through Character",
+            "headTeacherName": "Chisom Maxwell",
+            "timezone": "Africa/Lagos",
+            "versionNumber": 3
+          }
+        }
+      },
+      "SettingsIdentityGroupDto": {
+        "required": [
+          "schoolName",
+          "shortName",
+          "address",
+          "phone",
+          "email",
+          "motto",
+          "headTeacherName",
+          "timezone",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "schoolName": {
+            "type": "string",
+            "description": "Full school name. Appears in full on the result sheet header.",
+            "example": "Golden Royal Ark School"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Used where the full name will not fit, for example the pin slip.",
+            "example": "GRAS"
+          },
+          "address": {
+            "type": "string",
+            "description": "Multi-line permitted.",
+            "example": "12 Ark Crescent, Lekki, Lagos"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Nigerian format, normalised to `+234` form.",
+            "example": "+2348012345678"
+          },
+          "email": {
+            "type": "string",
+            "description": "Valid email format, stored lower-invariant.",
+            "example": "info@goldenroyalark.example"
+          },
+          "motto": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when unset. Printed under the school name if present.",
+            "example": "Excellence Through Character"
+          },
+          "headTeacherName": {
+            "type": "string",
+            "description": "Printed above the head teacher's signature block.",
+            "example": "Chisom Maxwell"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Always `Africa/Lagos`. Fixed; a `PATCH` cannot change it.",
+            "example": "Africa/Lagos"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The identity group's current optimistic-concurrency pointer. Echo this back as\r\n`expectedVersion` on the next `PATCH`.",
+            "format": "int32",
+            "example": 3
+          }
+        },
+        "additionalProperties": false,
+        "description": "The school identity group, both inside SettingsDto and as\r\n`PATCH /api/v1/settings/identity`'s own success body (spec 6.2.3).",
+        "example": {
+          "schoolName": "Golden Royal Ark School",
+          "shortName": "GRAS",
+          "address": "12 Ark Crescent, Lekki, Lagos",
+          "phone": "+2348012345678",
+          "email": "info@goldenroyalark.example",
+          "motto": "Excellence Through Character",
+          "headTeacherName": "Chisom Maxwell",
+          "timezone": "Africa/Lagos",
+          "versionNumber": 3
+        }
+      },
       "SignInCommand": {
         "required": [
           "email",
@@ -1253,6 +1923,81 @@
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
         }
+      },
+      "UpdateSchoolIdentityCommand": {
+        "required": [
+          "schoolName",
+          "shortName",
+          "address",
+          "phone",
+          "email",
+          "motto",
+          "headTeacherName",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "schoolName": {
+            "type": "string",
+            "description": "Full school name.",
+            "example": "Golden Royal Ark School"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Used where the full name will not fit.",
+            "example": "GRAS"
+          },
+          "address": {
+            "type": "string",
+            "description": "Multi-line permitted.",
+            "example": "12 Ark Crescent, Lekki, Lagos"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Nigerian format — `08012345678` or `+2348012345678`.",
+            "example": "08012345678"
+          },
+          "email": {
+            "type": "string",
+            "description": "Valid email format.",
+            "example": "info@goldenroyalark.example"
+          },
+          "motto": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave the school with no motto.",
+            "example": "Excellence Through Character"
+          },
+          "headTeacherName": {
+            "type": "string",
+            "description": "Printed above the head teacher's signature block.",
+            "example": "Chisom Maxwell"
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The identity group's current `versionNumber`, as last read from `GET /settings`. A\r\nstale value is rejected `409 settings.identity.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 2
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and\r\n        string SchoolProfile.Timezone are deliberately absent from this body — the abbreviation is\r\n        TASK-0005c's own endpoint, and the timezone is fixed and not editable in this version.",
+        "example": {
+          "schoolName": "Golden Royal Ark School",
+          "shortName": "GRAS",
+          "address": "12 Ark Crescent, Lekki, Lagos",
+          "phone": "08012345678",
+          "email": "info@goldenroyalark.example",
+          "motto": "Excellence Through Character",
+          "headTeacherName": "Chisom Maxwell",
+          "expectedVersion": 2
+        }
       }
     },
     "securitySchemes": {
@@ -1270,6 +2015,9 @@
     },
     {
       "name": "Reference"
+    },
+    {
+      "name": "Settings"
     }
   ]
 }

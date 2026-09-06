@@ -9,6 +9,7 @@ using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Settings;
 using SchoolManagement.Infrastructure.Audit;
 using SchoolManagement.Infrastructure.Auth;
 using SchoolManagement.Infrastructure.Authorization;
@@ -144,6 +145,10 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<ISystemAuditSink, LoggingSystemAuditSink>();
         services.AddScoped<IdempotencyPurgeJob>();
         services.AddHostedService<IdempotencyPurgeBackgroundService>();
+
+        // TASK-0005a: school identity and the append-only config_version ledger.
+        services.AddScoped<ISchoolProfileRepository, SchoolProfileRepository>();
+        services.AddScoped<IConfigVersionRepository, ConfigVersionRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
