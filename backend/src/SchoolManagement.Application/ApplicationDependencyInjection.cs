@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Authorization;
 using SchoolManagement.Application.Behaviors;
+using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Messaging;
 
 namespace SchoolManagement.Application;
@@ -42,6 +43,10 @@ public static class ApplicationDependencyInjection
         AddRequestHandlers(services);
 
         services.AddSingleton<IValidateOptions<PipelineOptions>, PipelineOptionsValidator>();
+
+        // TASK-0019: bound and validated in Program.cs (the composition root), the same way
+        // PipelineOptions is above — only the validator's registration lives here.
+        services.AddSingleton<IValidateOptions<IdempotencyOptions>, IdempotencyOptionsValidator>();
 
         return services;
     }

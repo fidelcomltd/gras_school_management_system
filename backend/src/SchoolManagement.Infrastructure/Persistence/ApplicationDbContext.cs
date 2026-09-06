@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Idempotency;
 using SchoolManagement.Domain.Reference;
 
 namespace SchoolManagement.Infrastructure.Persistence;
@@ -44,6 +45,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     /// <summary>TASK-0003. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<AdminSession> AdminSessions => Set<AdminSession>();
+
+    /// <summary>TASK-0019. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

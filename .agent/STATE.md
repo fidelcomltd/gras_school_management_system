@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-05 by orchestrator · size budget 12 KB, see `## Reading this file`
+Last reconciled: 2026-09-06 by orchestrator · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -82,12 +82,13 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0018, 0020, 0022-0026 — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0020, 0022-0026 — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0019 | Idempotency substrate, then admin account management | backend-dev | queued |
+| TASK-0027 | Admin account management | backend-dev | **blocked — human sign-off (§5)** |
+| TASK-0028 | Roles, assignments, privilege register | backend-dev | queued (stub card) |
 | TASK-0021 | Cookie auth seam and the sign-in screen | frontend-dev | queued |
 | TASK-0005 | School settings: identity, registration number, config versioning | backend-dev | queued |
 
@@ -102,7 +103,11 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 - **STANDING LESSONS ON GATES** (0010/0011/0015/0016, 0022-0026). **(1) A check that cannot be shown to fail is not a check** — break what it guards, watch it go red, then accept it; fixtures must match the real artefact, and a comment claiming coverage is not coverage. **(2) A gate is only as trustworthy as the reproducibility of its INPUTS** — before trusting green, ask what it reads that is neither committed nor pinned. TASK-0026 satisfied both at once: it made CI's failure reproduce locally, which then exposed 4 more sites. Full notes in `decisions/2026-Q3.md`.
 - 2026-09-05 **TASK-0022: the gate self-test had NEVER been able to run in CI** — its fixtures were `*.trx`-ignored, never committed. Reviewing the DIFF, not the agent's report, is what found it. `decisions/2026-Q3.md`.
 - 2026-09-05 **Open question 11 RESOLVED (human): follow §7** — `src/features/<feature>/`, react-hook-form+zod, Playwright; no bulk rename, `src/shared/` waits. Done by TASK-0020. Full note in `decisions/2026-Q3.md`.
+- 2026-09-06 **TASK-0019 CLOSED — idempotency substrate shipped, contract-neutral.** 10/10 gates, 264/264, `Skipped: 0`, line 79.52%. **Second card running whose implementing agent hit a session limit mid-dispatch** (TASK-0003 was the first): the work was on disk and correct, but unverified and unrecorded. The orchestrator ran the gates and reconciled. Standing lesson forming: *a dispatch that dies after writing and before verifying leaves a working tree that looks finished and is not* — run the gates yourself before believing a silent dispatch. Proven-not-vacuous on review: real-concurrency test, and redaction asserted against the STORED row, not the replayed response.
+- 2026-09-06 **TASK-0019 delta reviewed; card SPLIT THREE WAYS.** Part 1 (`Idempotency-Key`) APPROVED with two amendments — `Idempotency-Replay` must be a DECLARED response header built by construction, not prose (the exact defect TASK-0003 was reopened for), and the stored replay copy REDACTS `temporaryPassword`, because 6.1.9/6.1.14 say "never displays it again" and 6.1.14's `password-reset` already provides the lost-response recovery path. Part 2 (accounts) AMENDED and HELD. **Reviewing the delta against the spec rather than against itself found two endpoints missing from a list spec 6.1.14 literally enumerates** (`password-reset`, `DELETE /sessions`), a self-edit carve-out 6.1.2 requires and the draft omitted (name+phone only — NOT email), and 6.1.10's session-revocation-on-suspend. Now: TASK-0019 substrate (contract-neutral), TASK-0027 accounts (§5 sign-off), TASK-0028 roles/assignments. Full text: `decisions/2026-Q3-contract-deltas.md`.
+- 2026-09-06 **STATE.md size cap REMOVED (human directive).** The 12 KB byte budget is gone from §4.1, §13, this file, and both dev subagent prompts. Rationale for keeping it — a line cap let this file reach 36 KB unnoticed — is preserved in `decisions/2026-Q3.md`; what replaces the cap is the archive discipline alone (long sections move to `decisions/`/`drift/` with a one-line index). **No agent may now defer, trim, or skip a STATE.md append to save bytes** — that behaviour blocked TASK-0003's reconciliation and is exactly what the removal is meant to end.
 - 2026-09-05 **TASK-0023/0024/0025/0026 closed**: hermetic vitest `test.env`; SDK, gitleaks, analyzer VERSION and test bridge all pinned; 6 CA1873 + 1 CA2025 fixed not suppressed; client regenerated. **`AnalysisLevel: latest-All` was the real culprit — `latest` means "whatever SDK is installed", so the rule set was a property of the machine.** Contract unmoved throughout. Full notes in `decisions/2026-Q3.md`.
+- 2026-09-06 **TASK-0019 dispatch 1 (contract delta only) delivered by backend-dev, awaiting orchestrator approval.** No code/migration/contract file touched. Idempotency-Key required only on `POST /api/v1/admins`, 24h retention (flagged: the create response's one-time temp password sitting in that store is an open question, not decided). New cursor envelope for `/api/v1/admins` (list/detail/create/edit/status). Seven open questions raised, including whether real `role`/`role_assignment` CRUD (escalation rules 1-3) belongs in this card or a follow-up — proposed a split. Full detail in the card's Log.
 
 **Closed-card records** — archive-only, `grep` the ID in `decisions/2026-Q3.md`: 0001, 0003, 0012,
 0013, 0014, 0017, 0018, 0020, 0022-0026, plus 2026-08-27's four decisions (gitleaks, gate honesty,
@@ -118,9 +123,9 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 
 - 2026-09-05 **`vite build` succeeds with NO `.env` and emits a bundle that throws on boot** (inlines `VITE_*` as `undefined`), so Build goes green on something unusable. CI copies `.env.example` to mask it; nothing checks env at build time. Unowned. **Trigger: any card touching build or deployment.**
 - 2026-09-05 **`Microsoft.Testing.Platform.MSBuild` is an unpinned transitive floor; `backend/` has NO NuGet lock file.** Pinning it broke restore. **Trigger: next `xunit.v3` upgrade.** `drift/2026-Q3.md`.
-- 2026-09-04 **No `Idempotency-Key` mechanism.** Deferred (Option B, human sign-off). **Trigger: the first card implementing ANY retry-duplicable mutation builds it first** — §9.8.2's four operations are EXAMPLES, not the list. **Assigned to TASK-0019**; re-check before TASK-0005. `ASSUMPTIONS.md` §2.14.
+- 2026-09-06 **Idempotency mechanism now EXISTS** (TASK-0019); the 2026-09-04 build-it-first trigger is RETIRED. What replaces it is lighter and still live: **any card shipping a retry-duplicable mutation must DECLARE `Idempotency-Key` on that route** and mark one-time credentials with `RedactFromIdempotencyReplayAttribute` — §9.8.2's four operations are EXAMPLES, not the list. **Trigger: TASK-0027, then re-check before TASK-0005.** Also outstanding: `backend/docs/ASSUMPTIONS.md` §2.14 still reads as deferred and needs correcting by the next backend dispatch. Owner `backend-dev`.
 - 2026-09-05 **Three accepted auth exposures (TASK-0003):** unpersisted DP key ring (**trigger: deployment, Q5**); bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` timing asymmetry. Owner `backend-dev`. Full text: `drift/2026-Q3.md`.
-- 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0019.** Owner `backend-dev`.
+- 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0027** (moved from TASK-0019 on 2026-09-06 — 0019 is now contract-neutral and ships no route; 0027 is where a per-user-partitioned route first exists). Owner `backend-dev`.
 - 2026-09-05 `scripts/local-env.ps1` untracked/stale, splats `GateArgs` positionally. **Trigger: any dispatch running gates via the wrapper** — call `ci.ps1` directly. Full text: `drift/2026-Q3.md`.
 - 2026-09-05 **`gate-summary.tests.ps1:101,:108` are near-unfalsifiable** — `-match` substring passes even against a mangled path; only in-process `-eq` caught the TASK-0022 mutation. **Trigger: next card touching that suite.**
 - 2026-09-04 **The DEFAULT rate-limit policy has no 429 test.** Health covered by TASK-0015, sensitive by TASK-0003. Owner `backend-dev`, no trigger.
@@ -141,11 +146,19 @@ struck 2026-09-05 by TASK-0026.
 
 Live only; ten resolved questions are in `decisions/2026-Q3.md`.
 
+12. **TASK-0027 admin account management awaits §5 human sign-off.** Seven endpoints, two of which
+   operate sessions and credentials on another account's behalf (`POST /admins/{id}/password-reset`,
+   `DELETE /admins/{id}/sessions`); suspend and deactivate also revoke sessions. The auth MECHANISM
+   is TASK-0003's and unmoved — what needs the ruling is a Super Admin operating it on someone
+   else. Delta ready in `decisions/2026-Q3-contract-deltas.md`. **Blocks TASK-0027 only; TASK-0019
+   is contract-neutral and proceeds.**
+
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
    decision clears all four.
 
 ## Reading this file
 
-**Budget: 12 KB, bytes.** `wc -c` before appending. Over it, archive full text to `decisions/` or
-`drift/`, leave a one-line index — never delete. Rules: CLAUDE.md §4.1, §13.
+**No size cap** (removed 2026-09-06). Append what the ledger needs; never trim or defer an entry to
+hit a byte target. When a section grows long, archive full text to `decisions/` or `drift/` and
+leave a one-line index — never delete. Rules: CLAUDE.md §4.1, §13.

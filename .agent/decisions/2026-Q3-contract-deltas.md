@@ -314,3 +314,147 @@ concept models "who is calling," and CSRF proves request provenance, not identit
    unexamined.
 7. ~~HTTPS/HSTS enforcement~~ — checked, not open: `Program.cs` already calls `UseHsts()` /
    `UseHttpsRedirection()`, so the `__Host-`/`Secure` cookies in §6 have a real floor to stand on.
+
+---
+
+## TASK-0019 / TASK-0027 — Idempotency substrate and admin account management
+
+**Part 1 (idempotency) APPROVED 2026-09-06 by orchestrator. Part 2 (accounts) AMENDED and held for
+human sign-off under §5.** Drafted by backend-dev in one dispatch. The card was split three ways on
+approval: TASK-0019 substrate (contract-neutral), TASK-0027 accounts, TASK-0028 roles/assignments.
+
+Classification: Part 1 **none** as shipped by TASK-0019 (no route declares it); Part 2 **additive**.
+
+### Part 1 — `Idempotency-Key` — APPROVED
+
+**Format** `^[\x21-\x7E]{1,255}$`, visible ASCII, no whitespace, client-generated, UUID v4
+recommended and not enforced.
+
+**Fingerprint** = method + path + **caller** + normalized body hash. Caller is part of the key
+identity, so the same string from two accounts is two requests.
+
+**Declared per operation as an OpenAPI header parameter**, the way `X-CSRF-Token` is — never a
+blanket rule applied invisibly.
+
+| Route | Header |
+|---|---|
+| `POST /api/v1/admins` | REQUIRED |
+| `PATCH /api/v1/admins/{id}` | accepted |
+| `POST /api/v1/admins/{id}/status` | accepted |
+| `POST /api/v1/admins/{id}/password-reset` | accepted (orchestrator addition, see B1) |
+| all four mutating `/api/v1/auth/*` routes | **unchanged, no header** |
+
+The auth exclusion is ratified: a repeated sign-in, sign-out, refresh or password change converges
+to the same session state, and is not the double-creation harm class the mechanism exists for.
+`PATCH` and `status` accept the header not because they are unsafe but because a retry would
+otherwise write a duplicate `audit_event` (6.1.12).
+
+| Case | Status | `errorCode` |
+|---|---|---|
+| absent on a REQUIRED route | 400 | `idempotency.key_missing` |
+| present, fails the format | 400 | `idempotency.key_malformed` |
+| same key, different fingerprint | 409 | `idempotency.key_conflict` |
+| same key, same fingerprint, first call still in flight | 409 | `idempotency.request_in_progress` (retriable) |
+| same key, same fingerprint, first call finished | original status and body replayed, plus `Idempotency-Replay: true` | — |
+
+400 rather than 422 for a malformed key, consistent with `ASSUMPTIONS.md` §2.3's
+malformed-versus-rejected-by-rule split: this is a header-shape defect, not a validated-body rule.
+
+**Mechanism**: one filter/extension mirroring `RequireCsrfToken()` — centralised storage,
+fingerprinting and replay in the API layer, declared per route in the contract.
+
+**Retention: 24 hours.** Scheduled purge, same family as §9.9's existing purge jobs. Each run writes
+one `audit_event` (`actor_admin_id: null`, `action: system.idempotency_purge`). The stored row — key
+hash, fingerprint hash, caller, response body — is never exposed by any endpoint. §9.9 makes an
+indefinite table a defect, not a deferral.
+
+**Orchestrator amendment A1 — `Idempotency-Replay` is a DECLARED response header, not prose.** The
+draft had it as an informational header outside the schema. §3 makes the contract law for every byte
+crossing the boundary, and a response header is such a byte. TASK-0003 was reopened for exactly this
+defect with `X-CSRF-Token`, and the fix that was accepted there is the fix required here: a marker
+attached by the same extension method that wires the filter, read by an operation transformer
+(`CsrfHeaderOperationTransformer` is the working precedent). Declaration by construction, never
+hand-annotation. It lands with TASK-0027, since TASK-0019 declares nothing.
+
+**Orchestrator amendment A2 — resolves the agent's open Q6: REDACT.** The draft stored the
+`POST /admins` response verbatim, which embeds `temporaryPassword`, and asked whether a 24-hour
+plaintext window was acceptable. It is not, and the spec settles it rather than the risk appetite
+doing so: 6.1.9 says the system "displays it once on screen with a copy button, and never displays
+it again", and 6.1.14 repeats "Returns the temporary password once in the response body and never
+again." A replay that returns it is a second display. **The stored copy is redacted; a replay
+returns the same shape with `temporaryPassword` null, distinguished by the `Idempotency-Replay`
+header.**
+
+The objection this would normally attract — that a client which lost the original response is now
+holding an account whose password nobody knows — does not apply, because the spec already provides
+the recovery path as a first-class operation: `POST /admins/{id}/password-reset` (6.1.14, 6.1.11),
+whose privilege `admin.password.reset` is already in the register. Losing a create response costs
+one forced reset, not an orphaned account. **The redaction hook is generic and built in TASK-0019;
+its first caller is TASK-0027.**
+
+### Part 2 — `/api/v1/admins` — AMENDED, HELD FOR HUMAN SIGN-OFF
+
+Held under §5: `password-reset` and `DELETE /sessions` are session/credential operations. The
+mechanism is TASK-0003's and unchanged; what is new is who may operate it on whose behalf.
+
+Accepted from the draft as-is: the `CursorPagedResultOfAdminAccountSummaryDto` envelope and the
+refusal to reuse the offset-based `PagedResultOfSampleRecordDto` (§9.5 forbids offset); page size 25
+with max 100 rejected at 422 rather than silently clamped; default sort status-ascending then
+staff-name-ascending with deactivated excluded unless named (6.1.8); email uniqueness across active
+and suspended only, case-insensitive, a deactivated account's email reusable (6.1.3, 6.1.9); the
+full active/suspended/deactivated state machine rather than one-way deactivation, which the
+already-registered `Privileges.Admin.*` had in effect already committed this card to; per-user
+rate-limit partitioning with Sensitive on mutations and Default on reads; the last-active-Super-Admin
+invariant enforced transactionally under a row lock rather than by pre-flight read.
+
+**B1 — two endpoints were missing.** Spec 6.1.14 enumerates the endpoint list, and the draft's five
+omitted `POST /admins/{id}/password-reset` (`admin.password.reset`) and `DELETE /admins/{id}/sessions`
+(`admin.session.revoke`). Both privileges are already in the register; both are account lifecycle,
+not role management, so neither belongs in the TASK-0028 split. Added. Per 6.1.11, the forced reset
+sets a new temporary password, displays it once, sets `must_change_password`, and revokes every
+active session for the account.
+
+**B2 — resolves the agent's open Q5 against its own draft.** The draft gated `PATCH` on
+`admin.update` alone and flagged the self-edit carve-out as unresolved. 6.1.2 is explicit: "Edit an
+account's own details — `admin.update`, **or the account itself for name, phone and password**."
+The carve-out is required, and it is narrower than it first appears: it covers `staffName` and
+`phone` only. **Email is not in it**, and changing your own email — the login identifier (6.1.3) —
+still requires `admin.update`.
+
+**B3 — session revocation on state change was absent from the draft.** 6.1.10: suspension revokes
+existing sessions immediately; deactivation revokes sessions and all active assignments; a
+`deactivated -> active` move needs `admin.deactivate` held by a Super Admin and does NOT restore
+assignments. The assignment half has nothing to act on until TASK-0028 — that card wires it, and
+TASK-0027 must leave the seam visible rather than silently completing it.
+
+**B4 — approves the agent's open Q1 split.** 6.1.7's rules 1-3 govern `role_assignment` mutation and
+role privilege lists; only rule 4 (`is_super_admin`) has a surface in an accounts-only card. Roles,
+assignments, `GET /privileges` and rules 1-3 move to TASK-0028. The omissions this forces —
+`rolesHeld`/`scopeSummary` on the list item, assignments/effective-privileges/last-ten-audit-events
+on the detail view (6.1.8), and the role/scope/session filters — are all additive when TASK-0028
+restores them, so the split costs no breaking change. It is safe for a second reason the agent did
+not cite: 6.1.9 states outright that an account with zero assignments can exist, can log in, and
+sees a "no access has been granted" page. A roleless account is a supported product state, not a
+gap the split invents.
+
+**B5 — approves the agent's open Q4 with its caveat recorded.** Blocking a caller from changing
+their own status returns `403 admin.self_status_change_forbidden`. The agent correctly noted no spec
+line requires it. Approved anyway: it is strictly safer, it is always reversible by another Super
+Admin, and 4.1's at-least-one-active-Super-Admin invariant already establishes that the system is
+expected to prevent administrative self-lockout. **Recorded as an assumption in
+`backend/docs/ASSUMPTIONS.md`, not as a spec derivation** — this is an added rule and must be
+visible as one.
+
+**B6 — confirms the agent's open Q2 reading.** Audit event WRITES are in scope and transactional
+(6.1.12 names `admin_account` explicitly; 6.1.7's preamble additionally requires an event on every
+rejected escalation attempt). The audit READ surface (`GET /audit`, `GET /audit/export`) stays out —
+it is the Phase 1 roadmap row, not this card's.
+
+**B7 — the agent's open Q3 defers with B4.** 6.1.8's "last ten audit events by this account" needs
+an audit query; it goes to TASK-0028 with the rest of the detail view.
+
+**Q7 needed no ruling.** The `UseRateLimiter()`/`UseAuthentication()` ordering drift
+(`Program.cs:298` vs `:300`) is correctly identified as implementation, not contract. Its trigger
+moves from TASK-0019 to TASK-0027, which is where a per-user-partitioned route first ships. Noted
+there as an acceptance criterion with the trap stated: a 429 test that would still pass under IP
+partitioning does not prove the fix.

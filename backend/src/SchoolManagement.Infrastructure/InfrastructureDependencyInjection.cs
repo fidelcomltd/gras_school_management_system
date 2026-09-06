@@ -2,13 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
+using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Infrastructure.Audit;
 using SchoolManagement.Infrastructure.Auth;
 using SchoolManagement.Infrastructure.Authorization;
+using SchoolManagement.Infrastructure.Idempotency;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
@@ -130,6 +134,16 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
         services.AddScoped<IAdminSessionRepository, AdminSessionRepository>();
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();
+
+        // TASK-0019: the idempotency substrate. IIdempotencyStore is called once, from the API
+        // layer's RequireIdempotencyKey() endpoint filter — never per-endpoint. ISystemAuditSink is
+        // the same log-only seam IAuthorizationAuditSink already is, until real audit_event
+        // persistence exists. The hosted service runs the retention purge (§9.9) on a schedule; a
+        // test that needs a deterministic run resolves IdempotencyPurgeJob directly instead.
+        services.AddScoped<IIdempotencyStore, IdempotencyStore>();
+        services.AddScoped<ISystemAuditSink, LoggingSystemAuditSink>();
+        services.AddScoped<IdempotencyPurgeJob>();
+        services.AddHostedService<IdempotencyPurgeBackgroundService>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

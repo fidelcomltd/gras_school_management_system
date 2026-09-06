@@ -35,6 +35,16 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
     /// <summary>Whether a database was obtained. When false, every test in the collection skips.</summary>
     public bool IsDatabaseAvailable { get; private set; }
 
+    /// <summary>
+    /// The connection string this fixture migrated, valid once <see cref="IsDatabaseAvailable"/> is
+    /// true. TASK-0019: lets a test build a SECOND, purpose-built minimal host (see
+    /// <c>Idempotency/IdempotencyTestHost.cs</c>) against the SAME already-migrated database, without
+    /// adding a production route to <c>Program</c> just to have something to test against.
+    /// </summary>
+    public string ConnectionString => _connectionString
+        ?? throw new InvalidOperationException(
+            $"{nameof(ConnectionString)} is unavailable — {nameof(IsDatabaseAvailable)} is false.");
+
     /// <summary>Why the database is unavailable, for the skip message.</summary>
     public string? SkipReason { get; private set; }
 

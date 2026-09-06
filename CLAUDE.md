@@ -90,12 +90,13 @@ Single shared file. **Every** subagent reads it as the first action of its sessi
 - `## Open questions` — anything awaiting a human answer, live ones only
 - `## Known drift` — deviations from spec that are accepted for now, each with an owning task card, indexed the same way
 
-**Cap: 12 KB — bytes, not lines.** A line cap does not bound cost; the old "~200 lines" limit read
-green at 36 KB. Check `wc -c .agent/STATE.md` before appending.
+**No size cap.** There is no byte or line limit on this file — do not defer an append, compress an
+entry, or skip reconciliation to stay under a number. The ledger being complete beats it being
+short.
 
-When a section outgrows the cap, **archive rather than delete**: full text to
-`.agent/decisions/YYYY-QN.md` or `.agent/drift/YYYY-QN.md`, one-line index entry left behind. An
-agent then reads the entries its own card names, not all of them.
+Keep it *ordered* rather than small. When a section grows long, **archive rather than delete**:
+full text to `.agent/decisions/YYYY-QN.md` or `.agent/drift/YYYY-QN.md`, one-line index entry left
+behind. An agent then reads the entries its own card names, not all of them.
 
 ### 4.2 Task card format — `.agent/tasks/TASK-0042.md`
 
@@ -287,7 +288,7 @@ it. Rigour comes from §4.4's mechanical checks, not from an agent having read e
 - **Read the slice, not the file.** Never load `contracts/openapi.json` whole — `jq` the paths your card names. Same for the archives: read the drift and decision entries your card names.
 - **One home per rule.** §6 is `.agent/spec/backend.md`, §7 is `.agent/spec/frontend.md`; neither dev loads the other's. A rule restated in two files gets deleted from one.
 - **Archive, never delete.** Full text to `.agent/decisions/` or `.agent/drift/`, one-line index entry behind.
-- **Cards cap at ~120 lines**, `STATE.md` at 12 KB (§4.1), both in bytes/lines checked before appending.
+- **Cards cap at ~120 lines.** `STATE.md` has no cap (§4.1) — keep it ordered and archived, not short; never drop a ledger entry to save bytes.
 - **Cheapest gate first, stop at the first failure.** A broken typecheck should surface in seconds, not after a Postgres spin-up. Owned by TASK-0016.
 - **A skipped suite is not a passing suite.** This project's costliest defect was a false close on a silently skipping suite, not a large file. Gates exit non-zero on `Skipped > 0`.
 - **Report the summary line plus failing lines** (§9). Never a whole log.
