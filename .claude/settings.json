@@ -4,7 +4,13 @@
       "Edit(contracts/openapi.json)",
       "Write(contracts/openapi.json)",
       "Edit(contracts/CONTRACT.lock)",
-      "Write(contracts/CONTRACT.lock)"
+      "Write(contracts/CONTRACT.lock)",
+      "Bash(./backend/scripts/ci.ps1*)",
+      "Bash(./backend/scripts/local-env.ps1*)",
+      "Bash(./backend/scripts/generate-openapi.ps1*)",
+      "Bash(& \".\\backend\\scripts\\ci.ps1\"*)",
+      "Bash(& \".\\backend\\scripts\\local-env.ps1\"*)",
+      "Bash(& \".\\backend\\scripts\\generate-openapi.ps1\"*)"
     ]
   }
 }
