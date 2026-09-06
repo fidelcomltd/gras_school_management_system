@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
 using SchoolManagement.Application.Auth;
+using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
@@ -243,6 +244,99 @@ internal static class OpenApiExamples
               ],
               "sessionExpiresAt": "{{CanonicalTimestamp}}",
               "sessionAbsoluteExpiresAt": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CreateAdminAccountCommand)] = """
+            {
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "08012345678"
+            }
+            """,
+
+        [typeof(CreateAdminAccountResponse)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "mustChangePassword": true,
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+            }
+            """,
+
+        [typeof(AdminAccountSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "isSuperAdmin": false,
+              "mustChangePassword": false,
+              "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CursorPage<AdminAccountSummaryDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "staffName": "Ngozi Adeyemi",
+                  "email": "ngozi.adeyemi@example.com",
+                  "phone": "+2348012345678",
+                  "status": "Active",
+                  "isSuperAdmin": false,
+                  "mustChangePassword": false,
+                  "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                }
+              ],
+              "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
+            }
+            """,
+
+        [typeof(AdminAccountDetailDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "isSuperAdmin": false,
+              "mustChangePassword": false,
+              "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(UpdateAdminAccountCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi-Bello",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "08012345678",
+              "isSuperAdmin": null
+            }
+            """,
+
+        [typeof(ChangeAdminAccountStatusCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "status": "Suspended",
+              "reason": null
+            }
+            """,
+
+        [typeof(ResetAdminAccountPasswordResponse)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
             }
             """,
 

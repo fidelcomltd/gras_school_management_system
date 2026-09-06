@@ -17,4 +17,16 @@ public static class AdminSessionRevocationReasons
     /// the oldest is evicted to make room for a new sign-in.
     /// </summary>
     public const string SessionLimitExceeded = "session_limit_exceeded";
+
+    /// <summary>Spec 6.1.10: suspension revokes the account's existing sessions immediately.</summary>
+    public const string AccountSuspended = "account_suspended";
+
+    /// <summary>Spec 6.1.10: deactivation revokes the account's sessions.</summary>
+    public const string AccountDeactivated = "account_deactivated";
+
+    /// <summary>Spec 6.1.11: a forced reset (<c>admin.password.reset</c>) revokes every active session.</summary>
+    public const string ForcedPasswordReset = "forced_password_reset";
+
+    /// <summary>Spec 6.1.14: <c>DELETE /admins/{id}/sessions</c> (<c>admin.session.revoke</c>).</summary>
+    public const string RevokedByAdmin = "revoked_by_admin";
 }

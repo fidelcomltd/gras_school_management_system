@@ -263,6 +263,63 @@ so it runs unconditionally (still guarded by "only when the schema has none alre
 comment still always wins). This was invisible until a real `JsonElement`-typed property existed
 anywhere in the contract — TASK-0005a is that first case.
 
+### 2.16 TASK-0027 — admin account management
+
+Six decisions, one of them explicitly required to be recorded here rather than passed off as a
+spec derivation (approved delta amendment B5).
+
+**B5 — blocking a caller from changing their own status is an ADDED rule, not a spec line.**
+`POST /admins/{id}/status` returns `403 admin.self_status_change_forbidden` when the caller's own
+account is the target, regardless of privilege. No sentence in spec 6.1.7/6.1.10/6.1.13 requires
+this; the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry `TASK-0019/0027`, B5)
+approved it anyway because it is strictly safer, always reversible by another Super Admin, and 4.1's
+at-least-one-active-Super-Admin invariant already establishes that the system is expected to prevent
+administrative self-lockout. Recorded here as directed.
+
+**Phone is nullable at the persistence layer only for the pre-existing bootstrap account.**
+`AdminAccount.Phone` is required (non-null, validated Nigerian format) on every account created
+through the new `AdminAccount.Create` factory (`POST /admins`), matching spec 6.1.3's "Req: Yes."
+The bootstrap account (TASK-0003, `CreateBootstrapSuperAdmin`) predates this field and was never
+asked to supply one, and rewriting the bootstrap CLI is out of this card's scope — so the column
+stays nullable, and `null` is grandfathered to mean exactly one row: the bootstrap Super Admin.
+
+**Admin-account audit events (create, edit, status change, password reset, session revoke, and the
+6.1.7-rule-4 rejection) go through the existing `ISystemAuditSink` seam** — the same log-only
+mechanism TASK-0005a used for `settings.identity.updated`/`save_rejected_stale_version`, not a new
+persisted `audit_event` table. Spec 6.1.12 describes a transactional table this codebase has not
+built yet (`ISystemAuditSink`'s own remarks: "the real `audit_event` table does not exist yet... a
+future card... replaces both seams together"). Following the established precedent rather than
+inventing a second convention for the same gap.
+
+**6.1.7 rule 4 is enforced by an explicit actor-`IsSuperAdmin` check in the handler, not only by the
+route's privilege gate.** Under the current flag-bypass privilege model (TASK-0003;
+`SuperAdminFlagEffectivePrivilegeProvider`), only a Super Admin ever holds `admin.update` at all, so
+in production today the route-level gate alone already makes rule 4 unreachable-by-construction. The
+handler checks the acting admin's own `IsSuperAdmin` flag directly and independently anyway,
+because (a) spec 6.1.7's rule is stated as a domain invariant ("can only be set by an account that
+already has it"), not as a restatement of the privilege gate, and (b) TASK-0028's real role/
+assignment persistence will replace the flag-bypass provider, at which point `admin.update` could in
+principle be granted to a non-Super-Admin role — the explicit check is what keeps rule 4 true then
+too, rather than silently depending on today's provider never changing.
+
+**`PATCH /admins/{id}` and `POST /admins/{id}/status` declare a redundant `id` field in their request
+body schema**, even though the route already carries it and the endpoint always overwrites the bound
+value with the route's (`command with { Id = id }`). The alternative — binding a slimmer
+body-only DTO without `Id` — was tried and reverted: `RequireIdempotencyKeyExtensions`'s fingerprint
+reads the bound parameter via `context.Arguments.OfType<IBaseCommand>()`, and a body-only DTO does not
+implement `IBaseCommand`, so the fingerprint would silently stop reflecting the request body at all
+for these two routes (method+path+caller only) — the exact "same key, different fingerprint" case the
+approved delta's `409 idempotency.key_conflict` exists to catch would instead be misclassified as a
+replay. A cosmetic contract wart (`id` present twice) was judged the lesser defect against a silently
+weakened idempotency guarantee.
+
+**List search omits spec 9.5's "indicates which field matched" per-item signal.** `GET /admins`
+implements case-insensitive substring search across `staffName`/`email` (spec 9.5, 6.1.8), but does
+not add a `matchedField` indicator to `AdminAccountSummaryDto` — no acceptance criterion in this card
+names it, and role/scope/session filters are already split to TASK-0028 by the approved delta (B4).
+Left out to keep the dispatch bounded rather than gold-plating an untested surface; a future card can
+add it additively.
+
 ---
 
 ## 3. Open — a human must decide or supply

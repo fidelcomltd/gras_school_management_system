@@ -231,6 +231,46 @@ public sealed class OpenApiContractTests
     }
 
     [Fact]
+    public void ProblemDetailsSchema_DeclaresLockedUntilButHttpValidationProblemDetailsDoesNot()
+    {
+        // TASK-0027: ResultExtensions.cs attaches a `lockedUntil` extension member to the 423 sign-in
+        // body (approved contract delta §2), but the generator's additionalProperties: false made the
+        // committed document say that response could not carry it — invisible to §4.4's drift check
+        // because both the regenerated and committed documents were equally wrong. Pinning the DECLARED
+        // shape here, the same way ProblemSchemas_DeclareErrorCodeAndTraceId pins errorCode/traceId, so
+        // it cannot silently regress to prose-only again.
+        var schemas = Document.GetProperty("components").GetProperty("schemas");
+
+        var problemDetails = schemas.GetProperty("ProblemDetails");
+        problemDetails.TryGetProperty("properties", out var problemProperties).ShouldBeTrue();
+        problemProperties.TryGetProperty("lockedUntil", out var lockedUntil).ShouldBeTrue(
+            "ProblemDetails must declare 'lockedUntil' — the field POST /auth/sign-in's 423 response " +
+            "actually sends (spec 6.1.11).");
+        HasNonEmpty(lockedUntil, "description").ShouldBeTrue("'lockedUntil' must carry a description.");
+        lockedUntil.GetProperty("format").GetString().ShouldBe("date-time");
+
+        var problemRequired = problemDetails.TryGetProperty("required", out var requiredElement)
+            ? requiredElement.EnumerateArray().Select(entry => entry.GetString()).ToArray()
+            : [];
+
+        problemRequired.ShouldNotContain(
+            "lockedUntil",
+            "'lockedUntil' must NOT be required — it is present only on the one 423 outcome, not on " +
+            "every problem response.");
+
+        // A validation failure can never also be an account lockout, so the OTHER problem schema gets
+        // no such property at all — this is not a shape every problem response carries.
+        var validationProblemDetails = schemas.GetProperty("HttpValidationProblemDetails");
+
+        if (validationProblemDetails.TryGetProperty("properties", out var validationProperties))
+        {
+            validationProperties.TryGetProperty("lockedUntil", out _).ShouldBeFalse(
+                "HttpValidationProblemDetails should not declare 'lockedUntil' — a validation failure " +
+                "is never also a lockout.");
+        }
+    }
+
+    [Fact]
     public void EverySchemaExample_ValidatesAgainstItsOwnSchema()
     {
         // An example that a client cannot actually receive is worse than no example: it teaches a wrong

@@ -6,6 +6,897 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/v1/admins": {
+      "post": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Create an administrator account",
+        "description": "Spec 6.1.9 step 1: staff name, email and phone only — role assignment is a separate step (TASK-0028) and an account with zero assignments can exist and sign in. Returns the generated temporary password ONCE; it is never returned again by any endpoint. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same account (with the temporary password redacted on the replay) instead of creating a second one.",
+        "operationId": "CreateAdminAccount",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminAccountCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAdminAccountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "List administrator accounts",
+        "description": "Cursor-paginated per spec 9.5 — never offset. Default sort is status ascending (active first) then staff name ascending; deactivated accounts are excluded unless `status` names them explicitly (spec 6.1.8). `search` matches staff name or email, case-insensitively, by substring. Role, scope-arm and session filters are TASK-0028. `pageSize` defaults to 25 and is capped at 100.",
+        "operationId": "ListAdminAccounts",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AdminAccountStatus"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfAdminAccountSummaryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admins/{id}": {
+      "get": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Read one administrator account",
+        "description": "Assignments, the resolved effective privilege set and the last ten audit events by this account are TASK-0028 (approved delta B4) — this endpoint returns the account's own fields only.",
+        "operationId": "GetAdminAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Edit an administrator account",
+        "description": "Spec 6.1.2: requires `admin.update`, OR the account editing ITSELF — and even then, only `staffName` and `phone`; changing your own email still requires `admin.update`. `isSuperAdmin` is settable only by a caller who already holds it (spec 6.1.7 rule 4); a rejected attempt still writes an audit event. Session tokens rotate for the target account when `isSuperAdmin` actually changes (spec 9.1). `Idempotency-Key` is accepted, not required — a retry converges the same final state but would otherwise double the audit event.",
+        "operationId": "UpdateAdminAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdminAccountCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountDetailDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admins/{id}/status": {
+      "post": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Suspend, reactivate or deactivate an administrator account",
+        "description": "Spec 6.1.10: active/suspended requires `admin.suspend`; moving to deactivated requires `admin.deactivate`; reactivating a DEACTIVATED account requires `admin.deactivate` held by a Super Admin and does NOT restore revoked assignments. A caller can never change their OWN status (an added safeguard, not a spec line — see `backend/docs/ASSUMPTIONS.md` §2.16). `reason` is required, at least ten characters, when moving to deactivated (spec 6.1.12). Suspension and deactivation revoke the account's existing sessions immediately (spec 6.1.10); the at-least-one-active-Super-Admin invariant (spec 4.1) is enforced transactionally under a row lock, not a pre-flight read.",
+        "operationId": "ChangeAdminAccountStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAdminAccountStatusCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountDetailDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admins/{id}/password-reset": {
+      "post": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Force a password reset for an administrator account",
+        "description": "Spec 6.1.11: mints a new temporary password, sets `mustChangePassword`, and revokes every active session for the account. Human §5 sign-off (2026-09-06): the `admin.password.reset` grant is the whole gate — an acting admin may exercise this against any other account, with no step-up re-authentication and no additional Super-Admin requirement. Returns the temporary password ONCE; a redacted `null` replays on a repeated `Idempotency-Key`.",
+        "operationId": "ResetAdminAccountPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetAdminAccountPasswordResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admins/{id}/sessions": {
+      "delete": {
+        "tags": [
+          "Admins"
+        ],
+        "summary": "Revoke every active session for an administrator account",
+        "description": "Spec 6.1.14. Human §5 sign-off (2026-09-06): the `admin.session.revoke` grant is the whole gate, same ruling as the password-reset endpoint. Always `204`, including when the account already has no active sessions.",
+        "operationId": "RevokeAdminAccountSessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/csrf": {
       "get": {
         "tags": [
@@ -1013,6 +1904,177 @@
   },
   "components": {
     "schemas": {
+      "AdminAccountDetailDto": {
+        "required": [
+          "id",
+          "staffName",
+          "email",
+          "phone",
+          "status",
+          "isSuperAdmin",
+          "mustChangePassword",
+          "lastLoginAtUtc",
+          "createdAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "staffName": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Ngozi Adeyemi"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login identifier.",
+            "example": "ngozi.adeyemi@example.com"
+          },
+          "phone": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` only for the pre-existing bootstrap account.",
+            "example": "+2348012345678"
+          },
+          "status": {
+            "description": "Active, suspended or deactivated (spec 6.1.10).",
+            "$ref": "#/components/schemas/AdminAccountStatus"
+          },
+          "isSuperAdmin": {
+            "type": "boolean",
+            "description": "Whether the flag-bypass privilege path applies (spec 6.1.7 rule 4).",
+            "example": false
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "Whether the forced-change gate currently applies.",
+            "example": false
+          },
+          "lastLoginAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` if the account has never signed in.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When the account was created.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`GET /api/v1/admins/{id}` (spec 6.1.8). Deliberately omits assignments, the resolved\r\n        effective privilege set and the last ten audit events by this account — the approved delta (B4)\r\n        splits these to TASK-0028 along with roles and assignments themselves; adding them later is\r\n        additive.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "staffName": "Ngozi Adeyemi",
+          "email": "ngozi.adeyemi@example.com",
+          "phone": "+2348012345678",
+          "status": "Active",
+          "isSuperAdmin": false,
+          "mustChangePassword": false,
+          "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+          "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "AdminAccountStatus": {
+        "enum": [
+          "Active",
+          "Suspended",
+          "Deactivated"
+        ],
+        "description": "Lifecycle state of an AdminAccount (spec 6.1.10). Only AdminAccountStatus.Active may\r\nsign in.",
+        "example": "Active"
+      },
+      "AdminAccountSummaryDto": {
+        "required": [
+          "id",
+          "staffName",
+          "email",
+          "phone",
+          "status",
+          "isSuperAdmin",
+          "mustChangePassword",
+          "lastLoginAtUtc",
+          "createdAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "staffName": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Ngozi Adeyemi"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login identifier.",
+            "example": "ngozi.adeyemi@example.com"
+          },
+          "phone": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` only for the pre-existing bootstrap account.",
+            "example": "+2348012345678"
+          },
+          "status": {
+            "description": "Active, suspended or deactivated (spec 6.1.10).",
+            "$ref": "#/components/schemas/AdminAccountStatus"
+          },
+          "isSuperAdmin": {
+            "type": "boolean",
+            "description": "Whether the flag-bypass privilege path applies (spec 6.1.7 rule 4).",
+            "example": false
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "Whether the forced-change gate currently applies.",
+            "example": false
+          },
+          "lastLoginAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` if the account has never signed in.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When the account was created.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row of `GET /api/v1/admins` (spec 6.1.8). Deliberately omits `rolesHeld` and\r\n`scopeSummary` — the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry\r\n`TASK-0019/0027`, B4) splits roles and assignments to TASK-0028, which adds both fields\r\nadditively once a `role_assignment` table exists to compute them from.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "staffName": "Ngozi Adeyemi",
+          "email": "ngozi.adeyemi@example.com",
+          "phone": "+2348012345678",
+          "status": "Active",
+          "isSuperAdmin": false,
+          "mustChangePassword": false,
+          "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+          "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
       "AuthSessionResponse": {
         "required": [
           "accountId",
@@ -1095,6 +2157,40 @@
           ],
           "sessionExpiresAt": "2026-08-03T09:30:00+00:00",
           "sessionAbsoluteExpiresAt": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "ChangeAdminAccountStatusCommand": {
+        "required": [
+          "id",
+          "status",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The account whose status is changing.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "status": {
+            "description": "The target status.",
+            "$ref": "#/components/schemas/AdminAccountStatus"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required, at least ten characters, when Status is\r\nAdminAccountStatus.Deactivated (spec 6.1.12: \"A reason is mandatory on:...\r\nadmin deactivation\")."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is\r\n        DATA-DEPENDENT on Status — `admin.suspend` for the active/suspended pair,\r\n        `admin.deactivate` for deactivation, and `admin.deactivate` HELD BY A SUPER ADMIN for\r\n        reactivating a deactivated account — so this route is mapped with `RequireAuthenticatedCaller()`\r\n        and the handler resolves the exact requirement.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "status": "Suspended",
+          "reason": null
         }
       },
       "ChangePasswordCommand": {
@@ -1261,6 +2357,108 @@
           "createdAtUtc": "2026-08-03T09:30:00+00:00"
         }
       },
+      "CreateAdminAccountCommand": {
+        "required": [
+          "staffName",
+          "email",
+          "phone"
+        ],
+        "type": "object",
+        "properties": {
+          "staffName": {
+            "type": "string",
+            "description": "Two words minimum, letters/spaces/hyphens/apostrophes only (spec 6.1.3).",
+            "example": "Ngozi Adeyemi"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login identifier. Unique across active and suspended accounts (spec 6.1.3).",
+            "example": "ngozi.adeyemi@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Nigerian format — `08012345678` or `+2348012345678`.",
+            "example": "08012345678"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14): \"Step one takes staff name, email and\r\n        phone and creates the account.\" Role assignment (step two) is TASK-0028 — an account with zero\r\n        assignments can exist and sign in, per spec 6.1.9's own text.",
+        "example": {
+          "staffName": "Ngozi Adeyemi",
+          "email": "ngozi.adeyemi@example.com",
+          "phone": "08012345678"
+        }
+      },
+      "CreateAdminAccountResponse": {
+        "required": [
+          "id",
+          "staffName",
+          "email",
+          "phone",
+          "status",
+          "mustChangePassword",
+          "createdAtUtc",
+          "temporaryPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "staffName": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Ngozi Adeyemi"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login identifier.",
+            "example": "ngozi.adeyemi@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Normalised `+234` form.",
+            "example": "+2348012345678"
+          },
+          "status": {
+            "description": "Always `Active` on creation (spec 6.1.10).",
+            "$ref": "#/components/schemas/AdminAccountStatus"
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "Always `true` on creation (spec 6.1.3).",
+            "example": true
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When the account was created.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "temporaryPassword": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\r\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the\r\napproved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay\r\nthat returned it verbatim would be a second display).",
+            "example": "aB3xQ9mK2pL7vN4wR8dT"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created account, including the one-time temporary password (spec 6.1.9: \"displays it once on\r\nscreen with a copy button, and never displays it again\").",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "staffName": "Ngozi Adeyemi",
+          "email": "ngozi.adeyemi@example.com",
+          "phone": "+2348012345678",
+          "status": "Active",
+          "mustChangePassword": true,
+          "createdAtUtc": "2026-08-03T09:30:00+00:00",
+          "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+        }
+      },
       "CreateSampleRecordCommand": {
         "required": [
           "label",
@@ -1323,6 +2521,61 @@
         "description": "Response to `GET /api/v1/auth/csrf`.",
         "example": {
           "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
+        }
+      },
+      "CursorPageOfAdminAccountSummaryDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAccountSummaryDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "staffName": "Ngozi Adeyemi",
+                "email": "ngozi.adeyemi@example.com",
+                "phone": "+2348012345678",
+                "status": "Active",
+                "isSuperAdmin": false,
+                "mustChangePassword": false,
+                "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+                "createdAtUtc": "2026-08-03T09:30:00+00:00"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page.",
+            "example": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\r\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\r\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "isSuperAdmin": false,
+              "mustChangePassword": false,
+              "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+              "createdAtUtc": "2026-08-03T09:30:00+00:00"
+            }
+          ],
+          "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
         }
       },
       "CursorPageOfConfigVersionSummaryDto": {
@@ -1695,6 +2948,12 @@
           "traceId": {
             "type": "string",
             "description": "Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem."
+          },
+          "lockedUntil": {
+            "type": "string",
+            "description": "UTC time the account's lockout ends (spec 6.1.11: five failed attempts locks it for fifteen minutes). Present only on the `423 Locked` response `POST /auth/sign-in` returns when the SUBMITTED password is correct but the account is currently locked — never on any other problem response.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
           }
         },
         "additionalProperties": false,
@@ -1707,6 +2966,34 @@
           "instance": "/api/v1/reference/records",
           "errorCode": "sample_record.label_taken",
           "traceId": "0af7651916cd43dd8448eb211c80319c"
+        }
+      },
+      "ResetAdminAccountPasswordResponse": {
+        "required": [
+          "id",
+          "temporaryPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The account.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "temporaryPassword": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\r\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.",
+            "example": "aB3xQ9mK2pL7vN4wR8dT"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The new one-time temporary password (spec 6.1.11: \"displays it once\").",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
       "SampleRecordDto": {
@@ -1924,6 +3211,55 @@
           "password": "correct horse battery staple 9"
         }
       },
+      "UpdateAdminAccountCommand": {
+        "required": [
+          "id",
+          "staffName",
+          "email",
+          "phone",
+          "isSuperAdmin"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The account being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "staffName": {
+            "type": "string",
+            "description": "Two words minimum, letters/spaces/hyphens/apostrophes only.",
+            "example": "Ngozi Adeyemi-Bello"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login identifier. Self-edit callers must submit the account's current value unchanged.",
+            "example": "ngozi.adeyemi@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Nigerian format.",
+            "example": "08012345678"
+          },
+          "isSuperAdmin": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "`null` to leave unchanged. A non-null value that differs from the account's\r\n        current flag is rule 4 territory (spec 6.1.7): only an acting admin who already holds\r\n        bool AdminAccount.IsSuperAdmin may change it, and a rejected attempt writes an audit\r\n        event even though the request as a whole still fails."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes\r\n        reach this one command: an `admin.update` holder editing any account (name, email, phone,\r\n        and — rule 4 permitting — bool? UpdateAdminAccountCommand.IsSuperAdmin), or the account itself editing only its OWN\r\n        string UpdateAdminAccountCommand.StaffName and string UpdateAdminAccountCommand.Phone (spec 6.1.2's self-edit carve-out — NOT email,\r\n        which the caller must hold `admin.update` to change even on their own account).",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "staffName": "Ngozi Adeyemi-Bello",
+          "email": "ngozi.adeyemi@example.com",
+          "phone": "08012345678",
+          "isSuperAdmin": null
+        }
+      },
       "UpdateSchoolIdentityCommand": {
         "required": [
           "schoolName",
@@ -2010,6 +3346,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Admins"
+    },
     {
       "name": "Auth"
     },

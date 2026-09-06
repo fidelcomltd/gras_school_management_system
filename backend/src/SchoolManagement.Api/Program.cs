@@ -308,9 +308,16 @@ app.UseApiRequestLogging();
 // ordering bug.
 app.UseCors(CorsOptions.PolicyName);
 
-app.UseRateLimiter();
-
+// AUTHENTICATION BEFORE THE RATE LIMITER (TASK-0027 fix; drift entry struck in STATE.md). The two
+// were previously the other way round, so ResolveRateLimitPartitionKey ran before
+// HttpContext.User was ever populated by the authentication middleware — every request, authenticated
+// or not, partitioned by remote IP, and the "authenticated user" branch of that function was dead
+// code no test had ever exercised. Reordering costs nothing: authenticating first does not let an
+// unauthenticated caller past the limiter (RequireAuthorization/RequireAuthenticatedCaller still runs
+// afterwards), it only lets the limiter see the identity that authentication just established.
 app.UseAuthentication();
+
+app.UseRateLimiter();
 
 // TASK-0003: spec 6.1.6's forced-change gate. AFTER authentication (needs the claim it reads),
 // BEFORE authorization (this is account state, not a privilege decision — see the middleware's

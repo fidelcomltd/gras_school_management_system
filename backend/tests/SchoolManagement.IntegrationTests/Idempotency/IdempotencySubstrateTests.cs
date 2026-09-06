@@ -142,36 +142,78 @@ public sealed class IdempotencySubstrateTests(ApiTestFixture fixture) : IAsyncLi
     }
 
     [Fact]
-    public async Task ConcurrentDuplicatePosts_ProduceExactlyOneSideEffectAndOneInProgressRejection()
+    public async Task ConcurrentDuplicatePosts_ProduceExactlyOneSideEffect()
     {
         RequireDatabase();
 
         var key = $"key-{Guid.NewGuid():N}";
         var command = new ProbeCommand($"label-{Guid.NewGuid():N}");
 
-        // Genuinely concurrent: both requests are in flight before either completes, so the
-        // classification the store makes for the loser depends on the winner's row already having
-        // been inserted (an in-flight, uncompleted claim) — not on the two calls being sequenced.
+        // Genuinely concurrent: both requests are in flight before either completes. The STORE's
+        // guarantee — proven structurally by TryClaimAsync/RequireIdempotencyKeyExtensions, not just
+        // by this test — is that AT MOST ONE of the two ever reaches the protected handler at all
+        // (the unique index on (key_hash, caller) admits exactly one "Claimed" outcome; every other
+        // outcome returns before `next(context)` runs), so the side effect can never happen twice.
+        // WHICH of the two remaining legal shapes the loser gets is a scheduling accident, not a
+        // guarantee this test may assert on:
+        //   (a) the loser's read lands before the winner's claim is marked complete -> InProgress ->
+        //       409 idempotency.request_in_progress ([Created, Conflict]).
+        //   (b) the winner completes first -> the loser's read finds a COMPLETED row with a matching
+        //       fingerprint -> a genuine REPLAY of the winner's stored 201, `Idempotency-Replay: true`
+        //       ([Created, Created]). Confirmed empirically (not just by reading the store): under
+        //       real load against the hosted Neon instance this branch reproduces, and the second
+        //       response DOES carry the replay header, never a fresh execution.
+        // Both are legal; a naive [Created, Conflict]-only assertion (the shape this test used to
+        // require) fails on legitimate (b) — orchestrator-diagnosed 2026-09-06, TASK-0027 dispatch 2.
         var firstTask = SendAsync(key, "caller-1", command);
         var secondTask = SendAsync(key, "caller-1", command);
 
         var responses = await Task.WhenAll(firstTask, secondTask);
 
-        var statusCodes = responses.Select(response => response.StatusCode).OrderBy(code => code).ToArray();
-
-        statusCodes.ShouldBe(
-            [HttpStatusCode.Created, HttpStatusCode.Conflict],
-            $"expected one Created and one Conflict (in-progress), got {string.Join(", ", statusCodes)}");
-
-        var conflictResponse = responses.Single(response => response.StatusCode == HttpStatusCode.Conflict);
-        var body = await ReadProblemAsync(conflictResponse);
-        body.ShouldContain("idempotency.request_in_progress");
-
-        foreach (var response in responses)
+        try
         {
-            response.Dispose();
+            var statusCodes = responses.Select(response => response.StatusCode).ToArray();
+            var replayFlags = responses
+                .Select(response => response.Headers.TryGetValues("Idempotency-Replay", out var values) &&
+                    values.Contains("true"))
+                .ToArray();
+
+            var isInProgressShape = statusCodes.OrderBy(code => code).SequenceEqual(
+                [HttpStatusCode.Created, HttpStatusCode.Conflict]);
+            var isReplayShape = statusCodes.All(code => code == HttpStatusCode.Created) &&
+                replayFlags.Count(isReplay => isReplay) == 1;
+
+            (isInProgressShape || isReplayShape).ShouldBeTrue(
+                "expected either [Created, Conflict] (in-progress) or [Created, Created] with exactly " +
+                $"one carrying Idempotency-Replay: true (a genuine replay), got statuses " +
+                $"[{string.Join(", ", statusCodes)}] with replay flags [{string.Join(", ", replayFlags)}].");
+
+            if (isInProgressShape)
+            {
+                var conflictResponse = responses.Single(response => response.StatusCode == HttpStatusCode.Conflict);
+                var body = await ReadProblemAsync(conflictResponse);
+                body.ShouldContain("idempotency.request_in_progress");
+            }
+            else
+            {
+                var winner = responses[Array.IndexOf(replayFlags, false)];
+                var loser = responses[Array.IndexOf(replayFlags, true)];
+
+                var winnerBody = await winner.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+                var loserBody = await loser.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+                loserBody.ShouldBe(winnerBody, "a genuine replay returns the ORIGINAL response body verbatim");
+            }
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
         }
 
+        // The assertion that actually matters, unconditionally in EITHER legal branch: the side
+        // effect ran exactly once. This is what the status-code shape was only ever a proxy for.
         await using var scope = Host.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var matchingRows = await context.SampleRecords

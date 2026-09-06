@@ -135,7 +135,147 @@ public sealed class AdminAccountTests
         all.ShouldContain("bootstrap-hash");
     }
 
+    [Fact]
+    public void Create_NormalizesEmailStaffNameAndPhone()
+    {
+        var result = AdminAccount.Create(
+            Guid.CreateVersion7(), "  Ngozi@Example.COM ", "  Ngozi Adeyemi  ", "08012345678", "some-hash");
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Email.ShouldBe("ngozi@example.com");
+        result.Value.StaffName.ShouldBe("Ngozi Adeyemi");
+        result.Value.Phone.ShouldBe("+2348012345678");
+        result.Value.MustChangePassword.ShouldBeTrue();
+        result.Value.IsSuperAdmin.ShouldBeFalse();
+        result.Value.Status.ShouldBe(AdminAccountStatus.Active);
+    }
+
+    [Fact]
+    public void Create_RejectsAStaffNameWithOnlyOneWord()
+    {
+        var result = AdminAccount.Create(Guid.CreateVersion7(), "a@b.com", "Ngozi", "08012345678", "hash");
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("admin.staff_name_invalid");
+    }
+
+    [Fact]
+    public void Create_RejectsAnInvalidPhone()
+    {
+        var result = AdminAccount.Create(Guid.CreateVersion7(), "a@b.com", "Two Words", "not-a-phone", "hash");
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("admin.phone_invalid");
+    }
+
+    [Fact]
+    public void ChangeOwnDetails_UpdatesStaffNameAndPhone_NeverEmail()
+    {
+        var account = CreateRegularAccount();
+        var originalEmail = account.Email;
+
+        var result = account.ChangeOwnDetails("New Name Here", "08023456789");
+
+        result.IsSuccess.ShouldBeTrue();
+        account.StaffName.ShouldBe("New Name Here");
+        account.Phone.ShouldBe("+2348023456789");
+        account.Email.ShouldBe(originalEmail);
+    }
+
+    [Fact]
+    public void UpdateDetails_ChangesNameEmailAndPhoneTogether()
+    {
+        var account = CreateRegularAccount();
+
+        var result = account.UpdateDetails("Renamed Person", "new@example.com", "08023456789");
+
+        result.IsSuccess.ShouldBeTrue();
+        account.StaffName.ShouldBe("Renamed Person");
+        account.Email.ShouldBe("new@example.com");
+        account.Phone.ShouldBe("+2348023456789");
+    }
+
+    [Fact]
+    public void SetSuperAdmin_FlipsTheFlagUnconditionally()
+    {
+        var account = CreateRegularAccount();
+
+        account.SetSuperAdmin(true);
+
+        account.IsSuperAdmin.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(AdminAccountStatus.Active, AdminAccountStatus.Suspended, true)]
+    [InlineData(AdminAccountStatus.Suspended, AdminAccountStatus.Active, true)]
+    [InlineData(AdminAccountStatus.Active, AdminAccountStatus.Deactivated, true)]
+    [InlineData(AdminAccountStatus.Suspended, AdminAccountStatus.Deactivated, true)]
+    [InlineData(AdminAccountStatus.Deactivated, AdminAccountStatus.Active, true)]
+    [InlineData(AdminAccountStatus.Deactivated, AdminAccountStatus.Suspended, false)]
+    [InlineData(AdminAccountStatus.Active, AdminAccountStatus.Active, false)]
+    public void ChangeStatus_AllowsExactlyTheSpec6110Transitions(
+        AdminAccountStatus from,
+        AdminAccountStatus to,
+        bool expectedAllowed)
+    {
+        var account = CreateRegularAccount();
+        SetStatus(account, from);
+
+        var result = account.ChangeStatus(to);
+
+        result.IsSuccess.ShouldBe(expectedAllowed);
+
+        if (expectedAllowed)
+        {
+            account.Status.ShouldBe(to);
+        }
+        else
+        {
+            result.Error.Code.ShouldBe("admin.invalid_status_transition");
+            account.Status.ShouldBe(from);
+        }
+    }
+
+    [Fact]
+    public void ForcePasswordReset_SetsMustChangePasswordTrue_UnlikeASelfServiceChange()
+    {
+        var account = CreateRegularAccount();
+        account.ChangePassword("self-service-hash"); // Clears MustChangePassword to false first.
+        account.MustChangePassword.ShouldBeFalse();
+        var priorHash = account.PasswordHash;
+
+        account.ForcePasswordReset("forced-hash");
+
+        account.MustChangePassword.ShouldBeTrue();
+        account.PasswordHash.ShouldBe("forced-hash");
+        account.PasswordHistoryHashes.ShouldContain(priorHash);
+    }
+
     private static AdminAccount CreateAccount() =>
         AdminAccount.CreateBootstrapSuperAdmin(
             Guid.CreateVersion7(), "admin@example.com", "Ada Lovelace", "bootstrap-hash").Value;
+
+    private static AdminAccount CreateRegularAccount() =>
+        AdminAccount.Create(
+            Guid.CreateVersion7(), "regular@example.com", "Ngozi Adeyemi", "08012345678", "some-hash").Value;
+
+    /// <summary>
+    /// Drives the account to <paramref name="status"/> via legal transitions from Active, since
+    /// <see cref="AdminAccount.ChangeStatus"/> is the only mutator and there is no direct setter.
+    /// </summary>
+    private static void SetStatus(AdminAccount account, AdminAccountStatus status)
+    {
+        if (status == AdminAccountStatus.Active)
+        {
+            return;
+        }
+
+        if (status == AdminAccountStatus.Suspended)
+        {
+            account.ChangeStatus(AdminAccountStatus.Suspended).IsSuccess.ShouldBeTrue();
+            return;
+        }
+
+        account.ChangeStatus(AdminAccountStatus.Deactivated).IsSuccess.ShouldBeTrue();
+    }
 }

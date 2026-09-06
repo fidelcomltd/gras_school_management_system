@@ -16,13 +16,14 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 | TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | **done** |
 | TASK-0002 | Privilege register and authorisation enforcement | BE | 01 §4.2–4.4, 14 §9.2 | **done** |
 | TASK-0003 | Authentication and session management | BE | 03 §6.1.3/6.1.6/6.1.10/6.1.11, 14 §9.1 | **done** |
-| TASK-0019 | Idempotency substrate | BE | 14 §9.8.2, 9.9 | approved, ready |
-| TASK-0027 | Admin account management | BE | 03 §6.1.2/6.1.7/6.1.9-6.1.14, 14 §9.2/9.4/9.5 | blocked (§5 sign-off) |
+| TASK-0019 | Idempotency substrate | BE | 14 §9.8.2, 9.9 | **done** |
+| TASK-0027 | Admin account management | BE | 03 §6.1.2/6.1.7/6.1.9-6.1.14, 14 §9.2/9.4/9.5 | in progress — §5 sign-off GRANTED 2026-09-06; dispatch 2 in review |
 | TASK-0028 | Roles, assignments, privilege register | BE | 03 §6.1.4-6.1.7, 6.1.14 | queued (stub) |
 | TASK-0020 | Adopt §7's frontend structure, form and E2E mandates | FE | §7 — resolves Open question 11 | **done** |
-| TASK-0021 | Cookie auth seam and the sign-in screen | FE | §5, §7 — consumes TASK-0003's contract | queued |
+| TASK-0021 | Cookie auth seam and the sign-in screen | FE | §5, §7 — consumes TASK-0003's contract | **done** |
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
 | TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
+| TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | queued — carded 2026-09-06, dispatch when TASK-0027 closes |
 
 ### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
 

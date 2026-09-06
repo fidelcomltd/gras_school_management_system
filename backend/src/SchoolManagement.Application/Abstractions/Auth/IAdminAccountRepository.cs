@@ -1,3 +1,5 @@
+using SchoolManagement.Application.Auth.AdminAccounts;
+using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 
@@ -41,4 +43,43 @@ public interface IAdminAccountRepository
     /// the one narrow, documented exception; nothing else in this card's handlers calls it.
     /// </remarks>
     Task PersistLockoutStateAsync(AdminAccount account, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether <paramref name="normalizedEmail"/> is already used by an ACTIVE or SUSPENDED account
+    /// (spec 6.1.3: "Unique across active and suspended accounts, case-insensitive" — a deactivated
+    /// account's email is reusable, spec 6.1.13). <paramref name="excludingId"/> excludes the account
+    /// being edited from its own uniqueness check.
+    /// </summary>
+    Task<bool> EmailExistsActiveOrSuspendedAsync(
+        string normalizedEmail,
+        Guid? excludingId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cursor-paginated, filtered list projection (spec 6.1.8, 9.5) — <c>AsNoTracking</c>, projected
+    /// straight to <see cref="AdminAccountSummaryDto"/>. Default sort is status ascending (active
+    /// first) then staff name ascending; deactivated accounts are excluded unless
+    /// <paramref name="status"/> names them explicitly.
+    /// </summary>
+    /// <param name="status"><see langword="null"/> to use the default (active + suspended only).</param>
+    /// <param name="search">Case-insensitive substring match against staff name or email, or <see langword="null"/>.</param>
+    /// <param name="cursor">The opaque <c>nextCursor</c> from a previous page, or <see langword="null"/> for the first page.</param>
+    /// <param name="pageSize">Already clamped to <see cref="CursorPageRequest.MaxPageSize"/> by the caller.</param>
+    /// <param name="cancellationToken">Propagated to the underlying query.</param>
+    Task<CursorPage<AdminAccountSummaryDto>> ListAsync(
+        AdminAccountStatus? status,
+        string? search,
+        string? cursor,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Row-locks (<c>SELECT ... FOR UPDATE</c>) every currently ACTIVE Super Admin account and
+    /// returns their ids, to be called inside the ambient transaction BEFORE any write that could
+    /// leave zero (spec 6.1.6/6.1.13: "runs inside the transaction with a row lock on the account
+    /// table, not as a pre-flight read"). Two concurrent transactions each locking this same set
+    /// serialise against each other, which is what makes "two Super Admins suspend each other in the
+    /// same minute" (spec 6.1.13) safe even though each targets a DIFFERENT row.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> LockActiveSuperAdminIdsAsync(CancellationToken cancellationToken);
 }

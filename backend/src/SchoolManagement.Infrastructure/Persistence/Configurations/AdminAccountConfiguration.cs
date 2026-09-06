@@ -30,6 +30,12 @@ internal sealed class AdminAccountConfiguration : IEntityTypeConfiguration<Admin
             .IsRequired()
             .HasMaxLength(AuthPolicy.StaffNameMaxLength);
 
+        // Nullable at the persistence layer only for the pre-existing bootstrap account (TASK-0003),
+        // which predates this field — see the entity's Phone remarks. Every account created through
+        // AdminAccount.Create requires it non-null.
+        builder.Property(account => account.Phone)
+            .HasMaxLength(AuthPolicy.PhoneMaxLength);
+
         builder.Property(account => account.PasswordHash)
             .IsRequired()
             .HasMaxLength(AuthPolicy.PasswordHashMaxLength);

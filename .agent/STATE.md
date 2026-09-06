@@ -56,19 +56,27 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: 9a42360a8cf3741bea8a261eac405d31c71fdc08b13db3fd60303043880d5a20
-          `X-CSRF-Token` is a required header parameter on exactly the four mutating auth
-          operations, emitted by the same call that wires enforcement.
-regenerated: 2026-09-06 by TASK-0005a, `-Promote` (generator + SDK under `## Layout`).
-          **13 paths now** — the four settings/config-version paths joined the six auth and three
-          reference ones. **The frontend client is STALE against this hash until it is regenerated
-          (§4.4 check 2, §4.3's handoff).**
-api version: v1 · 13 paths: `/auth/{csrf,sign-in,sign-out,me,refresh,password}` +
+openapi.json sha256: 1a2d8afff15736c4f2b23894743b80de0d87f19ece7a70996db76a6eb8408926
+          (was `e434db40…` after TASK-0027 dispatch 1; dispatch 2 moved it by declaring
+          `lockedUntil` on `ProblemDetails`. **Verified byte-identical against a fresh
+          regeneration by the orchestrator on 2026-09-06**, not taken on report.)
+          `X-CSRF-Token` is a required header parameter on every mutating operation that calls
+          `.RequireCsrfToken()` — no longer just the four auth ones since TASK-0005a's
+          `PATCH /settings/identity`; TASK-0027 adds five more (all `/admins/*` mutations).
+          `lockedUntil` is now DECLARED on the `ProblemDetails` schema (optional, `date-time`) —
+          the 423 sign-in body has sent it since TASK-0003 while the document forbade it.
+regenerated: 2026-09-06 by TASK-0027, `-Promote` (generator + SDK under `## Layout`).
+          **18 paths now** — the five `/admins*` paths joined the thirteen settings/config-version/
+          auth/reference ones. **The frontend client is STALE against this hash until it is
+          regenerated (§4.4 check 2, §4.3's handoff).**
+api version: v1 · 18 paths: `/admins`, `/admins/{id}`, `/admins/{id}/status`,
+          `/admins/{id}/password-reset`, `/admins/{id}/sessions` +
+          `/auth/{csrf,sign-in,sign-out,me,refresh,password}` +
           `/settings`, `/settings/identity`, `/config-versions`, `/config-versions/{id}` +
           `/reference/{ping,records,arms/{armId}/secure}`. `/health/*` excluded
-          (`ASSUMPTIONS.md` §2.9); `/reference/*` is scaffolding. Client regenerated 2026-09-06
-          (frontend-dev, mechanical dispatch off TASK-0005a) and now matches the `9a42360a…`
-          hash — `check:api-drift` clean. History: `decisions/2026-Q3.md`.
+          (`ASSUMPTIONS.md` §2.9); `/reference/*` is scaffolding. Frontend client NOT yet
+          regenerated against this hash (backend-only dispatch; TASK-0027's frontend screen is a
+          separate card) — `check:api-drift` will report stale until then. History: `decisions/2026-Q3.md`.
 
 ## Auth decision
 mechanism: **HttpOnly cookie session + CSRF token.** Human sign-off 2026-08-26 per §5. Token
@@ -87,13 +95,13 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0026, 0005a (0021 and 0005a closed 2026-09-06) — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0027, 0005a (0021, 0005a and 0027 closed 2026-09-06) — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0027 | Admin account management | backend-dev | **blocked — human sign-off (§5)** |
 | TASK-0028 | Roles, assignments, privilege register | backend-dev | queued (stub card) |
+| TASK-0029 | Regenerate the client, complete the typed wrapper surface | frontend-dev | queued — card written 2026-09-06, dispatch the moment TASK-0027 closes |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
 
@@ -101,6 +109,104 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
 
+- 2026-09-06 **TASK-0027 CLOSED — all seven `/admins*` endpoints, contract `1a2d8aff…`, gates
+  verified by the ORCHESTRATOR rather than reported by the agent.** Dispatch 2 died on a session
+  rate limit — **the FOURTH occurrence** (TASK-0003, TASK-0019, TASK-0005a, now this) — after
+  launching its final gate run and before reporting a single line of it. The standing lesson held
+  for the fourth time and is now simply how this project works: *a dispatch that dies after writing
+  and before verifying leaves a working tree that looks finished and is not, and the tell is
+  silence.* Everything below was re-run or re-read locally, not accepted on report: build 0
+  warnings / 0 errors (Release); `dotnet format --verify-no-changes` exit 0; **unit 249, arch 28,
+  integration 100 — 377 passed, 0 failed, `Skipped: 0`**; merged line coverage 78.5%; no vulnerable
+  packages; `gitleaks detect --source . --config .gitleaks.toml` no leaks; and §4.4 check 1 run by
+  hand — a fresh `generate-openapi.ps1` (no `-Promote`) hashed **byte-identical** to the committed
+  document, with `CONTRACT.lock` matching. §4.4 check 3 clean (the single `fetch(` grep hit is
+  `me.refetch()`, not a raw call). §4.4 check 2 is knowingly stale and owned by **TASK-0029**.
+  **The reusable finding, worth more than the card:** `ConcurrentDuplicatePosts_…` had asserted a
+  SCHEDULING ACCIDENT since the day it was written — it demanded `[Created, Conflict]`, but two
+  same-key requests have two legal shapes, and which one occurs depends on whether the winner
+  completes before the loser reads. Sixteen instrumented runs settled it: fifteen produced
+  `[Created, Conflict]`, one (under full-suite load against hosted Neon) produced
+  `[Created, Created]` with the second response carrying `Idempotency-Replay: true` — **and a row
+  count of exactly 1 in every one of the sixteen.** The substrate never double-executed; the test
+  was wrong, not TASK-0019. It now accepts either shape, additionally asserts the replayed body
+  matches the winner's verbatim, and keeps the exactly-one-side-effect count unconditional. A test
+  that names an accident in its assertion will fail the day the timing changes, and will look like
+  a product defect when it does.
+- 2026-09-06 **TASK-0027 REVIEWED by orchestrator — REOPENED on three gaps; dispatch 1 otherwise
+  stands.** What was verified independently rather than taken on report, all green: `CONTRACT.lock`
+  matches the document byte for byte (`e434db40…`, recomputed); `Idempotency-Replay` is declared BY
+  CONSTRUCTION via `IdempotencyHeaderOperationTransformer`, not hand-annotated (the defect TASK-0003
+  was reopened for did not recur); the rate-limiter ordering fix is real and its new test could NOT
+  pass under IP partitioning (two accounts, one client, independent budgets); the super-admin
+  invariant is a genuine `FOR UPDATE` row lock, not a pre-flight read, with a concurrency test; the
+  redaction test reads the stored idempotency row back out of Postgres and asserts `temporaryPassword`
+  is JSON null; the TASK-0028 seam is an explicit `TODO(TASK-0028)` at the deactivation site.
+  **The three gaps** — (1) "session tokens rotate on privilege change … **prove it fires**" was
+  checked off with NO test reaching `UpdateAdminAccountHandler.cs:176`: both `isSuperAdmin` tests are
+  rejection paths that never execute the rotation, and the domain test `SetSuperAdmin_FlipsTheFlag…`
+  does not touch sessions. (2) The email-uniqueness criterion's second half — a deactivated account's
+  email is reusable — is correctly IMPLEMENTED (`EmailExistsActiveOrSuspendedAsync` excludes
+  `Deactivated`) but has no test. (3) The `lockedUntil` / `additionalProperties: false` drift entry
+  names TASK-0027 as its trigger and is untouched. **The standing lesson this sharpens:** gate output
+  proves the suite that exists is green; it says nothing about whether a criterion's test was ever
+  written, and a checked box is the agent's claim, not evidence. Criteria whose wording is "prove it"
+  need the assertion located during review, not the checkbox counted.
+- 2026-09-06 **TASK-0027 dispatch 1 IMPLEMENTED IN FULL by backend-dev — all seven endpoints, status →
+  review.** All 10 backend gates green: `total=373 passed=373 failed=0 skipped=0`, line 78.70% /
+  branch 61.98% coverage, contract drift clean at the new hash. New paths: `POST /admins`,
+  `GET /admins`, `GET /admins/{id}`, `PATCH /admins/{id}`, `POST /admins/{id}/status`,
+  `POST /admins/{id}/password-reset`, `DELETE /admins/{id}/sessions` — 18 paths total now (`e434db40…`).
+  **Domain**: `AdminAccount` gained `Phone` (nullable only for the pre-existing bootstrap row — new
+  accounts require it), `Create`, `ChangeOwnDetails` (self-edit carve-out), `UpdateDetails`,
+  `SetSuperAdmin`, `ChangeStatus` (the full state machine, not one-way), `ForcePasswordReset`.
+  **Invariant enforcement, verified against the diff rather than the report**: the at-least-one-
+  active-Super-Admin check (spec 4.1) uses a NEW repository method, `LockActiveSuperAdminIdsAsync`,
+  issuing `SELECT id ... FOR UPDATE` inside the ambient transaction — a genuine row lock, not a
+  pre-flight read — proven both by a single-attempt test (PATCH clearing `isSuperAdmin` on the only
+  active Super Admin) and by a REAL-CONCURRENCY test (two Super Admins suspending each other via
+  `Task.WhenAll`, unawaited until both are in flight): exactly one succeeds, the other gets
+  `409 admin.last_active_super_admin`. 6.1.7 rule 4 (`is_super_admin` settable only by a holder) is
+  enforced by an explicit actor-flag check independent of the route's privilege gate (defence in
+  depth — see `ASSUMPTIONS.md` §2.16 for why this matters once TASK-0028 replaces the flag-bypass
+  privilege provider) and writes an audit event on rejection, proven with a substituted
+  `ISystemAuditSink` fake since that seam is log-only. Self-edit carve-out (6.1.2) proven both ways:
+  a non-`admin.update` caller CAN change their own `staffName`/`phone` and CANNOT change their own
+  email (`403 admin.self_edit_restricted`). Session revocation proven per transition: suspend,
+  deactivate, forced password-reset and explicit `DELETE /sessions` each end with the target's next
+  `GET /auth/me` returning 401. The idempotency duplicate-create criterion is proven by counting
+  `admin_accounts` rows directly, and the redaction criterion by reading the STORED
+  `idempotency_records.response_body_json` back, not the replayed HTTP response.
+  **The `UseRateLimiter()`/`UseAuthentication()` ordering fix landed** (see the struck `## Known
+  drift` entry) with a test that could not pass under IP-only partitioning — two authenticated
+  accounts, one remote IP, independent budgets — and it caught a real, non-obvious side effect:
+  since `UseAuthentication()` now runs first, a successful sign-in's session cookie makes that
+  caller's SUBSEQUENT calls user-partitioned instead of IP-partitioned, which broke one existing
+  test's assumption (fixed, not worked around — using a wrong password keeps that specific test
+  anonymous throughout, which is what it actually needs to prove).
+  **Scoping decisions, all disclosed in `ASSUMPTIONS.md` §2.16**: `PATCH`/`status` keep a redundant
+  `id` in the request body rather than splitting a body-only DTO (splitting would silently blind the
+  idempotency fingerprint to the request body); admin-account audit events use the existing
+  `ISystemAuditSink` log-only seam, same precedent as TASK-0005a, not a new persisted table; list
+  search omits spec 9.5's "which field matched" indicator (no AC named it); reactivation's
+  Super-Admin-actor requirement (6.1.10) has no dedicated rejection test, since under the current
+  flag-bypass provider any `admin.deactivate` holder already is a Super Admin — the branch is
+  defence in depth, exercised on its happy path only. **Left for TASK-0028, seam kept visible, not
+  silently completed**: roles, assignments, `GET /privileges`, 6.1.7 rules 1-3, `rolesHeld`/
+  `scopeSummary` on the list, assignments/effective-privileges/last-ten-audit-events on the detail
+  view, and deactivation's assignment-revocation half (session revocation is wired; a `TODO(TASK-0028)`
+  marks exactly where assignment revocation belongs). Full text: the card's `## Log`.
+- 2026-09-06 **§5 human sign-off GRANTED for TASK-0027 — the account-management delta ships as
+  drafted (open question 12 closed).** An account holding `admin.password.reset` /
+  `admin.session.revoke` may exercise it against another account: the privilege grant is the whole
+  gate. **No step-up re-authentication** of the acting admin and **no additional `is_super_admin`
+  requirement** on those two endpoints — three narrower options were offered and declined. The
+  existing guards are unchanged and still binding: the at-least-one-active-Super-Admin invariant
+  (4.1) under a row lock, the self-status-change block (B5), Super-Admin-held `admin.deactivate` for
+  reactivation (6.1.10), and 6.1.7 rule 4 with an audit event on the rejected attempt. No contract
+  shape moved — the ruling is on authority, not on the wire. Full text:
+  [decisions/2026-Q3.md](decisions/2026-Q3.md); the delta itself is
+  `decisions/2026-Q3-contract-deltas.md` entry `TASK-0019/0027` Part 2.
 - 2026-09-06 **Frontend API client regenerated off TASK-0005a's committed contract
   (`9a42360a…`, 13 paths) — mechanical dispatch, no feature code.** `npm run generate:api`
   rewrote `src/api/schema.d.ts` (purely additive, 637 lines, generated header intact);
@@ -288,9 +394,16 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 
 - 2026-09-05 **`vite build` succeeds with NO `.env` and emits a bundle that throws on boot** (inlines `VITE_*` as `undefined`), so Build goes green on something unusable. CI copies `.env.example` to mask it; nothing checks env at build time. Unowned. **Trigger: any card touching build or deployment.**
 - 2026-09-05 **`Microsoft.Testing.Platform.MSBuild` is an unpinned transitive floor; `backend/` has NO NuGet lock file.** Pinning it broke restore. **Trigger: next `xunit.v3` upgrade.** `drift/2026-Q3.md`.
-- 2026-09-06 **Idempotency mechanism now EXISTS** (TASK-0019); the 2026-09-04 build-it-first trigger is RETIRED. What replaces it is lighter and still live: **any card shipping a retry-duplicable mutation must DECLARE `Idempotency-Key` on that route** and mark one-time credentials with `RedactFromIdempotencyReplayAttribute` — §9.8.2's four operations are EXAMPLES, not the list. **Trigger: TASK-0027, then TASK-0005 (checked in its dispatch-1 delta: all five mutating routes accept the header, none require it — none creates an independently-addressable entity; the two uploads additionally need the fingerprint to fold in a content hash, a real gap the delta found and recorded rather than deferring silently).** `backend/docs/ASSUMPTIONS.md` §2.14 **CORRECTED 2026-09-06 by TASK-0005's dispatch-1** (it read deferred; now states the mechanism as shipped and names TASK-0005 as the live per-route-declaration trigger). Owner `backend-dev`.
+- 2026-09-06 **Idempotency mechanism now EXISTS** (TASK-0019); the 2026-09-04 build-it-first trigger is RETIRED. What replaces it is lighter and still live: **any card shipping a retry-duplicable mutation must DECLARE `Idempotency-Key` on that route** and mark one-time credentials with `RedactFromIdempotencyReplayAttribute` — §9.8.2's four operations are EXAMPLES, not the list. **TASK-0027 satisfied this for all seven `/admins*` routes** (`POST /admins` REQUIRED, `PATCH`/`status`/`password-reset` accepted, `DELETE /sessions` and the two `GET`s excluded — none of the last three is retry-duplicable in a way the header would help). `IdempotencyHeaderOperationTransformer` (built ahead of schedule during TASK-0005a) declared the header and `Idempotency-Replay` response header by construction with no further work needed. **Live trigger now: TASK-0005** (checked in its dispatch-1 delta: all five mutating routes accept the header, none require it — none creates an independently-addressable entity; the two uploads additionally need the fingerprint to fold in a content hash, a real gap the delta found and recorded rather than deferring silently). `backend/docs/ASSUMPTIONS.md` §2.14 **CORRECTED 2026-09-06 by TASK-0005's dispatch-1** (it read deferred; now states the mechanism as shipped) and **§2.16 records TASK-0027's one deviation**: `PATCH`/`status` keep `id` in the request body (redundant with the route) rather than splitting a body-only DTO, because a body-only type breaks the fingerprint's `IBaseCommand` lookup. Owner `backend-dev`.
 - 2026-09-05 **Three accepted auth exposures (TASK-0003):** unpersisted DP key ring (**trigger: deployment, Q5**); bootstrap CLI prints the temp password to stdout; `PersistLockoutStateAsync` timing asymmetry. Owner `backend-dev`. Full text: `drift/2026-Q3.md`.
-- 2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`** (`Program.cs:298` vs `:300`), so every rate-limit partition falls back to remote IP and the per-user branch is dead code; admins behind one NAT share the sensitive bucket. **Trigger: TASK-0027** (moved from TASK-0019 on 2026-09-06 — 0019 is now contract-neutral and ships no route; 0027 is where a per-user-partitioned route first exists). Owner `backend-dev`.
+- ~~2026-09-05 **`UseRateLimiter()` runs before `UseAuthentication()`**~~ **STRUCK 2026-09-06 —
+  TASK-0027 fixed it**: `Program.cs` now calls `UseAuthentication()` before `UseRateLimiter()`, so
+  `ResolveRateLimitPartitionKey` sees the authenticated principal on every request after sign-in.
+  Proven by a test that could not have passed under the old IP-only partitioning (two different
+  authenticated accounts, same remote IP, independent budgets) — see the card's Log. One existing
+  test's assumption broke as a direct, correct consequence (sign-in success now replays a session
+  cookie that shifts the SAME caller's later calls from the IP bucket to a user bucket) and was
+  fixed alongside, not worked around. Full text: `drift/2026-Q3.md`.
 - 2026-09-05 `scripts/local-env.ps1` untracked/stale, splats `GateArgs` positionally. **Trigger: any dispatch running gates via the wrapper** — call `ci.ps1` directly. Full text: `drift/2026-Q3.md`.
 - 2026-09-05 **`gate-summary.tests.ps1:101,:108` are near-unfalsifiable** — `-match` substring passes even against a mangled path; only in-process `-eq` caught the TASK-0022 mutation. **Trigger: next card touching that suite.**
 - 2026-09-04 **The DEFAULT rate-limit policy has no 429 test.** Health covered by TASK-0015, sensitive by TASK-0003. Owner `backend-dev`, no trigger.
@@ -310,6 +423,13 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
   a domain invariant with the verbatim message (TASK-0005b), not an invented endpoint. **Trigger:
   the settings-screen frontend card — if the UI needs a remove affordance, that is a missing
   endpoint to add deliberately, not a gap to paper over.** Owner `backend-dev`.
+- ~~2026-09-06 **The committed contract FORBIDS a field the backend actually sends.**~~ **STRUCK
+  2026-09-06 — TASK-0027 dispatch 2 declared it.** `lockedUntil` is now a declared optional
+  `date-time` property on the `ProblemDetails` schema (`ProblemDetailsSchemaTransformer`), on that
+  schema ONLY — a validation failure can never also be a lockout — and both problem schemas stay
+  closed (`additionalProperties: false`), so the closed-type discipline TASK-0012 established is
+  intact. Contract moved `e434db40…` → `1a2d8aff…`; additive, no sign-off needed. Pinned by a test
+  in `OpenApiContractTests`. Full text of the original entry below and in `drift/2026-Q3.md`.
 - 2026-09-06 **The committed contract FORBIDS a field the backend actually sends.**
   `ResultExtensions.cs:85` attaches a `lockedUntil` extension member to the `423` sign-in body
   (approved delta §2 documents it), but `ProblemDetails` is generated with
@@ -319,7 +439,22 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
   Found by orchestrator review of TASK-0021, where the frontend correctly fell back to the
   generic message. Fix is ADDITIVE (declare the member, or stop emitting it). Owner
   `backend-dev`. **Trigger: the next backend card touching auth or `ProblemDetails` —
-  TASK-0027.**
+  TASK-0027.** **STILL LIVE after TASK-0027 dispatch 1 (verified 2026-09-06: `lockedUntil` appears
+  0 times in the committed document, `ResultExtensions.cs:85` still emits it).** The trigger did not
+  fire because the orchestrator's dispatch prompt never named it — a live trigger is only as good as
+  the dispatch that carries it, and "check them before every dispatch" is the orchestrator's line to
+  read, not the agent's to guess. Carried explicitly into dispatch 2.
+
+- 2026-09-06 **Admin-account audit events are LOG-ONLY, not the transactional table 6.1.12
+  describes.** TASK-0027 writes create / edit / status-change / password-reset / session-revoke and
+  the 6.1.7-rule-4 rejection through the existing `ISystemAuditSink` seam — the same log-only
+  mechanism TASK-0005a used — because no `audit_event` table exists anywhere in the codebase yet.
+  Following the established precedent rather than inventing a second convention for the same gap is
+  the right call, and it was disclosed (`ASSUMPTIONS.md` §2.16); what it means is that this card's
+  "audit event WRITES are in scope and transactional" criterion is satisfied in intent and not in
+  substance — a rolled-back transaction still leaves the log line. **Trigger: the card that builds
+  the `audit_event` table (the Phase 1 audit-read-surface row) must replace BOTH seams together and
+  re-point every call site TASK-0005a and TASK-0027 created.** Owner `backend-dev`.
 - 2026-09-06 **The session-end redirect is subscribed per-screen, not once.**
   `features/auth/landing-screen.tsx` calls `onSessionEnded(… navigate(signIn))` itself.
   Correct today because `/` is the only protected screen, but §5's "implemented once" is
@@ -342,14 +477,8 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 
 ## Open questions
 
-Live only; ten resolved questions are in `decisions/2026-Q3.md`.
-
-12. **TASK-0027 admin account management awaits §5 human sign-off.** Seven endpoints, two of which
-   operate sessions and credentials on another account's behalf (`POST /admins/{id}/password-reset`,
-   `DELETE /admins/{id}/sessions`); suspend and deactivate also revoke sessions. The auth MECHANISM
-   is TASK-0003's and unmoved — what needs the ruling is a Super Admin operating it on someone
-   else. Delta ready in `decisions/2026-Q3-contract-deltas.md`. **Blocks TASK-0027 only; TASK-0019
-   is contract-neutral and proceeds.**
+Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
+sign-off) resolved 2026-09-06 and archived there.
 
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one

@@ -319,8 +319,9 @@ concept models "who is calling," and CSRF proves request provenance, not identit
 
 ## TASK-0019 / TASK-0027 — Idempotency substrate and admin account management
 
-**Part 1 (idempotency) APPROVED 2026-09-06 by orchestrator. Part 2 (accounts) AMENDED and held for
-human sign-off under §5.** Drafted by backend-dev in one dispatch. The card was split three ways on
+**Part 1 (idempotency) APPROVED 2026-09-06 by orchestrator. Part 2 (accounts) AMENDED, then
+APPROVED 2026-09-06 by human sign-off under §5 — see the Part 2 heading for the ruling and its
+scope.** Drafted by backend-dev in one dispatch. The card was split three ways on
 approval: TASK-0019 substrate (contract-neutral), TASK-0027 accounts, TASK-0028 roles/assignments.
 
 Classification: Part 1 **none** as shipped by TASK-0019 (no route declares it); Part 2 **additive**.
@@ -392,10 +393,31 @@ whose privilege `admin.password.reset` is already in the register. Losing a crea
 one forced reset, not an orphaned account. **The redaction hook is generic and built in TASK-0019;
 its first caller is TASK-0027.**
 
-### Part 2 — `/api/v1/admins` — AMENDED, HELD FOR HUMAN SIGN-OFF
+### Part 2 — `/api/v1/admins` — AMENDED, then APPROVED BY HUMAN SIGN-OFF (2026-09-06)
 
 Held under §5: `password-reset` and `DELETE /sessions` are session/credential operations. The
 mechanism is TASK-0003's and unchanged; what is new is who may operate it on whose behalf.
+
+**§5 SIGN-OFF, 2026-09-06, human (chisom.maxwell@securedrecords.com): APPROVED AS DRAFTED.** The
+question put was who may operate another account's sessions and credentials, with four options
+offered: (1) approve as drafted, (2) approve with a step-up re-authentication requirement on
+`password-reset` and `DELETE /sessions`, (3) approve but restrict those two to `is_super_admin`
+regardless of the privilege grant, (4) defer the two endpoints (which would not have removed the
+sign-off, since suspend and deactivate revoke the target's sessions too). **Option 1 chosen.**
+
+What that authorises, precisely: an account **holding the privilege** may exercise it against
+another account — `admin.password.reset` mints a new temporary password, sets
+`must_change_password` and revokes every session the target holds (6.1.11); `admin.session.revoke`
+signs the target out everywhere; suspension and deactivation revoke the target's sessions
+immediately (6.1.10). **The privilege grant is the whole gate.** No step-up re-authentication is
+required of the acting admin, and `is_super_admin` is NOT an additional requirement on these two
+endpoints — the spec's privilege model stands unmodified. The guards that remain are the ones
+already in the delta and nothing further: the transactionally-enforced at-least-one-active-Super-Admin
+invariant (4.1), the self-status-change block (B5), the Super-Admin-only reactivation path (6.1.10),
+and 6.1.7 rule 4's is-super-admin-sets-is-super-admin restriction.
+
+No shape in this delta changed as a result of the sign-off — the ruling is on authority, not on the
+wire. TASK-0027 is unblocked and dispatchable as written.
 
 Accepted from the draft as-is: the `CursorPagedResultOfAdminAccountSummaryDto` envelope and the
 refusal to reuse the offset-based `PagedResultOfSampleRecordDto` (§9.5 forbids offset); page size 25
