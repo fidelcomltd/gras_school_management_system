@@ -187,8 +187,11 @@ A task is **not done** until its tests exist and pass.
 
 ### Step 8 — run the gates
 
+`ci.ps1` resolves its own `POSTGRES_TEST_CONNECTION` (TASK-0031: an explicit env var wins, else
+`$HOME/.gras/pg-test.txt`) — no prelude needed. The canonical invocation, matching CI's mode:
+
 ```bash
-./scripts/ci.ps1
+./scripts/ci.ps1 -NoFailFast
 ```
 
 ---

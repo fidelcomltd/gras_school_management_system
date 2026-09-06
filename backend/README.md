@@ -138,19 +138,19 @@ it does not enforce constraints or translate SQL, so it would pass queries that 
 A skipped test is visibly absent; a test that quietly used a weaker database would report success
 while verifying almost nothing.
 
-Two ways to make them run:
+Three ways to make them run:
 
 ```bash
 # Either: point them at any PostgreSQL (this is what CI does, with a service container).
 export POSTGRES_TEST_CONNECTION="Host=localhost;Port=5432;Database=schoolmanagement_tests;Username=...;Password=..."
 
+# Or: put the same connection string in $HOME/.gras/pg-test.txt (one line, no quotes) and do
+# nothing else — ./scripts/ci.ps1 reads it itself if the environment variable above isn't set. See
+# "Configuration and secrets" → "`POSTGRES_TEST_CONNECTION` is the one exception" below.
+
 # Or: install Docker Desktop / Podman. Testcontainers then starts and destroys one automatically,
 # with no configuration at all.
 ```
-
-Re-exporting that variable by hand every session is exactly the ergonomics gap `./scripts/local-env.ps1`
-solves — see "Configuration and secrets" → "`POSTGRES_TEST_CONNECTION` is the one exception" below for
-the one-command version.
 
 ---
 
@@ -169,7 +169,7 @@ One command runs every gate — the same one CI runs, so "it works on my machine
 | Tests + coverage | `dotnet test --settings coverlet.runsettings` |
 | Coverage floor (60%) | parsed from the cobertura report |
 | Vulnerable dependencies | `dotnet list package --vulnerable --include-transitive` |
-| Secret scan | `gitleaks detect --config .gitleaks.toml` |
+| Secret scan | `gitleaks detect --config .gitleaks.toml` (committed history) AND `gitleaks detect --no-git --config .gitleaks.toml` (working tree, repo root) — TASK-0032: the first alone never sees an uncommitted change |
 | OpenAPI contract drift | regenerate, compare hashes |
 
 The coverage number is a **floor, not a goal**. It catches a collapse — a deleted test project, a
@@ -217,26 +217,25 @@ variable from a service container). It bypasses `IConfiguration` entirely, which
 only feeds the Api/Infrastructure host's configuration, and the test harness never builds that host's
 configuration to read it from.
 
-So it needs its own local, git-ignored home. Use the one-command runner:
+So it needs its own local, git-ignored home. `./scripts/ci.ps1` resolves it itself (TASK-0031) —
+there is no separate runner script or environment prelude to set up:
 
-```powershell
-# One-time setup — copy the template, which documents every source it checks.
-cp scripts/local-env.template.ps1 scripts/local-env.ps1
-
-# Resolves POSTGRES_TEST_CONNECTION, then runs ci.ps1 (or pass -Gate <script> for another one).
-./scripts/local-env.ps1
+```
+Put the raw connection string, one line, no quotes, in:  $HOME/.gras/pg-test.txt
+Then just run:                                           ./scripts/ci.ps1
 ```
 
-[`scripts/local-env.template.ps1`](scripts/local-env.template.ps1) is committed and documents every
-source it checks, in priority order, with **no real credential** — the recommended one is a file
-**outside this repository entirely**, `$HOME/.gras/pg-test.txt`, so there is never a working-tree copy
-to protect. Your own copy, `scripts/local-env.ps1`, is git-ignored by an exact path (not a wildcard,
-so the template itself is never accidentally caught) — verify with
-`git check-ignore -v scripts/local-env.ps1` (shows a rule) and
-`git check-ignore -v scripts/local-env.template.ps1` (shows nothing, exits non-zero). The script never
-prints the resolved connection string, on either success or failure — only whether it resolved and
-which source it came from, the same rule `ci.ps1`'s own "Tests" gate already follows for this
-variable.
+That file lives **outside this repository entirely**, so there is never a working-tree copy to
+protect with a `.gitignore` line. An explicitly exported `POSTGRES_TEST_CONNECTION` still wins over
+the file unconditionally (`lib/postgres-test-connection.ps1`), so CI's own service-container
+variable is unaffected. The file's leading UTF-8 BOM (this is a real, observed detail of files
+written by common editors on this path, not a hypothetical) is stripped, and the value is trimmed;
+a missing file is not an error — the integration tests gate simply reports them SKIPPED, same as
+today. **The resolved value is never printed, on any path, at any verbosity** — only whether and
+from where it resolved — proven by
+[`scripts/tests/postgres-test-connection.tests.ps1`](scripts/tests/postgres-test-connection.tests.ps1),
+which plants a marker string in a fixture file and asserts it never appears in any captured output
+stream.
 
 This is still local-only, same as `appsettings.Development.json`: **not** a `.env` file loaded by the
 application. A `.env` would still live inside the repository directory, protected only by a

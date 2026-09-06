@@ -144,3 +144,48 @@ paths = [
   '''(^|/)contracts/CONTRACT\.lock$''',
   '''(^|/)\.agent/STATE\.md$''',
 ]
+
+# TASK-0032 (2026-09-06), Family C — the fake `temporaryPassword` example value TASK-0027 put in
+# OpenApiExamples.cs, echoed into contracts/openapi.json and frontend/src/api/schema.d.ts. 6
+# generic-api-key findings, all this one literal string, in commits 814b711/4170314 (see
+# ASSUMPTIONS.md §2.18/§2.19 for the finding history and why this remediation was chosen over the
+# other two the task card offered).
+[[allowlists]]
+description = '''Fake temporaryPassword example value for generic-api-key (TASK-0032) — see the comment above this block and ASSUMPTIONS.md §2.19.'''
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+regexes = [
+  '''temporaryPassword"\s*:\s*"aB3xQ9mK2pL7vN4wR8dT"''',
+]
+
+# TASK-0032 (2026-09-06), Family D — the two realistic fake connection strings TASK-0011 quoted
+# into its own run log and ASSUMPTIONS.md §3.9 as proof its narrowed rule still fires. TASK-0017
+# fingerprinted these for GIT-MODE scanning (backend/.gitleaksignore): that fingerprint is
+# <commit>:<file>:<rule>:<line> and does not apply to a --no-git (working-tree) scan of the SAME
+# still-committed content, which this card adds as a second pass of the Secret scan gate. A
+# content-anchored allowlist entry (not a fingerprint, not a path) covers both scan modes without
+# widening what the rule can see anywhere else — it matches only these two literal strings.
+[[allowlists]]
+description = '''TASK-0011's two realistic-fake proof connection strings, for no-git-mode coverage (TASK-0032) — see the comment above this block.'''
+targetRules = ["postgres-connection-string-with-password"]
+regexTarget = "match"
+regexes = [
+  '''Host=ep-still-water-12345\.us-east-2\.aws\.neon\.tech;Port=5432;Database=schoolmanagement;\s*Username=neondb_owner;Password=k7Qm2!vRtZx9pLwD3fJa''',
+  '''Host=db-prod-7\.internal\.example;\.\.\.;Password=Tz8#vQm2LpXw9Rk4Nb''',
+]
+
+# TASK-0032 (2026-09-06), Family E — TASK-0031's own self-test
+# (backend/scripts/tests/postgres-test-connection.tests.ps1) plants a deliberately-fake connection
+# string, `selftest-marker-3fae1c`, to prove the resolved value is never printed on any captured
+# stream — same intent as the pre-existing `test_user`/`test_password` stopwords above, just
+# literal enough (reused as both host and password) to also trip
+# postgres-connection-string-with-password, which those stopwords never actually reach (see the
+# Family A comment above: that rule's Secret is always "Host"/"Server", never the value). One
+# content-anchored entry, both rules, since the marker string is identical in both findings.
+[[allowlists]]
+description = '''TASK-0031's self-test marker string, both rules it trips (TASK-0032) — see the comment above this block.'''
+targetRules = ["generic-api-key", "postgres-connection-string-with-password"]
+regexTarget = "match"
+regexes = [
+  '''selftest-marker-3fae1c''',
+]

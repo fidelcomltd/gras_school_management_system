@@ -18,12 +18,12 @@ coverage*.info
 *.trx
 TestResults/
 
-## Carve-out: hand-authored .trx FIXTURES for gate-summary.tests.ps1 / local-env.tests.ps1 are
-## committed test data, not build output — the *.trx rule above must not eat them (TASK-0022:
-## they were silently untracked, so the self-test that guards CI's gate parser was never
-## capable of running on a fresh checkout). Scoped to this one directory only, so real test
-## output (artifacts/coverage/*.trx, TestResults/*.trx) stays ignored — verify with
-## `git check-ignore` after adding a fixture, never assume.
+## Carve-out: hand-authored .trx FIXTURES for gate-summary.tests.ps1 are committed test data, not
+## build output — the *.trx rule above must not eat them (TASK-0022: they were silently untracked,
+## so the self-test that guards CI's gate parser was never capable of running on a fresh checkout).
+## Scoped to this one directory only, so real test output (artifacts/coverage/*.trx,
+## TestResults/*.trx) stays ignored — verify with `git check-ignore` after adding a fixture, never
+## assume.
 !scripts/tests/fixtures/**/*.trx
 
 ## Local secrets and environment — NEVER commit these.
@@ -48,12 +48,6 @@ secrets.json
 ## documented release command — never by hand, never from a developer machine ad hoc.
 artifacts/openapi/
 *.openapi.local.json
-
-## Local gate runner (TASK-0008) — resolves POSTGRES_TEST_CONNECTION outside the repo tree and
-## runs a gate script. Copied from the committed scripts/local-env.template.ps1; see
-## README.md "Configuration and secrets". Exact path, not a wildcard, so nothing else under
-## scripts/ — including the template itself — is caught by this rule.
-scripts/local-env.ps1
 
 ## IDE / editor
 .vs/

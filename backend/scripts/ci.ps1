@@ -22,6 +22,13 @@
     the end instead — this is what CI wants, since it would rather see the full picture in one run
     than re-trigger per fix.
 
+    POSTGRES_TEST_CONNECTION (needed by gate 6, integration tests) is resolved BY THIS SCRIPT
+    (TASK-0031) before any gate runs: an explicitly set environment variable wins if present,
+    otherwise $HOME/.gras/pg-test.txt is read (BOM-stripped, trimmed) — see
+    lib/postgres-test-connection.ps1. Nothing else needs to be set first; the canonical invocation
+    is exactly `./scripts/ci.ps1 -NoFailFast`, no environment prelude. A missing file is not fatal —
+    the integration-tests gate below still just skips, and says so.
+
 .PARAMETER Configuration
     Build configuration. Defaults to Release, matching CI.
 
@@ -73,6 +80,14 @@ Push-Location $backendRoot
 # One implementation of "what does this batch of .trx files mean" — shared with the self-test under
 # backend/scripts/tests, which exercises these same functions against fixture .trx files.
 . (Join-Path $PSScriptRoot 'lib/gate-summary.ps1')
+
+# Same pattern: one implementation of "how POSTGRES_TEST_CONNECTION is resolved", shared with
+# backend/scripts/tests/postgres-test-connection.tests.ps1 (TASK-0031). Resolving it here, once,
+# before any gate runs, is what lets every dispatch invoke this whole script as
+# `./backend/scripts/ci.ps1 -NoFailFast` with no environment prelude — see STATE.md ## Gate
+# commands for why that matters.
+. (Join-Path $PSScriptRoot 'lib/postgres-test-connection.ps1')
+Initialize-PostgresTestConnection -HomeDirectory $HOME
 
 $failures = [System.Collections.Generic.List[string]]::new()
 $gateVerdicts = [System.Collections.Generic.List[string]]::new()
@@ -191,10 +206,12 @@ try {
     }
 
     Invoke-Gate 'Integration tests' {
-        # These SKIP when no PostgreSQL is reachable — they never silently pass. To run them here,
-        # set POSTGRES_TEST_CONNECTION or make a container runtime available. CI must do one of
-        # those, or the suite it is guarding is much smaller than it looks. A skip now fails the
-        # script (see the Coverage threshold gate below) unless -AllowSkipped is passed.
+        # These SKIP when no PostgreSQL is reachable — they never silently pass. POSTGRES_TEST_
+        # CONNECTION was already resolved at the top of this script (an explicit env var, or
+        # $HOME/.gras/pg-test.txt); if neither existed, it is still unset here and this suite skips,
+        # unless a container runtime is available instead. CI must supply one of those, or the suite
+        # it is guarding is much smaller than it looks. A skip now fails the script (see the
+        # Coverage threshold gate below) unless -AllowSkipped is passed.
         if (-not $env:POSTGRES_TEST_CONNECTION) {
             Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
             Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
@@ -327,7 +344,38 @@ try {
             return
         }
 
+        # TWO passes, deliberately (TASK-0032). `gitleaks detect` alone scans committed HISTORY
+        # only, so a secret introduced by the dispatch under test — and never committed — is
+        # invisible to it: the gate went green for the author who introduced one and red for
+        # whoever ran next (TASK-0027 closed clean, TASK-0028 dispatch 1 found it red having
+        # touched none of the flagged files). The first pass is unchanged and still catches
+        # anything already in history; the second treats the source as a plain directory instead
+        # of a git repo (`--no-git`), so it sees exactly the files on disk right now, staged or
+        # not, committed or not. Proven by backend/scripts/tests/secret-scan-working-tree.tests.ps1,
+        # which plants a fake secret in a never-committed file and shows the first form misses it
+        # and the second catches it.
+        Write-Host 'Pass 1 of 2: committed history...'
         gitleaks detect --source . --config .gitleaks.toml --redact --no-banner
+        $historyExitCode = $LASTEXITCODE
+
+        # Whole-repo, not just backend/: pass 1 already covers the whole repo despite the
+        # Push-Location above, because git history discovery walks up to the repository root
+        # regardless of cwd. Pass 2 has no git repo to discover from once --no-git is set, so it is
+        # pointed at the repo root explicitly — otherwise it would silently narrow coverage to
+        # backend/** alone and miss a secret landing in contracts/** or frontend/**.
+        $repoRoot = Split-Path -Parent $backendRoot
+
+        Write-Host ''
+        Write-Host 'Pass 2 of 2: working tree (uncommitted changes included)...'
+        gitleaks detect --source $repoRoot --no-git --config .gitleaks.toml --redact --no-banner
+        $workingTreeExitCode = $LASTEXITCODE
+
+        if ($historyExitCode -ne 0 -or $workingTreeExitCode -ne 0) {
+            $global:LASTEXITCODE = 1
+        }
+        else {
+            $global:LASTEXITCODE = 0
+        }
     }
 
     if ($SkipContractDrift) {
