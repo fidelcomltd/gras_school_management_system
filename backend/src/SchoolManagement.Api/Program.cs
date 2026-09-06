@@ -12,6 +12,7 @@ using SchoolManagement.Application;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Behaviors;
+using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Infrastructure;
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -108,6 +109,18 @@ var pipelineOptions = builder.Services
 if (validateOnStart)
 {
     pipelineOptions.ValidateOnStart();
+}
+
+// TASK-0019: bound directly here (not via the Api-only AddValidatedOptions helper) because both
+// Infrastructure's purge job and this project's idempotency endpoint filter need it, the same
+// reason PipelineOptions above lives in Application rather than Api.
+var idempotencyOptions = builder.Services
+    .AddOptions<IdempotencyOptions>()
+    .Bind(builder.Configuration.GetSection(IdempotencyOptions.SectionName));
+
+if (validateOnStart)
+{
+    idempotencyOptions.ValidateOnStart();
 }
 
 var requestLimits = builder.Configuration
