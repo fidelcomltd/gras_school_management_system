@@ -7,6 +7,114 @@
  */
 
 export interface paths {
+    "/api/v1/admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List administrator accounts
+         * @description Cursor-paginated per spec 9.5 — never offset. Default sort is status ascending (active first) then staff name ascending; deactivated accounts are excluded unless `status` names them explicitly (spec 6.1.8). `search` matches staff name or email, case-insensitively, by substring. Role, scope-arm and session filters are TASK-0028. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListAdminAccounts"];
+        put?: never;
+        /**
+         * Create an administrator account
+         * @description Spec 6.1.9 step 1: staff name, email and phone only — role assignment is a separate step (TASK-0028) and an account with zero assignments can exist and sign in. Returns the generated temporary password ONCE; it is never returned again by any endpoint. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same account (with the temporary password redacted on the replay) instead of creating a second one.
+         */
+        post: operations["CreateAdminAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admins/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one administrator account
+         * @description Assignments, the resolved effective privilege set and the last ten audit events by this account are TASK-0028 (approved delta B4) — this endpoint returns the account's own fields only.
+         */
+        get: operations["GetAdminAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit an administrator account
+         * @description Spec 6.1.2: requires `admin.update`, OR the account editing ITSELF — and even then, only `staffName` and `phone`; changing your own email still requires `admin.update`. `isSuperAdmin` is settable only by a caller who already holds it (spec 6.1.7 rule 4); a rejected attempt still writes an audit event. Session tokens rotate for the target account when `isSuperAdmin` actually changes (spec 9.1). `Idempotency-Key` is accepted, not required — a retry converges the same final state but would otherwise double the audit event.
+         */
+        patch: operations["UpdateAdminAccount"];
+        trace?: never;
+    };
+    "/api/v1/admins/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend, reactivate or deactivate an administrator account
+         * @description Spec 6.1.10: active/suspended requires `admin.suspend`; moving to deactivated requires `admin.deactivate`; reactivating a DEACTIVATED account requires `admin.deactivate` held by a Super Admin and does NOT restore revoked assignments. A caller can never change their OWN status (an added safeguard, not a spec line — see `backend/docs/ASSUMPTIONS.md` §2.16). `reason` is required, at least ten characters, when moving to deactivated (spec 6.1.12). Suspension and deactivation revoke the account's existing sessions immediately (spec 6.1.10); the at-least-one-active-Super-Admin invariant (spec 4.1) is enforced transactionally under a row lock, not a pre-flight read.
+         */
+        post: operations["ChangeAdminAccountStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admins/{id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force a password reset for an administrator account
+         * @description Spec 6.1.11: mints a new temporary password, sets `mustChangePassword`, and revokes every active session for the account. Human §5 sign-off (2026-09-06): the `admin.password.reset` grant is the whole gate — an acting admin may exercise this against any other account, with no step-up re-authentication and no additional Super-Admin requirement. Returns the temporary password ONCE; a redacted `null` replays on a repeated `Idempotency-Key`.
+         */
+        post: operations["ResetAdminAccountPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admins/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke every active session for an administrator account
+         * @description Spec 6.1.14. Human §5 sign-off (2026-09-06): the `admin.session.revoke` grant is the whole gate, same ruling as the password-reset endpoint. Always `204`, including when the account already has no active sessions.
+         */
+        delete: operations["RevokeAdminAccountSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -276,6 +384,139 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description `GET /api/v1/admins/{id}` (spec 6.1.8). Deliberately omits assignments, the resolved
+         *             effective privilege set and the last ten audit events by this account — the approved delta (B4)
+         *             splits these to TASK-0028 along with roles and assignments themselves; adding them later is
+         *             additive.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "staffName": "Ngozi Adeyemi",
+         *       "email": "ngozi.adeyemi@example.com",
+         *       "phone": "+2348012345678",
+         *       "status": "Active",
+         *       "isSuperAdmin": false,
+         *       "mustChangePassword": false,
+         *       "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        AdminAccountDetailDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description Display name.
+             * @example Ngozi Adeyemi
+             */
+            staffName: string;
+            /**
+             * @description Login identifier.
+             * @example ngozi.adeyemi@example.com
+             */
+            email: string;
+            /**
+             * @description `null` only for the pre-existing bootstrap account.
+             * @example +2348012345678
+             */
+            phone: null | string;
+            /** @description Active, suspended or deactivated (spec 6.1.10). */
+            status: components["schemas"]["AdminAccountStatus"];
+            /**
+             * @description Whether the flag-bypass privilege path applies (spec 6.1.7 rule 4).
+             * @example false
+             */
+            isSuperAdmin: boolean;
+            /**
+             * @description Whether the forced-change gate currently applies.
+             * @example false
+             */
+            mustChangePassword: boolean;
+            /**
+             * Format: date-time
+             * @description `null` if the account has never signed in.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastLoginAtUtc: null | string;
+            /**
+             * Format: date-time
+             * @description When the account was created.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+        };
+        /**
+         * @description Lifecycle state of an AdminAccount (spec 6.1.10). Only AdminAccountStatus.Active may
+         *     sign in.
+         * @example Active
+         * @enum {unknown}
+         */
+        AdminAccountStatus: "Active" | "Suspended" | "Deactivated";
+        /**
+         * @description One row of `GET /api/v1/admins` (spec 6.1.8). Deliberately omits `rolesHeld` and
+         *     `scopeSummary` — the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry
+         *     `TASK-0019/0027`, B4) splits roles and assignments to TASK-0028, which adds both fields
+         *     additively once a `role_assignment` table exists to compute them from.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "staffName": "Ngozi Adeyemi",
+         *       "email": "ngozi.adeyemi@example.com",
+         *       "phone": "+2348012345678",
+         *       "status": "Active",
+         *       "isSuperAdmin": false,
+         *       "mustChangePassword": false,
+         *       "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        AdminAccountSummaryDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description Display name.
+             * @example Ngozi Adeyemi
+             */
+            staffName: string;
+            /**
+             * @description Login identifier.
+             * @example ngozi.adeyemi@example.com
+             */
+            email: string;
+            /**
+             * @description `null` only for the pre-existing bootstrap account.
+             * @example +2348012345678
+             */
+            phone: null | string;
+            /** @description Active, suspended or deactivated (spec 6.1.10). */
+            status: components["schemas"]["AdminAccountStatus"];
+            /**
+             * @description Whether the flag-bypass privilege path applies (spec 6.1.7 rule 4).
+             * @example false
+             */
+            isSuperAdmin: boolean;
+            /**
+             * @description Whether the forced-change gate currently applies.
+             * @example false
+             */
+            mustChangePassword: boolean;
+            /**
+             * Format: date-time
+             * @description `null` if the account has never signed in.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastLoginAtUtc: null | string;
+            /**
+             * Format: date-time
+             * @description When the account was created.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+        };
+        /**
          * @description Shared response shape returned by `sign-in`, `me`, `refresh` and `password`
          *     (approved contract delta §0), so the frontend never needs a second round trip to learn its own
          *     state after any of the four.
@@ -346,6 +587,34 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             sessionAbsoluteExpiresAt: string;
+        };
+        /**
+         * @description `POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is
+         *             DATA-DEPENDENT on Status — `admin.suspend` for the active/suspended pair,
+         *             `admin.deactivate` for deactivation, and `admin.deactivate` HELD BY A SUPER ADMIN for
+         *             reactivating a deactivated account — so this route is mapped with `RequireAuthenticatedCaller()`
+         *             and the handler resolves the exact requirement.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "status": "Suspended",
+         *       "reason": null
+         *     }
+         */
+        ChangeAdminAccountStatusCommand: {
+            /**
+             * Format: uuid
+             * @description The account whose status is changing.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description The target status. */
+            status: components["schemas"]["AdminAccountStatus"];
+            /**
+             * @description Required, at least ten characters, when Status is
+             *     AdminAccountStatus.Deactivated (spec 6.1.12: "A reason is mandatory on:...
+             *     admin deactivation").
+             */
+            reason: null | string;
         };
         /**
          * @description Self-service password change (spec 6.1.11, spec 6.1.14). Approved contract delta:
@@ -477,6 +746,90 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description `POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14): "Step one takes staff name, email and
+         *             phone and creates the account." Role assignment (step two) is TASK-0028 — an account with zero
+         *             assignments can exist and sign in, per spec 6.1.9's own text.
+         * @example {
+         *       "staffName": "Ngozi Adeyemi",
+         *       "email": "ngozi.adeyemi@example.com",
+         *       "phone": "08012345678"
+         *     }
+         */
+        CreateAdminAccountCommand: {
+            /**
+             * @description Two words minimum, letters/spaces/hyphens/apostrophes only (spec 6.1.3).
+             * @example Ngozi Adeyemi
+             */
+            staffName: string;
+            /**
+             * @description Login identifier. Unique across active and suspended accounts (spec 6.1.3).
+             * @example ngozi.adeyemi@example.com
+             */
+            email: string;
+            /**
+             * @description Nigerian format — `08012345678` or `+2348012345678`.
+             * @example 08012345678
+             */
+            phone: string;
+        };
+        /**
+         * @description The created account, including the one-time temporary password (spec 6.1.9: "displays it once on
+         *     screen with a copy button, and never displays it again").
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "staffName": "Ngozi Adeyemi",
+         *       "email": "ngozi.adeyemi@example.com",
+         *       "phone": "+2348012345678",
+         *       "status": "Active",
+         *       "mustChangePassword": true,
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *     }
+         */
+        CreateAdminAccountResponse: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description Display name.
+             * @example Ngozi Adeyemi
+             */
+            staffName: string;
+            /**
+             * @description Login identifier.
+             * @example ngozi.adeyemi@example.com
+             */
+            email: string;
+            /**
+             * @description Normalised `+234` form.
+             * @example +2348012345678
+             */
+            phone: string;
+            /** @description Always `Active` on creation (spec 6.1.10). */
+            status: components["schemas"]["AdminAccountStatus"];
+            /**
+             * @description Always `true` on creation (spec 6.1.3).
+             * @example true
+             */
+            mustChangePassword: boolean;
+            /**
+             * Format: date-time
+             * @description When the account was created.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+            /**
+             * @description The generated plaintext password. Present on the live response; REDACTED (`null`)
+             *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the
+             *     approved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay
+             *     that returned it verbatim would be a second display).
+             * @example aB3xQ9mK2pL7vN4wR8dT
+             */
+            temporaryPassword: null | string;
+        };
+        /**
          * @description REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.
          * @example {
          *       "label": "Term 1 timetable draft",
@@ -522,6 +875,51 @@ export interface components {
              * @example CfDJ8N-example-opaque-csrf-token-value
              */
             csrfToken: string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "staffName": "Ngozi Adeyemi",
+         *           "email": "ngozi.adeyemi@example.com",
+         *           "phone": "+2348012345678",
+         *           "status": "Active",
+         *           "isSuperAdmin": false,
+         *           "mustChangePassword": false,
+         *           "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *         }
+         *       ],
+         *       "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
+         *     }
+         */
+        CursorPageOfAdminAccountSummaryDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "staffName": "Ngozi Adeyemi",
+             *         "email": "ngozi.adeyemi@example.com",
+             *         "phone": "+2348012345678",
+             *         "status": "Active",
+             *         "isSuperAdmin": false,
+             *         "mustChangePassword": false,
+             *         "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["AdminAccountSummaryDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA==
+             */
+            nextCursor: null | string;
         };
         /**
          * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
@@ -785,6 +1183,32 @@ export interface components {
             errorCode?: string;
             /** @description Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem. */
             traceId: string;
+            /**
+             * Format: date-time
+             * @description UTC time the account's lockout ends (spec 6.1.11: five failed attempts locks it for fifteen minutes). Present only on the `423 Locked` response `POST /auth/sign-in` returns when the SUBMITTED password is correct but the account is currently locked — never on any other problem response.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lockedUntil?: string;
+        };
+        /**
+         * @description The new one-time temporary password (spec 6.1.11: "displays it once").
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *     }
+         */
+        ResetAdminAccountPasswordResponse: {
+            /**
+             * @description The account.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description The generated plaintext password. Present on the live response; REDACTED (`null`)
+             *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.
+             * @example aB3xQ9mK2pL7vN4wR8dT
+             */
+            temporaryPassword: null | string;
         };
         /**
          * @description REFERENCE SLICE — read model for a sample record.
@@ -962,6 +1386,50 @@ export interface components {
             password: string;
         };
         /**
+         * @description `PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes
+         *             reach this one command: an `admin.update` holder editing any account (name, email, phone,
+         *             and — rule 4 permitting — bool? UpdateAdminAccountCommand.IsSuperAdmin), or the account itself editing only its OWN
+         *             string UpdateAdminAccountCommand.StaffName and string UpdateAdminAccountCommand.Phone (spec 6.1.2's self-edit carve-out — NOT email,
+         *             which the caller must hold `admin.update` to change even on their own account).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "staffName": "Ngozi Adeyemi-Bello",
+         *       "email": "ngozi.adeyemi@example.com",
+         *       "phone": "08012345678",
+         *       "isSuperAdmin": null
+         *     }
+         */
+        UpdateAdminAccountCommand: {
+            /**
+             * Format: uuid
+             * @description The account being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description Two words minimum, letters/spaces/hyphens/apostrophes only.
+             * @example Ngozi Adeyemi-Bello
+             */
+            staffName: string;
+            /**
+             * @description Login identifier. Self-edit callers must submit the account's current value unchanged.
+             * @example ngozi.adeyemi@example.com
+             */
+            email: string;
+            /**
+             * @description Nigerian format.
+             * @example 08012345678
+             */
+            phone: string;
+            /**
+             * @description `null` to leave unchanged. A non-null value that differs from the account's
+             *             current flag is rule 4 territory (spec 6.1.7): only an acting admin who already holds
+             *             bool AdminAccount.IsSuperAdmin may change it, and a rejected attempt writes an audit
+             *             event even though the request as a whole still fails.
+             */
+            isSuperAdmin: null | boolean;
+        };
+        /**
          * @description `PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and
          *             string SchoolProfile.Timezone are deliberately absent from this body — the abbreviation is
          *             TASK-0005c's own endpoint, and the timezone is fixed and not editable in this version.
@@ -1029,6 +1497,552 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    ListAdminAccounts: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["AdminAccountStatus"];
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfAdminAccountSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateAdminAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminAccountCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAdminAccountResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdminAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAdminAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminAccountCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangeAdminAccountStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeAdminAccountStatusCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ResetAdminAccountPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetAdminAccountPasswordResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RevokeAdminAccountSessions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetCsrfToken: {
         parameters: {
             query?: never;
