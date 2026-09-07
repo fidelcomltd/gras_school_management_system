@@ -235,6 +235,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privileges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the privilege register, grouped by module
+         * @description Every privilege the system understands (spec 4.4), grouped 4.4.1 through 4.4.6 in spec table order. Authenticated only — spec 6.1.14 requires no specific privilege to read this: every signed-in admin needs to see the full menu of privileges to understand what a role can be built from. NOT paged: this is a fixed, compile-time, 93-row register, not a growing list, so the usual cursor-pagination rule (spec 9.5) does not apply. Legacy `guardian.*` aliases never appear here — canonical codes only.
+         */
+        get: operations["GetPrivilegeRegister"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/ping": {
         parameters: {
             query?: never;
@@ -297,6 +317,58 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List roles
+         * @description Cursor-paginated per spec 9.5 — never offset. Archived roles are excluded unless `status` names them explicitly (spec 9.4's default-scope rule). `search` matches the role name, case-insensitively, by substring. `sort` is `name` (default) or `status`; `direction` is `asc` (default) or `desc`. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListRoles"];
+        put?: never;
+        /**
+         * Create a role
+         * @description Spec 6.1.4: name, description and at least one privilege code. Rejects the reserved name `Super Admin`, case-insensitive, and any privilege code that does not resolve (after legacy `guardian.*` alias resolution) to the register, naming the offender. Spec 6.1.7 rule 2: every requested privilege must already be held by the caller — a new role starts with none, so every one requested counts as an addition. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same role instead of creating a second one.
+         */
+        post: operations["CreateRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one role
+         * @description Returns the role's own fields — assignments and effective privileges are TASK-0030's detail-view additions, not this endpoint.
+         */
+        get: operations["GetRole"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a role
+         * @description Spec 9.4: hard-deletes unconditionally today, because no `role_assignment` table exists yet, so nothing can ever have referenced a role (TASK-0030 adds the has-ever-been-assigned branch that archives instead). A system role returns 409.
+         */
+        delete: operations["DeleteRole"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a role
+         * @description Every field is independently optional; an absent field is left unchanged (spec 6.1.4, 6.1.9). A system role (the seeded Super Admin) rejects the whole request with 409, regardless of which fields it touches. A `privileges` array REPLACES the whole set; spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role — removal is unrestricted. `Idempotency-Key` is accepted, not required.
+         */
+        patch: operations["UpdateRole"];
         trace?: never;
     };
     "/api/v1/settings": {
@@ -830,6 +902,42 @@ export interface components {
             temporaryPassword: null | string;
         };
         /**
+         * @description `POST /api/v1/roles` (spec 6.1.4; approved delta
+         *             `.agent/decisions/2026-Q3-contract-deltas.md` entry `TASK-0028` §2). Rejects the reserved
+         *             name `Super Admin`, case-insensitive, and an unknown privilege code naming the offender.
+         *             Spec 6.1.7 rule 2 applies to every requested privilege (the role starts with none, so every one
+         *             requested is an "add") — enforced by the handler, not this type.
+         * @example {
+         *       "name": "Class Teacher",
+         *       "description": "Enters marks and views pupil records for an assigned arm.",
+         *       "privileges": [
+         *         "result.score.enter",
+         *         "pupil.view"
+         *       ]
+         *     }
+         */
+        CreateRoleCommand: {
+            /**
+             * @description 1..60 characters.
+             * @example Class Teacher
+             */
+            name: string;
+            /**
+             * @description 0..300 characters, or `null`.
+             * @example Enters marks and views pupil records for an assigned arm.
+             */
+            description: null | string;
+            /**
+             * @description At least one privilege code. Legacy `guardian.*` aliases are accepted and resolved to their
+             *     canonical replacement before storage.
+             * @example [
+             *       "result.score.enter",
+             *       "pupil.view"
+             *     ]
+             */
+            privileges: string[];
+        };
+        /**
          * @description REFERENCE SLICE — the minimal COMMAND. Copy this shape for anything that changes state.
          * @example {
          *       "label": "Term 1 timetable draft",
@@ -955,6 +1063,51 @@ export interface components {
             /**
              * @description `null` when this is the last page.
              * @example MQ==
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "name": "Class Teacher",
+         *           "description": "Enters marks and views pupil records for an assigned arm.",
+         *           "isSystem": false,
+         *           "privileges": [
+         *             "pupil.view",
+         *             "result.score.enter"
+         *           ],
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": "Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA="
+         *     }
+         */
+        CursorPageOfRoleDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "name": "Class Teacher",
+             *         "description": "Enters marks and views pupil records for an assigned arm.",
+             *         "isSystem": false,
+             *         "privileges": [
+             *           "pupil.view",
+             *           "result.score.enter"
+             *         ],
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["RoleDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA=
              */
             nextCursor: null | string;
         };
@@ -1154,6 +1307,109 @@ export interface components {
             apiVersion: string;
         };
         /**
+         * @description One row of the privilege register (spec 4.4).
+         * @example {
+         *       "code": "result.score.enter",
+         *       "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+         *       "scopable": true
+         *     }
+         */
+        PrivilegeDescriptorDto: {
+            /**
+             * @description The canonical privilege code, for example `result.score.enter`. Never a legacy
+             *     `guardian.*` alias — the register is canonical codes only.
+             * @example result.score.enter
+             */
+            code: string;
+            /**
+             * @description Verbatim spec 4.4 "Permits" cell for this row.
+             * @example Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.
+             */
+            permits: string;
+            /**
+             * @description Whether the privilege may be granted over a list of arms rather than school-wide.
+             * @example true
+             */
+            scopable: boolean;
+        };
+        /**
+         * @description One module group of the privilege register (one of spec 4.4.1 through 4.4.6).
+         * @example {
+         *       "key": "results",
+         *       "title": "Results",
+         *       "privileges": [
+         *         {
+         *           "code": "result.score.enter",
+         *           "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+         *           "scopable": true
+         *         }
+         *       ]
+         *     }
+         */
+        PrivilegeGroupDto: {
+            /**
+             * @description The group's stable key: `administration`, `settings`, `academic_structure`,
+             *     `pupils_and_subjects`, `results` or `pins_and_reports`. Crosses the wire as a
+             *     plain string (root CLAUDE.md §8) — a client must tolerate a key it does not recognise, since a
+             *     seventh group is an additive change.
+             * @example results
+             */
+            key: string;
+            /**
+             * @description Verbatim spec 4.4.x section heading, for example "Academic structure".
+             * @example Results
+             */
+            title: string;
+            /**
+             * @description The group's privileges, in spec table order.
+             * @example [
+             *       {
+             *         "code": "result.score.enter",
+             *         "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+             *         "scopable": true
+             *       }
+             *     ]
+             */
+            privileges: components["schemas"]["PrivilegeDescriptorDto"][];
+        };
+        /**
+         * @description The privilege register, grouped 4.4.1 through 4.4.6 in spec table order.
+         * @example {
+         *       "groups": [
+         *         {
+         *           "key": "results",
+         *           "title": "Results",
+         *           "privileges": [
+         *             {
+         *               "code": "result.score.enter",
+         *               "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+         *               "scopable": true
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        PrivilegeRegisterResponse: {
+            /**
+             * @description One entry per module group, in spec section order.
+             * @example [
+             *       {
+             *         "key": "results",
+             *         "title": "Results",
+             *         "privileges": [
+             *           {
+             *             "code": "result.score.enter",
+             *             "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+             *             "scopable": true
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            groups: components["schemas"]["PrivilegeGroupDto"][];
+        };
+        /**
          * @description An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` extension member — it is stable — and never on `detail`, which is human-readable prose that may be reworded. `traceId` identifies this specific occurrence in the server logs; quote it when reporting a problem. `type` is a stable URN of the form `urn:schoolmanagement:error:<code>`.
          * @example {
          *       "type": "urn:schoolmanagement:error:sample_record.label_taken",
@@ -1210,6 +1466,67 @@ export interface components {
              */
             temporaryPassword: null | string;
         };
+        /**
+         * @description The wire shape of a role (spec 6.1.4; approved delta `.agent/decisions/2026-Q3-contract-deltas.md`
+         *     entry `TASK-0028` §2). Returned by every role endpoint — create, get, list (as the item
+         *     shape) and update all share this one DTO, matching how `AdminAccountDetailDto` is reused
+         *     across its own family.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Class Teacher",
+         *       "description": "Enters marks and views pupil records for an assigned arm.",
+         *       "isSystem": false,
+         *       "privileges": [
+         *         "pupil.view",
+         *         "result.score.enter"
+         *       ],
+         *       "status": "Active"
+         *     }
+         */
+        RoleDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description 1..60 characters.
+             * @example Class Teacher
+             */
+            name: string;
+            /**
+             * @description 0..300 characters, or `null`.
+             * @example Enters marks and views pupil records for an assigned arm.
+             */
+            description: null | string;
+            /**
+             * @description True only for the seeded Super Admin role. A system role cannot be edited, renamed, deleted or
+             *     have privileges removed (spec 6.1.4).
+             * @example false
+             */
+            isSystem: boolean;
+            /**
+             * @description Canonical codes, at least one, sorted deterministically.
+             * @example [
+             *       "pupil.view",
+             *       "result.score.enter"
+             *     ]
+             */
+            privileges: string[];
+            /**
+             * @description RoleStatus.Archived roles are excluded from the default list (spec 9.4) but remain
+             *             individually readable and editable (except by `PATCH`/`DELETE` only when
+             *             IsSystem is true).
+             */
+            status: components["schemas"]["RoleStatus"];
+        };
+        /**
+         * @description Lifecycle state of a Role (spec 6.1.4). "An archived role cannot be newly assigned
+         *     but existing assignments continue until the session ends."
+         * @example Active
+         * @enum {unknown}
+         */
+        RoleStatus: "Active" | "Archived";
         /**
          * @description REFERENCE SLICE — read model for a sample record.
          * @example {
@@ -1428,6 +1745,42 @@ export interface components {
              *             event even though the request as a whole still fails.
              */
             isSuperAdmin: null | boolean;
+        };
+        /**
+         * @description `PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):
+         *             "`UpdateRoleRequest name?, description?, privileges?, status? (all optional; absent =
+         *             unchanged)`." Every field is independently optional — `null` leaves that field
+         *             untouched. To clear string? UpdateRoleCommand.Description to "no description," send an empty string rather
+         *             than omitting the field: `null` here is indistinguishable from "not provided,"
+         *             exactly like `UpdateAdminAccountCommand.IsSuperAdmin`'s own null-means-unchanged convention.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Senior Class Teacher",
+         *       "description": null,
+         *       "privileges": null,
+         *       "status": null
+         *     }
+         */
+        UpdateRoleCommand: {
+            /**
+             * Format: uuid
+             * @description The role being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description `null` to leave unchanged. Rejected if it is the reserved name, case-insensitive.
+             * @example Senior Class Teacher
+             */
+            name: null | string;
+            /** @description `null` to leave unchanged; an empty string clears it. */
+            description: null | string;
+            /**
+             * @description `null` to leave unchanged. A non-null value REPLACES the whole set (never a diff) —
+             *             spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role.
+             */
+            privileges: null | string[];
+            status: null | components["schemas"]["RoleStatus"];
         };
         /**
          * @description `PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and
@@ -2334,6 +2687,53 @@ export interface operations {
             };
         };
     };
+    GetPrivilegeRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegeRegisterResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Ping: {
         parameters: {
             query: {
@@ -2534,6 +2934,405 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRoles: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["RoleStatus"];
+                search?: string;
+                sort?: string;
+                direction?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfRoleDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {

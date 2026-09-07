@@ -3,6 +3,10 @@ import { apiDelete, apiGet, apiPatch, apiPost } from './client';
 
 const ADMIN_ID = '0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40';
 
+// The privileges/roles operations (TASK-0033) are covered in the colocated
+// `client-roles.test.ts`, split out to stay under CONVENTIONS.md §3's 180-line
+// file cap rather than growing this file past it.
+
 /**
  * Proves the typed layer end to end against the real transport (`@/lib/http`)
  * and the contract-derived MSW mock (`@/test/msw/handlers.ts`) — not a mock

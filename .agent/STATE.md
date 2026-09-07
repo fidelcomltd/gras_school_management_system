@@ -97,9 +97,10 @@ openapi.json sha256: 73316bdb0f1c19248044a4ec5b405872902159157e1a44dc9680a3fa0a2
           `lockedUntil` remains DECLARED on the `ProblemDetails` schema since TASK-0027 dispatch 2.
 regenerated: 2026-09-07 by TASK-0028 dispatch 2, `-Promote` (generator + SDK under `## Layout`).
           **21 paths now** — `/roles` and `/roles/{id}` join the nineteen privileges/admins/
-          settings/config-version/auth/reference ones. **Frontend client NOT yet regenerated
-          against this hash** — no frontend dispatch was in scope; flagging here rather than
-          leaving it to be discovered as drift.
+          settings/config-version/auth/reference ones. ~~**Frontend client NOT yet regenerated
+          against this hash**~~ — **done by TASK-0033 (2026-09-07): `frontend/src/api/schema.d.ts`
+          regenerated against this same `73316bdb…` hash, `check:api-drift` green.** See TASK-0033
+          in `## Decisions` below for the full account.
 api version: v1 · 21 paths: `/roles`, `/roles/{id}` + `/privileges` +
           `/admins`, `/admins/{id}`, `/admins/{id}/status`,
           `/admins/{id}/password-reset`, `/admins/{id}/sessions` +
@@ -130,12 +131,12 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031, 0032, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06) — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031, 0032, 0033, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
+0033 closed 2026-09-07) — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0033 | Regenerate the client for roles + privileges | frontend-dev | queued |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
@@ -143,6 +144,103 @@ history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-07 **TASK-0033 — coordinator caught acceptance criterion 4 checked off with no test
+  behind it in the entry immediately below; gap closed same session.** Criterion 4 reads "Prove
+  the typed layer REJECTS an `idempotencyKey` on operations that do not declare it." The dispatch
+  below only ever proved the other direction — `@ts-expect-error` on an OMITTED *required*
+  `Idempotency-Key` (`CreateRole`) and on omitted required path params — and checked the box
+  anyway, off the shape of the work rather than the literal wording of the criterion. Neither
+  `client-roles.test.ts` nor `client.test.ts` had a REJECTS-an-extra-`idempotencyKey` case
+  anywhere in the suite until this entry.
+
+  **Fix**: two new `@ts-expect-error` cases in `client-roles.test.ts` — `GET /api/v1/privileges`
+  (options type carries nothing beyond `signal`/`timeout`) and `GET /api/v1/roles` (options type
+  is not trivially empty, so the rejection isn't just "an empty type rejects everything"). Read
+  `IdempotencyKeyOf`/`RequestExtras` in `client-types.ts` first: both operations have
+  `header?: never` (or no header position), so `IdempotencyKeyOf` resolves to `undefined` and the
+  idempotency branch of `RequestExtras` contributes `unknown` — the options type ends up with no
+  `idempotencyKey` property, so the rejection is TypeScript's ordinary excess-property check on a
+  fresh object literal, not a bespoke mechanism. **Verified, not assumed**: removed each
+  `@ts-expect-error` in turn, re-ran `npm run typecheck` — `TS2353: Object literal may only
+  specify known properties, and 'idempotencyKey' does not exist in type 'Omit<CallerOptions,
+  "params">'` at the privileges call site, identical `TS2353` at the roles call site — restored
+  both, suite re-verified green. The type layer genuinely rejects it; this was a missing test, not
+  a real looseness in the wrapper surface.
+
+  **Gates re-run after the fix**: `npm run typecheck` 0 errors; `npm run lint` 0 warnings;
+  `npm run test` **21 files, 167 passed, 0 failed, Skipped: 0** (was 165 in the entry below — the
+  2 new cases account for the delta); `npm run build` and `npm run check:api-drift` re-confirmed
+  green, unchanged. `test:e2e` not re-run (test-file-only change, nothing e2e-relevant touched,
+  already green below). `client-roles.test.ts` now **176 lines / 15 cases** (was 154/13) — still
+  under CONVENTIONS.md §3's 180-line cap. No other file touched by this fix. **The `154 lines /
+  13 cases / 165 passed` figures in the entry immediately below describe the state BEFORE this
+  fix and are superseded by the numbers here — left as originally written, not edited in place,
+  per this project's own standing practice of marking a correction rather than silently
+  overwriting a prior report** (TASK-0029's 2026-09-06 entry set that precedent). Full text:
+  `TASK-0033`'s own `## Log`, which carries the identical correction.
+
+- 2026-09-07 **TASK-0033 implemented by frontend-dev — client regenerated against `73316bdb…`,
+  all six roles/privileges operations reachable through the existing generic wrapper with ZERO
+  new lines in `client.ts`/`client-types.ts`; status → review.**
+
+  `npm run generate:api` re-run against the committed contract (hash independently recomputed
+  with `sha256sum` before starting, matches `CONTRACT.lock` byte for byte). Rewrote
+  `src/api/schema.d.ts` — **+799/-0 lines**, purely additive per `git diff --stat`: the
+  `GetPrivilegeRegister`, `ListRoles`, `CreateRole`, `GetRole`, `UpdateRole`, `DeleteRole`
+  operations plus their schemas (`RoleDto`, `CreateRoleCommand`, `UpdateRoleCommand`,
+  `RoleStatus`, `CursorPageOfRoleDto`, `PrivilegeRegisterResponse`, `PrivilegeGroupDto`,
+  `PrivilegeDto`). `check:api-drift` → "No drift."
+
+  **The reusable finding: a new operation on an already-supported HTTP method needs no new
+  hand-written code at all.** TASK-0029 built `apiGet`/`apiPost`/`apiPatch`/`apiDelete` generic
+  over every path `schema.d.ts` declares for that method, so regenerating the schema is what
+  makes a path callable — this dispatch touched `client.ts`/`client-types.ts` in zero lines.
+  Documented explicitly in `src/api/README.md` so a future session doesn't go looking for six
+  new wrapper functions that were never needed (a new *method* the contract has never used,
+  e.g. `PUT`, is the one case that would still need one).
+
+  **Tests split across two files to respect CONVENTIONS.md §3's 180-line cap**: new colocated
+  `frontend/src/api/client-roles.test.ts` (154 lines, 13 cases) rather than growing
+  `client.test.ts` (already 127 lines) to 275. Covers all six operations, including: a
+  `@ts-expect-error` proving `CreateRole` rejects an omitted `Idempotency-Key` (required there,
+  same as `POST /admins`); `@ts-expect-error`s proving `GetRole`/`UpdateRole`/`DeleteRole` reject
+  an omitted required path parameter; `UpdateRole`/`DeleteRole` exercised both with and without
+  an optional `Idempotency-Key` (the first PATCH/DELETE pair in this contract to accept it
+  optionally — the generic `IdempotencyKeyOf`/`RequestExtras` machinery from TASK-0029 already
+  covered that branch with no change needed); and, for §8 ("the client tolerates unknown enum
+  members without crashing"), two proofs — `sort` compiles with an unrecognised value because
+  the contract types it as a plain `string`, not a closed union, and a `server.use(...)` override
+  returns `status: "SomeFutureStatus"` on `ListRoles` (`RoleStatus` is a compile-time-only union,
+  `"Active" | "Archived"`, and nothing in `client.ts`/`client-types.ts` validates a response body
+  at runtime) with the client asserted to pass it through unchanged rather than throw. **One
+  real mistake caught by the type checker, not by review**: the first draft of the "no filters"
+  `ListRoles` test called `apiGet('/api/v1/roles', undefined)`, which fails `tsc -b` with
+  `TS2345` — `QueryOf` resolves an operation's optional `query?:` position to the object's own
+  shape (per `client-types.ts`'s own doc comment, needed so an optional query object with
+  individually-optional fields still gets typed usefully), not to `undefined`, so an empty `{}`
+  is the correct call, not a literal `undefined`. Fixed the test, not the (correct) type. Every
+  `@ts-expect-error` verified the same way TASK-0029 established: removed one at a time, confirmed
+  `npm run typecheck` fails at exactly that line, restored, re-verified green.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **21 files,
+  165 passed, 0 failed, Skipped: 0** (was 20/152 before this dispatch); `npm run build`
+  (`tsc -b && vite build`) succeeded, 323 modules, 9 chunks, unchanged (test files aren't
+  bundled); `npm run check:api-drift` "No drift"; `npm run test:e2e` (`playwright test`) **4
+  passed, Skipped: 0**, unchanged (no e2e spec touches `/roles`/`/privileges` — no screen exists,
+  out of scope per the card). §4.4 check 3 (`src/test/http-boundary.test.ts`) re-run directly: 2
+  passed, no raw `fetch`/`axios` outside `src/lib/http/`.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +799/-0),
+  `frontend/src/api/client.test.ts` (+4, a comment pointing at the split — no existing test
+  moved or altered), `frontend/src/api/client-roles.test.ts` (new), `frontend/src/api/README.md`
+  (documents the split and the "no new client.ts code" finding). Nothing under `contracts/**` or
+  `backend/**` touched; hash unmoved at `73316bdb…`.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no role/privilege screen, no
+  TanStack Query hooks, no `features/roles` folder, no query-key enum — client seam only.
+  Full text: `TASK-0033`'s own `## Log`.
 
 - 2026-09-07 **TASK-0028 dispatch 2 verified by orchestrator — the raw-SQL decision is sounder
   than its own justification.** `RoleRepository.ListAsync` splices three fragments into
