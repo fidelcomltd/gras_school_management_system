@@ -2687,7 +2687,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "`GET /api/v1/admins/{id}` (spec 6.1.8). Deliberately omits assignments, the resolved\r\n        effective privilege set and the last ten audit events by this account — the approved delta (B4)\r\n        splits these to TASK-0028 along with roles and assignments themselves; adding them later is\r\n        additive.",
+        "description": "`GET /api/v1/admins/{id}` (spec 6.1.8). Deliberately omits assignments, the resolved\n        effective privilege set and the last ten audit events by this account — the approved delta (B4)\n        splits these to TASK-0028 along with roles and assignments themselves; adding them later is\n        additive.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "staffName": "Ngozi Adeyemi",
@@ -2706,7 +2706,7 @@
           "Suspended",
           "Deactivated"
         ],
-        "description": "Lifecycle state of an AdminAccount (spec 6.1.10). Only AdminAccountStatus.Active may\r\nsign in.",
+        "description": "Lifecycle state of an AdminAccount (spec 6.1.10). Only AdminAccountStatus.Active may\nsign in.",
         "example": "Active"
       },
       "AdminAccountSummaryDto": {
@@ -2777,7 +2777,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "One row of `GET /api/v1/admins` (spec 6.1.8). Deliberately omits `rolesHeld` and\r\n`scopeSummary` — the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry\r\n`TASK-0019/0027`, B4) splits roles and assignments to TASK-0028, which adds both fields\r\nadditively once a `role_assignment` table exists to compute them from.",
+        "description": "One row of `GET /api/v1/admins` (spec 6.1.8). Deliberately omits `rolesHeld` and\n`scopeSummary` — the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry\n`TASK-0019/0027`, B4) splits roles and assignments to TASK-0028, which adds both fields\nadditively once a `role_assignment` table exists to compute them from.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "staffName": "Ngozi Adeyemi",
@@ -2833,7 +2833,7 @@
             "items": {
               "$ref": "#/components/schemas/EffectivePrivilegeDto"
             },
-            "description": "The caller's resolved effective privilege set. For this card, populated only via the\r\nbool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.",
+            "description": "The caller's resolved effective privilege set. For this card, populated only via the\nbool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.",
             "example": [
               {
                 "privilege": "admin.view",
@@ -2856,7 +2856,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Shared response shape returned by `sign-in`, `me`, `refresh` and `password`\r\n(approved contract delta §0), so the frontend never needs a second round trip to learn its own\r\nstate after any of the four.",
+        "description": "Shared response shape returned by `sign-in`, `me`, `refresh` and `password`\n(approved contract delta §0), so the frontend never needs a second round trip to learn its own\nstate after any of the four.",
         "example": {
           "accountId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "email": "admin@example.com",
@@ -2897,11 +2897,11 @@
               "null",
               "string"
             ],
-            "description": "Required, at least ten characters, when Status is\r\nAdminAccountStatus.Deactivated (spec 6.1.12: \"A reason is mandatory on:...\r\nadmin deactivation\")."
+            "description": "Required, at least ten characters, when Status is\nAdminAccountStatus.Deactivated (spec 6.1.12: \"A reason is mandatory on:...\nadmin deactivation\")."
           }
         },
         "additionalProperties": false,
-        "description": "`POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is\r\n        DATA-DEPENDENT on Status — `admin.suspend` for the active/suspended pair,\r\n        `admin.deactivate` for deactivation, and `admin.deactivate` HELD BY A SUPER ADMIN for\r\n        reactivating a deactivated account — so this route is mapped with `RequireAuthenticatedCaller()`\r\n        and the handler resolves the exact requirement.",
+        "description": "`POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is\n        DATA-DEPENDENT on Status — `admin.suspend` for the active/suspended pair,\n        `admin.deactivate` for deactivation, and `admin.deactivate` HELD BY A SUPER ADMIN for\n        reactivating a deactivated account — so this route is mapped with `RequireAuthenticatedCaller()`\n        and the handler resolves the exact requirement.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "status": "Suspended",
@@ -2917,17 +2917,17 @@
         "properties": {
           "currentPassword": {
             "type": "string",
-            "description": "Must match the account's current password (re-authentication for a\r\n            sensitive action).",
+            "description": "Must match the account's current password (re-authentication for a\n            sensitive action).",
             "example": "correct horse battery staple 9"
           },
           "newPassword": {
             "type": "string",
-            "description": "Must satisfy spec 6.1.11's composition rule and must not match any of the\r\n            last int AuthPolicy.PasswordHistoryLimit hashes (checked in the handler, which needs the\r\n            password hasher — not expressible as a synchronous FluentValidation rule).",
+            "description": "Must satisfy spec 6.1.11's composition rule and must not match any of the\n            last int AuthPolicy.PasswordHistoryLimit hashes (checked in the handler, which needs the\n            password hasher — not expressible as a synchronous FluentValidation rule).",
             "example": "another horse battery staple 4"
           }
         },
         "additionalProperties": false,
-        "description": "Self-service password change (spec 6.1.11, spec 6.1.14). Approved contract delta:\r\n`POST /api/v1/auth/password`. The account comes from the caller's own session — this is never\r\nhow another account's password is changed (that is `admin.password.reset`, TASK-0019).",
+        "description": "Self-service password change (spec 6.1.11, spec 6.1.14). Approved contract delta:\n`POST /api/v1/auth/password`. The account comes from the caller's own session — this is never\nhow another account's password is changed (that is `admin.password.reset`, TASK-0019).",
         "example": {
           "currentPassword": "correct horse battery staple 9",
           "newPassword": "another horse battery staple 4"
@@ -2978,7 +2978,7 @@
               "null",
               "string"
             ],
-            "description": "The reason given for this save, or `null` when the changed group's rule does not\r\nrequire one (6.2.10) — always `null` for an `Identity` row."
+            "description": "The reason given for this save, or `null` when the changed group's rule does not\nrequire one (6.2.10) — always `null` for an `Identity` row."
           },
           "createdAtUtc": {
             "type": "string",
@@ -2987,7 +2987,7 @@
             "example": "2026-08-03T09:30:00+00:00"
           },
           "snapshot": {
-            "description": "The whole serialised configuration as of this save (6.2.9) — every group's values at that moment,\r\nnot only the one that changed.",
+            "description": "The whole serialised configuration as of this save (6.2.9) — every group's values at that moment,\nnot only the one that changed.",
             "$ref": "#/components/schemas/JsonElement"
           }
         },
@@ -3063,7 +3063,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "One row of `GET /api/v1/config-versions`'s cursor-paged list — everything except the\r\nsnapshot itself, which only the detail endpoint returns.",
+        "description": "One row of `GET /api/v1/config-versions`'s cursor-paged list — everything except the\nsnapshot itself, which only the detail endpoint returns.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "versionNumber": 3,
@@ -3097,7 +3097,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "`POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14): \"Step one takes staff name, email and\r\n        phone and creates the account.\" Role assignment (step two) is TASK-0028 — an account with zero\r\n        assignments can exist and sign in, per spec 6.1.9's own text.",
+        "description": "`POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14): \"Step one takes staff name, email and\n        phone and creates the account.\" Role assignment (step two) is TASK-0028 — an account with zero\n        assignments can exist and sign in, per spec 6.1.9's own text.",
         "example": {
           "staffName": "Ngozi Adeyemi",
           "email": "ngozi.adeyemi@example.com",
@@ -3157,12 +3157,12 @@
               "null",
               "string"
             ],
-            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\r\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the\r\napproved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay\r\nthat returned it verbatim would be a second display).",
+            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the\napproved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay\nthat returned it verbatim would be a second display).",
             "example": "aB3xQ9mK2pL7vN4wR8dT"
           }
         },
         "additionalProperties": false,
-        "description": "The created account, including the one-time temporary password (spec 6.1.9: \"displays it once on\r\nscreen with a copy button, and never displays it again\").",
+        "description": "The created account, including the one-time temporary password (spec 6.1.9: \"displays it once on\nscreen with a copy button, and never displays it again\").",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "staffName": "Ngozi Adeyemi",
@@ -3200,7 +3200,7 @@
             "items": {
               "type": "string"
             },
-            "description": "At least one privilege code. Legacy `guardian.*` aliases are accepted and resolved to their\r\ncanonical replacement before storage.",
+            "description": "At least one privilege code. Legacy `guardian.*` aliases are accepted and resolved to their\ncanonical replacement before storage.",
             "example": [
               "result.score.enter",
               "pupil.view"
@@ -3208,7 +3208,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "`POST /api/v1/roles` (spec 6.1.4; approved delta\r\n        `.agent/decisions/2026-Q3-contract-deltas.md` entry `TASK-0028` §2). Rejects the reserved\r\n        name `Super Admin`, case-insensitive, and an unknown privilege code naming the offender.\r\n        Spec 6.1.7 rule 2 applies to every requested privilege (the role starts with none, so every one\r\n        requested is an \"add\") — enforced by the handler, not this type.",
+        "description": "`POST /api/v1/roles` (spec 6.1.4; approved delta\n        `.agent/decisions/2026-Q3-contract-deltas.md` entry `TASK-0028` §2). Rejects the reserved\n        name `Super Admin`, case-insensitive, and an unknown privilege code naming the offender.\n        Spec 6.1.7 rule 2 applies to every requested privilege (the role starts with none, so every one\n        requested is an \"add\") — enforced by the handler, not this type.",
         "example": {
           "name": "Class Teacher",
           "description": "Enters marks and views pupil records for an assigned arm.",
@@ -3254,7 +3254,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "The new record's opaque identifier. Returned in the body as well as in the `Location`\r\nheader, so a client need not parse the URL to learn it.",
+            "description": "The new record's opaque identifier. Returned in the body as well as in the `Location`\nheader, so a client need not parse the URL to learn it.",
             "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
           }
         },
@@ -3272,7 +3272,7 @@
         "properties": {
           "csrfToken": {
             "type": "string",
-            "description": "Opaque token — also set as the `__Host-XSRF-TOKEN` cookie. Echo verbatim in an `X-CSRF-Token`\r\nheader on every mutating `/auth/*` request.",
+            "description": "Opaque token — also set as the `__Host-XSRF-TOKEN` cookie. Echo verbatim in an `X-CSRF-Token`\nheader on every mutating `/auth/*` request.",
             "example": "CfDJ8N-example-opaque-csrf-token-value"
           }
         },
@@ -3319,7 +3319,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\r\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\r\nconstructed by hand.",
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
         "example": {
           "items": [
             {
@@ -3370,7 +3370,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\r\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\r\nconstructed by hand.",
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
         "example": {
           "items": [
             {
@@ -3421,7 +3421,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\r\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\r\nconstructed by hand.",
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
         "example": {
           "items": [
             {
@@ -3467,7 +3467,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant\r\n            minus its session id — that field is server-internal and never crosses the wire.",
+        "description": "One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant\n            minus its session id — that field is server-internal and never crosses the wire.",
         "example": {
           "privilege": "admin.view",
           "scope": "SchoolWide",
@@ -3633,7 +3633,7 @@
               "integer",
               "string"
             ],
-            "description": "Total matching rows across all pages. long because a table can exceed\r\nint rows, and discovering that in production is not the moment to find out.",
+            "description": "Total matching rows across all pages. long because a table can exceed\nint rows, and discovering that in production is not the moment to find out.",
             "format": "int64",
             "example": 137
           },
@@ -3659,7 +3659,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "The one pagination response envelope for the whole API. Consistency here is what lets the\r\nfrontend write a single generic paging hook instead of one per endpoint.",
+        "description": "The one pagination response envelope for the whole API. Consistency here is what lets the\nfrontend write a single generic paging hook instead of one per endpoint.",
         "example": {
           "items": [
             {
@@ -3693,18 +3693,18 @@
           },
           "serverTimeUtc": {
             "type": "string",
-            "description": "Server time when the request was handled. Always UTC with an explicit offset (ISO-8601), per the\r\nrepo-wide rule that timestamps cross the wire as DateTimeOffset and are converted\r\nto a local zone only in the UI.",
+            "description": "Server time when the request was handled. Always UTC with an explicit offset (ISO-8601), per the\nrepo-wide rule that timestamps cross the wire as DateTimeOffset and are converted\nto a local zone only in the UI.",
             "format": "date-time",
             "example": "2026-08-03T09:30:00+00:00"
           },
           "apiVersion": {
             "type": "string",
-            "description": "The API version that served the request, matching the URL segment — useful when a client is\r\nunsure which version a proxy routed it to.",
+            "description": "The API version that served the request, matching the URL segment — useful when a client is\nunsure which version a proxy routed it to.",
             "example": "1.0"
           }
         },
         "additionalProperties": false,
-        "description": "Response to a PingQuery. Confirms the service is reachable and that its clock,\r\nserialisation, and API version are what the caller expects.",
+        "description": "Response to a PingQuery. Confirms the service is reachable and that its clock,\nserialisation, and API version are what the caller expects.",
         "example": {
           "message": "Hello, Ada.",
           "serverTimeUtc": "2026-08-03T09:30:00+00:00",
@@ -3721,7 +3721,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "The canonical privilege code, for example `result.score.enter`. Never a legacy\r\n`guardian.*` alias — the register is canonical codes only.",
+            "description": "The canonical privilege code, for example `result.score.enter`. Never a legacy\n`guardian.*` alias — the register is canonical codes only.",
             "example": "result.score.enter"
           },
           "permits": {
@@ -3753,7 +3753,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "The group's stable key: `administration`, `settings`, `academic_structure`,\r\n`pupils_and_subjects`, `results` or `pins_and_reports`. Crosses the wire as a\r\nplain string (root CLAUDE.md §8) — a client must tolerate a key it does not recognise, since a\r\nseventh group is an additive change.",
+            "description": "The group's stable key: `administration`, `settings`, `academic_structure`,\n`pupils_and_subjects`, `results` or `pins_and_reports`. Crosses the wire as a\nplain string (root CLAUDE.md §8) — a client must tolerate a key it does not recognise, since a\nseventh group is an additive change.",
             "example": "results"
           },
           "title": {
@@ -3923,7 +3923,7 @@
               "null",
               "string"
             ],
-            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\r\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.",
+            "description": "The generated plaintext password. Present on the live response; REDACTED (`null`)\non a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.",
             "example": "aB3xQ9mK2pL7vN4wR8dT"
           }
         },
@@ -3965,7 +3965,7 @@
           },
           "isSystem": {
             "type": "boolean",
-            "description": "True only for the seeded Super Admin role. A system role cannot be edited, renamed, deleted or\r\nhave privileges removed (spec 6.1.4).",
+            "description": "True only for the seeded Super Admin role. A system role cannot be edited, renamed, deleted or\nhave privileges removed (spec 6.1.4).",
             "example": false
           },
           "privileges": {
@@ -3980,12 +3980,12 @@
             ]
           },
           "status": {
-            "description": "RoleStatus.Archived roles are excluded from the default list (spec 9.4) but remain\r\n        individually readable and editable (except by `PATCH`/`DELETE` only when\r\n        IsSystem is true).",
+            "description": "RoleStatus.Archived roles are excluded from the default list (spec 9.4) but remain\n        individually readable and editable (except by `PATCH`/`DELETE` only when\n        IsSystem is true).",
             "$ref": "#/components/schemas/RoleStatus"
           }
         },
         "additionalProperties": false,
-        "description": "The wire shape of a role (spec 6.1.4; approved delta `.agent/decisions/2026-Q3-contract-deltas.md`\r\nentry `TASK-0028` §2). Returned by every role endpoint — create, get, list (as the item\r\nshape) and update all share this one DTO, matching how `AdminAccountDetailDto` is reused\r\nacross its own family.",
+        "description": "The wire shape of a role (spec 6.1.4; approved delta `.agent/decisions/2026-Q3-contract-deltas.md`\nentry `TASK-0028` §2). Returned by every role endpoint — create, get, list (as the item\nshape) and update all share this one DTO, matching how `AdminAccountDetailDto` is reused\nacross its own family.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "name": "Class Teacher",
@@ -4003,7 +4003,7 @@
           "Active",
           "Archived"
         ],
-        "description": "Lifecycle state of a Role (spec 6.1.4). \"An archived role cannot be newly assigned\r\nbut existing assignments continue until the session ends.\"",
+        "description": "Lifecycle state of a Role (spec 6.1.4). \"An archived role cannot be newly assigned\nbut existing assignments continue until the session ends.\"",
         "example": "Active"
       },
       "SampleRecordDto": {
@@ -4018,7 +4018,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Opaque identifier. A STRING on the wire even though it is a GUID in the database, per the\r\nrepo-wide rule that IDs are opaque to clients — that way the storage key type can change without\r\nbreaking them.",
+            "description": "Opaque identifier. A STRING on the wire even though it is a GUID in the database, per the\nrepo-wide rule that IDs are opaque to clients — that way the storage key type can change without\nbreaking them.",
             "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
           },
           "label": {
@@ -4065,7 +4065,7 @@
           "SchoolWide",
           "ArmList"
         ],
-        "description": "How a role assignment's grant is bounded. Spec 4.2: \"Scope is one of two things: school-wide,\r\nor a list of specific arms in a specific session.\"",
+        "description": "How a role assignment's grant is bounded. Spec 4.2: \"Scope is one of two things: school-wide,\nor a list of specific arms in a specific session.\"",
         "example": "SchoolWide"
       },
       "SecureArmResponse": {
@@ -4099,7 +4099,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of\r\nTASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups\r\n(logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather\r\nthan a new top-level field, and registration-number/abbreviation get their own group here).",
+        "description": "The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of\nTASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups\n(logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather\nthan a new top-level field, and registration-number/abbreviation get their own group here).",
         "example": {
           "identity": {
             "schoolName": "Golden Royal Ark School",
@@ -4177,13 +4177,13 @@
               "integer",
               "string"
             ],
-            "description": "The identity group's current optimistic-concurrency pointer. Echo this back as\r\n`expectedVersion` on the next `PATCH`.",
+            "description": "The identity group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next `PATCH`.",
             "format": "int32",
             "example": 3
           }
         },
         "additionalProperties": false,
-        "description": "The school identity group, both inside SettingsDto and as\r\n`PATCH /api/v1/settings/identity`'s own success body (spec 6.2.3).",
+        "description": "The school identity group, both inside SettingsDto and as\n`PATCH /api/v1/settings/identity`'s own success body (spec 6.2.3).",
         "example": {
           "schoolName": "Golden Royal Ark School",
           "shortName": "GRAS",
@@ -4205,17 +4205,17 @@
         "properties": {
           "email": {
             "type": "string",
-            "description": "The account's login identifier. SignInCommandValidator DOES\r\n            check this is a well-formed email address — that check runs (and can reject) before the Argon2id\r\n            verify, but it does not reopen spec 6.1.11's timing concern: format validation happens identically\r\n            whether or not any account with that shape of address exists, so it cannot distinguish \"known\r\n            email\" from \"unknown email\" the way the Argon2id verify's presence/absence would.",
+            "description": "The account's login identifier. SignInCommandValidator DOES\n            check this is a well-formed email address — that check runs (and can reject) before the Argon2id\n            verify, but it does not reopen spec 6.1.11's timing concern: format validation happens identically\n            whether or not any account with that shape of address exists, so it cannot distinguish \"known\n            email\" from \"unknown email\" the way the Argon2id verify's presence/absence would.",
             "example": "admin@example.com"
           },
           "password": {
             "type": "string",
-            "description": "The submitted plaintext password. Never logged (redacted by field name — see\r\n            `RedactSensitivePropertiesEnricher` — and never included in the request-logging behaviour's\r\n            output in the first place, since that behaviour logs only the request TYPE name).",
+            "description": "The submitted plaintext password. Never logged (redacted by field name — see\n            `RedactSensitivePropertiesEnricher` — and never included in the request-logging behaviour's\n            output in the first place, since that behaviour logs only the request TYPE name).",
             "example": "correct horse battery staple 9"
           }
         },
         "additionalProperties": false,
-        "description": "Signs an administrator in (spec 6.1.11, spec 9.1). Approved contract delta:\r\n`POST /api/v1/auth/sign-in`.",
+        "description": "Signs an administrator in (spec 6.1.11, spec 9.1). Approved contract delta:\n`POST /api/v1/auth/sign-in`.",
         "example": {
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
@@ -4257,11 +4257,11 @@
               "null",
               "boolean"
             ],
-            "description": "`null` to leave unchanged. A non-null value that differs from the account's\r\n        current flag is rule 4 territory (spec 6.1.7): only an acting admin who already holds\r\n        bool AdminAccount.IsSuperAdmin may change it, and a rejected attempt writes an audit\r\n        event even though the request as a whole still fails."
+            "description": "`null` to leave unchanged. A non-null value that differs from the account's\n        current flag is rule 4 territory (spec 6.1.7): only an acting admin who already holds\n        bool AdminAccount.IsSuperAdmin may change it, and a rejected attempt writes an audit\n        event even though the request as a whole still fails."
           }
         },
         "additionalProperties": false,
-        "description": "`PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes\r\n        reach this one command: an `admin.update` holder editing any account (name, email, phone,\r\n        and — rule 4 permitting — bool? UpdateAdminAccountCommand.IsSuperAdmin), or the account itself editing only its OWN\r\n        string UpdateAdminAccountCommand.StaffName and string UpdateAdminAccountCommand.Phone (spec 6.1.2's self-edit carve-out — NOT email,\r\n        which the caller must hold `admin.update` to change even on their own account).",
+        "description": "`PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes\n        reach this one command: an `admin.update` holder editing any account (name, email, phone,\n        and — rule 4 permitting — bool? UpdateAdminAccountCommand.IsSuperAdmin), or the account itself editing only its OWN\n        string UpdateAdminAccountCommand.StaffName and string UpdateAdminAccountCommand.Phone (spec 6.1.2's self-edit carve-out — NOT email,\n        which the caller must hold `admin.update` to change even on their own account).",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "staffName": "Ngozi Adeyemi-Bello",
@@ -4309,7 +4309,7 @@
             "items": {
               "type": "string"
             },
-            "description": "`null` to leave unchanged. A non-null value REPLACES the whole set (never a diff) —\r\n        spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role."
+            "description": "`null` to leave unchanged. A non-null value REPLACES the whole set (never a diff) —\n        spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role."
           },
           "status": {
             "oneOf": [
@@ -4324,7 +4324,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "`PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):\r\n        \"`UpdateRoleRequest name?, description?, privileges?, status? (all optional; absent =\r\n        unchanged)`.\" Every field is independently optional — `null` leaves that field\r\n        untouched. To clear string? UpdateRoleCommand.Description to \"no description,\" send an empty string rather\r\n        than omitting the field: `null` here is indistinguishable from \"not provided,\"\r\n        exactly like `UpdateAdminAccountCommand.IsSuperAdmin`'s own null-means-unchanged convention.",
+        "description": "`PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):\n        \"`UpdateRoleRequest name?, description?, privileges?, status? (all optional; absent =\n        unchanged)`.\" Every field is independently optional — `null` leaves that field\n        untouched. To clear string? UpdateRoleCommand.Description to \"no description,\" send an empty string rather\n        than omitting the field: `null` here is indistinguishable from \"not provided,\"\n        exactly like `UpdateAdminAccountCommand.IsSuperAdmin`'s own null-means-unchanged convention.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
           "name": "Senior Class Teacher",
@@ -4390,13 +4390,13 @@
               "integer",
               "string"
             ],
-            "description": "The identity group's current `versionNumber`, as last read from `GET /settings`. A\r\nstale value is rejected `409 settings.identity.stale_version` before anything is written.",
+            "description": "The identity group's current `versionNumber`, as last read from `GET /settings`. A\nstale value is rejected `409 settings.identity.stale_version` before anything is written.",
             "format": "int32",
             "example": 2
           }
         },
         "additionalProperties": false,
-        "description": "`PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and\r\n        string SchoolProfile.Timezone are deliberately absent from this body — the abbreviation is\r\n        TASK-0005c's own endpoint, and the timezone is fixed and not editable in this version.",
+        "description": "`PATCH /api/v1/settings/identity` (spec 6.2.3). string SchoolProfile.Abbreviation and\n        string SchoolProfile.Timezone are deliberately absent from this body — the abbreviation is\n        TASK-0005c's own endpoint, and the timezone is fixed and not editable in this version.",
         "example": {
           "schoolName": "Golden Royal Ark School",
           "shortName": "GRAS",

@@ -356,6 +356,67 @@ public sealed class OpenApiContractTests
         description.ShouldContain("422");
     }
 
+    [Fact]
+    public void NoDescription_ContainsACarriageReturn()
+    {
+        // TASK-0034: Roslyn writes the XML doc files (bin/**/SchoolManagement.*.xml) with
+        // Environment.NewLine, not the source's own LF, so a wrapped /// comment built on Windows
+        // used to reach every "description" string here as an embedded CRLF, while the same source
+        // built on ubuntu-latest produced a bare LF in the same place. ci.ps1's drift gate hashes
+        // this exact artefact byte-for-byte against contracts/openapi.json (see OpenApiDocument's
+        // remarks), so that divergence made a Windows-promoted contract permanently fail on every
+        // Linux CI run of the same commit — not a real content difference, since JSON has no
+        // canonical newline representation, but the hash could not tell the two apart.
+        // generate-openapi.ps1 now normalises every escaped \r\n (and any lone \r) to \n on the
+        // generated artefact itself, before anything hashes or copies it — this test is the
+        // regression guard for that normalisation, walking every "description" string anywhere in
+        // the document (paths, operations, parameters, schemas, properties — recursively, not just
+        // the schema-level ones the other tests above already sample) rather than trusting the 93
+        // known offenders to be the only ones that can ever appear.
+        var failures = new List<string>();
+
+        CollectCarriageReturnDescriptions(Document, "$", failures);
+
+        failures.ShouldBeEmpty(
+            "No 'description' string may contain a carriage return — generate-openapi.ps1 must " +
+            $"normalise it to LF so the document is byte-identical across platforms.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, failures.Select(failure => "  - " + failure)));
+    }
+
+    private static void CollectCarriageReturnDescriptions(JsonElement element, string path, List<string> failures)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    var childPath = $"{path}.{property.Name}";
+
+                    if (property.Name == "description" &&
+                        property.Value.ValueKind == JsonValueKind.String &&
+                        property.Value.GetString() is { } description &&
+                        description.Contains('\r'))
+                    {
+                        failures.Add(childPath);
+                    }
+
+                    CollectCarriageReturnDescriptions(property.Value, childPath, failures);
+                }
+
+                break;
+
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                {
+                    CollectCarriageReturnDescriptions(item, $"{path}[{index}]", failures);
+                    index++;
+                }
+
+                break;
+        }
+    }
+
     private static bool HasNonEmpty(JsonElement element, string propertyName) =>
         element.TryGetProperty(propertyName, out var value) &&
         !string.IsNullOrWhiteSpace(value.GetString());

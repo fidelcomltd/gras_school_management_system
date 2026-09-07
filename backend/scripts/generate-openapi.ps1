@@ -104,6 +104,37 @@ if (-not (Test-Path $generatedDocument)) {
     throw "Expected a document at '$generatedDocument' but none was produced. Check the build output above."
 }
 
+# Roslyn writes the XML doc files (bin/**/SchoolManagement.*.xml) using Environment.NewLine, not the
+# source's own LF (backend/.gitattributes forces `* text=auto eol=lf` on every .cs file).
+# Microsoft.Extensions.ApiDescription.Server lifts those <summary> bodies straight into this
+# document's "description" strings, so on Windows they carry an escaped CRLF (the literal 4-byte
+# text `\r\n`, since JSON escapes real control characters rather than embedding them raw) wherever a
+# doc comment wraps a line; a Linux runner emits an escaped `\n` in the same spots. Gate 10
+# ("OpenAPI contract drift") is a byte-exact hash comparison against contracts/openapi.json BY
+# DESIGN, so this single-platform artefact was making the two platforms disagree over content that
+# means nothing. Normalised HERE, on the generated artefact itself, on every run (-Promote or not) —
+# gate 10 hashes this file directly, so normalising only inside the -Promote branch below would still
+# leave a Windows-generated (non-promoted) artefact CRLF-bearing and failing gate 10 locally against
+# an already-normalised committed contract.
+#
+# Plain text replacement, not ConvertFrom-Json + re-serialise: round-tripping through the JSON object
+# model reorders and reformats far more than these 93 values, per the approach this card specified.
+# Read with File.ReadAllText / write with File.WriteAllText (not Get-Content/Set-Content or -replace
+# piped through a pipeline) so nothing here is tempted to translate the file's OWN physical line
+# endings (already LF, per .gitattributes) or add a BOM — only the escaped text inside the JSON
+# string values changes.
+$rawText = [System.IO.File]::ReadAllText($generatedDocument)
+# Order matters: collapse the escaped CRLF pair first, so a lone escaped CR left over (0 occurrences
+# today; kept defensively in case Roslyn or a future dependency ever emits a bare \r) is only ever
+# whatever a real \r\n pair did NOT already consume.
+$normalizedText = $rawText -replace '\\r\\n', '\n' -replace '\\r', '\n'
+
+if ($normalizedText -ne $rawText) {
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($generatedDocument, $normalizedText, $utf8NoBom)
+    Write-Host '==> Normalised escaped CRLF sequences in the generated document to LF (cross-platform reproducibility).' -ForegroundColor Cyan
+}
+
 $documentInfo = Get-Item $generatedDocument
 Write-Host "==> Generated: $($documentInfo.FullName) ($($documentInfo.Length) bytes)" -ForegroundColor Green
 

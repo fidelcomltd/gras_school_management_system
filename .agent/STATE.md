@@ -137,6 +137,7 @@ history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
+| TASK-0034 | Make the generated OpenAPI document byte-reproducible across platforms | backend-dev | review — fix + promote landed, gates re-running |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
@@ -1046,6 +1047,17 @@ sign-off) resolved 2026-09-06 and archived there.
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
    decision clears all four.
+
+6. **Root `.gitattributes` is missing, and `core.autocrlf=true`.** `backend/.gitattributes`
+   normalises `backend/**` only, so `contracts/openapi.json`, `contracts/CONTRACT.lock` and
+   `frontend/src/api/schema.d.ts` are unnormalised. They are LF in the worktree today only
+   because generators wrote them, not a checkout — git already warns "LF will be replaced by
+   CRLF the next time Git touches it" on all three. After a fresh clone on Windows, gate 10 and
+   `check:api-drift` both fail locally on line endings alone while CI stays green. Same class of
+   bug as TASK-0034, one layer out. Fix is a root `.gitattributes` pinning at least the generated
+   artefacts to `eol=lf`, but it renormalises stored files repo-wide, so the blast radius wants a
+   human nod before it lands. Raised 2026-09-07 while diagnosing TASK-0034; recorded as
+   out-of-scope on that card. Orchestrator-owned. NOT blocking anything today.
 
 ## Reading this file
 
