@@ -8,6 +8,7 @@ using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Security.PrivilegeRegister;
+using SchoolManagement.Application.Security.Roles;
 using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
@@ -378,6 +379,51 @@ internal static class OpenApiExamples
                   ]
                 }
               ]
+            }
+            """,
+
+        [typeof(CreateRoleCommand)] = """
+            {
+              "name": "Class Teacher",
+              "description": "Enters marks and views pupil records for an assigned arm.",
+              "privileges": ["result.score.enter", "pupil.view"]
+            }
+            """,
+
+        [typeof(RoleDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Class Teacher",
+              "description": "Enters marks and views pupil records for an assigned arm.",
+              "isSystem": false,
+              "privileges": ["pupil.view", "result.score.enter"],
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<RoleDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "name": "Class Teacher",
+                  "description": "Enters marks and views pupil records for an assigned arm.",
+                  "isSystem": false,
+                  "privileges": ["pupil.view", "result.score.enter"],
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": "Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA="
+            }
+            """,
+
+        [typeof(UpdateRoleCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Senior Class Teacher",
+              "description": null,
+              "privileges": null,
+              "status": null
             }
             """,
 

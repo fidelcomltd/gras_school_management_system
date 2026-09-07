@@ -485,6 +485,60 @@ steps, so this suite does not silently never run in CI — the same gap TASK-002
 `## Known drift` entry for the 2026-08-27 Secret-scan finding and `## Gate commands` are
 orchestrator-owned; this card's ledger entry says what to strike rather than striking it directly.
 
+### 2.20 TASK-0028 dispatch 2 — role persistence, CRUD, rule 2
+
+Five decisions, none of them redesigning the three inherited files (`Role.cs`,
+`RolePrivilegeEscalationGuard.cs`, `IRoleRepository.cs`) beyond two mechanical XML-doc-comment fixes
+that blocked `warnings-as-errors` build (below) — the guard's logic, message wording and repository
+contract are exactly as the previous dispatch and the orchestrator's review left them.
+
+**Two pre-existing compile errors in the six inherited files, fixed as doc-only changes, logic
+untouched.** `RolePrivilegeEscalationGuard.cs`'s CLASS-level `<remarks>` used
+`<paramref name="existingPrivileges"/>`/`<paramref name="actorPrivileges"/>`, which only resolves
+against a MEMBER's own parameters — CS1734 on a class comment, which `AnalysisLevel 10.0-All` turns
+into a build error. Changed to `<c>existingPrivileges</c>`/`<c>actorPrivileges"</c>` (plain code
+formatting, same words, no cross-reference). `IRoleRepository.cs` also carried an unused
+`using SchoolManagement.Domain.Common;` (IDE0005, likewise an error) — removed. Neither the guard's
+evaluation order, its message text, nor the repository's method signatures changed.
+
+**Privileges are stored as a comma-joined `text` column, not a native Postgres array.** Same
+technique `AdminAccountConfiguration.PasswordHistoryHashes` already uses for a newline-joined list,
+applied to a comma separator: every privilege code is a fixed, dot-separated, comma-free vocabulary
+(`PrivilegeRegistry`), so the join is unambiguous, and `IReadOnlyList<string>` (an interface, backed
+by a private `List<string>` field via `PropertyAccessMode.Field`) sidesteps whatever native-array
+mapping Npgsql's EF Core provider would or would not infer for an interface-typed property. Chosen
+for consistency with an already-reviewed precedent under time pressure, not because a native
+`text[]` column was tried and found lacking.
+
+**`GET /roles`'s caller-chosen `sort`/`direction` needed raw SQL with a DYNAMIC column and
+comparison operator**, which `AdminAccountRepository.ListAsync`'s `SqlQuery<T>(FormattableString)`
+precedent does not do (its own sort is fixed). C# has no relational `>`/`<` operator on `string`
+(the same reason that precedent gives), so the column name (`name_key` or `status`) and the
+comparison operator (`>`/`<` for ascending/descending) are spliced into the SQL TEXT via ordinary C#
+string interpolation — safe only because both are chosen from a two-value whitelist the query
+validator already enforces, never from arbitrary caller text — while every genuine VALUE (status
+text, search term, cursor value, page size) still passes through `SqlQueryRaw`'s `{0}`-style bound
+parameters. Worth a second pair of eyes precisely because "safe string-built SQL" is the kind of
+claim that stops being true the moment someone adds a third sort field without re-deriving why the
+first two were safe.
+
+**`UpdateRoleRequest`'s "absent field = unchanged" is expressed with plain nullable properties, the
+same convention `UpdateAdminAccountCommand.IsSuperAdmin` already uses** — `null` means unchanged,
+a non-null value means "set to this." This leaves ONE genuine gap for `description`, which is
+ITSELF legitimately nullable at the entity level (no description): there is no way, with a plain
+nullable string, to distinguish "leave the description alone" from "clear it to null." Resolved by
+convention, not by a new wrapper type: an explicit **empty string** clears the description (`Role`'s
+own `TryNormalizeDescription` already trims an empty string to `null`), while an absent/`null`
+field leaves it untouched. Proven by `RoleEndpointsTests.Update_DescriptionSetToAnEmptyString_ClearsIt`.
+If a future card needs to represent "clear the NAME" the same way, it cannot — `Name` has no
+legitimate null state, so this convention was never extended there.
+
+**General audit events (create/update/delete) reuse `Privileges.Role.{Create,Update,Delete}` as the
+audit `action`, and rule 2's rejection reuses its own error code (`role.privilege_escalation`) as
+the action** — mirroring `UpdateAdminAccountCommandHandler`'s rule-4 rejection precedent (same
+string for both), not a new naming convention. All through the existing log-only `ISystemAuditSink`
+seam (§2.16), not a new mechanism.
+
 ---
 
 ## 3. Open — a human must decide or supply

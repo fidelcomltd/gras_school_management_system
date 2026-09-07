@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
+using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Settings;
@@ -149,6 +150,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0005a: school identity and the append-only config_version ledger.
         services.AddScoped<ISchoolProfileRepository, SchoolProfileRepository>();
         services.AddScoped<IConfigVersionRepository, ConfigVersionRepository>();
+
+        // TASK-0028 dispatch 2: role persistence and CRUD.
+        services.AddScoped<IRoleRepository, RoleRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

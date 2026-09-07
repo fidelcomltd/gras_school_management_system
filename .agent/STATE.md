@@ -83,21 +83,24 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: 618f730d98641d1e31f2c970c8dce861dac28648eead322c5df635695e5eb644
-          (was `1a2d8aff…` before TASK-0028 dispatch 1; this dispatch moved it by adding
-          `GET /api/v1/privileges`, purely additive — three new schemas
-          (`PrivilegeRegisterResponse`, `PrivilegeGroupDto`, `PrivilegeDescriptorDto`), no existing
-          path or schema changed shape. **Independently recomputed with `sha256sum` against the
-          committed file — matches `CONTRACT.lock` byte for byte.**)
-          `X-CSRF-Token` is a required header parameter on every mutating operation that calls
-          `.RequireCsrfToken()` — unchanged this dispatch (`GET /privileges` is a read, no CSRF).
+openapi.json sha256: 73316bdb0f1c19248044a4ec5b405872902159157e1a44dc9680a3fa0a227977
+          (was `618f730d…` before TASK-0028 dispatch 2; this dispatch moved it by adding
+          `GET|POST /api/v1/roles` and `GET|PATCH|DELETE /api/v1/roles/{id}`, purely additive —
+          new schemas `RoleDto`, `CreateRoleCommand`, `UpdateRoleCommand`, `CursorPage<RoleDto>`
+          (rendered `CursorPageOfRoleDto`), no existing path or schema changed shape.
+          **Independently recomputed with `sha256sum` against the committed file — matches
+          `CONTRACT.lock` byte for byte.** `900` lines added to `contracts/openapi.json`, 1 line
+          changed in `CONTRACT.lock` (the hash itself) — verified via `git diff --stat`.
+          `X-CSRF-Token` required on all four `/roles*` mutations; `Idempotency-Key` REQUIRED on
+          `POST /roles`, ACCEPTED on `PATCH`/`DELETE` — both declared by construction via the
+          existing operation transformers, never hand-annotated.
           `lockedUntil` remains DECLARED on the `ProblemDetails` schema since TASK-0027 dispatch 2.
-regenerated: 2026-09-06 by TASK-0028 dispatch 1, `-Promote` (generator + SDK under `## Layout`).
-          **19 paths now** — `/privileges` joins the eighteen admins/settings/config-version/
-          auth/reference ones. **Frontend client NOT yet regenerated against this hash** — that is
-          TASK-0028 dispatch 2/3's or a follow-up frontend card's job once roles/CRUD exist too;
-          flagging here rather than leaving it to be discovered as drift.
-api version: v1 · 19 paths: `/privileges` +
+regenerated: 2026-09-07 by TASK-0028 dispatch 2, `-Promote` (generator + SDK under `## Layout`).
+          **21 paths now** — `/roles` and `/roles/{id}` join the nineteen privileges/admins/
+          settings/config-version/auth/reference ones. **Frontend client NOT yet regenerated
+          against this hash** — no frontend dispatch was in scope; flagging here rather than
+          leaving it to be discovered as drift.
+api version: v1 · 21 paths: `/roles`, `/roles/{id}` + `/privileges` +
           `/admins`, `/admins/{id}`, `/admins/{id}/status`,
           `/admins/{id}/password-reset`, `/admins/{id}/sessions` +
           `/auth/{csrf,sign-in,sign-out,me,refresh,password}` +
@@ -105,7 +108,10 @@ api version: v1 · 19 paths: `/privileges` +
           `/reference/{ping,records,arms/{armId}/secure}`. `/health/*` excluded
           (`ASSUMPTIONS.md` §2.9); `/reference/*` is scaffolding. `GET /privileges` is
           authenticated-only (`.RequireAuthenticatedCaller()`), no privilege required (spec
-          6.1.14), not paged — a fixed 93-row compile-time register. History: `decisions/2026-Q3.md`.
+          6.1.14), not paged — a fixed 93-row compile-time register. `GET|POST /roles` and
+          `GET|PATCH|DELETE /roles/{id}` are each gated by one fixed `role.{view,create,update,
+          delete}` privilege declaratively (`.RequirePrivilege(...)`) — none of the five is
+          data-dependent the way two `/admins*` routes are. History: `decisions/2026-Q3.md`.
 
 ## Auth decision
 mechanism: **HttpOnly cookie session + CSRF token.** Human sign-off 2026-08-26 per §5. Token
@@ -129,7 +135,7 @@ history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0028 | Roles and the privilege register | backend-dev | dispatch 1 of 3 DONE (10 gates green); 2 and 3 queued |
+| TASK-0028 | Roles and the privilege register | backend-dev | dispatches 1-2 of 3 DONE (10 gates green); 3 queued |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
@@ -138,6 +144,78 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
 
+- 2026-09-07 **TASK-0028 dispatch 2 verified by orchestrator — the raw-SQL decision is sounder
+  than its own justification.** `RoleRepository.ListAsync` splices three fragments into
+  `SqlQueryRaw` as literal text (`sortColumn`, `comparisonOperator`, `orderDirection`), which is
+  injection-shaped and was the one claim worth checking rather than accepting. The agent defended
+  it on the `ListRolesQueryValidator` whitelist. **The real guarantee is stronger and does not
+  depend on the validator at all:** `sortColumn` is one of two string literals chosen by an `==`
+  comparison and the other two derive from a `bool`, so no caller text reaches SQL text even if
+  the validator were removed or wrong. Every actual value stays a bound `{n}` parameter. Verified
+  there are exactly three splice sites in the file and no others. Also verified: hash
+  `73316bdb…` matches `CONTRACT.lock`, 21 paths with `/api/v1/roles` and `/api/v1/roles/{id}` new
+  and nothing reshaped; the migration's only `DropTable` is in `Down()`, `Up()` is a `CreateTable`
+  plus a `CreateIndex`. **Worth keeping as a habit:** a defence that rests on a validator is weaker
+  than one that rests on the type of the input — when the two coincide, say which one you are
+  relying on, because the validator can be edited by the next card and the `bool` cannot.
+  Dispatch 2 was a continuation after a rate-limit cut-off; the six inherited files were kept, with
+  two mechanical doc-comment fixes disclosed rather than made silently (a class-level `<remarks>`
+  cannot use `<paramref>` — CS1734 under warnings-as-errors).
+
+- 2026-09-07 **TASK-0028 dispatch 2 implemented by backend-dev (continuation of the rate-limit-cut
+  session) — role entity persisted, all five endpoints, rule 2, contract `73316bdb…`, status →
+  review.** Built on the six inherited, previously-reviewed files without redesigning them; two
+  mechanical XML-doc-comment/unused-`using` fixes were needed to even compile under
+  warnings-as-errors (`RolePrivilegeEscalationGuard.cs`'s class-level `<remarks>` misused
+  `<paramref>` for the method's own parameters; `IRoleRepository.cs` had one unused `using`) — logic
+  in both files is byte-for-byte otherwise unchanged from the orchestrator-approved version. Full
+  design rationale: `backend/docs/ASSUMPTIONS.md` §2.20.
+  **Application**: `Security/Roles/` gained `RoleMapper`, `CreateRole(+Handler)`, `UpdateRole(+Handler)`,
+  `DeleteRole(+Handler)`, `GetRole(+Handler)`, `ListRoles(+Handler)`. Create/update build (or mutate)
+  the entity FIRST — which validates the reserved name, field lengths and privilege-registry
+  membership, naming an unknown code as the offender — and only THEN run
+  `RolePrivilegeEscalationGuard.ValidateAddition`, so a genuinely unrecognised privilege code is
+  never misreported as an escalation attempt. Update's escalation check snapshots
+  `role.Privileges.ToArray()` BEFORE calling `SetPrivileges` (`Privileges` is a live view over the
+  same backing list, so capturing it after mutation would silently defeat the "added privileges
+  only" rule). A rejected escalation still mutates the tracked entity in memory, but the
+  unit-of-work's roll-back-on-failure guarantee (AGENTS.md §4) means nothing is persisted — proven,
+  not assumed, by `RoleEndpointsTests.Update_RuleTwo_...` reading the role back afterward.
+  **Infrastructure**: `RoleConfiguration` (privileges comma-joined into one `text` column, same
+  technique as `AdminAccountConfiguration.PasswordHistoryHashes`; unique index on `name_key`, no
+  status carve-out — unlike admin email, an archived role's name still blocks reuse);
+  `RoleRepository` (`ListAsync` uses `SqlQueryRaw` with the sort COLUMN and comparison OPERATOR
+  spliced in as literal SQL text — safe only because both come from the query validator's
+  two-value whitelist, never arbitrary caller text — while every genuine value stays a bound
+  `{0}`-style parameter); one migration, `AddRoles` (verified additive-only via
+  `git diff --stat` — 71 lines in the model snapshot, nothing touching an existing table).
+  **Api**: `RoleEndpoints` — all five routes gated by ONE FIXED privilege declaratively
+  (`.RequirePrivilege(...)`), unlike two of `/admins*`'s data-dependent routes; CSRF on all four
+  mutations, `Idempotency-Key` required on `POST`, accepted on `PATCH`/`DELETE`.
+  **Tests**: `RoleTests` (24 cases — every entity invariant, reserved name case-insensitivity,
+  alias resolution, unknown-code naming); `RolePrivilegeEscalationGuardTests` (10 cases — pure
+  guard, register-order message assertions, the Super-Admin-widening non-special-case, null
+  guards); `RoleEndpointsTests` (21 integration cases covering all five endpoints, reserved/
+  duplicate name, unknown-privilege-naming, system-role 409 on PATCH and DELETE, default-scope
+  archive exclusion, and — the acceptance criterion the drift entry named as unprovable over HTTP
+  today — 6.1.7 rule 2 on BOTH create and update, proven end-to-end with `IEffectivePrivilegeProvider`
+  substituted under a REAL signed-in cookie session (unlike `PrivilegeAuthorizationTests`' test-only
+  auth scheme, needed here because these routes require genuine CSRF), each asserting the exact
+  verbatim rejection message, the audit event, and — for update — that nothing was persisted).
+  Reused `FakeEffectivePrivilegeProvider` (`PrivilegeAuthorizationTests.cs`) and
+  `RecordingSystemAuditSink` (`AdminAccountEndpointsTests.cs`) rather than redeclaring them — both
+  already exist in the same test assembly/namespace. `PipelineTests` gained a stub
+  `IRoleRepository` registration (the new handlers were otherwise unconstructable in that
+  Application-only DI container, exactly the treatment every other repository there already gets).
+  **Gates: all ten green**, run for real via the canonical `./scripts/ci.ps1 -NoFailFast`:
+  `Tests: total=443 passed=443 failed=0 skipped=0`, `Coverage: line=79.66% branch=64.74%`,
+  `ALL GATES PASSED`. Contract hash independently recomputed with `sha256sum`, matches
+  `CONTRACT.lock`; `git diff --stat` on `contracts/**` shows 900 insertions / 1 changed line
+  (the hash), nothing removed.
+  **Left undone, exactly as scoped**: no seeded roles (dispatch 3), no `role_assignment`, rules 1
+  and 3, `IEffectivePrivilegeProvider` graduation (all TASK-0030, already live drift). Frontend
+  client not regenerated (no frontend dispatch in scope).
+  Full text: `TASK-0028`'s own `## Log`.
 - 2026-09-06 **TASK-0032 CLOSED — gate 9 green, and for the first time it can see the diff it is
   gating.** Two passes now: history unchanged, plus `gitleaks detect --no-git` pointed at the repo
   ROOT (pass 1 finds the root by git discovery regardless of cwd; pass 2 has no repo to discover
