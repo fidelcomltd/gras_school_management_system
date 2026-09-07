@@ -112,6 +112,24 @@ jobs:
         # not after a full build and a database round trip.
         run: ./scripts/tests/gate-summary.tests.ps1
 
+      - name: Self-test the postgres-test-connection resolver
+        working-directory: backend
+        shell: pwsh
+        # Same reason as the step above, and one more: this resolver decides whether the
+        # integration tests RUN or skip. A silent regression in it turns a green run into a green
+        # run that tested less — the exact failure mode TASK-0008 and §13 exist to stop. A
+        # self-test that never executes in CI is TASK-0011's defect wearing a different hat.
+        run: ./scripts/tests/postgres-test-connection.tests.ps1
+
+      - name: Self-test the secret-scan working-tree branch
+        working-directory: backend
+        shell: pwsh
+        # Gate 9 runs two gitleaks passes; the second (--no-git) is the only one that can see an
+        # uncommitted change, which is the shape every dispatch is actually gated in. This proves
+        # the second pass still fires by planting a fake secret in a never-committed file — the
+        # branch is otherwise indistinguishable from a no-op whenever the tree happens to be clean.
+        run: ./scripts/tests/secret-scan-working-tree.tests.ps1
+
       - name: Run all quality gates
         working-directory: backend
         shell: pwsh

@@ -6,6 +6,8 @@ Two files, two different rules.
 |---|---|---|
 | [`schema.d.ts`](./schema.d.ts) | **Generated.** `openapi-typescript` against the committed `contracts/openapi.json`. | Never hand-edit. Carries a `// GENERATED — DO NOT EDIT` header; §4.4's drift check enforces this. |
 | [`client.ts`](./client.ts) | **Hand-written.** | Reviewed like any other source file. |
+| [`client-types.ts`](./client-types.ts) | **Hand-written.** | The type-level derivation behind `client.ts`'s verb helpers, split into its own file to stay under CONVENTIONS.md §3's 180-line cap. |
+| [`client.test.ts`](./client.test.ts) / [`client-roles.test.ts`](./client-roles.test.ts) | **Hand-written.** | Colocated tests for `client.ts`'s generic verb helpers, split across two files (reference/admins operations, then privileges/roles — TASK-0033) to stay under the same 180-line cap. |
 
 This mirrors what `frontend/HANDOFF.md` decision 3 originally set out: the generated layer
 supplies *types*, the hand-written layer supplies *transport*. `client.ts` is the thin seam
@@ -42,6 +44,14 @@ Run `generate:api` any time `contracts/openapi.json` changes, then commit the re
 this from the **committed** document only — never point the generator at a live server
 (CLAUDE.md §3).
 
+**A new operation on an existing method (GET/POST/PATCH/DELETE) needs no new code in
+`client.ts`.** `apiGet`/`apiPost`/`apiPatch`/`apiDelete` are generic over every path
+`schema.d.ts` declares for that method, so regenerating the schema is what makes the new
+path callable — TASK-0033 (`/privileges`, `/roles`, `/roles/{id}`) added zero lines to
+`client.ts`/`client-types.ts`, only regenerated `schema.d.ts` and added the new operations'
+tests (`client-roles.test.ts`). A new *method* the contract has never used before (`PUT`
+still has no operation anywhere) is the one case that needs a new verb helper.
+
 ## `client.ts` — why a typed helper and not a second HTTP stack
 
 `openapi-fetch`, NSwag and Kiota were all rejected (`STATE.md` Decisions, 2026-08-26)
@@ -66,21 +76,41 @@ declare for that path, is a compile error. This is the mechanism that makes "the
 cannot call the backend without guessing across the boundary" (CLAUDE.md §3) enforced by the
 type checker rather than by convention.
 
-`GetPath`/`PostPath` cover the methods in use today. Extend `client.ts` with `apiPut` /
-`apiPatch` / `apiDelete` the same way when a feature needs them — same shape, same pattern.
+`apiGet`, `apiPost`, `apiPatch` and `apiDelete` (TASK-0029) cover every method the contract
+declares (`PUT` has no operation anywhere yet, so `apiPut` doesn't exist until one does — add
+it the same way when a feature needs it).
+
+**Path parameters** (`/admins/{id}`) are threaded through a `pathParams` field on the trailing
+options argument, type-driven from `operations[...]["parameters"]["path"]` — never a string
+the caller formats by hand — and that whole options argument becomes *required* (not just the
+field) exactly when the operation declares a path parameter, so omitting one is a compile
+error, not a runtime 404:
+
+```ts
+import { apiGet } from '@/api/client';
+
+const account = await apiGet('/api/v1/admins/{id}', undefined, { pathParams: { id } });
+```
+
+**`Idempotency-Key`** is caller-owned data, threaded the same way as its own `idempotencyKey`
+field — required when the contract requires it (`POST /admins`), optional when the contract
+allows it (`PATCH /admins/{id}`, `POST /admins/{id}/status`, `POST /admins/{id}/password-reset`,
+`PATCH /settings/identity`), and simply absent from the options type everywhere else.
+**`X-CSRF-Token` is never a field here** — despite the schema declaring it a required header on
+every mutating operation, it is transport-owned: `http-client.ts`'s request interceptor injects
+it on every mutating request, and `client.ts` has no way for a caller to set or override it.
+The type-level derivation behind all of this (`SuccessBody`, `QueryOf`, `OptionsArgs`, …) lives
+in [`client-types.ts`](./client-types.ts), split out to stay under CONVENTIONS.md §3's
+180-line file cap.
 
 ## Feature code
 
-`src/features/<tag>/api.ts` hooks call `apiGet`/`apiPost` and nothing else — never the plain
-verb helpers in `@/lib/http` directly, never `axios` or `fetch`. A feature hook that skips
-`client.ts` skips schema inference too, which is exactly the "hand-typed interface that can
-drift from the contract" §3 rules out.
-
-If a feature needs a method `client.ts` doesn't cover yet (`PUT`/`PATCH`/`DELETE` — only `GET`
-and `POST` are wired today), add `apiPut`/`apiPatch`/`apiDelete` to `client.ts` first, following
-the exact shape of `apiGet`/`apiPost` above, then call that from the feature. There is no
-sanctioned path from feature code straight to `@/lib/http`'s verb helpers — the one seam that
-would bypass schema inference is closed. See [`src/features/README.md`](../features/README.md).
+`src/features/<tag>/api.ts` hooks call `apiGet`/`apiPost`/`apiPatch`/`apiDelete` and nothing
+else — never the plain verb helpers in `@/lib/http` directly, never `axios` or `fetch`. A
+feature hook that skips `client.ts` skips schema inference too, which is exactly the
+"hand-typed interface that can drift from the contract" §3 rules out. There is no sanctioned
+path from feature code straight to `@/lib/http`'s verb helpers — the one seam that would bypass
+schema inference is closed. See [`src/features/README.md`](../features/README.md).
 
 ## Tests: MSW handlers derived from the contract
 

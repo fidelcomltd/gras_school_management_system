@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { onSessionExpired, setSession } from '@/lib/auth/auth-session';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { ApiError } from './http-error';
 import { deleteRequest, getRequest, patchRequest, postRequest, putRequest } from './request';
+
+/**
+ * Auth wiring — CSRF attachment, the terminal-401 path, the single CSRF retry —
+ * moved to `./http-client.test.ts` (TASK-0021): those behaviours belong to
+ * `http-client.ts`'s interceptors, which is what that file exercises directly.
+ */
 
 interface Term {
   id: string;
@@ -11,7 +16,6 @@ interface Term {
 }
 
 const TERM: Term = { id: 't1', name: 'Michaelmas' };
-const liveSession = () => ({ accessToken: 'token-abc', expiresAt: Date.now() + 3_600_000 });
 
 describe('payload unwrapping', () => {
   it('returns the response body, not the Axios envelope', async () => {
@@ -112,36 +116,8 @@ describe('error handling', () => {
   });
 });
 
-describe('auth wiring', () => {
-  it('attaches the bearer token when a session is live', async () => {
-    const seen = vi.fn();
-    server.use(
-      http.get(apiUrl('/terms'), ({ request }) => {
-        seen(request.headers.get('Authorization'));
-        return HttpResponse.json([]);
-      }),
-    );
-
-    setSession(liveSession());
-    await getRequest('/terms');
-
-    expect(seen).toHaveBeenCalledWith('Bearer token-abc');
-  });
-
-  it('sends no Authorization header when signed out', async () => {
-    const seen = vi.fn();
-    server.use(
-      http.get(apiUrl('/terms'), ({ request }) => {
-        seen(request.headers.get('Authorization'));
-        return HttpResponse.json([]);
-      }),
-    );
-
-    await getRequest('/terms');
-    expect(seen).toHaveBeenCalledWith(null);
-  });
-
-  it('always sends a correlation id', async () => {
+describe('correlation id', () => {
+  it('always sends one', async () => {
     const seen = vi.fn();
     server.use(
       http.get(apiUrl('/terms'), ({ request }) => {
@@ -152,32 +128,5 @@ describe('auth wiring', () => {
 
     await getRequest('/terms');
     expect(seen).toHaveBeenCalledWith(expect.stringMatching(/.+/));
-  });
-
-  it('ends the session and notifies listeners on a 401', async () => {
-    const onExpired = vi.fn();
-    onSessionExpired(onExpired);
-    server.use(http.get(apiUrl('/secure'), () => problemResponse(401)));
-
-    setSession(liveSession());
-    await expect(getRequest('/secure')).rejects.toBeInstanceOf(ApiError);
-
-    expect(onExpired).toHaveBeenCalled();
-  });
-
-  it('does not retry a 401 forever', async () => {
-    let calls = 0;
-    server.use(
-      http.get(apiUrl('/secure'), () => {
-        calls += 1;
-        return problemResponse(401);
-      }),
-    );
-
-    setSession(liveSession());
-    await expect(getRequest('/secure')).rejects.toBeInstanceOf(ApiError);
-
-    // No refresh handler is registered, so there is nothing to retry with.
-    expect(calls).toBe(1);
   });
 });

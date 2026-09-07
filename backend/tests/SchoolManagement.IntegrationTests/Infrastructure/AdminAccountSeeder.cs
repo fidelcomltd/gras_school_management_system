@@ -61,4 +61,51 @@ internal static class AdminAccountSeeder
 
         return (account.Id, account.Email);
     }
+
+    /// <summary>
+    /// Seeds a REGULAR (non-super-admin) account through <see cref="AdminAccount.Create"/> — TASK-0027's
+    /// own factory, not the bootstrap seam. Under the current flag-bypass privilege provider
+    /// (<c>SuperAdminFlagEffectivePrivilegeProvider</c>), a signed-in account created this way holds
+    /// NO privileges at all, which is exactly what the self-edit-carve-out and no-privilege 403 tests
+    /// need — a real, HTTP-signed-in caller rather than the test-only authentication substitute
+    /// <c>PrivilegeAuthorizationTests</c> uses elsewhere.
+    /// </summary>
+    public static async Task<(Guid AccountId, string Email, string Phone)> SeedRegularAsync(
+        ApiTestFixture fixture,
+        bool mustChangePassword = false,
+        string? email = null,
+        string? staffName = null,
+        string? phone = null)
+    {
+        ArgumentNullException.ThrowIfNull(fixture);
+
+        await using var scope = fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        var resolvedEmail = email ?? $"regular-{Guid.NewGuid():N}@example.com";
+        var resolvedPhone = phone ?? "08012345678";
+        var passwordHash = hasher.Hash(Password);
+
+        var creation = AdminAccount.Create(
+            Guid.CreateVersion7(),
+            resolvedEmail,
+            staffName ?? "Regular Admin",
+            resolvedPhone,
+            passwordHash);
+
+        creation.IsSuccess.ShouldBeTrue(creation.IsFailure ? creation.Error.Description : string.Empty);
+
+        var account = creation.Value;
+
+        if (!mustChangePassword)
+        {
+            account.ChangePassword(passwordHash);
+        }
+
+        context.Add(account);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return (account.Id, account.Email, account.Phone!);
+    }
 }

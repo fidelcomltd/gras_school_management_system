@@ -54,20 +54,24 @@ internal sealed class SchemaExampleTransformer : IOpenApiSchemaTransformer
                 schema.Example = propertyExample.DeepClone();
             }
         }
-        else
+        else if (OpenApiExamples.TryGetExample(context.JsonTypeInfo.Type) is { } typeExample)
         {
-            if (OpenApiExamples.TryGetExample(context.JsonTypeInfo.Type) is { } typeExample)
-            {
-                schema.Example = typeExample;
-            }
+            schema.Example = typeExample;
+        }
 
-            // Only when the schema has none already: an XML doc comment always wins, so this fills the
-            // gap for framework types we cannot annotate rather than overriding our own documentation.
-            if (string.IsNullOrWhiteSpace(schema.Description) &&
-                OpenApiExamples.TryGetDescription(context.JsonTypeInfo.Type) is { } description)
-            {
-                schema.Description = description;
-            }
+        // Only when the schema has none already: an XML doc comment always wins, so this fills the
+        // gap for framework types we cannot annotate rather than overriding our own documentation.
+        // NOT nested inside the "no JsonPropertyInfo" branch above: a type with no properties of its
+        // own to distinguish a schema shape (JsonElement is TASK-0005a's example — every settings
+        // snapshot is genuinely free-form) is a case .NET's generator can hand this transformer ONLY
+        // through the property-context call for its sole reference site, never a separate type-level
+        // call. Checking here unconditionally is what makes that referenced-component schema
+        // describable at all, rather than a silent gap this project's own risk register warns about:
+        // "a control that reports success and does nothing."
+        if (string.IsNullOrWhiteSpace(schema.Description) &&
+            OpenApiExamples.TryGetDescription(context.JsonTypeInfo.Type) is { } description)
+        {
+            schema.Description = description;
         }
 
         // Backstop for dates, applied whether or not the type was registered.

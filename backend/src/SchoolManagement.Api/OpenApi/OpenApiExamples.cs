@@ -1,11 +1,15 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
 using SchoolManagement.Application.Auth;
+using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Security.PrivilegeRegister;
+using SchoolManagement.Application.Security.Roles;
+using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
 
@@ -108,6 +112,100 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(SettingsIdentityGroupDto)] = """
+            {
+              "schoolName": "Golden Royal Ark School",
+              "shortName": "GRAS",
+              "address": "12 Ark Crescent, Lekki, Lagos",
+              "phone": "+2348012345678",
+              "email": "info@goldenroyalark.example",
+              "motto": "Excellence Through Character",
+              "headTeacherName": "Chisom Maxwell",
+              "timezone": "Africa/Lagos",
+              "versionNumber": 3
+            }
+            """,
+
+        [typeof(SettingsDto)] = """
+            {
+              "identity": {
+                "schoolName": "Golden Royal Ark School",
+                "shortName": "GRAS",
+                "address": "12 Ark Crescent, Lekki, Lagos",
+                "phone": "+2348012345678",
+                "email": "info@goldenroyalark.example",
+                "motto": "Excellence Through Character",
+                "headTeacherName": "Chisom Maxwell",
+                "timezone": "Africa/Lagos",
+                "versionNumber": 3
+              }
+            }
+            """,
+
+        [typeof(UpdateSchoolIdentityCommand)] = """
+            {
+              "schoolName": "Golden Royal Ark School",
+              "shortName": "GRAS",
+              "address": "12 Ark Crescent, Lekki, Lagos",
+              "phone": "08012345678",
+              "email": "info@goldenroyalark.example",
+              "motto": "Excellence Through Character",
+              "headTeacherName": "Chisom Maxwell",
+              "expectedVersion": 2
+            }
+            """,
+
+        [typeof(ConfigVersionSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "versionNumber": 3,
+              "changedGroup": "Identity",
+              "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CursorPage<ConfigVersionSummaryDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "versionNumber": 3,
+                  "changedGroup": "Identity",
+                  "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                }
+              ],
+              "nextCursor": "MQ=="
+            }
+            """,
+
+        [typeof(ConfigVersionDetailDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "versionNumber": 3,
+              "changedGroup": "Identity",
+              "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
+              "reason": null,
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "snapshot": {
+                "schoolProfile": {
+                  "schoolName": "Golden Royal Ark School",
+                  "shortName": "GRAS",
+                  "abbreviation": "GRAS",
+                  "address": "12 Ark Crescent, Lekki, Lagos",
+                  "phone": "+2348012345678",
+                  "email": "info@goldenroyalark.example",
+                  "motto": "Excellence Through Character",
+                  "headTeacherName": "Chisom Maxwell",
+                  "timezone": "Africa/Lagos",
+                  "identityVersionNumber": 3,
+                  "abbreviationVersionNumber": 0
+                }
+              }
+            }
+            """,
+
         [typeof(CsrfTokenResponse)] = """
             {
               "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
@@ -148,6 +246,184 @@ internal static class OpenApiExamples
               ],
               "sessionExpiresAt": "{{CanonicalTimestamp}}",
               "sessionAbsoluteExpiresAt": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CreateAdminAccountCommand)] = """
+            {
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "08012345678"
+            }
+            """,
+
+        [typeof(CreateAdminAccountResponse)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "mustChangePassword": true,
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+            }
+            """,
+
+        [typeof(AdminAccountSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "isSuperAdmin": false,
+              "mustChangePassword": false,
+              "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(CursorPage<AdminAccountSummaryDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "staffName": "Ngozi Adeyemi",
+                  "email": "ngozi.adeyemi@example.com",
+                  "phone": "+2348012345678",
+                  "status": "Active",
+                  "isSuperAdmin": false,
+                  "mustChangePassword": false,
+                  "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                }
+              ],
+              "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
+            }
+            """,
+
+        [typeof(AdminAccountDetailDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "+2348012345678",
+              "status": "Active",
+              "isSuperAdmin": false,
+              "mustChangePassword": false,
+              "lastLoginAtUtc": "{{CanonicalTimestamp}}",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(UpdateAdminAccountCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "staffName": "Ngozi Adeyemi-Bello",
+              "email": "ngozi.adeyemi@example.com",
+              "phone": "08012345678",
+              "isSuperAdmin": null
+            }
+            """,
+
+        [typeof(ChangeAdminAccountStatusCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "status": "Suspended",
+              "reason": null
+            }
+            """,
+
+        [typeof(ResetAdminAccountPasswordResponse)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+            }
+            """,
+
+        [typeof(PrivilegeDescriptorDto)] = """
+            {
+              "code": "result.score.enter",
+              "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+              "scopable": true
+            }
+            """,
+
+        [typeof(PrivilegeGroupDto)] = """
+            {
+              "key": "results",
+              "title": "Results",
+              "privileges": [
+                {
+                  "code": "result.score.enter",
+                  "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                  "scopable": true
+                }
+              ]
+            }
+            """,
+
+        [typeof(PrivilegeRegisterResponse)] = """
+            {
+              "groups": [
+                {
+                  "key": "results",
+                  "title": "Results",
+                  "privileges": [
+                    {
+                      "code": "result.score.enter",
+                      "permits": "Enter and edit continuous assessment and examination marks while the result set is Draft or Returned for Correction.",
+                      "scopable": true
+                    }
+                  ]
+                }
+              ]
+            }
+            """,
+
+        [typeof(CreateRoleCommand)] = """
+            {
+              "name": "Class Teacher",
+              "description": "Enters marks and views pupil records for an assigned arm.",
+              "privileges": ["result.score.enter", "pupil.view"]
+            }
+            """,
+
+        [typeof(RoleDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Class Teacher",
+              "description": "Enters marks and views pupil records for an assigned arm.",
+              "isSystem": false,
+              "privileges": ["pupil.view", "result.score.enter"],
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<RoleDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleId}}",
+                  "name": "Class Teacher",
+                  "description": "Enters marks and views pupil records for an assigned arm.",
+                  "isSystem": false,
+                  "privileges": ["pupil.view", "result.score.enter"],
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": "Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA="
+            }
+            """,
+
+        [typeof(UpdateRoleCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Senior Class Teacher",
+              "description": null,
+              "privileges": null,
+              "status": null
             }
             """,
 
@@ -212,6 +488,15 @@ internal static class OpenApiExamples
             "the standard problem shape with `errors`: an object keyed by request property name, whose " +
             "values are the messages for that property, suitable for attaching to form fields. A 400 " +
             "(rather than 422) means the request itself could not be parsed.",
+
+        // TASK-0005a: config_versions/{id}'s snapshot is deliberately free-form (spec 6.2.9 — "the
+        // whole serialised configuration," a shape every future settings card adds a new section to),
+        // so it is typed as System.Text.Json.JsonElement rather than a fixed DTO. A framework type
+        // again — see this dictionary's own remarks above.
+        [typeof(System.Text.Json.JsonElement)] =
+            "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, " +
+            "because every settings card adds its own section to the same snapshot shape. Read it as " +
+            "an opaque object; do not assume today's set of keys is complete.",
     };
 
     /// <summary>

@@ -6,7 +6,9 @@ Recorded because a scaffold's assumptions are invisible once code is built on th
 assumption turns out to be wrong, twenty files depend on it. Each entry says what was assumed, why, and
 what it would cost to change.
 
-Last updated: 2026-08-03.
+Last updated: 2026-09-07 (§2.21 added — TASK-0028 dispatch 3's six seeded roles: the single-source
+seed data design, three found disagreements between spec 4.5 and spec 4.4's "Seeded to" column, and
+the pre-existing-test fallout from seeding real, permanently-present role rows).
 
 ---
 
@@ -142,55 +144,489 @@ and the integration-test harness all work end to end.
 **Delete it with the first real aggregate** — the entity, its configuration, repository, endpoints, DTOs,
 examples and tests, plus a migration dropping the table.
 
-### 2.14 No `Idempotency-Key` mechanism exists yet — DEVIATION
+### 2.14 `Idempotency-Key` mechanism — RESOLVED by TASK-0019, declared per-route from TASK-0027 onward
 
 Root `CLAUDE.md` §6 (`.agent/spec/backend.md`) requires: **"Mutating endpoints that can be retried
-accept an `Idempotency-Key`."** Verified: zero occurrences of `Idempotency` in any `.cs`, `.csproj`,
-`.md` or `.ps1` under `backend/`, apart from `dotnet ef migrations script --idempotent` in
-`README.md`. No middleware, no endpoint filter, no key store, no test. This is a deviation from §6's
-letter, recorded here rather than fixed today.
+accept an `Idempotency-Key`."** This was a deviation as of 2026-09-04 (deferred, Option B, human
+sign-off) because no product mutating endpoint existed yet to validate the mechanism's hard parts
+against. **That deferral is over.** TASK-0019 (2026-09-06) built the substrate: centralised
+storage, request fingerprinting (method + path + caller + normalised body hash), stored-response
+replay with a declared `Idempotency-Replay` response header, `RedactFromIdempotencyReplayAttribute`
+for one-time-display fields, and a 24-hour scheduled purge writing `system.idempotency_purge`
+audit events per §9.9. `RequireIdempotencyKeyExtensions.RequireIdempotencyKey(required:)` is the
+one call site every mutating route attaches through — mirroring `RequireCsrfToken()` in shape.
 
-**Why deferred rather than built (Option B, human sign-off 2026-09-04):** no product mutating
-endpoint exists yet, so a mechanism built now would have no real caller to validate its hard parts
-against — key storage, request fingerprinting, and the retention/purge rule §9.9 cares about. The
-risk that made this a blocker was never the missing mechanism; it was `ReferenceEndpoints.cs`
-silently teaching its absence to every future POST copied from it as the template. That risk is
-closed by the documented TODO in that file's class-level `<remarks>` (this task's Deliverable 2), not
-by building the filter early against no real requirements.
+**What replaces the old deferral, and does not go away:** the requirement is no longer "build the
+mechanism," it is **"declare `Idempotency-Key` per route, at the point that route ships."** §9.8.2's
+four named examples (pupil registration, pin generation, promotion commit, result publication) were
+never the exhaustive list — its own wording is "Idempotency keys on **every** mutating endpoint that
+a retry could duplicate." TASK-0019 itself ships no route that declares the header (it is
+contract-neutral); TASK-0027 (admin accounts, held for §5 sign-off) is the first to call
+`RequireIdempotencyKey` for real and wires the OpenAPI declaration for both the request and
+`Idempotency-Replay` response headers. **Live trigger, current as of 2026-09-06: TASK-0005**
+(school settings) is the next card whose mutating routes must each state, per route, `required`,
+`accepted`, or "excluded, with reason" — the logo/signature uploads and the versioned-config PATCH
+routes are retry-duplicable by the same "duplicate audit-visible row" reasoning TASK-0019's Part 2
+delta applied to `PATCH /admins/{id}` (a converged final state, but a doubled `config_version`/audit
+row on naive retry), not the "genuine duplicate create" reasoning that made `POST /admins` REQUIRED.
 
-**Owner:** `backend-dev` implements the mechanism, on the trigger below. The orchestrator is
-accountable for firing that trigger at dispatch time — i.e. for not opening a mutating-endpoint task
-card without first checking this entry.
+**What the implementing card still has to decide per route, not re-derived from scratch:**
+- Required vs. accepted vs. excluded, argued from what a retry would actually duplicate — not
+  assumed from the four named examples.
+- For a multipart body (a file upload), the existing fingerprint builder
+  (`RequireIdempotencyKeyExtensions.BuildFingerprint`) serialises the bound `IBaseCommand` via
+  `JsonSerializer` — this does not meaningfully capture an `IFormFile`'s bytes. A route accepting
+  the header on a multipart endpoint must decide how the fingerprint incorporates the uploaded
+  content (e.g. a content hash folded in separately) so that a reused key against a *different* file
+  is classified `idempotency.key_conflict` rather than silently replaying the wrong stored image.
 
-**Trigger, stated so it cannot be read narrowly:** the first task card implementing **any** mutating
-operation that a retry could duplicate builds the idempotency mechanism first, before the operation
-itself ships. Spec `product-specification/14-non-functional-requirements.md` §9.8.2 names four
-examples explicitly — pupil registration, pin generation, promotion commit, and result publication —
-but its own wording is "Idempotency keys on **every** mutating endpoint that a retry could
-duplicate, in particular pupil registration, pin generation, promotion commit and result
-publication." The four are examples, not an exhaustive list; a future mutating endpoint outside
-those four that a retry could duplicate is equally in scope and does not get a pass for not being on
-the list.
+Cross-references: `TASK-0013` (original deviation record, now superseded by this entry); `.agent/AUDIT.md`
+finding **B2** (original finding); `TASK-0019`/`TASK-0027` (the mechanism and its first real route);
+`.agent/decisions/2026-Q3-contract-deltas.md` (approved shape). **Cost to change:** none — the
+substrate is built; cost from here is only the discipline of declaring the header on each new
+mutating route, which is now a review-time check (`grep` for a mutating `MapPost`/`MapPatch` missing
+a `RequireIdempotencyKey` call), not an implementation gap. **Update (TASK-0005a, 2026-09-06):**
+TASK-0027 remains held for §5 sign-off, so `PATCH /settings/identity` is the actual first route to
+call `RequireIdempotencyKey` for real — see §2.15.
 
-The requirement is concrete and dated, not hypothetical: `product-specification/10-module-access-pins.md:180`
-already specifies `POST /pin-batches` as requiring an idempotency key ("Idempotency key required, per
-9.8.2, so a retry cannot double-generate a batch."), so the first of the four named triggers is
-already written into the product spec with its own endpoint.
+### 2.15 TASK-0005a — school identity and the append-only `config_version` ledger
 
-**What the implementing card will have to decide** (not re-derived from scratch when the trigger
-fires):
-- **Key storage and its retention/purge rule.** §9.9's data-protection retention table governs what
-  may be retained and for how long — a stored idempotency record (key, fingerprint, response body)
-  is itself data that needs a purge rule, not an indefinite table.
-- **Request fingerprinting**, so a reused key submitted with a different payload is rejected rather
-  than silently replaying an unrelated stored response.
-- **Stored-response replay** on a genuine repeat (same key, same fingerprint) — return the original
-  response rather than re-executing the mutation.
+Decisions made shipping the first product settings surface and the first real `config_version` row,
+plus two gaps the work exposed in shared code nobody had exercised this way before.
 
-Cross-references: `TASK-0013` (this decision); `.agent/AUDIT.md` finding **B2** (original finding);
-`ReferenceEndpoints.cs` class `<remarks>` (the documented TODO). **Cost to change:** none yet — no
-mutating endpoint exists to retrofit. Cost grows by one endpoint for every mutating route added
-before the trigger fires and is not honoured.
+**Authored copy, not spec copy (approved delta amendment 3).** 6.2.11's stale-save sentence names
+the grading scale ("The grading scale was changed by another administrator..."), a group this card
+never touches. `UpdateSchoolIdentityCommandHandler`'s `409 settings.identity.stale_version` message —
+"The school identity was changed by another administrator while you were editing. Reload and make
+your change again." — follows the spec's PATTERN, substituting the group name, but is this project's
+own wording, not a quotation. TASK-0005c's abbreviation and registration-number groups need their own
+equally-authored sentences when they ship; do not copy this one verbatim across groups.
+
+**Nigerian phone number format — first implementation, written for reuse.** Spec 6.2.3 reuses 6.1.3's
+phone rule verbatim ("Nigerian format... Accepts 08012345678 or +2348012345678 and normalises to +234
+form on save. Rejects fewer than 11 digits in the national form"), but 6.1.3's own module (admin
+accounts) has not shipped yet — TASK-0027 is held for §5 sign-off, so there was no existing type to
+copy. `SchoolManagement.Domain.Common.NigerianPhoneNumber` is deliberately placed in `Domain/Common/`
+rather than `Domain/Settings/`, so TASK-0027 reuses it rather than re-deriving the same regex pair.
+Interpreted strictly: exactly `0` + 10 digits, or exactly `+234` + 10 digits; anything else (fewer or
+more digits, a different country code, stray characters) is rejected. This is an authored reading of
+the spec's two named examples, not a literal transcription — flagging in case a softer interpretation
+(stripping spaces/hyphens first, say) was intended.
+
+**Seed defaults for "not seeded" fields are empty string, not `null`.** 6.2.2 lists `school_name`,
+`address`, `phone`, `email`, `motto`, `head_teacher_name` as "Not seeded — admin must supply," but
+6.2.3's own table marks most of them `Req: Yes` (NOT NULL). `SchoolProfileConfiguration.HasData` seeds
+them as `""` rather than leaving the column nullable, so `GET /settings` never 404s before the first
+admin visit — it returns an identity group with empty strings the frontend renders as "not set" (a
+frontend settings-screen decision, not resolved here). `motto` (the one genuinely optional field) is
+seeded `null`, matching its own nullability.
+
+**Both version pointers (`identity_version_number`, `abbreviation_version_number`) start at 0.**
+Interpreted as "installed, never yet saved through a versioned PATCH" — the first real save on a
+group takes its pointer 0→1 AND writes that group's first `config_version` row. 6.2.9's "every SAVE
+writes a new row" reads as scoped to an actual `PATCH`, not to migration-time seeding, so the ledger
+is legitimately empty (`GET /config-versions` returns no rows) until the first admin edit. `0` was
+picked over `1` because it lets `GET /config-versions` being empty mean something real ("nobody has
+ever saved this") rather than a row existing with no matching version-history entry to explain it.
+
+**`config_version.version_number` is a real PostgreSQL `GENERATED ALWAYS AS IDENTITY` column, not an
+application-computed "read the max, add one."** The latter has a genuine two-writer race under
+concurrent saves across different groups (identity save + a future abbreviation save landing in the
+same instant could compute the same next number); a database identity sequence cannot. This is new
+precedent in this codebase — every existing entity's key is a client-generated `Guid`
+(`Guid.CreateVersion7()`), so `ConfigVersion.VersionNumber` is the first EF-mapped property whose
+value the database, not the application, assigns.
+
+**Real gap found #1 — the shared integration-test fixture had no way to keep a `HasData`-seeded
+singleton alive across `ResetDatabaseAsync`.** `school_profile` is the first entity in the whole
+codebase seeded via migration `HasData`; `ApiTestFixture.ResetDatabaseAsync`'s `TRUNCATE ... CASCADE`
+(built for `SampleRecord`/`AdminAccount`/`IdempotencyRecord`, none of which are ever seeded) wipes that
+row on the very first test and it never comes back — every settings test after the first would have
+failed with "sequence contains no elements" from `FirstAsync`, not from anything wrong in the
+production code. Fixed by having `ResetDatabaseAsync` reinsert the exact seed row immediately after
+truncating, rather than teaching every settings test to re-seed itself. If a SECOND `HasData`-seeded
+table is ever added, consider generalising this into a walk over `context.Model.GetEntityTypes()...
+GetSeedData()` rather than a second hand-written `INSERT` — not built now, per this project's own
+"a third exemption must argue for itself" reasoning (`STATE.md` `## Known drift`).
+
+**Real gap found #2 — `SchemaExampleTransformer` could not describe a schema whose only appearance
+in the document is as a property's referenced type.** `ConfigVersionDetailDto.Snapshot` is typed
+`System.Text.Json.JsonElement` (spec 6.2.9's snapshot is genuinely free-form — every future settings
+card adds its own section). `JsonElement` is a framework type with no XML doc comment, so it needs the
+same `OpenApiExamples.DescriptionsByType` treatment `ProblemDetails`/`HttpValidationProblemDetails`
+already use — but adding the entry alone did nothing: `EverySchema_HasADescription` still failed. The
+transformer's description fallback lived inside the `else` branch (the "type-level, no
+`JsonPropertyInfo`" case), and `JsonElement`'s one and only appearance in the whole document is
+reached exclusively through the PROPERTY-context branch, since a type this shape-less generates no
+separate top-level call. Fixed by moving the description fallback outside the property/type branching
+so it runs unconditionally (still guarded by "only when the schema has none already," so an XML doc
+comment still always wins). This was invisible until a real `JsonElement`-typed property existed
+anywhere in the contract — TASK-0005a is that first case.
+
+### 2.16 TASK-0027 — admin account management
+
+Six decisions, one of them explicitly required to be recorded here rather than passed off as a
+spec derivation (approved delta amendment B5).
+
+**B5 — blocking a caller from changing their own status is an ADDED rule, not a spec line.**
+`POST /admins/{id}/status` returns `403 admin.self_status_change_forbidden` when the caller's own
+account is the target, regardless of privilege. No sentence in spec 6.1.7/6.1.10/6.1.13 requires
+this; the approved delta (`decisions/2026-Q3-contract-deltas.md`, entry `TASK-0019/0027`, B5)
+approved it anyway because it is strictly safer, always reversible by another Super Admin, and 4.1's
+at-least-one-active-Super-Admin invariant already establishes that the system is expected to prevent
+administrative self-lockout. Recorded here as directed.
+
+**Phone is nullable at the persistence layer only for the pre-existing bootstrap account.**
+`AdminAccount.Phone` is required (non-null, validated Nigerian format) on every account created
+through the new `AdminAccount.Create` factory (`POST /admins`), matching spec 6.1.3's "Req: Yes."
+The bootstrap account (TASK-0003, `CreateBootstrapSuperAdmin`) predates this field and was never
+asked to supply one, and rewriting the bootstrap CLI is out of this card's scope — so the column
+stays nullable, and `null` is grandfathered to mean exactly one row: the bootstrap Super Admin.
+
+**Admin-account audit events (create, edit, status change, password reset, session revoke, and the
+6.1.7-rule-4 rejection) go through the existing `ISystemAuditSink` seam** — the same log-only
+mechanism TASK-0005a used for `settings.identity.updated`/`save_rejected_stale_version`, not a new
+persisted `audit_event` table. Spec 6.1.12 describes a transactional table this codebase has not
+built yet (`ISystemAuditSink`'s own remarks: "the real `audit_event` table does not exist yet... a
+future card... replaces both seams together"). Following the established precedent rather than
+inventing a second convention for the same gap.
+
+**6.1.7 rule 4 is enforced by an explicit actor-`IsSuperAdmin` check in the handler, not only by the
+route's privilege gate.** Under the current flag-bypass privilege model (TASK-0003;
+`SuperAdminFlagEffectivePrivilegeProvider`), only a Super Admin ever holds `admin.update` at all, so
+in production today the route-level gate alone already makes rule 4 unreachable-by-construction. The
+handler checks the acting admin's own `IsSuperAdmin` flag directly and independently anyway,
+because (a) spec 6.1.7's rule is stated as a domain invariant ("can only be set by an account that
+already has it"), not as a restatement of the privilege gate, and (b) TASK-0028's real role/
+assignment persistence will replace the flag-bypass provider, at which point `admin.update` could in
+principle be granted to a non-Super-Admin role — the explicit check is what keeps rule 4 true then
+too, rather than silently depending on today's provider never changing.
+
+**`PATCH /admins/{id}` and `POST /admins/{id}/status` declare a redundant `id` field in their request
+body schema**, even though the route already carries it and the endpoint always overwrites the bound
+value with the route's (`command with { Id = id }`). The alternative — binding a slimmer
+body-only DTO without `Id` — was tried and reverted: `RequireIdempotencyKeyExtensions`'s fingerprint
+reads the bound parameter via `context.Arguments.OfType<IBaseCommand>()`, and a body-only DTO does not
+implement `IBaseCommand`, so the fingerprint would silently stop reflecting the request body at all
+for these two routes (method+path+caller only) — the exact "same key, different fingerprint" case the
+approved delta's `409 idempotency.key_conflict` exists to catch would instead be misclassified as a
+replay. A cosmetic contract wart (`id` present twice) was judged the lesser defect against a silently
+weakened idempotency guarantee.
+
+**List search omits spec 9.5's "indicates which field matched" per-item signal.** `GET /admins`
+implements case-insensitive substring search across `staffName`/`email` (spec 9.5, 6.1.8), but does
+not add a `matchedField` indicator to `AdminAccountSummaryDto` — no acceptance criterion in this card
+names it, and role/scope/session filters are already split to TASK-0028 by the approved delta (B4).
+Left out to keep the dispatch bounded rather than gold-plating an untested surface; a future card can
+add it additively.
+
+### 2.17 TASK-0028 dispatch 1 — the privilege register's group `key` is a plain string, not a reflected enum
+
+The approved delta (`decisions/2026-Q3-contract-deltas.md`, entry `TASK-0028` §1) calls
+`PrivilegeGroupDto.Key` a "string enum" with six fixed, lowercase, underscore-separated values
+(`administration`, `settings`, `academic_structure`, `pupils_and_subjects`, `results`,
+`pins_and_reports`). Every existing enum-shaped field in this codebase (`AdminAccountStatus`, for
+example) crosses the wire via a genuine C# `enum` plus the GLOBAL `JsonStringEnumConverter`
+registered once in `Program.cs`, and that converter has no naming policy — it serializes the literal
+PascalCase member name (`"Active"`, `"Suspended"`), never a naming-policy transform. Making
+`PrivilegeModule` a wire-serialized enum with these exact snake_case values would have meant either
+(a) giving `PrivilegeModule`'s own members non-PascalCase names (`academic_structure` as a C#
+identifier — flagged by this repo's naming analysers, since `Warnings are errors`), or (b)
+registering a SECOND, more-specific `JsonStringEnumConverter<PrivilegeModule>` ahead of the global one
+in `Program.cs`, which is a global-serialization-behaviour change to justify for one field, and would
+also have forced every test that deserializes a response containing it (`IntegrationTestBase.
+JsonOptions`, currently a single shared converter list "mirroring Program.cs's global registration")
+to carry a matching special case.
+
+Chose instead: `PrivilegeModule` stays a plain domain enum (grouping key, `GroupBy`, no wire concern
+of its own); `PrivilegeModuleCatalog.KeyFor(module)`/`TitleFor(module)` are static lookup functions
+returning plain `string`s, and the Application-layer handler builds `PrivilegeGroupDto.Key` from
+`KeyFor(...)` directly. The DTO property is `string`, exactly like `ProblemDetails.errorCode` (also a
+fixed, lowercase, dot/underscore-separated vocabulary that is NOT a reflected C# enum in this
+codebase). Verified empirically, not assumed: the generated schema (`generate-openapi.ps1`, no
+`-Promote`) declares `"key": {"type": "string", ...}` with the correct example value, and the
+committed contract's `PrivilegeGroupDto`/`PrivilegeRegisterResponse` examples show the exact
+delta-specified strings. No `Program.cs` change, no shared test-JSON-options change — the smaller
+surface for a niche, closed vocabulary. If a later card wants the OpenAPI document to declare an
+actual `enum: [...]` constraint on this field (rather than an open string, as `errorCode` also is),
+that is a deliberate additive follow-up, not something this dispatch silently ruled out.
+
+### 2.18 TASK-0028 dispatch 1 — pre-existing Secret-scan finding, NOT caused by this dispatch — RESOLVED by TASK-0032, see §2.19
+
+`./scripts/ci.ps1`'s Secret scan gate is red on a clean checkout of this dispatch's starting point,
+independent of anything dispatch 1 touched. `gitleaks detect --source . --config .gitleaks.toml`
+reports 6 `generic-api-key` findings, all matching the same fake 20-character mixed-case
+alphanumeric example password used in `CreateAdminAccountResponse`/
+`ResetAdminAccountPasswordResponse`'s `temporaryPassword` OpenAPI examples (`OpenApiExamples.cs`,
+pre-existing lines — see the two `$$"""..."""` blocks whose response type names those, NOT quoted
+again here: AGENTS.md §5's own warning is that quoting a credential-shaped string as proof re-arms
+the rule against the very commit that quotes it) and its downstream copies in the already-committed
+`contracts/openapi.json` and `frontend/src/api/schema.d.ts`. Every finding's
+`Commit` field names `814b711` or `4170314` — both already on this branch before this dispatch's
+session began (visible in the initial `git log`), and `gitleaks detect`'s git-history mode does not
+scan uncommitted working-tree content, so re-running the scan before and after every file this
+dispatch added or changed reports the identical "32 commits scanned / 6 leaks found", proving this
+dispatch introduces zero new findings. `backend/.gitleaksignore` (TASK-0017's mechanism) has no entry
+for this string/rule yet — it is unaddressed pre-existing debt, not a false positive this dispatch is
+positioned to judge (deciding a fake-vs-real credential and pinning a fingerprint is the kind of
+security-relevant call the TASK-0011/0017 precedent treated as its own reviewed task, not a drive-by
+fix). Not remediated here; recorded in `STATE.md`'s `## Known drift` for the orchestrator.
+
+### 2.19 TASK-0032 — Secret scan: the six §2.18 findings cleared, and the gate made to see the working tree
+
+Two problems, one card: the six findings above, and the fact that `gitleaks detect` on its own
+scans committed history only, so it always fires one dispatch late against the dispatch that
+introduced something, never the dispatch itself. Both closed together because the second changes
+how the first has to be verified — a fix that only clears git-mode findings would immediately
+reopen itself the moment the same still-committed content is scanned by the new working-tree pass.
+
+**Problem 1 remediation chosen: a content-anchored `.gitleaks.toml` allowlist entry ("tighten the
+rule"), not a `.gitleaksignore` fingerprint and not changing the example string.**
+
+- **Why not a `.gitleaksignore` fingerprint (TASK-0017's own mechanism):** a git-mode fingerprint
+  (`<commit>:<file>:<rule>:<line>`) only clears the git-mode scan. This card adds a second,
+  `--no-git` scan of the SAME still-committed files (`OpenApiExamples.cs`,
+  `contracts/openapi.json`, `frontend/src/api/schema.d.ts`) — a no-git-mode fingerprint would need
+  the mutable `<file>:<rule>:<line>` form the ignore file's own header warns against (a later real
+  secret landing at the same path/rule/line would be silently suppressed), and it would mean
+  maintaining the same finding twice, once per scan mode, forever in sync.
+- **Why not changing the example string:** it does not clear the historical findings at all. The
+  six findings are tied to commits `814b711`/`4170314`, already on the branch; `gitleaks detect`
+  (git-mode) re-evaluates every commit's own diff on every run regardless of what the CURRENT file
+  says, so a string change only stops the count from growing on some future commit — the two
+  introducing commits keep failing every future run either way. It would also force a contract
+  regeneration (`generate-openapi.ps1 -Promote`) and a downstream frontend client regeneration for
+  zero net benefit on the actual six findings, against a card whose own header says
+  `Contract impact: none`.
+- **Why a content-anchored allowlist entry instead:** `.gitleaks.toml`'s `[[allowlists]]` with
+  `targetRules = ["generic-api-key"]`, `regexTarget = "match"`, anchored to the literal
+  `temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"` (Family C, added beside Families A/B) suppresses the
+  finding by CONTENT, not by commit or by line, so the same entry clears both the git-mode scan
+  (all history, both commits) and the new `--no-git` scan (current working tree) with one rule,
+  zero contract impact, and no edit to any of the three flagged files. It does not blanket-ignore
+  those files or their paths — a real leaked secret at a different value in any of them still
+  trips every rule, including this one, exactly as `.gitleaks.toml`'s existing Family A/B comments
+  already argue for the same shape of fix.
+
+**Problem 2: `ci.ps1`'s Secret scan gate now runs gitleaks twice.** Pass 1 is the pre-existing
+`gitleaks detect --source . --config .gitleaks.toml --redact --no-banner` (git history — unchanged
+in behaviour, still whole-repo despite `Push-Location backend/`, since git history discovery walks
+up to the repository root regardless of cwd). Pass 2 is new:
+`gitleaks detect --source <repo-root> --no-git --config .gitleaks.toml --redact --no-banner` —
+`--source` is pointed at the repository root explicitly, because `--no-git` has no git repository
+to discover a root from, and leaving it at `.` (i.e. `backend/`) would silently narrow the new
+pass's coverage to `backend/**` alone, missing a secret landing in `contracts/**` or
+`frontend/**`. Chose `--no-git` over `protect --staged`: the latter only sees staged changes, so
+an uncommitted-but-unstaged file (the normal shape of a dispatch's own working tree before it ever
+runs `git add`) would stay invisible — exactly the gap this card exists to close. The gate fails
+if EITHER pass fails.
+
+**Why `--no-git` needs its own path exclusions, and why they are cheap.** `--no-git` walks the
+filesystem directly rather than reading git history, so nothing gitignored is invisible to it the
+way it is to pass 1 — `frontend/node_modules/` alone is large enough that a plain `du -sh` on it did
+not return within two minutes on this machine. Extended the existing "Build output and packages"
+path allowlist (already `bin|obj|artifacts`, `packages/`) with `node_modules/`, `.git/`, and
+`dist|coverage`. Verified this is not merely optimistic: gitleaks' path allowlist is evaluated
+before a file's content is read, so a whole-repo `--no-git` scan with these four extra entries
+completed in **~1-2 seconds**, not by accident — measured directly, both with `Measure-Command`-style
+timing and by watching it fail to finish inside a 120-second tool timeout before the exclusions were
+added (that first attempt was `du -sh`, not gitleaks itself, but same underlying tree).
+
+**A `--no-git` scan of the real repo surfaces findings problem 1 did not name, all pre-existing and
+all cleared the same way (content-anchored allowlist, not fingerprint, not path):**
+
+- **Family D** — the two realistic-fake connection strings TASK-0011 quoted into
+  `.agent/tasks/logs/TASK-0011.log.md` and this file's own §3.9, as proof its narrowed rule still
+  fires. TASK-0017 fingerprinted these for git-mode; that fingerprint does not reach a `--no-git`
+  scan of the same still-committed content, so two more content-anchored regexes (targeting
+  `postgres-connection-string-with-password` only, the exact two literal strings, not a shape) were
+  added. This is not a reversal of TASK-0011's own "no `--no-git`" ruling — that ruling was about
+  not REPLACING the history scan with a working-tree-only one to dodge the history problem;
+  `--no-git` here is an ADDED second pass, and history scanning is unchanged.
+- **Family E** — TASK-0031's own self-test (`backend/scripts/tests/postgres-test-connection.tests.ps1`,
+  uncommitted at the time this card was worked, per the dispatch's own "leave it alone" instruction)
+  plants `selftest-marker-3fae1c` as both host and password to prove a resolved connection string is
+  never echoed to any captured stream — the same intent as the pre-existing `test_user`/
+  `test_password` global stopwords, just literal enough to also trip
+  `postgres-connection-string-with-password` (whose `Secret` is always the literal word `Host`, per
+  Family A's own finding — the existing stopwords never reached this rule either). One
+  content-anchored entry, both rules, added rather than editing TASK-0031's file. Verified: TASK-0031's
+  own self-test still passes 3/3 with this entry in place (the fixture's assertions are about runtime
+  stream capture, not about whether gitleaks itself later allowlists the marker).
+- Both new families are additive to `.gitleaks.toml`'s existing Family A/B, same file, same
+  `[[allowlists]]` shape, each with its own dated comment naming which task and which finding.
+
+**Verification.** `gitleaks detect --source . --config .gitleaks.toml --redact --no-banner`
+(git-mode, run from `backend/`): `32 commits scanned`, `no leaks found`, exit 0. `gitleaks detect
+--source <repo-root> --no-git --config backend/.gitleaks.toml --redact --no-banner` (working tree,
+whole repo): `no leaks found`, exit 0. Both re-run after every `.gitleaks.toml` edit in this card,
+not only once. **Proved the allowlist entries are not overbroad**: planted an unrelated realistic
+fake key (`sk-live-<40 random hex chars>`) in a throwaway uncommitted file under `backend/src/`,
+confirmed `--no-git` still catches it (`leaks found`, exit 1), then deleted the file — the new
+Families C/D/E match only their own specific literal strings, not a shape broad enough to swallow
+a different secret landing nearby.
+
+**New self-test**: `backend/scripts/tests/secret-scan-working-tree.tests.ps1` (hand-rolled, no
+Pester, same style as `gate-summary.tests.ps1` / `postgres-test-connection.tests.ps1`). Builds a
+throwaway `git init` repository (never the real one), plants a fake secret matching this project's
+own `bearer-or-api-key-literal` rule in a file that is deliberately never staged or committed
+(the secret value itself is generated at run time from a fresh GUID, not a literal in the test
+file's own source — a static matching literal committed in a tracked file would be exactly the
+family of finding this card exists to stop introducing). Three assertions: git-mode `detect`
+alone does NOT see it (proving the pre-fix behaviour is real, not asserted from memory), `detect
+--no-git` DOES see it (proving the fix), and a clean uncommitted file passes `--no-git` (proving
+assertion two is not vacuously true for any working tree). `PASSED: 3 assertion(s)`, exit 0.
+
+**Left for the orchestrator, not this card's to edit**: `.github/workflows/backend-ci.yml` should
+gain a "Self-test the secret-scan working-tree branch" step
+(`run: ./scripts/tests/secret-scan-working-tree.tests.ps1`) alongside the two existing self-test
+steps, so this suite does not silently never run in CI — the same gap TASK-0022 found for
+`gate-summary.tests.ps1` and TASK-0031 flagged for its own resolver test. `STATE.md`'s
+`## Known drift` entry for the 2026-08-27 Secret-scan finding and `## Gate commands` are
+orchestrator-owned; this card's ledger entry says what to strike rather than striking it directly.
+
+### 2.20 TASK-0028 dispatch 2 — role persistence, CRUD, rule 2
+
+Five decisions, none of them redesigning the three inherited files (`Role.cs`,
+`RolePrivilegeEscalationGuard.cs`, `IRoleRepository.cs`) beyond two mechanical XML-doc-comment fixes
+that blocked `warnings-as-errors` build (below) — the guard's logic, message wording and repository
+contract are exactly as the previous dispatch and the orchestrator's review left them.
+
+**Two pre-existing compile errors in the six inherited files, fixed as doc-only changes, logic
+untouched.** `RolePrivilegeEscalationGuard.cs`'s CLASS-level `<remarks>` used
+`<paramref name="existingPrivileges"/>`/`<paramref name="actorPrivileges"/>`, which only resolves
+against a MEMBER's own parameters — CS1734 on a class comment, which `AnalysisLevel 10.0-All` turns
+into a build error. Changed to `<c>existingPrivileges</c>`/`<c>actorPrivileges"</c>` (plain code
+formatting, same words, no cross-reference). `IRoleRepository.cs` also carried an unused
+`using SchoolManagement.Domain.Common;` (IDE0005, likewise an error) — removed. Neither the guard's
+evaluation order, its message text, nor the repository's method signatures changed.
+
+**Privileges are stored as a comma-joined `text` column, not a native Postgres array.** Same
+technique `AdminAccountConfiguration.PasswordHistoryHashes` already uses for a newline-joined list,
+applied to a comma separator: every privilege code is a fixed, dot-separated, comma-free vocabulary
+(`PrivilegeRegistry`), so the join is unambiguous, and `IReadOnlyList<string>` (an interface, backed
+by a private `List<string>` field via `PropertyAccessMode.Field`) sidesteps whatever native-array
+mapping Npgsql's EF Core provider would or would not infer for an interface-typed property. Chosen
+for consistency with an already-reviewed precedent under time pressure, not because a native
+`text[]` column was tried and found lacking.
+
+**`GET /roles`'s caller-chosen `sort`/`direction` needed raw SQL with a DYNAMIC column and
+comparison operator**, which `AdminAccountRepository.ListAsync`'s `SqlQuery<T>(FormattableString)`
+precedent does not do (its own sort is fixed). C# has no relational `>`/`<` operator on `string`
+(the same reason that precedent gives), so the column name (`name_key` or `status`) and the
+comparison operator (`>`/`<` for ascending/descending) are spliced into the SQL TEXT via ordinary C#
+string interpolation — safe only because both are chosen from a two-value whitelist the query
+validator already enforces, never from arbitrary caller text — while every genuine VALUE (status
+text, search term, cursor value, page size) still passes through `SqlQueryRaw`'s `{0}`-style bound
+parameters. Worth a second pair of eyes precisely because "safe string-built SQL" is the kind of
+claim that stops being true the moment someone adds a third sort field without re-deriving why the
+first two were safe.
+
+**`UpdateRoleRequest`'s "absent field = unchanged" is expressed with plain nullable properties, the
+same convention `UpdateAdminAccountCommand.IsSuperAdmin` already uses** — `null` means unchanged,
+a non-null value means "set to this." This leaves ONE genuine gap for `description`, which is
+ITSELF legitimately nullable at the entity level (no description): there is no way, with a plain
+nullable string, to distinguish "leave the description alone" from "clear it to null." Resolved by
+convention, not by a new wrapper type: an explicit **empty string** clears the description (`Role`'s
+own `TryNormalizeDescription` already trims an empty string to `null`), while an absent/`null`
+field leaves it untouched. Proven by `RoleEndpointsTests.Update_DescriptionSetToAnEmptyString_ClearsIt`.
+If a future card needs to represent "clear the NAME" the same way, it cannot — `Name` has no
+legitimate null state, so this convention was never extended there.
+
+**General audit events (create/update/delete) reuse `Privileges.Role.{Create,Update,Delete}` as the
+audit `action`, and rule 2's rejection reuses its own error code (`role.privilege_escalation`) as
+the action** — mirroring `UpdateAdminAccountCommandHandler`'s rule-4 rejection precedent (same
+string for both), not a new naming convention. All through the existing log-only `ISystemAuditSink`
+seam (§2.16), not a new mechanism.
+
+### 2.21 TASK-0028 dispatch 3 — spec 4.5's six seeded roles
+
+**Seeding mechanism**: EF Core `HasData` in `RoleConfiguration`, one new additive migration
+(`SeedRoles`) — the same pattern `SchoolProfileConfiguration` already established for the one other
+`HasData`-seeded row in the codebase. `Domain/Security/SeededRoles.cs` is the SINGLE source: fixed
+role ids, fixed per-row concurrency-token seed values, and each role's canonical privilege set as a
+literal, hand-transcribed array (never a generated wildcard-expansion) — `SeededRoles.All`
+(`IReadOnlyList<SeededRoleDefinition>`) is what both `RoleConfiguration.SeedRoles` (the migration's
+`HasData` seed) and `ApiTestFixture.ReseedRolesAsync` (the post-`TRUNCATE` reseed every integration
+test needs, mirroring the pre-existing `ReseedSchoolProfileAsync`) are built from, so the two can
+never drift from each other. IDs are `00000000-0000-0000-0000-0000000001{01..06}` (Super Admin
+first, spec 4.5's own table order); concurrency-token seed values are similarly fixed
+(`…0002{01..06}`) rather than `Guid.CreateVersion7()`, because a value minted inside `Configure()`
+would be regenerated on every process start and make the running model disagree with the committed
+migration's literal `HasData` values. `CreatedAtUtc` uses `DateTimeOffset.UnixEpoch` as an explicit
+"installed, not a real event" sentinel, the same spirit as `SchoolProfile`'s version pointers
+starting at 0.
+
+**All six expected counts were verified two independent ways**: by hand (transcribing spec 4.5's
+prose against the register file-by-file) and by parsing the generated migration's actual comma-joined
+`privileges` column values back out with a throwaway script — both agree exactly: Super Admin 93
+(the whole register), School Administrator 43, Head Teacher 25, Class Teacher 19, Bursar 11, Auditor
+15. The domain test suite (`SeededRolesTests`) re-derives a THIRD, independent flat literal list per
+role (not calling `SeededRoles`' own grouping/`Sorted` helper) and asserts exact sequence equality
+after sorting both sides the same way — the copy-in-the-repo the next drift check has to disagree
+with, not a loop re-running the same expansion logic against itself.
+
+**Three disagreements found between spec 4.5 (the section this dispatch was named to implement) and
+spec 4.4's per-privilege "Seeded to" column (described to the implementing session only as "the
+vocabulary [4.5] draws on") — disclosed rather than silently reconciled, 4.5 treated as
+authoritative in every case:**
+
+1. Spec 4.4 lists `weekly.enter` and `weekly.publish` as "Seeded to: SA, ADM, HT, CT" (including
+   School Administrator) — spec 4.5's own prose for School Administrator names no `weekly.*`
+   privilege at all.
+2. Spec 4.4 marks `weekly.view` "Seeded to: all roles" (which would include both School Administrator
+   and Auditor) — spec 4.5's prose omits it from both.
+3. Spec 4.4 marks `subject.view` "Seeded to: all roles" (which would include Bursar) — spec 4.5's
+   Bursar prose omits it (Bursar's set otherwise has no `subject.*` privilege at all).
+
+None of the five non-system roles' `guardian.*`/`pupil.*`/`level.*`/`arm.*`/`subject.*` wildcard
+exclusions produced any OTHER disagreement once fully expanded and cross-checked module by module —
+these three are the only ones found. **This needs orchestrator/human confirmation**: if 4.4's
+"Seeded to" column is the one that's actually current and 4.5 is the stale prose, three privilege
+codes across two roles would need adding. Shipped per 4.5 as instructed; flagged rather than guessed.
+
+**One thing the task card asserted that turned out not to hold, checked directly rather than
+repeated**: the dispatch prompt stated "there is no `pupil.delete` in the register." Spec 4.4.4 (line
+141 of `01-actors-and-privileges.md`) and `Privileges.Pupil.Delete` both define it (seeded to Super
+Admin only) — School Administrator's "except delete" excludes a real, existing code, nothing was
+invented. No functional impact (the code is correctly excluded from School Administrator's set
+either way), but the premise itself was wrong and is corrected here rather than silently repeated in
+a future report.
+
+**`guardian.*` resolves to its three `contact.*` replacements** (`create`/`update`/`view` — the only
+three privileges that ever existed under the old name, per `PrivilegeAliases.Map`) for School
+Administrator; no seeded role stores a `guardian.*` code, proven by
+`SchoolAdministratorPrivileges.ShouldAllBe(code => !code.StartsWith("guardian."))`.
+
+**Fallout in `RoleEndpointsTests.cs` from seeding real, permanently-present rows into every
+integration test's database** (via `ApiTestFixture.ReseedRolesAsync`), found by actually running the
+suite rather than assumed clean:
+
+- Several PRE-EXISTING tests created a throwaway role literally named `"Class Teacher"` — now a real
+  seeded name, so `POST /roles` correctly returned `409 role.name_duplicate` instead of the `201`/
+  `422` those tests expected. Renamed the throwaway name to `"Custom Marking Role"` everywhere in the
+  file (six call sites) — none of those tests were about the Class Teacher role itself, just needed
+  an arbitrary example name.
+- `CreateSystemRoleDirectlyAsync` (dispatch 2's fixture helper, inserting a SECOND row via
+  `Role.CreateSystemRole` — which only ever accepts the name `"Super Admin"`) can no longer run at
+  all: a second row with that name violates `ix_roles_name_key_unique` now that the real one is
+  always present. Removed the helper and its two dependent tests
+  (`Update_OnASystemRole_Returns409`, `Delete_OnASystemRole_Returns409`), replacing them with this
+  dispatch's own `Update_OnTheRealSeededSuperAdminRole_Returns409` /
+  `Delete_OnTheRealSeededSuperAdminRole_Returns409` — which is strictly stronger evidence (the real
+  production row, not a stand-in) and exactly what the task card's live-drift entry asked this
+  dispatch to add.
+- `Create_WithTheReservedNameCaseInsensitive_Returns422` asserted 422 `role.name_reserved` for a
+  create attempt named `"Super Admin"`/`"super admin"`. `CreateRoleCommandHandler` checks
+  `NameExistsAsync` (duplicate name) BEFORE calling `Role.Create` (where the reserved-name check
+  lives) — a dispatch-2 ordering decision, unchanged and out of this dispatch's scope. Before a real
+  Super Admin row existed, no duplicate was ever found, so the reserved-name path was the one actually
+  observed over HTTP; now the literal string is both reserved AND genuinely taken, and the duplicate
+  check wins first — 409, not 422. Renamed to
+  `Create_WithTheReservedNameCaseInsensitive_Returns409BecauseTheRealRowAlreadyExists` and re-pointed
+  at `409`/`role.name_duplicate`, with a comment explaining why. The reserved-name domain rule itself
+  is untouched and still fully proven independent of any database state by
+  `RoleTests.Create_WithTheReservedNameCaseInsensitive_Rejects`.
 
 ---
 

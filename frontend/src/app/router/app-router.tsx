@@ -1,7 +1,8 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { ErrorBoundary } from '@/components/feedback/error-boundary';
 import { AppShell } from '@/components/layout/app-shell';
-import { ScaffoldStatusScreen } from '@/screens/scaffold-status/scaffold-status-screen';
+import { LandingScreen } from '@/features/auth/landing-screen';
+import { SignInScreen } from '@/features/auth/sign-in-screen';
 import { paths } from './paths';
 
 /**
@@ -17,7 +18,17 @@ const router = createBrowserRouter([
     element: (
       <AppShell>
         <ErrorBoundary>
-          <ScaffoldStatusScreen />
+          <LandingScreen />
+        </ErrorBoundary>
+      </AppShell>
+    ),
+  },
+  {
+    path: paths.signIn,
+    element: (
+      <AppShell>
+        <ErrorBoundary>
+          <SignInScreen />
         </ErrorBoundary>
       </AppShell>
     ),

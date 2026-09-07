@@ -16,13 +16,16 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 | TASK-0001 | Re-audit both scaffolds against §6/§7 | RV | CLAUDE.md §6, §7 | **done** |
 | TASK-0002 | Privilege register and authorisation enforcement | BE | 01 §4.2–4.4, 14 §9.2 | **done** |
 | TASK-0003 | Authentication and session management | BE | 03 §6.1.3/6.1.6/6.1.10/6.1.11, 14 §9.1 | **done** |
-| TASK-0019 | Idempotency substrate | BE | 14 §9.8.2, 9.9 | approved, ready |
-| TASK-0027 | Admin account management | BE | 03 §6.1.2/6.1.7/6.1.9-6.1.14, 14 §9.2/9.4/9.5 | blocked (§5 sign-off) |
-| TASK-0028 | Roles, assignments, privilege register | BE | 03 §6.1.4-6.1.7, 6.1.14 | queued (stub) |
+| TASK-0019 | Idempotency substrate | BE | 14 §9.8.2, 9.9 | **done** |
+| TASK-0027 | Admin account management | BE | 03 §6.1.2/6.1.7/6.1.9-6.1.14, 14 §9.2/9.4/9.5 | **done** |
+| TASK-0028 | Roles and the privilege register | BE | 03 §6.1.4, 6.1.7 r2, 6.1.14 · 01 §4.4, 4.5 | **done** — 3 dispatches |
+| TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | BE | 03 §6.1.5, 6.1.7, 6.1.8, 6.1.10, 6.1.13-14 · 01 §4.2 | **blocked** — needs sessions (05 §6.3) and arms (06 §6.4); split from 0028 on 2026-09-06 |
 | TASK-0020 | Adopt §7's frontend structure, form and E2E mandates | FE | §7 — resolves Open question 11 | **done** |
-| TASK-0021 | Cookie auth seam and the sign-in screen | FE | §5, §7 — consumes TASK-0003's contract | queued |
+| TASK-0021 | Cookie auth seam and the sign-in screen | FE | §5, §7 — consumes TASK-0003's contract | **done** |
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
 | TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
+| TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | **done** |
+| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | queued — §4.4 check 2 is RED until it lands |
 
 ### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
 
@@ -42,6 +45,8 @@ inherits whatever these leave broken.
 | TASK-0013 | Idempotency — Option B (defer, binding record), decided 2026-09-04 | BE | TASK-0001 blocker B2. Deferred with a binding record: `ASSUMPTIONS.md` §2.14 + `TODO(TASK-0013)`. **Trigger: the first card implementing ANY retry-duplicable mutation builds the mechanism first.** | closed |
 | TASK-0017 | Clear the secret-scan gate TASK-0011's own docs turned red | BE | TASK-0011 proved its rule still fired by committing the fake credential it tested with, re-arming the rule against its own write-up. A gate red for documenting its fix stops being information. | **done** |
 | TASK-0014 | Frontend scaffold conformance fixes from the §7 audit | FE | TASK-0001 S4-S8. The feature README prescribes bypassing the generated client, and `npm run lint` cannot fail on warnings. | **done** |
+| TASK-0031 | Move the test-connection prelude into the gate script itself | BE | Every caller had to hand-build a compound PowerShell statement to set one environment variable, and the reinvention is where the cost went: TASK-0028 dispatch 1 spent repeated ten-minute CI runs on the invocation rather than the code. Supersedes TASK-0018 by deleting the wrapper it fixed. | **done** |
+| TASK-0032 | Make the secret scan see the diff it is gating | BE | `gitleaks detect` reads committed history while a dispatch gates an uncommitted tree, so gate 9 never examines the change under test and fires one card late, at the next author. A scan that reports PASS without having looked is TASK-0011 all over again. | **done** |
 | TASK-0018 | Make `local-env.template.ps1` pass switches to the gate script | BE | TASK-0016 added the two switches a local developer most needs (`-NoFailFast`, `-AllowSkipped`) and the only sanctioned wrapper could not pass either: an array splat binds positionally. A gate option nobody can reach is a gate option nobody uses. | **done** |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | **done** |
 

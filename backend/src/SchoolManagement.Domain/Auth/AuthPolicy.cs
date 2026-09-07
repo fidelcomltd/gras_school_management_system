@@ -49,6 +49,9 @@ public static class AuthPolicy
     /// <summary>Maximum email length. Not fixed by spec 6.1.3 beyond "required"; sized generously.</summary>
     public const int EmailMaxLength = 180;
 
+    /// <summary>Maximum phone length (spec 6.1.3). The normalised <c>+234</c> form is always 14 characters; this leaves headroom.</summary>
+    public const int PhoneMaxLength = 20;
+
     /// <summary>Maximum length of the stored Argon2id encoded hash string.</summary>
     public const int PasswordHashMaxLength = 512;
 }

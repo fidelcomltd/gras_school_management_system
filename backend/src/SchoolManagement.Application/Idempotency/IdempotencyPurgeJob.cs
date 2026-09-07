@@ -43,6 +43,7 @@ public sealed class IdempotencyPurgeJob(
             PurgeEntityType,
             entityId: null, // Bulk action — spec 6.1.12's "Null for bulk actions" case.
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["count"] = purgedCount },
+            actorAdminId: null, // Genuine system action — TASK-0005a's new parameter, unchanged behaviour here.
             cancellationToken).ConfigureAwait(false);
 
         return purgedCount;

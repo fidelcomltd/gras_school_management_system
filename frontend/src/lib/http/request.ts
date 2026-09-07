@@ -1,5 +1,5 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { expireSession } from '@/lib/auth/auth-session';
+import { terminateSession } from '@/lib/auth/auth-session';
 import { httpClient } from './http-client';
 import { ApiError, normalizeError } from './http-error';
 
@@ -9,7 +9,7 @@ import { ApiError, normalizeError } from './http-error';
  * Each helper:
  *   - returns only the server payload, never the Axios response envelope;
  *   - throws an `ApiError` whose `message` is safe to show a user;
- *   - logs the session out when the server says the credential is dead.
+ *   - ends the session when the server says the credential is dead.
  */
 
 /** The slice of Axios config a caller has any business setting. */
@@ -51,9 +51,10 @@ async function send<TResponse>(
   } catch (error) {
     const apiError = normalizeError(error);
 
-    // The interceptor already tried to refresh. Reaching here with a 401 means
-    // the session is genuinely finished — tear it down so the UI can react.
-    if (apiError.isUnauthorized) expireSession();
+    // Defense in depth: the interceptor's response handler already calls this
+    // for a 401 (delta §3a — every 401 is terminal). `terminateSession` is
+    // idempotent, so calling it again here is a no-op, not a double sign-out.
+    if (apiError.isUnauthorized) terminateSession();
 
     throw apiError;
   }

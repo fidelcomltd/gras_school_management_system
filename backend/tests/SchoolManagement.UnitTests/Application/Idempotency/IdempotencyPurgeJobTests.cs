@@ -42,6 +42,7 @@ public sealed class IdempotencyPurgeJobTests
             IdempotencyPurgeJob.PurgeEntityType,
             entityId: null,
             Arg.Is<IReadOnlyDictionary<string, object?>>(metadata => HasCount(metadata, 7)),
+            actorAdminId: null,
             Arg.Any<CancellationToken>());
     }
 
@@ -60,6 +61,7 @@ public sealed class IdempotencyPurgeJobTests
             IdempotencyPurgeJob.PurgeEntityType,
             entityId: null,
             Arg.Is<IReadOnlyDictionary<string, object?>>(metadata => HasCount(metadata, 0)),
+            actorAdminId: null,
             Arg.Any<CancellationToken>());
     }
 

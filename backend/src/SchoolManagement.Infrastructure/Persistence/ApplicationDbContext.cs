@@ -4,6 +4,8 @@ using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Idempotency;
 using SchoolManagement.Domain.Reference;
+using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Infrastructure.Persistence;
 
@@ -48,6 +50,15 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     /// <summary>TASK-0019. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
+    /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<SchoolProfile> SchoolProfiles => Set<SchoolProfile>();
+
+    /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<ConfigVersion> ConfigVersions => Set<ConfigVersion>();
+
+    /// <summary>TASK-0028 dispatch 2. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Role> Roles => Set<Role>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

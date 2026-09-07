@@ -14,12 +14,14 @@ namespace SchoolManagement.Api.Idempotency;
 
 /// <summary>
 /// Attached alongside the filter in <see cref="RequireIdempotencyKeyExtensions.RequireIdempotencyKey{TBuilder}"/>,
-/// so enforcement and (future) documentation cannot drift apart — the same construction
-/// <c>RequireCsrfTokenMarker</c> uses. No operation transformer reads this yet: TASK-0019 ships no
-/// route that declares it, so nothing in the committed contract changes. TASK-0027 is the first
-/// route to call <see cref="RequireIdempotencyKeyExtensions.RequireIdempotencyKey{TBuilder}"/> for
-/// real, and wires the transformer that reads <see cref="Required"/> to declare the request header
-/// and the <c>Idempotency-Replay</c> response header (orchestrator amendment A1).
+/// so enforcement and documentation cannot drift apart — the same construction
+/// <c>RequireCsrfTokenMarker</c> uses. TASK-0019 shipped no route that declares it, so the committed
+/// contract stayed unchanged then. TASK-0027 (admin accounts) was expected to be the first route to
+/// call <see cref="RequireIdempotencyKeyExtensions.RequireIdempotencyKey{TBuilder}"/> for real, but it
+/// remains held for §5 sign-off — TASK-0005a's <c>PATCH /settings/identity</c> shipped first instead.
+/// <see cref="Api.OpenApi.IdempotencyHeaderOperationTransformer"/> is the transformer
+/// that reads <see cref="Required"/> to declare the request header and the <c>Idempotency-Replay</c>
+/// response header (orchestrator amendment A1).
 /// </summary>
 /// <param name="Required">
 /// Whether <c>Idempotency-Key</c> is REQUIRED (absent → <c>idempotency.key_missing</c>) or merely

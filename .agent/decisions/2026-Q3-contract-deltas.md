@@ -319,8 +319,9 @@ concept models "who is calling," and CSRF proves request provenance, not identit
 
 ## TASK-0019 / TASK-0027 — Idempotency substrate and admin account management
 
-**Part 1 (idempotency) APPROVED 2026-09-06 by orchestrator. Part 2 (accounts) AMENDED and held for
-human sign-off under §5.** Drafted by backend-dev in one dispatch. The card was split three ways on
+**Part 1 (idempotency) APPROVED 2026-09-06 by orchestrator. Part 2 (accounts) AMENDED, then
+APPROVED 2026-09-06 by human sign-off under §5 — see the Part 2 heading for the ruling and its
+scope.** Drafted by backend-dev in one dispatch. The card was split three ways on
 approval: TASK-0019 substrate (contract-neutral), TASK-0027 accounts, TASK-0028 roles/assignments.
 
 Classification: Part 1 **none** as shipped by TASK-0019 (no route declares it); Part 2 **additive**.
@@ -392,10 +393,31 @@ whose privilege `admin.password.reset` is already in the register. Losing a crea
 one forced reset, not an orphaned account. **The redaction hook is generic and built in TASK-0019;
 its first caller is TASK-0027.**
 
-### Part 2 — `/api/v1/admins` — AMENDED, HELD FOR HUMAN SIGN-OFF
+### Part 2 — `/api/v1/admins` — AMENDED, then APPROVED BY HUMAN SIGN-OFF (2026-09-06)
 
 Held under §5: `password-reset` and `DELETE /sessions` are session/credential operations. The
 mechanism is TASK-0003's and unchanged; what is new is who may operate it on whose behalf.
+
+**§5 SIGN-OFF, 2026-09-06, human (chisom.maxwell@securedrecords.com): APPROVED AS DRAFTED.** The
+question put was who may operate another account's sessions and credentials, with four options
+offered: (1) approve as drafted, (2) approve with a step-up re-authentication requirement on
+`password-reset` and `DELETE /sessions`, (3) approve but restrict those two to `is_super_admin`
+regardless of the privilege grant, (4) defer the two endpoints (which would not have removed the
+sign-off, since suspend and deactivate revoke the target's sessions too). **Option 1 chosen.**
+
+What that authorises, precisely: an account **holding the privilege** may exercise it against
+another account — `admin.password.reset` mints a new temporary password, sets
+`must_change_password` and revokes every session the target holds (6.1.11); `admin.session.revoke`
+signs the target out everywhere; suspension and deactivation revoke the target's sessions
+immediately (6.1.10). **The privilege grant is the whole gate.** No step-up re-authentication is
+required of the acting admin, and `is_super_admin` is NOT an additional requirement on these two
+endpoints — the spec's privilege model stands unmodified. The guards that remain are the ones
+already in the delta and nothing further: the transactionally-enforced at-least-one-active-Super-Admin
+invariant (4.1), the self-status-change block (B5), the Super-Admin-only reactivation path (6.1.10),
+and 6.1.7 rule 4's is-super-admin-sets-is-super-admin restriction.
+
+No shape in this delta changed as a result of the sign-off — the ruling is on authority, not on the
+wire. TASK-0027 is unblocked and dispatchable as written.
 
 Accepted from the draft as-is: the `CursorPagedResultOfAdminAccountSummaryDto` envelope and the
 refusal to reuse the offset-based `PagedResultOfSampleRecordDto` (§9.5 forbids offset); page size 25
@@ -458,3 +480,197 @@ an audit query; it goes to TASK-0028 with the rest of the detail view.
 moves from TASK-0019 to TASK-0027, which is where a per-user-partitioned route first ships. Noted
 there as an acceptance criterion with the trap stated: a 429 test that would still pass under IP
 partitioning does not prove the fix.
+
+---
+
+# TASK-0005 — School settings delta: APPROVED WITH FOUR AMENDMENTS (2026-09-06)
+
+Proposed by `backend-dev` dispatch 1 (delta-only, no code — full text in the card's `## Log`).
+Additive throughout; no existing path changes shape, so no human sign-off is required (§3). The
+card is **SPLIT THREE WAYS** as proposed: TASK-0005a (identity + `config_version` substrate),
+TASK-0005b (uploads), TASK-0005c (registration numbers).
+
+**Verified mechanically before approving**: all five privilege strings exist verbatim in
+TASK-0002's shipped register (`Privileges.cs:76,86,92,95,98`) — `settings.view`,
+`settings.identity.update`, `settings.abbreviation.update`, `settings.regnumber.update`,
+`audit.view`. None invented.
+
+**Verified against the spec, not against the delta**: the preview reading is correct and I had
+expected it to be wrong. Spec 6.2.4 says the preview is built "from the **current** abbreviation,
+separator and serial width" — so taking `separator`/`serialWidth` as unsaved query parameters
+while composing the abbreviation from saved state is exactly right, not an omission.
+
+## Amendment 1 — `serial_reset: continuous` has no counter to read (BLOCKER for 0005c)
+
+`registration_number_counter` is proposed as `admission_year` (PK) + `last_serial_issued`. That
+shape can only express `per_year`. Spec 6.2.4 makes `serial_reset` an enum of **`per_year` OR
+`continuous`**, and under `continuous` the serial does not restart in January — 2027's first
+pupil follows 2026's last. A counter keyed on year alone cannot represent that sequence, so
+`continuous` would silently behave as `per_year`: the setting would appear in the API, be
+accepted, be stored, and do nothing. That is the defect family this project keeps removing —
+a control that reports success and changes no behaviour.
+
+Fix in 0005c: the counter must carry both modes (a sentinel/global partition alongside the
+per-year rows, or an explicit partition key), the preview must compose from whichever partition
+the **currently saved** `serial_reset` selects, and the width-reduction rejection must scan the
+partition that mode actually uses. **A test must set `continuous`, cross a year boundary in
+seeded counter state, and assert the serial does not restart** — a test that only exercises
+`per_year` leaves this unproven.
+
+## Amendment 2 — `abbreviation.issuedCount` cannot be computed by this card, and must not pretend
+
+The delta returns the 6.2.4 dialogue's count ("**412 pupils** already hold registration numbers
+beginning GRAS") as a plain field on `GET /settings`. Correct placement — it must reach the UI
+before the admin types `CHANGE`, so it cannot ride on an error body. But **no pupil or
+registration register exists yet**; nothing in TASK-0005 can count issued numbers. Left as
+drafted, the field ships as a permanent `0` and the dialogue renders "0 pupils already hold…"
+as though it were a fact.
+
+Fix in 0005c: the field is **nullable**, `null` meaning "no register exists to count yet" — never
+`0`, which is a claim. The contract documents it as nullable-until-the-register-exists, and the
+frontend card that renders the dialogue must handle `null` by suppressing the count sentence
+rather than printing a zero. Owner of the wiring: the pupil-registration card, recorded as drift
+with that trigger.
+
+## Amendment 3 — the stale-save message is grading-scale copy; do not reuse it verbatim
+
+6.2.11's optimistic-concurrency sentence names the grading scale specifically ("The grading scale
+was changed by another administrator while you were editing. Reload and make your change again.").
+This card touches identity, abbreviation and registration number — none of them the grading
+scale. Substituting the group name follows the spec's pattern but the resulting sentence is
+**our copy, not the school's spec**. Write it per group, and record it in
+`backend/docs/ASSUMPTIONS.md` as authored copy awaiting confirmation. Do not present invented
+user-facing text as though the spec supplied it.
+
+## Amendment 4 — "logo deleted with no replacement" gets a domain invariant, not an invented route
+
+Open question 4 answered: **do not invent a `DELETE` route.** Spec 6.2.12's own endpoint
+enumeration has no removal route, and 6.2.2 confirms the logo is *not seeded* — so the real rule
+is a set→null transition guard, not a route. Implement it as a domain invariant carrying 6.2.11's
+verbatim message, unit-tested at the domain level. An acceptance criterion whose only proof is an
+HTTP route that does not exist is a vacuous criterion; this makes it testable without inventing
+product surface. Record in `STATE.md ## Known drift` that the removal affordance is currently
+unrouted, triggered by the settings-screen frontend card.
+
+## Confirmed as proposed (no change needed)
+
+- **Concurrency**: client-echoed integer `expectedVersion` per group, compared inside the same
+  transaction as the `config_version` insert, `409` before any write. Two int pointer columns on
+  `school_profile` (identity + abbreviation) rather than a second singleton table for one string
+  field. Loser gets the audit-seam call and no version row — which is what 6.2.11's "both attempts
+  appear in the audit log" actually says.
+- **`config_version`**: one global monotonic ledger, `snapshot` holding the WHOLE serialised
+  configuration on every write (6.2.9's rationale, card note 1). Not a reference. Never updated.
+- **Idempotency**: `Idempotency-Key` **accepted, not required**, on all five mutating routes —
+  consistent with TASK-0019 Part 2's placement of `PATCH /admins/{id}`. The multipart-fingerprint
+  gap found while answering (the fingerprint builder JSON-serialises the bound command and so
+  cannot see uploaded bytes) is real and is **0005b's to resolve by folding in a content hash** —
+  not to rediscover.
+- **`ProblemDetails additionalProperties: false` does not bite this card.** Answered explicitly,
+  with the count moved to `200` data rather than stuffed into `detail`. The `lockedUntil`
+  inaccuracy therefore stays TASK-0027's (`STATE.md ## Known drift`, 2026-09-06).
+- **The two serving endpoints** (`GET /settings/identity/logo/{size}`, `.../signature`) are
+  APPROVED as additions. §9.6 requires uploads be served through a privilege-checked endpoint and
+  spec 6.2.12 lists none — the delta was right to add them rather than assume the silence meant
+  "don't build one".
+- **Abbreviation reason**: non-empty (trimmed), no 10-character floor. 6.2.9's floor is scoped by
+  its own prose to grading/assessment/traits/trait-scale/result-rules, and 6.2.10 confirms
+  abbreviation is never locked and never triggers that warning. Cap the length and record both
+  choices in `ASSUMPTIONS.md`.
+- **Seeding**: 6.2.2 seeds the abbreviation as `GRAS`; the migration must ship that row. School
+  name, address, phone, email, motto, logo and signature are explicitly NOT seeded.
+
+---
+
+## TASK-0028 — Roles and the privilege register — APPROVED (orchestrator, 2026-09-06)
+
+Additive throughout. No breaking change, so no human sign-off under §3. No session/auth mechanism
+change, so no §5 sign-off. Three new paths take the document from 18 to 21.
+
+Assignments are **not** in this delta — see TASK-0030 and the card's "Why assignments are NOT in
+this card".
+
+### 1. `GET /api/v1/privileges` — the register (dispatch 1)
+
+Authenticated, **no privilege required** (spec 6.1.14 says so explicitly). No CSRF (read). Not
+paged: the register is a fixed 93-row compile-time constant, not a growing list, so §9.5's cursor
+rule does not apply. Deterministic ordering — groups 4.4.1→4.4.6, rows in spec table order.
+
+```
+200 PrivilegeRegisterResponse
+  groups: PrivilegeGroup[]
+      key        string enum — administration | settings | academic_structure |
+                 pupils_and_subjects | results | pins_and_reports
+      title      string — verbatim spec 4.4.x heading, e.g. "Administration and access control"
+      privileges: PrivilegeDescriptor[]
+          code      string — canonical register code, e.g. "pupil.safeguarding.view"
+          permits   string — verbatim spec 4.4 "Permits" cell
+          scopable  boolean
+```
+
+- Legacy `guardian.*` aliases (`PrivilegeAliases`) are **not** in the response. The register is
+  canonical codes only; aliasing is an input concern.
+- `key` crosses as a string (§8) and the client must tolerate unknown members — a seventh module
+  group is an additive change.
+- No `401`-only special casing beyond the standard authenticated-endpoint behaviour.
+
+### 2. `/api/v1/roles` and `/api/v1/roles/{id}` (dispatch 2)
+
+| Op | Privilege | Idempotency-Key | CSRF | Success |
+| --- | --- | --- | --- | --- |
+| `GET /roles` | `role.view` | — | — | 200 cursor page |
+| `POST /roles` | `role.create` | **required** | yes | 201 + `Location` |
+| `GET /roles/{id}` | `role.view` | — | — | 200 |
+| `PATCH /roles/{id}` | `role.update` | accepted | yes | 200 |
+| `DELETE /roles/{id}` | `role.delete` | accepted | yes | 204 |
+
+`POST` requires the key on TASK-0027's `POST /admins` precedent: it creates an independently
+addressable entity, so a retried create must not make two roles.
+
+```
+Role
+  id           string (opaque, §8)
+  name         string 1..60
+  description  string 0..300, nullable
+  isSystem     boolean
+  privileges   string[] — canonical codes, min 1, sorted deterministically
+  status       string enum — active | archived
+
+CreateRoleRequest   name, description?, privileges[]
+UpdateRoleRequest   name?, description?, privileges?, status?   (all optional; absent = unchanged)
+RoleListResponse    items: Role[], nextCursor: string|null      (§9.5, page size 25)
+  query: status? (active|archived; ARCHIVED EXCLUDED BY DEFAULT per §9.4), search?, sort?
+         (whitelist: name | status), direction?, cursor?, pageSize?
+```
+
+### 3. Error codes — all `ProblemDetails` with `errorCode`, closed schema (TASK-0012)
+
+| `errorCode` | Status | When | Message |
+| --- | --- | --- | --- |
+| `role.name_reserved` | 422 | create/rename to `Super Admin`, case-insensitive | 6.1.4 |
+| `role.name_duplicate` | 409 | case-insensitive name collision | 6.1.4 |
+| `role.privileges_empty` | 422 | empty privilege list | 6.1.4 "At least one" |
+| `role.unknown_privilege` | 422 | any code not in the register | **names the offender** (6.1.4) |
+| `role.system_immutable` | **409** | `PATCH`/`DELETE` on an `is_system` role | 6.1.14 fixes 409 |
+| `role.privilege_escalation` | 403 | 6.1.7 rule 2 | verbatim, below |
+
+Rule 2's message is fixed by spec 6.1.7 and must not be rephrased. One offender:
+`You do not hold settings.grading.update and cannot add it to a role.` Several, comma-joined in
+register order: `You do not hold a, b and cannot add them to a role.` Every rejection writes an
+audit event through `ISystemAuditSink` (6.1.7 preamble; log-only per the 2026-09-06 drift entry).
+
+Rule 2 is evaluated against the **added** privileges only — a `PATCH` that leaves an existing
+privilege untouched is not an "add" and is not rejected (spec: "add a privilege to a role that it
+does not itself currently hold"). Removal is unrestricted except on a system role.
+
+### 4. `DELETE` semantics, and the branch this card cannot write
+
+§9.4: a role may be hard-deleted "when no assignment has ever used it", and archived otherwise. No
+assignment table exists, so nothing can ever have referenced a role and `DELETE` hard-deletes
+unconditionally (system roles excepted, 409). Archiving is reachable today only through
+`PATCH { status: "archived" }`. **TASK-0030 must add the has-ever-been-assigned branch** — recorded
+as live drift, not left to be rediscovered.
+
+### 5. Breaking vs additive
+
+Every item above is a new path or a new schema. Nothing existing changes shape. Additive.

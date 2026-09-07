@@ -87,6 +87,11 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_history_hashes");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
                     b.Property<string>("StaffName")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -303,6 +308,289 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("sample_records", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Security.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_system");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name_key");
+
+                    b.Property<string>("Privileges")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("privileges");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roles");
+
+                    b.HasIndex("NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roles_name_key_unique");
+
+                    b.ToTable("roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000101"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Holds every privilege school-wide. Creates other admins, builds roles, edits settings.",
+                            IsSystem = true,
+                            Name = "Super Admin",
+                            NameKey = "super admin",
+                            Privileges = "admin.create,admin.deactivate,admin.password.reset,admin.session.revoke,admin.suspend,admin.update,admin.view,arm.capacity.override,arm.create,arm.delete,arm.formteacher.assign,arm.update,arm.view,audit.export,audit.view,contact.create,contact.update,contact.view,level.create,level.deactivate,level.delete,level.update,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,promotion.decide,promotion.reverse,promotion.run,pupil.admission.approve,pupil.create,pupil.delete,pupil.document.manage,pupil.import,pupil.photo.update,pupil.regnumber.correct,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.annual.compute,result.approve,result.attendance.enter,result.compute,result.print,result.publish,result.remark.classteacher,result.remark.headteacher,result.return,result.score.enter,result.score.void,result.submit,result.trait.enter,result.unpublish,result.view,role.assign,role.create,role.delete,role.scope.assign,role.update,role.view,session.create,session.update,session.view,settings.abbreviation.update,settings.assessment.update,settings.grading.update,settings.identity.update,settings.pin.update,settings.regnumber.update,settings.reset.defaults,settings.resultrules.update,settings.traits.update,settings.view,subject.create,subject.deactivate,subject.delete,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view,term.close,term.open,weekly.enter,weekly.publish,weekly.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000201")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000102"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Runs the school's records: sessions, terms, levels, arms, subjects, pupils, guardians, promotion.",
+                            IsSystem = false,
+                            Name = "School Administrator",
+                            NameKey = "school administrator",
+                            Privileges = "admin.view,arm.capacity.override,arm.create,arm.formteacher.assign,arm.update,arm.view,contact.create,contact.update,contact.view,level.create,level.deactivate,level.update,level.view,pin.usage.view,pin.view,promotion.run,pupil.admission.approve,pupil.create,pupil.document.manage,pupil.import,pupil.photo.update,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.print,result.view,role.scope.assign,session.create,session.update,session.view,settings.view,subject.create,subject.deactivate,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000202")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000103"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Reviews computed results for an arm, writes the head teacher's remark, approves or returns, publishes.",
+                            IsSystem = false,
+                            Name = "Head Teacher",
+                            NameKey = "head teacher",
+                            Privileges = "arm.view,contact.view,level.view,pin.view,promotion.decide,pupil.admission.approve,pupil.safeguarding.update,pupil.safeguarding.view,pupil.view,report.export,report.view,result.annual.compute,result.approve,result.compute,result.print,result.publish,result.remark.headteacher,result.return,result.view,session.view,settings.view,subject.view,weekly.enter,weekly.publish,weekly.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000203")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000104"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Enters continuous assessment and examination marks, trait ratings, attendance figures and the class teacher's remark, for the arms their assignment is scoped to.",
+                            IsSystem = false,
+                            Name = "Class Teacher",
+                            NameKey = "class teacher",
+                            Privileges = "arm.view,contact.view,level.view,pupil.photo.update,pupil.safeguarding.view,pupil.view,result.attendance.enter,result.compute,result.print,result.remark.classteacher,result.score.enter,result.submit,result.trait.enter,result.view,session.view,subject.view,weekly.enter,weekly.publish,weekly.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000204")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000105"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Generates, prints, revokes and reports on access pins. Reads the pupil register. Cannot see or enter marks.",
+                            IsSystem = false,
+                            Name = "Bursar",
+                            NameKey = "bursar",
+                            Privileges = "arm.view,contact.view,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,pupil.view,session.view,weekly.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000205")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000106"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Read-only across records, results and the audit log. Holds no write privilege at all.",
+                            IsSystem = false,
+                            Name = "Auditor",
+                            NameKey = "auditor",
+                            Privileges = "admin.view,arm.view,audit.export,audit.view,level.view,pin.usage.view,pin.view,pupil.view,report.export,report.view,result.view,role.view,session.view,settings.view,subject.view",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000206")
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.ConfigVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorAdminId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor_admin_id");
+
+                    b.Property<string>("ChangedGroup")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("changed_group");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot");
+
+                    b.Property<long>("VersionNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version_number");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("VersionNumber"));
+
+                    b.HasKey("Id")
+                        .HasName("pk_config_versions");
+
+                    b.HasIndex("VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_config_versions_version_number_unique");
+
+                    b.ToTable("config_versions", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("abbreviation");
+
+                    b.Property<int>("AbbreviationVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("abbreviation_version_number");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("HeadTeacherName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("head_teacher_name");
+
+                    b.Property<int>("IdentityVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("identity_version_number");
+
+                    b.Property<string>("Motto")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("motto");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("SchoolName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("school_name");
+
+                    b.Property<string>("ShortName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("short_name");
+
+                    b.Property<string>("Timezone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("timezone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_school_profile");
+
+                    b.ToTable("school_profile", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+                            Abbreviation = "GRAS",
+                            AbbreviationVersionNumber = 0,
+                            Address = "",
+                            Email = "",
+                            HeadTeacherName = "",
+                            IdentityVersionNumber = 0,
+                            Phone = "",
+                            SchoolName = "",
+                            ShortName = "",
+                            Timezone = "Africa/Lagos"
+                        });
                 });
 #pragma warning restore 612, 618
         }

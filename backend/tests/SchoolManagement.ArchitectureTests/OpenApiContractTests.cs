@@ -231,6 +231,46 @@ public sealed class OpenApiContractTests
     }
 
     [Fact]
+    public void ProblemDetailsSchema_DeclaresLockedUntilButHttpValidationProblemDetailsDoesNot()
+    {
+        // TASK-0027: ResultExtensions.cs attaches a `lockedUntil` extension member to the 423 sign-in
+        // body (approved contract delta §2), but the generator's additionalProperties: false made the
+        // committed document say that response could not carry it — invisible to §4.4's drift check
+        // because both the regenerated and committed documents were equally wrong. Pinning the DECLARED
+        // shape here, the same way ProblemSchemas_DeclareErrorCodeAndTraceId pins errorCode/traceId, so
+        // it cannot silently regress to prose-only again.
+        var schemas = Document.GetProperty("components").GetProperty("schemas");
+
+        var problemDetails = schemas.GetProperty("ProblemDetails");
+        problemDetails.TryGetProperty("properties", out var problemProperties).ShouldBeTrue();
+        problemProperties.TryGetProperty("lockedUntil", out var lockedUntil).ShouldBeTrue(
+            "ProblemDetails must declare 'lockedUntil' — the field POST /auth/sign-in's 423 response " +
+            "actually sends (spec 6.1.11).");
+        HasNonEmpty(lockedUntil, "description").ShouldBeTrue("'lockedUntil' must carry a description.");
+        lockedUntil.GetProperty("format").GetString().ShouldBe("date-time");
+
+        var problemRequired = problemDetails.TryGetProperty("required", out var requiredElement)
+            ? requiredElement.EnumerateArray().Select(entry => entry.GetString()).ToArray()
+            : [];
+
+        problemRequired.ShouldNotContain(
+            "lockedUntil",
+            "'lockedUntil' must NOT be required — it is present only on the one 423 outcome, not on " +
+            "every problem response.");
+
+        // A validation failure can never also be an account lockout, so the OTHER problem schema gets
+        // no such property at all — this is not a shape every problem response carries.
+        var validationProblemDetails = schemas.GetProperty("HttpValidationProblemDetails");
+
+        if (validationProblemDetails.TryGetProperty("properties", out var validationProperties))
+        {
+            validationProperties.TryGetProperty("lockedUntil", out _).ShouldBeFalse(
+                "HttpValidationProblemDetails should not declare 'lockedUntil' — a validation failure " +
+                "is never also a lockout.");
+        }
+    }
+
+    [Fact]
     public void EverySchemaExample_ValidatesAgainstItsOwnSchema()
     {
         // An example that a client cannot actually receive is worse than no example: it teaches a wrong
@@ -314,6 +354,67 @@ public sealed class OpenApiContractTests
         // rather than in a README they will not read.
         description.ShouldContain("9457");
         description.ShouldContain("422");
+    }
+
+    [Fact]
+    public void NoDescription_ContainsACarriageReturn()
+    {
+        // TASK-0034: Roslyn writes the XML doc files (bin/**/SchoolManagement.*.xml) with
+        // Environment.NewLine, not the source's own LF, so a wrapped /// comment built on Windows
+        // used to reach every "description" string here as an embedded CRLF, while the same source
+        // built on ubuntu-latest produced a bare LF in the same place. ci.ps1's drift gate hashes
+        // this exact artefact byte-for-byte against contracts/openapi.json (see OpenApiDocument's
+        // remarks), so that divergence made a Windows-promoted contract permanently fail on every
+        // Linux CI run of the same commit — not a real content difference, since JSON has no
+        // canonical newline representation, but the hash could not tell the two apart.
+        // generate-openapi.ps1 now normalises every escaped \r\n (and any lone \r) to \n on the
+        // generated artefact itself, before anything hashes or copies it — this test is the
+        // regression guard for that normalisation, walking every "description" string anywhere in
+        // the document (paths, operations, parameters, schemas, properties — recursively, not just
+        // the schema-level ones the other tests above already sample) rather than trusting the 93
+        // known offenders to be the only ones that can ever appear.
+        var failures = new List<string>();
+
+        CollectCarriageReturnDescriptions(Document, "$", failures);
+
+        failures.ShouldBeEmpty(
+            "No 'description' string may contain a carriage return — generate-openapi.ps1 must " +
+            $"normalise it to LF so the document is byte-identical across platforms.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, failures.Select(failure => "  - " + failure)));
+    }
+
+    private static void CollectCarriageReturnDescriptions(JsonElement element, string path, List<string> failures)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    var childPath = $"{path}.{property.Name}";
+
+                    if (property.Name == "description" &&
+                        property.Value.ValueKind == JsonValueKind.String &&
+                        property.Value.GetString() is { } description &&
+                        description.Contains('\r'))
+                    {
+                        failures.Add(childPath);
+                    }
+
+                    CollectCarriageReturnDescriptions(property.Value, childPath, failures);
+                }
+
+                break;
+
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                {
+                    CollectCarriageReturnDescriptions(item, $"{path}[{index}]", failures);
+                    index++;
+                }
+
+                break;
+        }
     }
 
     private static bool HasNonEmpty(JsonElement element, string propertyName) =>

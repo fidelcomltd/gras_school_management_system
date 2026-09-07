@@ -10,4 +10,12 @@
     <RootNamespace>SchoolManagement.Domain</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- TASK-0005a: SchoolProfile has no public factory (it is a migration-seeded singleton, never
+         created by application code) — unit tests need SchoolProfile.CreateForTesting, an internal
+         seam, to build an instance at all. Matches the grant every other project already makes to
+         the same test assembly. -->
+    <InternalsVisibleTo Include="SchoolManagement.UnitTests" />
+  </ItemGroup>
+
 </Project>

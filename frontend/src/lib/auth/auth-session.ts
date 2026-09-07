@@ -1,145 +1,178 @@
 import { AUTH_EXPIRY_LEEWAY_MS } from '@/config/env-values';
+import type { components } from '@/api/schema';
 
 /**
  * The ONE place that knows how this app authenticates.
  *
- * Decision (2026-08-03): bearer access token, held in memory only.
- *
- * Memory-only is deliberate — a token in `localStorage` is readable by any XSS
- * payload and survives the tab. The cost is that a refresh signs the user out
- * until a refresh handler is wired up.
- *
- * If the project later moves to HttpOnly cookie sessions, this file and
- * `attachAuthInterceptors` are the only things that change. Nothing else in
- * the tree may read or store a token.
+ * Decision (TASK-0021, superseding the 2026-08-03 bearer scaffold): HttpOnly
+ * cookie session + CSRF token, human sign-off 2026-08-26 (root CLAUDE.md §5).
+ * The session token is never readable from JavaScript — this module holds no
+ * token at all, only the non-secret state an `AuthSessionResponse` reports,
+ * plus the CSRF token (deliberately readable JS-side; that's the point of a
+ * double-submit cookie). If the mechanism ever changes again, this file and
+ * `attachAuthInterceptors` in `../http/http-client.ts` are the only things
+ * that change.
  */
 
-export interface AuthSession {
-  accessToken: string;
-  /** Absolute expiry as epoch milliseconds. Backend-reported — never computed locally. */
-  expiresAt: number;
-}
+/** Contract-derived — never hand-typed. Source of truth: src/api/schema.d.ts. */
+export type AuthSession = components['schemas']['AuthSessionResponse'];
 
-/** Resolves to a fresh session, or null if the session cannot be renewed. */
-export type RefreshHandler = () => Promise<AuthSession | null>;
-export type ExpiryListener = () => void;
+export type SessionEndListener = () => void;
+
+/** Makes the proactive `POST /auth/refresh` call. Registered once by http-client.ts. */
+export type KeepaliveCaller = () => Promise<AuthSession>;
 
 let current: AuthSession | null = null;
-let expiryTimer: ReturnType<typeof setTimeout> | undefined;
-let refreshHandler: RefreshHandler | null = null;
-let inFlightRefresh: Promise<AuthSession | null> | null = null;
-const expiryListeners = new Set<ExpiryListener>();
+let csrfToken: string | null = null;
+let sessionActive = false;
 
-function clearExpiryTimer(): void {
-  if (expiryTimer !== undefined) {
-    clearTimeout(expiryTimer);
-    expiryTimer = undefined;
+let keepaliveTimer: ReturnType<typeof setTimeout> | undefined;
+let keepaliveCaller: KeepaliveCaller | null = null;
+let inFlightKeepalive: Promise<AuthSession | null> | null = null;
+
+const sessionEndListeners = new Set<SessionEndListener>();
+
+function clearKeepaliveTimer(): void {
+  if (keepaliveTimer !== undefined) {
+    clearTimeout(keepaliveTimer);
+    keepaliveTimer = undefined;
   }
 }
 
-/** True once we are inside the leeway window before the real expiry. */
-export function isExpired(session: AuthSession | null = current): boolean {
-  if (!session) return true;
-  return Date.now() >= session.expiresAt - AUTH_EXPIRY_LEEWAY_MS;
+/** Registers the function that performs the proactive refresh call. */
+export function registerKeepaliveCaller(caller: KeepaliveCaller | null): void {
+  keepaliveCaller = caller;
 }
 
 /**
- * Ends the session and tells every listener to log out. Called by the expiry
- * timer, and by the http layer when the server rejects a credential we still
- * believed was valid.
+ * Single-flight proactive refresh: overlapping triggers collapse into one
+ * `POST /auth/refresh`. A failure here needs no handling of its own — it goes
+ * through the http layer's response interceptor like any other request,
+ * which is what actually ends the session (delta §3a: this call is terminal
+ * too, it just isn't a *reactive* one).
  */
-export function expireSession(): void {
-  clearSession();
-  for (const listener of expiryListeners) listener();
+function runKeepalive(): Promise<AuthSession | null> {
+  if (!keepaliveCaller) return Promise.resolve(null);
+  if (inFlightKeepalive) return inFlightKeepalive;
+
+  inFlightKeepalive = keepaliveCaller()
+    .then((session) => {
+      setSession(session);
+      return session;
+    })
+    .catch(() => null)
+    .finally(() => {
+      inFlightKeepalive = null;
+    });
+
+  return inFlightKeepalive;
 }
 
 /**
- * Schedules the lapse. When the token reaches its leeway window we try the
- * refresh handler once; if there is none, or it declines, listeners fire and
- * the app logs out. This is what stops a user sitting on a dead session.
+ * Schedules the proactive keepalive from the backend-reported deadlines —
+ * never a hardcoded duration (ruling 4). "Room to extend" means the reported
+ * idle deadline (`sessionExpiresAt`) is still strictly short of the fixed
+ * absolute cap (`sessionAbsoluteExpiresAt`, set once at sign-in); once the
+ * backend has already clamped the two to be equal, refreshing again would
+ * just report the identical deadline back, so this goes straight to ending
+ * the session, at the cap, instead of calling `/refresh` (delta §3a).
+ *
+ * Skipped entirely while `mustChangePassword` is set — `refresh` is not
+ * exempt from that gate (unlike `me`) and would just 403, and there is no
+ * change-password screen in this card to react to it (ruling 6, follow-up
+ * card owns it).
  */
-function scheduleExpiry(session: AuthSession): void {
-  clearExpiryTimer();
-  const fireIn = session.expiresAt - AUTH_EXPIRY_LEEWAY_MS - Date.now();
+function scheduleKeepalive(session: AuthSession): void {
+  clearKeepaliveTimer();
+  if (session.mustChangePassword) return;
 
+  const expiresAtMs = Date.parse(session.sessionExpiresAt);
+  const absoluteAtMs = Date.parse(session.sessionAbsoluteExpiresAt);
+  const canExtend = expiresAtMs < absoluteAtMs;
+  const deadlineMs = canExtend ? expiresAtMs : absoluteAtMs;
+  const fireAtMs = deadlineMs - AUTH_EXPIRY_LEEWAY_MS;
+
+  const act = (): void => {
+    if (canExtend) void runKeepalive();
+    else terminateSession();
+  };
+
+  const fireIn = fireAtMs - Date.now();
   if (fireIn <= 0) {
-    expireSession();
+    act();
     return;
   }
-
-  expiryTimer = setTimeout(() => {
-    void (async () => {
-      const renewed = await refreshSession();
-      if (!renewed) expireSession();
-    })();
-  }, fireIn);
+  keepaliveTimer = setTimeout(act, fireIn);
 }
 
-export function setSession(session: AuthSession): void {
-  current = session;
-  scheduleExpiry(session);
+/** The CSRF token last returned by `GET /auth/csrf`, or null before it is fetched. */
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+/**
+ * Stores the CSRF token. Read from the `GET /auth/csrf` response BODY only —
+ * never `document.cookie` (ruling 2). The cookie is readable today only
+ * because dev shares the host `localhost`; the `__Host-` prefix forbids a
+ * `Domain` attribute, so on a real deployment where the API is a different
+ * host the frontend could never read it there.
+ */
+export function setCsrfToken(token: string): void {
+  csrfToken = token;
 }
 
 export function getSession(): AuthSession | null {
   return current;
 }
 
-/** The access token, or null when absent or lapsed. Never returns a dead token. */
-export function getAccessToken(): string | null {
-  if (!current || isExpired(current)) return null;
-  return current.accessToken;
+/** Records the latest session state and (re)arms the keepalive from it. */
+export function setSession(session: AuthSession): void {
+  current = session;
+  sessionActive = true;
+  scheduleKeepalive(session);
 }
 
-export function clearSession(): void {
-  clearExpiryTimer();
+/**
+ * The one session-end path (amended AC-5). Idempotent and synchronous, so
+ * calling it several times in the same tick — several concurrent 401s, or a
+ * 401 racing a voluntary sign-out — still notifies listeners exactly once.
+ * Used by: the http layer's response interceptor on any terminal 401; a
+ * successful sign-out mutation, after the server has revoked the session
+ * (never before — clearing client state alone is a blocker, §5); and the
+ * keepalive schedule once there is nothing left to extend.
+ */
+export function terminateSession(): void {
+  if (!sessionActive) return;
+  sessionActive = false;
   current = null;
-  inFlightRefresh = null;
+  clearKeepaliveTimer();
+  for (const listener of sessionEndListeners) listener();
 }
 
-/**
- * Registers how a lapsed session is renewed. Called once at app wiring, after
- * the auth endpoints exist in the contract. Until then expiry means logout.
- */
-export function setRefreshHandler(handler: RefreshHandler | null): void {
-  refreshHandler = handler;
-}
-
-/**
- * Single-flight renewal: concurrent callers queue behind one attempt rather
- * than firing N refreshes and racing to overwrite each other's token.
- */
-export function refreshSession(): Promise<AuthSession | null> {
-  if (!refreshHandler) return Promise.resolve(null);
-  if (inFlightRefresh) return inFlightRefresh;
-
-  inFlightRefresh = refreshHandler()
-    .then((session) => {
-      if (session) setSession(session);
-      else clearSession();
-      return session;
-    })
-    .catch(() => {
-      clearSession();
-      return null;
-    })
-    .finally(() => {
-      inFlightRefresh = null;
-    });
-
-  return inFlightRefresh;
-}
-
-/** Subscribe to session lapse. Returns an unsubscribe function. */
-export function onSessionExpired(listener: ExpiryListener): () => void {
-  expiryListeners.add(listener);
+/** Subscribe to session end. Returns an unsubscribe function. */
+export function onSessionEnded(listener: SessionEndListener): () => void {
+  sessionEndListeners.add(listener);
   return () => {
-    expiryListeners.delete(listener);
+    sessionEndListeners.delete(listener);
   };
 }
 
-/** Test-only: drop all registered state so cases cannot leak into each other. */
+/**
+ * Test-only: drop all PER-SESSION state so cases cannot leak into each other.
+ * Deliberately leaves `keepaliveCaller` alone — it is app-lifetime wiring
+ * done once by `http-client.ts` at module load, not per-test state; a test
+ * that needs a specific (or no) caller registers one explicitly.
+ */
 export function __resetAuthSession(): void {
-  clearSession();
-  refreshHandler = null;
-  expiryListeners.clear();
+  clearKeepaliveTimer();
+  current = null;
+  sessionActive = false;
+  csrfToken = null;
+  inFlightKeepalive = null;
+  sessionEndListeners.clear();
+}
+
+/** Test-only: lets a test drive the scheduled keepalive directly. */
+export function __triggerKeepaliveForTest(): Promise<AuthSession | null> {
+  return runKeepalive();
 }
