@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Observability;
 using SchoolManagement.Api.Security;
+using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -201,6 +202,11 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // relies on the singleton row existing (ISchoolProfileRepository's contract is "always
         // exists"), so it is reinserted here rather than in every test that touches settings.
         await ReseedSchoolProfileAsync(context, cancellationToken);
+
+        // TASK-0028 dispatch 3: same reasoning, for spec 4.5's six seeded roles — TRUNCATE wipes them
+        // too, and RoleEndpointsTests' system-role 409 tests need the REAL seeded Super Admin row to
+        // exist, not only the fixture-built one `CreateSystemRoleDirectlyAsync` still covers.
+        await ReseedRolesAsync(context, cancellationToken);
     }
 
     /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
@@ -215,6 +221,31 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                  NULL, '', {SchoolProfile.FixedTimezone}, 0, 0)
             """,
             cancellationToken);
+
+    /// <summary>
+    /// Reinserts spec 4.5's six seeded roles, built from the SAME <see cref="SeededRoles.All"/> the
+    /// <c>SeedRoles</c> migration itself is generated from, so this can never drift from what the
+    /// migration actually seeds.
+    /// </summary>
+    private static async Task ReseedRolesAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        foreach (var role in SeededRoles.All)
+        {
+            var nameKey = role.Name.ToLowerInvariant();
+            var joinedPrivileges = string.Join(',', role.Privileges);
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO roles
+                    (id, created_at_utc, created_by, description, is_system, modified_at_utc,
+                     modified_by, name, name_key, privileges, status, version)
+                VALUES
+                    ({role.Id}, {SeededRoles.SeedTimestamp}, NULL, {role.Description}, {role.IsSystem},
+                     NULL, NULL, {role.Name}, {nameKey}, {joinedPrivileges}, 'Active', {role.Version})
+                """,
+                cancellationToken);
+        }
+    }
 
     /// <summary>Creates a scope for resolving application services inside a test.</summary>
     public AsyncServiceScope CreateScope() => Services.CreateAsyncScope();

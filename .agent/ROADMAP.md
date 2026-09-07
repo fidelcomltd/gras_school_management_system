@@ -18,13 +18,14 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 | TASK-0003 | Authentication and session management | BE | 03 §6.1.3/6.1.6/6.1.10/6.1.11, 14 §9.1 | **done** |
 | TASK-0019 | Idempotency substrate | BE | 14 §9.8.2, 9.9 | **done** |
 | TASK-0027 | Admin account management | BE | 03 §6.1.2/6.1.7/6.1.9-6.1.14, 14 §9.2/9.4/9.5 | **done** |
-| TASK-0028 | Roles and the privilege register | BE | 03 §6.1.4, 6.1.7 r2, 6.1.14 · 01 §4.4, 4.5 | in progress — dispatch 1 of 3 |
+| TASK-0028 | Roles and the privilege register | BE | 03 §6.1.4, 6.1.7 r2, 6.1.14 · 01 §4.4, 4.5 | **done** — 3 dispatches |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | BE | 03 §6.1.5, 6.1.7, 6.1.8, 6.1.10, 6.1.13-14 · 01 §4.2 | **blocked** — needs sessions (05 §6.3) and arms (06 §6.4); split from 0028 on 2026-09-06 |
 | TASK-0020 | Adopt §7's frontend structure, form and E2E mandates | FE | §7 — resolves Open question 11 | **done** |
 | TASK-0021 | Cookie auth seam and the sign-in screen | FE | §5, §7 — consumes TASK-0003's contract | **done** |
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
 | TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
-| TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | queued — carded 2026-09-06, dispatch when TASK-0027 closes |
+| TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | **done** |
+| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | queued — §4.4 check 2 is RED until it lands |
 
 ### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
 

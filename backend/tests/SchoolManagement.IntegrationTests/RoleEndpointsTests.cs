@@ -25,6 +25,7 @@ namespace SchoolManagement.IntegrationTests;
 /// the default-scope archive filter, and spec 6.1.7 rule 2 end-to-end with its audit event.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Builds its OWN <see cref="WebApplicationFactory{TEntryPoint}"/> substituting
 /// <see cref="IEffectivePrivilegeProvider"/> for a controllable fake — same technique as
 /// <c>PrivilegeAuthorizationTests</c>, but layered UNDER the real cookie-session authentication
@@ -33,6 +34,16 @@ namespace SchoolManagement.IntegrationTests;
 /// everything" or "holds nothing," so rule 2 (an account holding <c>role.update</c> but not
 /// <c>settings.grading.update</c>) cannot be proven with a real signed-in caller otherwise — the
 /// exact gap the task card's live drift entry names, left for TASK-0030's provider graduation.
+/// </para>
+/// <para>
+/// TASK-0028 dispatch 3 seeded the real six roles into every test's database (spec 4.5,
+/// <c>ApiTestFixture.ReseedRolesAsync</c>), so the system-role 409 is now proven against the ACTUAL
+/// seeded <c>SeededRoles.SuperAdminId</c> row rather than a fixture-created stand-in — the
+/// fixture-based <c>CreateSystemRoleDirectlyAsync</c> helper and its two tests were removed, since a
+/// second row also named "Super Admin" cannot coexist under the name-uniqueness index, and every
+/// arbitrary test role name elsewhere in this file that collided with a real seeded name ("Class
+/// Teacher") was renamed to something that cannot.
+/// </para>
 /// </remarks>
 [Collection(ApiTestCollectionDefinition.Name)]
 public sealed class RoleEndpointsTests : IAsyncLifetime
@@ -90,7 +101,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         // Rule 2 (spec 6.1.7): the actor must hold every privilege it is granting to the new role, so
         // this "happy path" caller needs pupil.view too, not just role.create.
         var jar = await SignInWithGrantsAsync(Privileges.Role.Create, Privileges.Pupil.View);
-        var command = new CreateRoleCommand("Class Teacher", "Marks and pupil records.", [Privileges.Pupil.View]);
+        var command = new CreateRoleCommand("Custom Marking Role", "Marks and pupil records.", [Privileges.Pupil.View]);
 
         var response = await PostAsync(RolesUrl, jar, command, idempotencyKey: $"key-{Guid.NewGuid():N}");
 
@@ -99,7 +110,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         response.Headers.Location!.ToString().ShouldStartWith($"{RolesUrl}/");
 
         var body = await ReadAsync<RoleDto>(response);
-        body.Name.ShouldBe("Class Teacher");
+        body.Name.ShouldBe("Custom Marking Role");
         body.Description.ShouldBe("Marks and pupil records.");
         body.IsSystem.ShouldBeFalse();
         body.Status.ShouldBe(RoleStatus.Active);
@@ -116,7 +127,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         using var request = new HttpRequestMessage(HttpMethod.Post, RolesUrl)
         {
             Content = JsonContent.Create(
-                new CreateRoleCommand("Class Teacher", null, [Privileges.Pupil.View])),
+                new CreateRoleCommand("Custom Marking Role", null, [Privileges.Pupil.View])),
         };
         jar.ApplyWithCsrf(request);
 
@@ -136,7 +147,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
 
         using var request = new HttpRequestMessage(HttpMethod.Post, RolesUrl)
         {
-            Content = JsonContent.Create(new CreateRoleCommand("Class Teacher", null, [Privileges.Pupil.View])),
+            Content = JsonContent.Create(new CreateRoleCommand("Custom Marking Role", null, [Privileges.Pupil.View])),
         };
         jar.Apply(request); // cookies only, no X-CSRF-Token
         request.Headers.Add("Idempotency-Key", $"key-{Guid.NewGuid():N}");
@@ -149,18 +160,27 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
     [Theory]
     [InlineData("Super Admin")]
     [InlineData("super admin")]
-    public async Task Create_WithTheReservedNameCaseInsensitive_Returns422(string reservedName)
+    public async Task Create_WithTheReservedNameCaseInsensitive_Returns409BecauseTheRealRowAlreadyExists(
+        string reservedName)
     {
         RequireDatabase();
 
+        // Before TASK-0028 dispatch 3 seeded the real Super Admin row, no role named "Super Admin"
+        // existed anywhere, so CreateRoleCommandHandler's duplicate-name check (which runs BEFORE
+        // Role.Create's reserved-name check — see the handler's own comment) found nothing and the
+        // reserved-name rejection (422 role.name_reserved) was the one actually observed over HTTP.
+        // Now a real row occupies that name permanently, so the duplicate check wins first: 409, not
+        // 422. The reserved-name rule itself is unaffected and still fully proven independent of any
+        // database state — RoleTests.Create_WithTheReservedNameCaseInsensitive_Rejects — this test only
+        // pins what a real caller actually observes in production.
         var jar = await SignInWithGrantsAsync(Privileges.Role.Create);
         var command = new CreateRoleCommand(reservedName, null, [Privileges.Pupil.View]);
 
         var response = await PostAsync(RolesUrl, jar, command, idempotencyKey: $"key-{Guid.NewGuid():N}");
 
-        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(response);
-        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role.name_reserved");
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role.name_duplicate");
     }
 
     [Fact]
@@ -192,7 +212,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         RequireDatabase();
 
         var jar = await SignInWithGrantsAsync(Privileges.Role.Create);
-        var command = new CreateRoleCommand("Class Teacher", null, ["not.a.real.code"]);
+        var command = new CreateRoleCommand("Custom Marking Role", null, ["not.a.real.code"]);
 
         var response = await PostAsync(RolesUrl, jar, command, $"key-{Guid.NewGuid():N}");
 
@@ -210,7 +230,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
 
         // Signed in, holding SOME privilege, just not role.create.
         var jar = await SignInWithGrantsAsync(Privileges.Role.View);
-        var command = new CreateRoleCommand("Class Teacher", null, [Privileges.Pupil.View]);
+        var command = new CreateRoleCommand("Custom Marking Role", null, [Privileges.Pupil.View]);
 
         var response = await PostAsync(RolesUrl, jar, command, $"key-{Guid.NewGuid():N}");
 
@@ -377,15 +397,21 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Update_OnASystemRole_Returns409()
+    public async Task Update_OnTheRealSeededSuperAdminRole_Returns409()
     {
         RequireDatabase();
 
-        var jar = await SignInWithGrantsAsync(Privileges.Role.Update, Privileges.Role.Create);
-        var roleId = await CreateSystemRoleDirectlyAsync();
+        // TASK-0028 dispatch 3: unlike every other 409 test in this class, this one names NO
+        // fixture-created system role — SeededRoles.SuperAdminId is the actual row spec 4.5 ships in
+        // production (reinserted by ApiTestFixture.ReseedRolesAsync after every TRUNCATE), so this is
+        // the first time the 409 the task card's own live-drift entry named ("finally reachable in
+        // production rather than only through a test fixture") is proven against it directly.
+        var jar = await SignInWithGrantsAsync(Privileges.Role.Update);
 
         var response = await PatchAsync(
-            $"{RolesUrl}/{roleId}", jar, new UpdateRoleCommand(roleId, "New Name", null, null, null));
+            $"{RolesUrl}/{SeededRoles.SuperAdminId}",
+            jar,
+            new UpdateRoleCommand(SeededRoles.SuperAdminId, "New Name", null, null, null));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(response);
@@ -421,18 +447,24 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Delete_OnASystemRole_Returns409()
+    public async Task Delete_OnTheRealSeededSuperAdminRole_Returns409()
     {
         RequireDatabase();
 
-        var jar = await SignInWithGrantsAsync(Privileges.Role.Delete);
-        var roleId = await CreateSystemRoleDirectlyAsync();
+        // Same reasoning as Update_OnTheRealSeededSuperAdminRole_Returns409 — this must return 409,
+        // not the 204/404 an actual delete against a live production row would otherwise produce.
+        var jar = await SignInWithGrantsAsync(Privileges.Role.Delete, Privileges.Role.View);
 
-        var response = await DeleteAsync($"{RolesUrl}/{roleId}", jar);
+        var response = await DeleteAsync($"{RolesUrl}/{SeededRoles.SuperAdminId}", jar);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(response);
         document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role.system_immutable");
+
+        // Must still exist, unchanged — nothing about a rejected delete may remove or narrow the row.
+        var stored = await ReadAsync<RoleDto>(await GetAsync($"{RolesUrl}/{SeededRoles.SuperAdminId}", jar));
+        stored.IsSystem.ShouldBeTrue();
+        stored.Privileges.Count.ShouldBe(93);
     }
 
     [Fact]
@@ -501,21 +533,6 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return role.Id;
-    }
-
-    private async Task<Guid> CreateSystemRoleDirectlyAsync()
-    {
-        await using var scope = _fixture.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var creation = Role.CreateSystemRole(
-            Guid.CreateVersion7(), "Super Admin", "Everything.", [Privileges.Admin.View]);
-        creation.IsSuccess.ShouldBeTrue(creation.IsFailure ? creation.Error.Description : string.Empty);
-
-        context.Add(creation.Value);
-        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        return creation.Value.Id;
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

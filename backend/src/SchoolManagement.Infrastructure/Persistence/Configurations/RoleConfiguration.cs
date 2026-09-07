@@ -77,5 +77,37 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.HasIndex(role => role.NameKey)
             .IsUnique()
             .HasDatabaseName("ix_roles_name_key_unique");
+
+        SeedRoles(builder);
+    }
+
+    /// <summary>
+    /// Spec 4.5's six seeded roles (TASK-0028 dispatch 3), with fixed ids from
+    /// <see cref="SeededRoles"/> so a fresh install and an existing database always agree on them.
+    /// <c>HasData</c> bypasses every entity constructor and factory — it writes column values
+    /// straight into the model, the same way <c>SchoolProfileConfiguration</c>'s singleton row is
+    /// seeded — so the anonymous objects below must already be normalised (trimmed name, lower-
+    /// invariant <c>NameKey</c>, de-duplicated/alias-resolved/sorted privileges): nothing here re-runs
+    /// <see cref="Role"/>'s own <c>Create</c> factory or its validation.
+    /// </summary>
+    private static void SeedRoles(EntityTypeBuilder<Role> builder)
+    {
+        var seedRows = SeededRoles.All.Select(role => new
+        {
+            role.Id,
+            role.Name,
+            NameKey = role.Name.ToLowerInvariant(),
+            role.Description,
+            role.IsSystem,
+            Status = RoleStatus.Active,
+            role.Privileges,
+            CreatedAtUtc = SeededRoles.SeedTimestamp,
+            CreatedBy = (string?)null,
+            ModifiedAtUtc = (DateTimeOffset?)null,
+            ModifiedBy = (string?)null,
+            role.Version,
+        });
+
+        builder.HasData(seedRows);
     }
 }

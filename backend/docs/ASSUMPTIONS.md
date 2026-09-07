@@ -6,9 +6,9 @@ Recorded because a scaffold's assumptions are invisible once code is built on th
 assumption turns out to be wrong, twenty files depend on it. Each entry says what was assumed, why, and
 what it would cost to change.
 
-Last updated: 2026-09-06 (§2.15 added — TASK-0005a's authored copy, seed defaults, phone
-normalisation, the identity concurrency design, and two real gaps found while shipping the first
-`config_version` ledger and the first `Idempotency-Key`-declaring route).
+Last updated: 2026-09-07 (§2.21 added — TASK-0028 dispatch 3's six seeded roles: the single-source
+seed data design, three found disagreements between spec 4.5 and spec 4.4's "Seeded to" column, and
+the pre-existing-test fallout from seeding real, permanently-present role rows).
 
 ---
 
@@ -538,6 +538,95 @@ audit `action`, and rule 2's rejection reuses its own error code (`role.privileg
 the action** — mirroring `UpdateAdminAccountCommandHandler`'s rule-4 rejection precedent (same
 string for both), not a new naming convention. All through the existing log-only `ISystemAuditSink`
 seam (§2.16), not a new mechanism.
+
+### 2.21 TASK-0028 dispatch 3 — spec 4.5's six seeded roles
+
+**Seeding mechanism**: EF Core `HasData` in `RoleConfiguration`, one new additive migration
+(`SeedRoles`) — the same pattern `SchoolProfileConfiguration` already established for the one other
+`HasData`-seeded row in the codebase. `Domain/Security/SeededRoles.cs` is the SINGLE source: fixed
+role ids, fixed per-row concurrency-token seed values, and each role's canonical privilege set as a
+literal, hand-transcribed array (never a generated wildcard-expansion) — `SeededRoles.All`
+(`IReadOnlyList<SeededRoleDefinition>`) is what both `RoleConfiguration.SeedRoles` (the migration's
+`HasData` seed) and `ApiTestFixture.ReseedRolesAsync` (the post-`TRUNCATE` reseed every integration
+test needs, mirroring the pre-existing `ReseedSchoolProfileAsync`) are built from, so the two can
+never drift from each other. IDs are `00000000-0000-0000-0000-0000000001{01..06}` (Super Admin
+first, spec 4.5's own table order); concurrency-token seed values are similarly fixed
+(`…0002{01..06}`) rather than `Guid.CreateVersion7()`, because a value minted inside `Configure()`
+would be regenerated on every process start and make the running model disagree with the committed
+migration's literal `HasData` values. `CreatedAtUtc` uses `DateTimeOffset.UnixEpoch` as an explicit
+"installed, not a real event" sentinel, the same spirit as `SchoolProfile`'s version pointers
+starting at 0.
+
+**All six expected counts were verified two independent ways**: by hand (transcribing spec 4.5's
+prose against the register file-by-file) and by parsing the generated migration's actual comma-joined
+`privileges` column values back out with a throwaway script — both agree exactly: Super Admin 93
+(the whole register), School Administrator 43, Head Teacher 25, Class Teacher 19, Bursar 11, Auditor
+15. The domain test suite (`SeededRolesTests`) re-derives a THIRD, independent flat literal list per
+role (not calling `SeededRoles`' own grouping/`Sorted` helper) and asserts exact sequence equality
+after sorting both sides the same way — the copy-in-the-repo the next drift check has to disagree
+with, not a loop re-running the same expansion logic against itself.
+
+**Three disagreements found between spec 4.5 (the section this dispatch was named to implement) and
+spec 4.4's per-privilege "Seeded to" column (described to the implementing session only as "the
+vocabulary [4.5] draws on") — disclosed rather than silently reconciled, 4.5 treated as
+authoritative in every case:**
+
+1. Spec 4.4 lists `weekly.enter` and `weekly.publish` as "Seeded to: SA, ADM, HT, CT" (including
+   School Administrator) — spec 4.5's own prose for School Administrator names no `weekly.*`
+   privilege at all.
+2. Spec 4.4 marks `weekly.view` "Seeded to: all roles" (which would include both School Administrator
+   and Auditor) — spec 4.5's prose omits it from both.
+3. Spec 4.4 marks `subject.view` "Seeded to: all roles" (which would include Bursar) — spec 4.5's
+   Bursar prose omits it (Bursar's set otherwise has no `subject.*` privilege at all).
+
+None of the five non-system roles' `guardian.*`/`pupil.*`/`level.*`/`arm.*`/`subject.*` wildcard
+exclusions produced any OTHER disagreement once fully expanded and cross-checked module by module —
+these three are the only ones found. **This needs orchestrator/human confirmation**: if 4.4's
+"Seeded to" column is the one that's actually current and 4.5 is the stale prose, three privilege
+codes across two roles would need adding. Shipped per 4.5 as instructed; flagged rather than guessed.
+
+**One thing the task card asserted that turned out not to hold, checked directly rather than
+repeated**: the dispatch prompt stated "there is no `pupil.delete` in the register." Spec 4.4.4 (line
+141 of `01-actors-and-privileges.md`) and `Privileges.Pupil.Delete` both define it (seeded to Super
+Admin only) — School Administrator's "except delete" excludes a real, existing code, nothing was
+invented. No functional impact (the code is correctly excluded from School Administrator's set
+either way), but the premise itself was wrong and is corrected here rather than silently repeated in
+a future report.
+
+**`guardian.*` resolves to its three `contact.*` replacements** (`create`/`update`/`view` — the only
+three privileges that ever existed under the old name, per `PrivilegeAliases.Map`) for School
+Administrator; no seeded role stores a `guardian.*` code, proven by
+`SchoolAdministratorPrivileges.ShouldAllBe(code => !code.StartsWith("guardian."))`.
+
+**Fallout in `RoleEndpointsTests.cs` from seeding real, permanently-present rows into every
+integration test's database** (via `ApiTestFixture.ReseedRolesAsync`), found by actually running the
+suite rather than assumed clean:
+
+- Several PRE-EXISTING tests created a throwaway role literally named `"Class Teacher"` — now a real
+  seeded name, so `POST /roles` correctly returned `409 role.name_duplicate` instead of the `201`/
+  `422` those tests expected. Renamed the throwaway name to `"Custom Marking Role"` everywhere in the
+  file (six call sites) — none of those tests were about the Class Teacher role itself, just needed
+  an arbitrary example name.
+- `CreateSystemRoleDirectlyAsync` (dispatch 2's fixture helper, inserting a SECOND row via
+  `Role.CreateSystemRole` — which only ever accepts the name `"Super Admin"`) can no longer run at
+  all: a second row with that name violates `ix_roles_name_key_unique` now that the real one is
+  always present. Removed the helper and its two dependent tests
+  (`Update_OnASystemRole_Returns409`, `Delete_OnASystemRole_Returns409`), replacing them with this
+  dispatch's own `Update_OnTheRealSeededSuperAdminRole_Returns409` /
+  `Delete_OnTheRealSeededSuperAdminRole_Returns409` — which is strictly stronger evidence (the real
+  production row, not a stand-in) and exactly what the task card's live-drift entry asked this
+  dispatch to add.
+- `Create_WithTheReservedNameCaseInsensitive_Returns422` asserted 422 `role.name_reserved` for a
+  create attempt named `"Super Admin"`/`"super admin"`. `CreateRoleCommandHandler` checks
+  `NameExistsAsync` (duplicate name) BEFORE calling `Role.Create` (where the reserved-name check
+  lives) — a dispatch-2 ordering decision, unchanged and out of this dispatch's scope. Before a real
+  Super Admin row existed, no duplicate was ever found, so the reserved-name path was the one actually
+  observed over HTTP; now the literal string is both reserved AND genuinely taken, and the duplicate
+  check wins first — 409, not 422. Renamed to
+  `Create_WithTheReservedNameCaseInsensitive_Returns409BecauseTheRealRowAlreadyExists` and re-pointed
+  at `409`/`role.name_duplicate`, with a comment explaining why. The reserved-name domain rule itself
+  is untouched and still fully proven independent of any database state by
+  `RoleTests.Create_WithTheReservedNameCaseInsensitive_Rejects`.
 
 ---
 
