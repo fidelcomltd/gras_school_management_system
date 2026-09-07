@@ -103,7 +103,15 @@ regenerated: 2026-09-07 by TASK-0028 dispatch 2, `-Promote` (generator + SDK und
           against this hash**~~ — **done by TASK-0033 (2026-09-07): `frontend/src/api/schema.d.ts`
           regenerated against this same `73316bdb…` hash, `check:api-drift` green.** See TASK-0033
           in `## Decisions` below for the full account.
-api version: v1 · 21 paths: `/roles`, `/roles/{id}` + `/privileges` +
+          **Hash moved again, 2026-09-07, TASK-0035: `73316bdb…` →
+          `a618db6208e45fd846648537baf9d1eb10d256587530ad182c4d490f1eb8c2a6` (223737 bytes, was
+          160697) — six new paths (`/sessions`, `/sessions/{id}`, `/terms/{id}`,
+          `/terms/{id}/{open,close,reopen}`), eleven new schemas, purely additive.** Frontend
+          regenerated against this same hash by TASK-0037
+          (2026-09-07): `frontend/src/api/schema.d.ts` re-run through `npm run generate:api`,
+          `check:api-drift` green. See TASK-0037 in `## Decisions` below for the full account.
+api version: v1 · 27 paths: `/sessions`, `/sessions/{id}` + `/terms/{id}`,
+          `/terms/{id}/{open,close,reopen}` + `/roles`, `/roles/{id}` + `/privileges` +
           `/admins`, `/admins/{id}`, `/admins/{id}/status`,
           `/admins/{id}/password-reset`, `/admins/{id}/sessions` +
           `/auth/{csrf,sign-in,sign-out,me,refresh,password}` +
@@ -114,7 +122,10 @@ api version: v1 · 21 paths: `/roles`, `/roles/{id}` + `/privileges` +
           6.1.14), not paged — a fixed 93-row compile-time register. `GET|POST /roles` and
           `GET|PATCH|DELETE /roles/{id}` are each gated by one fixed `role.{view,create,update,
           delete}` privilege declaratively (`.RequirePrivilege(...)`) — none of the five is
-          data-dependent the way two `/admins*` routes are. History: `decisions/2026-Q3.md`.
+          data-dependent the way two `/admins*` routes are. `POST /sessions` requires
+          `Idempotency-Key`; `PATCH /sessions/{id}`, `PATCH /terms/{id}` and the three term
+          transitions accept it optionally; `GET /sessions` and `GET /sessions/{id}` are reads
+          (neither CSRF nor Idempotency-Key). History: `decisions/2026-Q3.md`.
 
 ## Auth decision
 mechanism: **HttpOnly cookie session + CSRF token.** Human sign-off 2026-08-26 per §5. Token
@@ -133,12 +144,14 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0034, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
-0033 and 0034 closed 2026-09-07) — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
+0033, 0034, 0035 and 0037 closed 2026-09-07) — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
+| TASK-0038 | Class levels, arms and the progression chain | backend-dev | queued (stub) — last blocker on TASK-0030; owns two TASK-0035 drifts |
+| TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
@@ -146,6 +159,86 @@ history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-07 **TASK-0037 implemented by frontend-dev — client regenerated against `a618db62…`,
+  all eight sessions/terms operations reachable through the existing generic wrapper with ZERO
+  new lines in `client.ts`/`client-types.ts`; closed same session (client-seam-only card, no
+  screen to review).**
+
+  `npm run generate:api` re-run against the committed contract (hash independently recomputed with
+  `sha256sum` before starting, matches `CONTRACT.lock` byte for byte:
+  `a618db6208e45fd846648537baf9d1eb10d256587530ad182c4d490f1eb8c2a6`). Rewrote
+  `src/api/schema.d.ts` — **+1361/-40 lines** per `git diff --stat`, purely additive: the
+  `CreateSession`, `ListSessions`, `GetSession`, `UpdateSession`, `UpdateTerm`, `OpenTerm`,
+  `CloseTerm`, `ReopenTerm` operations plus their eleven schemas (`SessionDto`,
+  `SessionDetailDto`, `CreateSessionCommand`, `CreateSessionTermInput`, `UpdateSessionCommand`,
+  `SessionState`, `CursorPageOfSessionDto`, `TermDto`, `TermState`, `UpdateTermCommand`,
+  `ReopenTermCommand`). `check:api-drift` → "No drift." Third confirmation of the same finding
+  TASK-0033 established: a new operation on an already-supported HTTP method (all eight are
+  GET/POST/PATCH, all three methods already generic in `client.ts`) needs no hand-written code —
+  regenerating the schema is what makes the path callable.
+
+  **Both negative typing directions proven, per the dispatch instruction that TASK-0033 had to be
+  re-dispatched for getting only one of**: `POST /sessions` rejects an omitted `Idempotency-Key`
+  (required there, spec 6.3.5); `GET /sessions` rejects an `idempotencyKey` passed to an operation
+  that declares none (a read). Every `PATCH`/POST-transition op (`UpdateSession`, `UpdateTerm`,
+  `OpenTerm`, `CloseTerm`, `ReopenTerm`) proven to reject an omitted required path parameter.
+
+  **§8 enum tolerance proven for BOTH new enums, not just one**: `SessionState` via a
+  `server.use(...)` override on `ListSessions` returning `state: "SomeFutureState"`, and the
+  sibling proof for `TermState` via the same override technique on `OpenTerm`'s response — both
+  asserted to pass the unrecognised value through unchanged rather than throw, since neither
+  `client.ts` nor `client-types.ts` validates a response body at runtime.
+
+  **One real bug caught while writing the enum-tolerance test, not by review**: the MSW override
+  used the contract's own `{id}` path-template syntax
+  (`http.post(apiUrl('/api/v1/terms/{id}/open'), …)`), which MSW does not treat as a parameter —
+  `openapi-handlers.ts`'s own `toMswRoute` helper converts `{id}` → `:id` for exactly this reason,
+  and the override needs the same conversion by hand since it bypasses that helper. First run
+  produced a real (non-type) test failure — `expected 'Upcoming' to be 'SomeFutureTermState'` — the
+  default contract-derived handler was answering instead of the override, because the override's
+  route never matched. Fixed by writing `:id` in the override, not by relaxing the assertion;
+  re-run green. Left a one-line comment at the fix site pointing at `toMswRoute` so a future
+  path-param override in this codebase doesn't repeat the same fifteen minutes.
+
+  **Tests split into two new files**, neither growing an existing one past CONVENTIONS.md §3's
+  180-line cap: `client-sessions.test.ts` (126 lines — `CreateSession`/`ListSessions`/
+  `GetSession`/`UpdateSession`) and `client-terms.test.ts` (117 lines — `UpdateTerm`/`OpenTerm`/
+  `CloseTerm`/`ReopenTerm`), colocated with `client.ts` alongside `client.test.ts` (130) and
+  `client-roles.test.ts` (176, unchanged, already at cap). `src/api/README.md` updated to name all
+  four test files and both TASK-0033/TASK-0037 as "zero new client.ts lines" precedents.
+
+  **Every `@ts-expect-error` verified load-bearing the way TASK-0029 established, all 8 of
+  them**: removed one at a time (fresh copy restored after each from a backup, since these are new
+  untracked files with no git history to `checkout` back to), re-ran `npm run typecheck`, confirmed
+  each fails at exactly its own line with `TS2554: Expected 3 arguments, but got 2` (the four
+  required-path-parameter/required-Idempotency-Key cases, where the whole options tuple becomes
+  required) or `TS2353: Object literal may only specify known properties, and 'idempotencyKey' does
+  not exist` (the one declares-no-Idempotency-Key case on `GET /sessions`), then restored and
+  re-verified green. Re-ran the two `client-terms.test.ts` probes whose line numbers shifted after
+  the MSW-route fix, against a fresh backup of the corrected file, rather than trusting the
+  pre-fix line numbers.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **23 files,
+  186 passed, 0 failed, Skipped: 0** (was 21 files / 167 passed per TASK-0033's corrected entry;
+  the two new files' 19 cases — 10 + 9 — account for the delta exactly); `npm run build`
+  (`tsc -b && vite build`) succeeded,
+  323 modules, 9 chunks, unchanged (test files aren't bundled); `npm run check:api-drift` "No
+  drift"; `npm run test:e2e` (`playwright test`) **4 passed, Skipped: 0**, unchanged (no e2e spec
+  touches `/sessions`/`/terms` — no screen exists, out of scope per the card). §4.4 check 3
+  (`src/test/http-boundary.test.ts`) re-run directly: 2 passed, no raw `fetch`/`axios` outside
+  `src/lib/http/`.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +1361/-40),
+  `frontend/src/api/client-sessions.test.ts` (new, 126 lines), `frontend/src/api/client-terms.test.ts`
+  (new, 117 lines), `frontend/src/api/README.md` (+13/-4, documents the split and both zero-new-
+  code precedents). Nothing under `contracts/**` or `backend/**` touched; hash unmoved at
+  `a618db62…`, matching what TASK-0035 already committed.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no session/term/promotion
+  screen, no TanStack Query hooks, no `features/sessions`/`features/terms` folder, no query-key
+  enum — client seam only. Full text: `TASK-0037`'s own `## Log`.
 
 - 2026-09-07 **Open question 6 RESOLVED — root `.gitattributes` added; the repo now has one
   line-ending policy instead of one that stopped at `backend/`.** Human approved both the
@@ -985,13 +1078,27 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 
 **Live triggers**
 
-- 2026-09-07 **The committed frontend client is TWO contract moves behind; §4.4 check 2 is RED.**
-  TASK-0028 moved the contract `1a2d8aff…` → `618f730d…` → `73316bdb…`; the client was last
-  regenerated by TASK-0029 against the first of those, so `frontend/src/api/schema.d.ts` contains
-  neither `/privileges` nor `/roles`. Backend gates cannot see this — `check:api-drift` is a
-  FRONTEND gate and is deliberately not folded into `npm run verify`, so nothing in `ci.ps1` goes
-  red for it. **Trigger: TASK-0033, and any frontend dispatch before it — regenerate first, or you
-  will be writing callers against a schema that does not describe the API.** Owner `frontend-dev`.
+- ~~2026-09-07 **The committed frontend client is TWO contract moves behind (TASK-0028).**~~
+  **STRUCK 2026-09-07 — TASK-0033 regenerated it against `73316bdb…` and closed.** Superseded by
+  the entry immediately below, which is the same drift recurring one contract move later.
+- ~~2026-09-07 **The committed frontend client is ONE contract move behind again; §4.4 check 2 is
+  RED.**~~ **STRUCK 2026-09-07 — TASK-0037 regenerated it against `a618db62…` and closed.** This
+  was the third occurrence of the identical drift (TASK-0029, TASK-0033, TASK-0037): a backend
+  card that moves the contract leaves the client stale until a separate frontend card lands — no
+  fourth occurrence expected to need a new pattern, the fix is always "run TASK-0037's shape
+  again." Full text: TASK-0037's own entry below and its card's `## Log`.
+- 2026-09-07 **`POST /terms/{id}/open` is MORE PERMISSIVE than spec 6.3.6: it does not enforce
+  "at least one arm exists for the session".** Accepted deliberately by TASK-0035 because arms
+  (spec 06 §6.4) do not exist yet — the alternative was an always-satisfied arm probe, i.e. a
+  second always-true bypass of the kind `SuperAdminFlagEffectivePrivilegeProvider` already is.
+  Seam marked `DEFERRED` at `OpenTermHandler.cs:16`; rationale in `backend/docs/ASSUMPTIONS.md`
+  §2.22. **Trigger: TASK-0038 resolves this and rewrites that comment.** Owner `backend-dev`.
+- 2026-09-07 **`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition**
+  (blocked by any set in Draft / Awaiting Approval / Approved, listing the offending arms), and
+  the session list/detail omit spec 6.3.8's arm, pupil and publication counts rather than
+  emitting a dishonest `0`. Both accepted by TASK-0035 on absent entities. Seams `DEFERRED` at
+  `CloseTermHandler.cs:15` and `SessionDto.cs:35`. **Triggers: TASK-0038 for the counts' arm
+  half; the Phase 3 result-set cards for the close precondition.** Owner `backend-dev`.
 - ~~2026-09-06 **Gate 9 (secret scan) is RED, and it is structurally one card late.**~~
   **STRUCK 2026-09-06 — TASK-0032 fixed both halves.** Gate 9 now runs two gitleaks passes:
   history as before, plus `--no-git` over the repo ROOT (not `backend/`, which would silently

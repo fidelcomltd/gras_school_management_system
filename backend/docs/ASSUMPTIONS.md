@@ -628,6 +628,65 @@ suite rather than assumed clean:
   is untouched and still fully proven independent of any database state by
   `RoleTests.Create_WithTheReservedNameCaseInsensitive_Rejects`.
 
+### 2.22 TASK-0035 — academic sessions and terms
+
+**"The following term" for reopening Third Term has no direct FK, so it is read off the session's
+own `state` instead.** Spec 6.3.6 refuses to reopen a closed term "if the following term has already
+been opened." For ordinal 1 or 2 this is a plain sibling lookup (`Ordinal + 1` in the same session).
+For ordinal 3 the "following term" is First Term of a session that does not exist yet when this term
+was created, and this codebase has no FK from one `academic_session` to "the next one." Resolved by
+reading `AcademicSession.State` instead: `AcademicSession.Close()` is called (by `OpenTermHandler`)
+ONLY as a side effect of a successor session's First Term opening (spec 6.3.5), so
+`SessionState.Closed` on Third Term's own session is exactly "a following term opened," with no new
+column and no FK. This also turns out to be load-bearing for the one-active-term partial unique
+index, not just a wording nicety: without it, reopening a term whose true successor is active would
+attempt to mark two terms active at once, which the database would then reject anyway —
+`ReopenTermHandler`'s remarks and `TermTransitionGuardTests.CanReopen_WhenFollowingTermAlreadyOpened_Rejects`
+record the reasoning and the test, respectively. Flagged here rather than asked about up front because
+it is fully determined by the two already-approved spec paragraphs (6.3.5's side-effect description
+and 6.3.6's refusal rule) and is disclosed, not guessed silently.
+
+**Session `state` is derived, not a field an endpoint sets directly — also spec 6.3.5, also worth
+flagging.** `PATCH /sessions/{id}` never accepts a `state` value: `Upcoming` -> `Active` happens only
+when the session's own First Term opens, and `Active` -> `Closed` happens only as the side effect
+above, on the PREVIOUSLY active session, triggered by a DIFFERENT session's First Term opening. A
+session can therefore sit at `Active` with all three of its own terms `Closed` for a while (the
+school plans next year in June while Third Term still runs, per 6.3.5's own example) — this is
+intentional, not a bug, and is exercised by
+`TermEndpointsTests.Open_OrdinalOne_ClosesThePreviouslyActiveSession`.
+
+**Three spec 6.3.6 preconditions deferred on a hard entity dependency, not on effort — visible in
+code, not silent:** `open`'s "at least one arm exists for the session" (spec 06 §6.4's `Arm`, no task
+card yet), `close`'s result-set precondition (spec 09 §6.7's result sets, no task card yet), and
+spec 6.3.8's arm/pupil/publication counts on the list and detail views. Each is a doc-comment on the
+relevant handler or DTO, not a literal `TODO` — `SourceConventionTests` requires a real `TASK-####`
+on every `TODO`/`FIXME`/`HACK`, and none of the three has a card number yet (unlike promotion, which
+does: TASK-0036). The orchestrator's own dispatch named this tension explicitly and asked for it to
+be surfaced rather than papered over with a fabricated task number or a silently-passing check.
+Concretely: `open` and `close` are both MORE PERMISSIVE than spec until their respective cards land —
+`OpenTermHandler`/`CloseTermHandler`'s remarks and `TermEndpoints`' route descriptions say so, and
+`SessionDto`/`SessionDetailDto` simply omit the count fields rather than emit a fabricated `0`.
+
+**List/detail counts deferred as a WHOLE, including one that is honestly computable
+(`termsClosedCount`), for scope discipline.** Spec 6.3.8 lists "number of terms closed" alongside the
+arm/pupil counts that genuinely need entities this codebase does not have yet. Unlike those, a
+session's own three terms are always loaded already, so a closed-count is answerable today — it was
+left out anyway, to keep this already-large card's list/detail DTOs to one shape (all-or-nothing on
+"counts are TASK-0036/arms-card territory") rather than half-populating spec 6.3.8's row. Cheap to add
+later; recorded here so it reads as a choice, not an oversight.
+
+**The session list's cursor carries the session's OWN `name`, not a name+id composite the way
+`RoleListCursor` does.** Spec 6.3.3 makes the name unique, and the list has exactly one server-fixed
+sort (`name` descending, spec 6.3.8 — no caller-chosen sort the way `GET /roles` allows), so the name
+alone is already a sufficient, self-tie-breaking keyset value. `SessionListCursor` is deliberately
+simpler than `RoleListCursor` for this reason, not because the tie-break case was missed.
+
+**No `AcademicSession.PromotionBatchId`/`ArchivedAt` columns yet**, though spec 6.3.3's field table
+names both. Both are meaningless until TASK-0036 (promotion) and spec 9.8 (the archive job) exist —
+adding an always-null column now would be speculative, and a later migration adding it is additive by
+construction. Same reasoning as the counts above: nothing is emitted that cannot be populated
+honestly.
+
 ---
 
 ## 3. Open — a human must decide or supply

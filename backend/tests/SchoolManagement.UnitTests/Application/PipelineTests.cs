@@ -10,6 +10,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Security;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -65,6 +66,11 @@ public sealed class PipelineTests
         // TASK-0028 dispatch 2: the Roles/* handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRoleRepository>());
+
+        // TASK-0035: the Sessions/* handlers depend on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAcademicSessionRepository>());
+        services.AddSingleton(Substitute.For<ITermRepository>());
 
         services.AddOptions<PipelineOptions>();
 

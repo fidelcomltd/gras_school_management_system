@@ -25,7 +25,7 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
 | TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
 | TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | **done** |
-| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | queued — §4.4 check 2 is RED until it lands |
+| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | **done** 2026-09-07 |
 
 ### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
 
@@ -49,6 +49,9 @@ inherits whatever these leave broken.
 | TASK-0032 | Make the secret scan see the diff it is gating | BE | `gitleaks detect` reads committed history while a dispatch gates an uncommitted tree, so gate 9 never examines the change under test and fires one card late, at the next author. A scan that reports PASS without having looked is TASK-0011 all over again. | **done** |
 | TASK-0018 | Make `local-env.template.ps1` pass switches to the gate script | BE | TASK-0016 added the two switches a local developer most needs (`-NoFailFast`, `-AllowSkipped`) and the only sanctioned wrapper could not pass either: an array splat binds positionally. A gate option nobody can reach is a gate option nobody uses. | **done** |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | **done** |
+
+| TASK-0034 | Make the generated OpenAPI document byte-reproducible across platforms | BE | Roslyn writes XML doc files with `Environment.NewLine`, so a Windows-promoted contract carried 93 escaped `\r\n` and every `ubuntu-latest` run of the same commit failed gate 10 on content that means nothing. A byte-exact gate is only as good as the bytes being reproducible. | **done** 2026-09-07 |
+| — | Root `.gitattributes` | orchestrator | `backend/.gitattributes` normalised `backend/**` only, so the three generated artefacts the drift gates hash byte-for-byte had no attribute at all. A fresh Windows clone would have handed them out as CRLF and failed both gates locally while CI stayed green. Same class as TASK-0034, one layer out. | **done** 2026-09-07 |
 
 **The through-line, worth remembering when the next card is tempting to rush:** every one of these
 was a way for a green result to mean nothing. Skipped tests reported as passes, a coverage floor

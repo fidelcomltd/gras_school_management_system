@@ -9,6 +9,7 @@ using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
+using SchoolManagement.Application.Sessions;
 using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
@@ -460,6 +461,144 @@ internal static class OpenApiExamples
                   "PageSize must be at most 100."
                 ]
               }
+            }
+            """,
+
+        [typeof(CreateSessionTermInput)] = """
+            {
+              "startDate": "2026-09-14",
+              "endDate": "2026-12-18",
+              "nextResumptionDate": "2027-01-05"
+            }
+            """,
+
+        [typeof(CreateSessionCommand)] = """
+            {
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "term1": { "startDate": "2026-09-14", "endDate": "2026-12-18", "nextResumptionDate": "2027-01-05" },
+              "term2": { "startDate": "2027-01-05", "endDate": "2027-04-02", "nextResumptionDate": "2027-04-20" },
+              "term3": { "startDate": "2027-04-20", "endDate": "2027-07-25", "nextResumptionDate": null }
+            }
+            """,
+
+        [typeof(TermDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "sessionId": "{{ExampleId}}",
+              "ordinal": 1,
+              "name": "First Term",
+              "startDate": "2026-09-14",
+              "endDate": "2026-12-18",
+              "timesSchoolOpened": null,
+              "nextResumptionDate": "2027-01-05",
+              "state": "Upcoming",
+              "closedAtUtc": null,
+              "closedBy": null
+            }
+            """,
+
+        [typeof(SessionDto)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "state": "Upcoming"
+            }
+            """,
+
+        [typeof(SessionDetailDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "state": "Active",
+              "terms": [
+                {
+                  "id": "{{ExampleId}}",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 1,
+                  "name": "First Term",
+                  "startDate": "2026-09-14",
+                  "endDate": "2026-12-18",
+                  "timesSchoolOpened": 62,
+                  "nextResumptionDate": "2027-01-05",
+                  "state": "Closed",
+                  "closedAtUtc": "{{CanonicalTimestamp}}",
+                  "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+                },
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 2,
+                  "name": "Second Term",
+                  "startDate": "2027-01-05",
+                  "endDate": "2027-04-02",
+                  "timesSchoolOpened": null,
+                  "nextResumptionDate": "2027-04-20",
+                  "state": "Active",
+                  "closedAtUtc": null,
+                  "closedBy": null
+                },
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 3,
+                  "name": "Third Term",
+                  "startDate": "2027-04-20",
+                  "endDate": "2027-07-25",
+                  "timesSchoolOpened": null,
+                  "nextResumptionDate": null,
+                  "state": "Upcoming",
+                  "closedAtUtc": null,
+                  "closedBy": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(CursorPage<SessionDto>)] = """
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "name": "2026/2027",
+                  "startDate": "2026-09-14",
+                  "endDate": "2027-07-25",
+                  "state": "Active"
+                }
+              ],
+              "nextCursor": "MjAyNi8yMDI3"
+            }
+            """,
+
+        [typeof(UpdateSessionCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "2026/2027",
+              "startDate": null,
+              "endDate": null
+            }
+            """,
+
+        [typeof(UpdateTermCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": null,
+              "startDate": null,
+              "endDate": null,
+              "timesSchoolOpened": 118,
+              "nextResumptionDate": "2027-01-05"
+            }
+            """,
+
+        [typeof(ReopenTermCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "reason": "A mark was entered against the wrong subject and discovered after publication."
             }
             """,
     };

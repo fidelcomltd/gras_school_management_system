@@ -371,6 +371,54 @@ export interface paths {
         patch: operations["UpdateRole"];
         trace?: never;
     };
+    "/api/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sessions
+         * @description Cursor-paginated per spec 9.5, always sorted `name` descending — newest first (spec 6.3.8). `state` is the only filter. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListSessions"];
+        put?: never;
+        /**
+         * Create a session
+         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
+         */
+        post: operations["CreateSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one session with its terms
+         * @description Arms grouped by level, enrolment counts and the publication position (spec 6.3.8) are not yet in this response — they need Arm/Pupil/result sets, which do not exist in this codebase yet.
+         */
+        get: operations["GetSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a session's name and dates
+         * @description Spec 6.3.10: name and dates, while `upcoming` or `active` — a `closed` session returns 409. Every field is independently optional; an absent field is left unchanged. `Idempotency-Key` is accepted, not required.
+         */
+        patch: operations["UpdateSession"];
+        trace?: never;
+    };
     "/api/v1/settings": {
         parameters: {
             query?: never;
@@ -445,6 +493,86 @@ export interface paths {
         get: operations["GetConfigVersion"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a term's schedule
+         * @description Spec 6.3.10: dates, label, times school opened, next resumption date. Every field is independently optional; an absent field is left unchanged. Times school opened is rejected once the term is `closed` (spec 6.3.6: printed on results already issued). `Idempotency-Key` is accepted, not required.
+         */
+        patch: operations["UpdateTerm"];
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a term
+         * @description Spec 6.3.6: moves `upcoming` to `active`. Blocked unless the previous term in the session is closed (or this is ordinal 1 and no term anywhere is currently active). The rejection names the reason. Opening ordinal 1 also moves this session to `active` and the previously active session (if any) to `closed` (spec 6.3.5). The "at least one arm exists" precondition (spec 6.3.6) is NOT checked — Arm does not exist in this codebase yet, so `open` is more permissive than spec until that card lands.
+         */
+        post: operations["OpenTerm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a term
+         * @description Spec 6.3.6, 6.3.9: moves `active` to `closed`, writing `closedAtUtc`/`closedBy`. Rejected if `timesSchoolOpened` is blank, naming the term. The result-set precondition (spec 6.3.6: blocked by Draft/Awaiting Approval/Approved sets) is NOT checked — result sets do not exist in this codebase yet, so `close` is more permissive than spec until that card lands.
+         */
+        post: operations["CloseTerm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a closed term
+         * @description Spec 6.3.6: `term.close` PLUS `isSuperAdmin` (checked in the handler — not a privilege code), a reason of at least 10 characters, and refused outright if the following term has already been opened.
+         */
+        post: operations["ReopenTerm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -971,6 +1099,88 @@ export interface components {
             id: string;
         };
         /**
+         * @description `POST /api/v1/sessions` (spec 6.3.5). Creates the session AND its three terms in one
+         *             transaction — spec 6.3.5: "There is no route that creates a session without terms, because a
+         *             session with two terms is not a state the school ever wants." CreateSessionHandler
+         *             is the only place in this codebase that adds a row to the sessions table.
+         * @example {
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "term1": {
+         *         "startDate": "2026-09-14",
+         *         "endDate": "2026-12-18",
+         *         "nextResumptionDate": "2027-01-05"
+         *       },
+         *       "term2": {
+         *         "startDate": "2027-01-05",
+         *         "endDate": "2027-04-02",
+         *         "nextResumptionDate": "2027-04-20"
+         *       },
+         *       "term3": {
+         *         "startDate": "2027-04-20",
+         *         "endDate": "2027-07-25",
+         *         "nextResumptionDate": null
+         *       }
+         *     }
+         */
+        CreateSessionCommand: {
+            /**
+             * @description Format `YYYY/YYYY`; the second year must be exactly the first plus one. Unique.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Must fall inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Must fall inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description First Term's dates. */
+            term1: components["schemas"]["CreateSessionTermInput"];
+            /** @description Second Term's dates. */
+            term2: components["schemas"]["CreateSessionTermInput"];
+            /** @description Third Term's dates. */
+            term3: components["schemas"]["CreateSessionTermInput"];
+        };
+        /**
+         * @description One term's dates as supplied at session creation (spec 6.3.5: "The form takes the session name,
+         *     then three rows of start date, end date and next resumption date"). The term's `name` is
+         *     never taken from the client here — it defaults to "First/Second/Third Term" by ordinal and is
+         *     editable afterwards via `PATCH /api/v1/terms/{id}` (spec 6.3.4).
+         * @example {
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2026-12-18",
+         *       "nextResumptionDate": "2027-01-05"
+         *     }
+         */
+        CreateSessionTermInput: {
+            /**
+             * Format: date
+             * @description Inside the session's range; later than the previous term's end date.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Later than StartDate; earlier than the next term's start date.
+             * @example 2026-12-18
+             */
+            endDate: string;
+            /**
+             * Format: date
+             * @description May be left blank (spec 6.3.4: required only to publish, which does not exist yet).
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
+        };
+        /**
          * @description Response to `GET /api/v1/auth/csrf`.
          * @example {
          *       "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
@@ -1108,6 +1318,43 @@ export interface components {
             /**
              * @description `null` when this is the last page.
              * @example Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA=
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "name": "2026/2027",
+         *           "startDate": "2026-09-14",
+         *           "endDate": "2027-07-25",
+         *           "state": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": "MjAyNi8yMDI3"
+         *     }
+         */
+        CursorPageOfSessionDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "name": "2026/2027",
+             *         "startDate": "2026-09-14",
+             *         "endDate": "2027-07-25",
+             *         "state": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["SessionDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example MjAyNi8yMDI3
              */
             nextCursor: null | string;
         };
@@ -1447,6 +1694,28 @@ export interface components {
             lockedUntil?: string;
         };
         /**
+         * @description `POST /api/v1/terms/{id}/reopen` (spec 6.3.6): Super Admin only, a reason of at least
+         *             int Term.ReopenReasonMinLength characters, refused outright if the following term has
+         *             already been opened.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "reason": "A mark was entered against the wrong subject and discovered after publication."
+         *     }
+         */
+        ReopenTermCommand: {
+            /**
+             * Format: uuid
+             * @description The closed term being reopened.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description At least 10 characters — spec 6.3.6's audit trail for why marks moved after close.
+             * @example A mark was entered against the wrong subject and discovered after publication.
+             */
+            reason: string;
+        };
+        /**
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -1590,6 +1859,176 @@ export interface components {
             armId: string;
         };
         /**
+         * @description The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms. Arms
+         *     grouped by level, enrolment counts and the publication position are deferred for the same reason
+         *     as SessionDto; the promotion panel is all of TASK-0036.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "state": "Active",
+         *       "terms": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 1,
+         *           "name": "First Term",
+         *           "startDate": "2026-09-14",
+         *           "endDate": "2026-12-18",
+         *           "timesSchoolOpened": 62,
+         *           "nextResumptionDate": "2027-01-05",
+         *           "state": "Closed",
+         *           "closedAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 2,
+         *           "name": "Second Term",
+         *           "startDate": "2027-01-05",
+         *           "endDate": "2027-04-02",
+         *           "timesSchoolOpened": null,
+         *           "nextResumptionDate": "2027-04-20",
+         *           "state": "Active",
+         *           "closedAtUtc": null,
+         *           "closedBy": null
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 3,
+         *           "name": "Third Term",
+         *           "startDate": "2027-04-20",
+         *           "endDate": "2027-07-25",
+         *           "timesSchoolOpened": null,
+         *           "nextResumptionDate": null,
+         *           "state": "Upcoming",
+         *           "closedAtUtc": null,
+         *           "closedBy": null
+         *         }
+         *       ]
+         *     }
+         */
+        SessionDetailDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            id: string;
+            /**
+             * @description `YYYY/YYYY`.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["SessionState"];
+            /**
+             * @description Exactly three, ordered by ordinal — a session is never created without them.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 1,
+             *         "name": "First Term",
+             *         "startDate": "2026-09-14",
+             *         "endDate": "2026-12-18",
+             *         "timesSchoolOpened": 62,
+             *         "nextResumptionDate": "2027-01-05",
+             *         "state": "Closed",
+             *         "closedAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 2,
+             *         "name": "Second Term",
+             *         "startDate": "2027-01-05",
+             *         "endDate": "2027-04-02",
+             *         "timesSchoolOpened": null,
+             *         "nextResumptionDate": "2027-04-20",
+             *         "state": "Active",
+             *         "closedAtUtc": null,
+             *         "closedBy": null
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 3,
+             *         "name": "Third Term",
+             *         "startDate": "2027-04-20",
+             *         "endDate": "2027-07-25",
+             *         "timesSchoolOpened": null,
+             *         "nextResumptionDate": null,
+             *         "state": "Upcoming",
+             *         "closedAtUtc": null,
+             *         "closedBy": null
+             *       }
+             *     ]
+             */
+            terms: components["schemas"]["TermDto"][];
+        };
+        /**
+         * @description The list-item shape of a session (spec 6.3.8). Arms, enrolled-pupil and publication counts are
+         *     deliberately absent — spec 6.3.8 asks for them, but Arm/Pupil/result sets do not exist in this
+         *     codebase yet, and this module ships nothing it cannot populate honestly (never a fabricated
+         *     `0`). See TASK-0035's Log for the tracked deferral.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "state": "Upcoming"
+         *     }
+         */
+        SessionDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            id: string;
+            /**
+             * @description `YYYY/YYYY`.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["SessionState"];
+        };
+        /**
+         * @description Lifecycle of an AcademicSession (spec 6.3.3). Only one session system-wide may be
+         *     SessionState.Active — enforced by a partial unique index (spec 6.3.9), not application code.
+         * @example Active
+         * @enum {unknown}
+         */
+        SessionState: "Upcoming" | "Active" | "Closed";
+        /**
          * @description The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of
          *     TASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups
          *     (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather
@@ -1702,6 +2141,86 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * @description The wire shape of a term (spec 6.3.4), shared by every term-facing endpoint and nested inside
+         *     SessionDetailDto.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "ordinal": 1,
+         *       "name": "First Term",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2026-12-18",
+         *       "timesSchoolOpened": null,
+         *       "nextResumptionDate": "2027-01-05",
+         *       "state": "Upcoming",
+         *       "closedAtUtc": null,
+         *       "closedBy": null
+         *     }
+         */
+        TermDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description The owning session's id.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sessionId: string;
+            /**
+             * Format: int32
+             * @description 1, 2 or 3. Immutable.
+             * @example 1
+             */
+            ordinal: number | string;
+            /**
+             * @description Editable label; logic keys off Ordinal, never this.
+             * @example First Term
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the session's range.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Later than StartDate.
+             * @example 2026-12-18
+             */
+            endDate: string;
+            /**
+             * Format: int32
+             * @description `null` while blank; 1..200 once set; immutable once closed.
+             */
+            timesSchoolOpened: null | number | string;
+            /**
+             * Format: date
+             * @description `null` until filled in.
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["TermState"];
+            /**
+             * Format: date-time
+             * @description `null` unless State is closed.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            closedAtUtc: null | string;
+            /** @description The admin who closed it, or `null`. */
+            closedBy: null | string;
+        };
+        /**
+         * @description Lifecycle of a Term (spec 6.3.4, 6.3.6). Only one term system-wide may be
+         *     TermState.Active — enforced by a partial unique index (spec 6.3.9), not application code.
+         * @example Upcoming
+         * @enum {unknown}
+         */
+        TermState: "Upcoming" | "Active" | "Closed";
         /**
          * @description `PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes
          *             reach this one command: an `admin.update` holder editing any account (name, email, phone,
@@ -1840,6 +2359,87 @@ export interface components {
              * @example 2
              */
             expectedVersion: number | string;
+        };
+        /**
+         * @description `PATCH /api/v1/sessions/{id}` (spec 6.3.10): "Name and dates, while upcoming or active."
+         *             Every field is independently optional; an absent field is left unchanged — the same convention
+         *             `UpdateRoleCommand` established.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "2026/2027",
+         *       "startDate": null,
+         *       "endDate": null
+         *     }
+         */
+        UpdateSessionCommand: {
+            /**
+             * Format: uuid
+             * @description The session being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description `null` to leave unchanged.
+             * @example 2026/2027
+             */
+            name: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            startDate: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            endDate: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/terms/{id}` (spec 6.3.10): "Dates, label, times school opened, next
+         *             resumption date." Every field is independently optional; an absent field is left unchanged.
+         *             int? UpdateTermCommand.TimesSchoolOpened cannot be CLEARED back to blank through this command — spec never
+         *             asks for that operation, only for filling it in once and (implicitly, spec 6.3.6) never touching
+         *             it again after close.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": null,
+         *       "startDate": null,
+         *       "endDate": null,
+         *       "timesSchoolOpened": 118,
+         *       "nextResumptionDate": "2027-01-05"
+         *     }
+         */
+        UpdateTermCommand: {
+            /**
+             * Format: uuid
+             * @description The term being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. */
+            name: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            startDate: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            endDate: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged; rejected once the term is closed.
+             * @example 118
+             */
+            timesSchoolOpened: null | number | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
         };
     };
     responses: never;
@@ -3341,6 +3941,320 @@ export interface operations {
             };
         };
     };
+    ListSessions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                state?: components["schemas"]["SessionState"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfSessionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetSettings: {
         parameters: {
             query?: never;
@@ -3583,6 +4497,383 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTermCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    OpenTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CloseTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReopenTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenTermCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {

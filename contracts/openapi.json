@@ -2259,6 +2259,509 @@
         }
       }
     },
+    "/api/v1/sessions": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Create a session",
+        "description": "Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.",
+        "operationId": "CreateSession",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetailDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "List sessions",
+        "description": "Cursor-paginated per spec 9.5, always sorted `name` descending — newest first (spec 6.3.8). `state` is the only filter. `pageSize` defaults to 25 and is capped at 100.",
+        "operationId": "ListSessions",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SessionState"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfSessionDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Read one session with its terms",
+        "description": "Arms grouped by level, enrolment counts and the publication position (spec 6.3.8) are not yet in this response — they need Arm/Pupil/result sets, which do not exist in this codebase yet.",
+        "operationId": "GetSession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Edit a session's name and dates",
+        "description": "Spec 6.3.10: name and dates, while `upcoming` or `active` — a `closed` session returns 409. Every field is independently optional; an absent field is left unchanged. `Idempotency-Key` is accepted, not required.",
+        "operationId": "UpdateSession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSessionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetailDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings": {
       "get": {
         "tags": [
@@ -2605,6 +3108,672 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/terms/{id}": {
+      "patch": {
+        "tags": [
+          "Terms"
+        ],
+        "summary": "Edit a term's schedule",
+        "description": "Spec 6.3.10: dates, label, times school opened, next resumption date. Every field is independently optional; an absent field is left unchanged. Times school opened is rejected once the term is `closed` (spec 6.3.6: printed on results already issued). `Idempotency-Key` is accepted, not required.",
+        "operationId": "UpdateTerm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTermCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/terms/{id}/open": {
+      "post": {
+        "tags": [
+          "Terms"
+        ],
+        "summary": "Open a term",
+        "description": "Spec 6.3.6: moves `upcoming` to `active`. Blocked unless the previous term in the session is closed (or this is ordinal 1 and no term anywhere is currently active). The rejection names the reason. Opening ordinal 1 also moves this session to `active` and the previously active session (if any) to `closed` (spec 6.3.5). The \"at least one arm exists\" precondition (spec 6.3.6) is NOT checked — Arm does not exist in this codebase yet, so `open` is more permissive than spec until that card lands.",
+        "operationId": "OpenTerm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/terms/{id}/close": {
+      "post": {
+        "tags": [
+          "Terms"
+        ],
+        "summary": "Close a term",
+        "description": "Spec 6.3.6, 6.3.9: moves `active` to `closed`, writing `closedAtUtc`/`closedBy`. Rejected if `timesSchoolOpened` is blank, naming the term. The result-set precondition (spec 6.3.6: blocked by Draft/Awaiting Approval/Approved sets) is NOT checked — result sets do not exist in this codebase yet, so `close` is more permissive than spec until that card lands.",
+        "operationId": "CloseTerm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/terms/{id}/reopen": {
+      "post": {
+        "tags": [
+          "Terms"
+        ],
+        "summary": "Reopen a closed term",
+        "description": "Spec 6.3.6: `term.close` PLUS `isSuperAdmin` (checked in the handler — not a privilege code), a reason of at least 10 characters, and refused outright if the following term has already been opened.",
+        "operationId": "ReopenTerm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReopenTermCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3264,6 +4433,108 @@
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
         }
       },
+      "CreateSessionCommand": {
+        "required": [
+          "name",
+          "startDate",
+          "endDate",
+          "term1",
+          "term2",
+          "term3"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Format `YYYY/YYYY`; the second year must be exactly the first plus one. Unique.",
+            "example": "2026/2027"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Must fall inside the first named year.",
+            "format": "date",
+            "example": "2026-09-14"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Must fall inside the second named year.",
+            "format": "date",
+            "example": "2027-07-25"
+          },
+          "term1": {
+            "description": "First Term's dates.",
+            "$ref": "#/components/schemas/CreateSessionTermInput"
+          },
+          "term2": {
+            "description": "Second Term's dates.",
+            "$ref": "#/components/schemas/CreateSessionTermInput"
+          },
+          "term3": {
+            "description": "Third Term's dates.",
+            "$ref": "#/components/schemas/CreateSessionTermInput"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/sessions` (spec 6.3.5). Creates the session AND its three terms in one\n        transaction — spec 6.3.5: \"There is no route that creates a session without terms, because a\n        session with two terms is not a state the school ever wants.\" CreateSessionHandler\n        is the only place in this codebase that adds a row to the sessions table.",
+        "example": {
+          "name": "2026/2027",
+          "startDate": "2026-09-14",
+          "endDate": "2027-07-25",
+          "term1": {
+            "startDate": "2026-09-14",
+            "endDate": "2026-12-18",
+            "nextResumptionDate": "2027-01-05"
+          },
+          "term2": {
+            "startDate": "2027-01-05",
+            "endDate": "2027-04-02",
+            "nextResumptionDate": "2027-04-20"
+          },
+          "term3": {
+            "startDate": "2027-04-20",
+            "endDate": "2027-07-25",
+            "nextResumptionDate": null
+          }
+        }
+      },
+      "CreateSessionTermInput": {
+        "required": [
+          "startDate",
+          "endDate",
+          "nextResumptionDate"
+        ],
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "description": "Inside the session's range; later than the previous term's end date.",
+            "format": "date",
+            "example": "2026-09-14"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Later than StartDate; earlier than the next term's start date.",
+            "format": "date",
+            "example": "2026-12-18"
+          },
+          "nextResumptionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "May be left blank (spec 6.3.4: required only to publish, which does not exist yet).",
+            "format": "date",
+            "example": "2027-01-05"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One term's dates as supplied at session creation (spec 6.3.5: \"The form takes the session name,\nthen three rows of start date, end date and next resumption date\"). The term's `name` is\nnever taken from the client here — it defaults to \"First/Second/Third Term\" by ordinal and is\neditable afterwards via `PATCH /api/v1/terms/{id}` (spec 6.3.4).",
+        "example": {
+          "startDate": "2026-09-14",
+          "endDate": "2026-12-18",
+          "nextResumptionDate": "2027-01-05"
+        }
+      },
       "CsrfTokenResponse": {
         "required": [
           "csrfToken"
@@ -3437,6 +4708,53 @@
             }
           ],
           "nextCursor": "Y2xhc3MgdGVhY2hlch8wMTkyZjBjNC03YzNlLTdhMWItOWYyZC0zYjhlNWE2YzFkNDA="
+        }
+      },
+      "CursorPageOfSessionDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "name": "2026/2027",
+                "startDate": "2026-09-14",
+                "endDate": "2027-07-25",
+                "state": "Active"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page.",
+            "example": "MjAyNi8yMDI3"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "state": "Active"
+            }
+          ],
+          "nextCursor": "MjAyNi8yMDI3"
         }
       },
       "EffectivePrivilegeDto": {
@@ -3906,6 +5224,32 @@
           "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       },
+      "ReopenTermCommand": {
+        "required": [
+          "id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The closed term being reopened.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "reason": {
+            "type": "string",
+            "description": "At least 10 characters — spec 6.3.6's audit trail for why marks moved after close.",
+            "example": "A mark was entered against the wrong subject and discovered after publication."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/terms/{id}/reopen` (spec 6.3.6): Super Admin only, a reason of at least\n        int Term.ReopenReasonMinLength characters, refused outright if the following term has\n        already been opened.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "reason": "A mark was entered against the wrong subject and discovered after publication."
+        }
+      },
       "ResetAdminAccountPasswordResponse": {
         "required": [
           "id",
@@ -4087,6 +5431,199 @@
           "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
         }
       },
+      "SessionDetailDto": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate",
+          "state",
+          "terms"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "name": {
+            "type": "string",
+            "description": "`YYYY/YYYY`.",
+            "example": "2026/2027"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Inside the first named year.",
+            "format": "date",
+            "example": "2026-09-14"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Inside the second named year.",
+            "format": "date",
+            "example": "2027-07-25"
+          },
+          "state": {
+            "description": "upcoming, active or closed. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TermDto"
+            },
+            "description": "Exactly three, ordered by ordinal — a session is never created without them.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "ordinal": 1,
+                "name": "First Term",
+                "startDate": "2026-09-14",
+                "endDate": "2026-12-18",
+                "timesSchoolOpened": 62,
+                "nextResumptionDate": "2027-01-05",
+                "state": "Closed",
+                "closedAtUtc": "2026-08-03T09:30:00+00:00",
+                "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+              },
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "ordinal": 2,
+                "name": "Second Term",
+                "startDate": "2027-01-05",
+                "endDate": "2027-04-02",
+                "timesSchoolOpened": null,
+                "nextResumptionDate": "2027-04-20",
+                "state": "Active",
+                "closedAtUtc": null,
+                "closedBy": null
+              },
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "ordinal": 3,
+                "name": "Third Term",
+                "startDate": "2027-04-20",
+                "endDate": "2027-07-25",
+                "timesSchoolOpened": null,
+                "nextResumptionDate": null,
+                "state": "Upcoming",
+                "closedAtUtc": null,
+                "closedBy": null
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms. Arms\ngrouped by level, enrolment counts and the publication position are deferred for the same reason\nas SessionDto; the promotion panel is all of TASK-0036.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "name": "2026/2027",
+          "startDate": "2026-09-14",
+          "endDate": "2027-07-25",
+          "state": "Active",
+          "terms": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "ordinal": 1,
+              "name": "First Term",
+              "startDate": "2026-09-14",
+              "endDate": "2026-12-18",
+              "timesSchoolOpened": 62,
+              "nextResumptionDate": "2027-01-05",
+              "state": "Closed",
+              "closedAtUtc": "2026-08-03T09:30:00+00:00",
+              "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+            },
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "ordinal": 2,
+              "name": "Second Term",
+              "startDate": "2027-01-05",
+              "endDate": "2027-04-02",
+              "timesSchoolOpened": null,
+              "nextResumptionDate": "2027-04-20",
+              "state": "Active",
+              "closedAtUtc": null,
+              "closedBy": null
+            },
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "ordinal": 3,
+              "name": "Third Term",
+              "startDate": "2027-04-20",
+              "endDate": "2027-07-25",
+              "timesSchoolOpened": null,
+              "nextResumptionDate": null,
+              "state": "Upcoming",
+              "closedAtUtc": null,
+              "closedBy": null
+            }
+          ]
+        }
+      },
+      "SessionDto": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "name": {
+            "type": "string",
+            "description": "`YYYY/YYYY`.",
+            "example": "2026/2027"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Inside the first named year.",
+            "format": "date",
+            "example": "2026-09-14"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Inside the second named year.",
+            "format": "date",
+            "example": "2027-07-25"
+          },
+          "state": {
+            "description": "upcoming, active or closed. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/SessionState"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The list-item shape of a session (spec 6.3.8). Arms, enrolled-pupil and publication counts are\ndeliberately absent — spec 6.3.8 asks for them, but Arm/Pupil/result sets do not exist in this\ncodebase yet, and this module ships nothing it cannot populate honestly (never a fabricated\n`0`). See TASK-0035's Log for the tracked deferral.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "name": "2026/2027",
+          "startDate": "2026-09-14",
+          "endDate": "2027-07-25",
+          "state": "Upcoming"
+        }
+      },
+      "SessionState": {
+        "enum": [
+          "Upcoming",
+          "Active",
+          "Closed"
+        ],
+        "description": "Lifecycle of an AcademicSession (spec 6.3.3). Only one session system-wide may be\nSessionState.Active — enforced by a partial unique index (spec 6.3.9), not application code.",
+        "example": "Active"
+      },
       "SettingsDto": {
         "required": [
           "identity"
@@ -4220,6 +5757,124 @@
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
         }
+      },
+      "TermDto": {
+        "required": [
+          "id",
+          "sessionId",
+          "ordinal",
+          "name",
+          "startDate",
+          "endDate",
+          "timesSchoolOpened",
+          "nextResumptionDate",
+          "state",
+          "closedAtUtc",
+          "closedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The owning session's id.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "ordinal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1, 2 or 3. Immutable.",
+            "format": "int32",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Editable label; logic keys off Ordinal, never this.",
+            "example": "First Term"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Inside the session's range.",
+            "format": "date",
+            "example": "2026-09-14"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Later than StartDate.",
+            "format": "date",
+            "example": "2026-12-18"
+          },
+          "timesSchoolOpened": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` while blank; 1..200 once set; immutable once closed.",
+            "format": "int32"
+          },
+          "nextResumptionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` until filled in.",
+            "format": "date",
+            "example": "2027-01-05"
+          },
+          "state": {
+            "description": "upcoming, active or closed. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/TermState"
+          },
+          "closedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` unless State is closed.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "closedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The admin who closed it, or `null`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of a term (spec 6.3.4), shared by every term-facing endpoint and nested inside\nSessionDetailDto.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "ordinal": 1,
+          "name": "First Term",
+          "startDate": "2026-09-14",
+          "endDate": "2026-12-18",
+          "timesSchoolOpened": null,
+          "nextResumptionDate": "2027-01-05",
+          "state": "Upcoming",
+          "closedAtUtc": null,
+          "closedBy": null
+        }
+      },
+      "TermState": {
+        "enum": [
+          "Upcoming",
+          "Active",
+          "Closed"
+        ],
+        "description": "Lifecycle of a Term (spec 6.3.4, 6.3.6). Only one term system-wide may be\nTermState.Active — enforced by a partial unique index (spec 6.3.9), not application code.",
+        "example": "Upcoming"
       },
       "UpdateAdminAccountCommand": {
         "required": [
@@ -4407,6 +6062,127 @@
           "headTeacherName": "Chisom Maxwell",
           "expectedVersion": 2
         }
+      },
+      "UpdateSessionCommand": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The session being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "example": "2026/2027"
+          },
+          "startDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/sessions/{id}` (spec 6.3.10): \"Name and dates, while upcoming or active.\"\n        Every field is independently optional; an absent field is left unchanged — the same convention\n        `UpdateRoleCommand` established.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "name": "2026/2027",
+          "startDate": null,
+          "endDate": null
+        }
+      },
+      "UpdateTermCommand": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate",
+          "timesSchoolOpened",
+          "nextResumptionDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The term being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged."
+          },
+          "startDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "date"
+          },
+          "timesSchoolOpened": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` to leave unchanged; rejected once the term is closed.",
+            "format": "int32",
+            "example": 118
+          },
+          "nextResumptionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "date",
+            "example": "2027-01-05"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/terms/{id}` (spec 6.3.10): \"Dates, label, times school opened, next\n        resumption date.\" Every field is independently optional; an absent field is left unchanged.\n        int? UpdateTermCommand.TimesSchoolOpened cannot be CLEARED back to blank through this command — spec never\n        asks for that operation, only for filling it in once and (implicitly, spec 6.3.6) never touching\n        it again after close.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "name": null,
+          "startDate": null,
+          "endDate": null,
+          "timesSchoolOpened": 118,
+          "nextResumptionDate": "2027-01-05"
+        }
       }
     },
     "securitySchemes": {
@@ -4435,7 +6211,13 @@
       "name": "Roles"
     },
     {
+      "name": "Sessions"
+    },
+    {
       "name": "Settings"
+    },
+    {
+      "name": "Terms"
     }
   ]
 }

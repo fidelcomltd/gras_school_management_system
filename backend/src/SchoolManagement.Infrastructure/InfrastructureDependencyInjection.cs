@@ -8,6 +8,7 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Settings;
@@ -153,6 +154,10 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();
+
+        // TASK-0035: academic sessions and terms.
+        services.AddScoped<IAcademicSessionRepository, AcademicSessionRepository>();
+        services.AddScoped<ITermRepository, TermRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

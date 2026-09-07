@@ -7,7 +7,7 @@ Two files, two different rules.
 | [`schema.d.ts`](./schema.d.ts) | **Generated.** `openapi-typescript` against the committed `contracts/openapi.json`. | Never hand-edit. Carries a `// GENERATED — DO NOT EDIT` header; §4.4's drift check enforces this. |
 | [`client.ts`](./client.ts) | **Hand-written.** | Reviewed like any other source file. |
 | [`client-types.ts`](./client-types.ts) | **Hand-written.** | The type-level derivation behind `client.ts`'s verb helpers, split into its own file to stay under CONVENTIONS.md §3's 180-line cap. |
-| [`client.test.ts`](./client.test.ts) / [`client-roles.test.ts`](./client-roles.test.ts) | **Hand-written.** | Colocated tests for `client.ts`'s generic verb helpers, split across two files (reference/admins operations, then privileges/roles — TASK-0033) to stay under the same 180-line cap. |
+| [`client.test.ts`](./client.test.ts) / [`client-roles.test.ts`](./client-roles.test.ts) / [`client-sessions.test.ts`](./client-sessions.test.ts) / [`client-terms.test.ts`](./client-terms.test.ts) | **Hand-written.** | Colocated tests for `client.ts`'s generic verb helpers, split across four files (reference/admins, then privileges/roles — TASK-0033, then sessions and terms — TASK-0037) to stay under the same 180-line cap. |
 
 This mirrors what `frontend/HANDOFF.md` decision 3 originally set out: the generated layer
 supplies *types*, the hand-written layer supplies *transport*. `client.ts` is the thin seam
@@ -47,10 +47,13 @@ this from the **committed** document only — never point the generator at a liv
 **A new operation on an existing method (GET/POST/PATCH/DELETE) needs no new code in
 `client.ts`.** `apiGet`/`apiPost`/`apiPatch`/`apiDelete` are generic over every path
 `schema.d.ts` declares for that method, so regenerating the schema is what makes the new
-path callable — TASK-0033 (`/privileges`, `/roles`, `/roles/{id}`) added zero lines to
-`client.ts`/`client-types.ts`, only regenerated `schema.d.ts` and added the new operations'
-tests (`client-roles.test.ts`). A new *method* the contract has never used before (`PUT`
-still has no operation anywhere) is the one case that needs a new verb helper.
+path callable — TASK-0033 (`/privileges`, `/roles`, `/roles/{id}`) and TASK-0037
+(`/sessions`, `/sessions/{id}`, `/terms/{id}`, `/terms/{id}/open`, `/terms/{id}/close`,
+`/terms/{id}/reopen`) each added zero lines to `client.ts`/`client-types.ts`, only
+regenerated `schema.d.ts` and added the new operations' tests (`client-roles.test.ts`,
+`client-sessions.test.ts`, `client-terms.test.ts`). A new *method* the contract has never
+used before (`PUT` still has no operation anywhere) is the one case that needs a new verb
+helper.
 
 ## `client.ts` — why a typed helper and not a second HTTP stack
 
