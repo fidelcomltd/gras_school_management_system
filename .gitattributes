@@ -1,0 +1,54 @@
+# Root line-ending policy. TASK-0034 follow-up (STATE.md open question 6, 2026-09-07).
+#
+# Why this file exists: `backend/.gitattributes` normalised `backend/**` only, so everything
+# outside it — `contracts/`, `frontend/`, `.agent/`, root CI and docs — fell through to whatever
+# `core.autocrlf` happened to be on each machine. Nothing in the repo is STORED with CRLF (every
+# tracked text file is `i/lf`), so this file changes no committed content; what it fixes is the
+# WORKTREE, which until now was LF on this machine only because generators wrote those files
+# rather than a checkout.
+#
+# The concrete failure it prevents: `contracts/openapi.json`, `contracts/CONTRACT.lock` and
+# `frontend/src/api/schema.d.ts` are compared BYTE-FOR-BYTE by the drift gates — ci.ps1 gate 10
+# hashes the contract with Get-FileHash, and `npm run check:api-drift` string-compares the
+# generated client. On a fresh clone on Windows with core.autocrlf=true, git would hand all three
+# out as CRLF, and both gates would fail on line endings alone while CI (ubuntu-latest) stayed
+# green. That is the same class of bug as TASK-0034 itself, one layer out: a byte-exact gate is
+# only as good as the bytes being reproducible.
+
+* text=auto eol=lf
+
+# Windows shell scripts must keep CRLF — cmd.exe mis-parses LF line continuations.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# GENERATED ARTEFACTS, hashed byte-for-byte by the drift gates (CLAUDE.md §4.4 checks 1, 2 and 4).
+# Covered by `* text=auto eol=lf` above; named explicitly anyway, because a future edit that
+# loosens the blanket rule must not silently take these with it.
+contracts/openapi.json        text eol=lf
+contracts/CONTRACT.lock       text eol=lf
+frontend/src/api/schema.d.ts  text eol=lf
+
+# Binary: never touch these.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.dll  binary
+*.exe  binary
+*.pfx  binary
+*.snk  binary
+
+# Diff/merge hints.
+*.json text
+*.md   text
+*.sln  text eol=crlf
+
+# NOTE: `backend/.gitattributes` still exists and still wins for paths under `backend/` (a
+# subdirectory .gitattributes takes precedence). It repeats `* text=auto eol=lf` and the binary
+# list, which is harmless because the two agree exactly; its .NET-specific hints (`*.cs
+# diff=csharp`, `*.csproj merge=union`, `*.slnx`) are its own and belong there. Consolidating the
+# duplicated lines is a backend-owned tidy-up, not a correctness issue.

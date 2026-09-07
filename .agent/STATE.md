@@ -83,7 +83,9 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: 73316bdb0f1c19248044a4ec5b405872902159157e1a44dc9680a3fa0a227977
+openapi.json sha256: 9dca7f11ed2c4ed00cd444f2fe3d99af8334f7f48cc0a1b74ebc64d9d761a573
+          (was 73316bdb… until TASK-0034, 2026-09-07: the document is now newline-normalised so a
+          Windows promote and a Linux CI run of the same commit produce identical bytes.)
           (was `618f730d…` before TASK-0028 dispatch 2; this dispatch moved it by adding
           `GET|POST /api/v1/roles` and `GET|PATCH|DELETE /api/v1/roles/{id}`, purely additive —
           new schemas `RoleDto`, `CreateRoleCommand`, `UpdateRoleCommand`, `CursorPage<RoleDto>`
@@ -131,13 +133,12 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031, 0032, 0033, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
-0033 closed 2026-09-07) — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0034, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
+0033 and 0034 closed 2026-09-07) — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0034 | Make the generated OpenAPI document byte-reproducible across platforms | backend-dev | review — fix + promote landed, gates re-running |
 | TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
@@ -145,6 +146,82 @@ history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-07 **Open question 6 RESOLVED — root `.gitattributes` added; the repo now has one
+  line-ending policy instead of one that stopped at `backend/`.** Human approved both the
+  repo-wide scope and the worktree resync.
+
+  The measurement that de-risked it, and that corrected my own earlier caution to the human:
+  **nothing in this repo was ever STORED with CRLF.** `git ls-files --eol` showed all 504 tracked
+  text files as `i/lf`. So the fix changes no committed content at all — proven, not assumed, by
+  running `git add --renormalize .` and observing that the ONLY staged paths were the two ledger
+  files being edited by hand at the time. I had told the human this would "renormalise stored
+  files repo-wide"; that was wrong, and being wrong in the cautious direction still cost them a
+  decision they did not need to agonise over.
+
+  What was actually broken was the WORKTREE. `contracts/openapi.json`, `contracts/CONTRACT.lock`
+  and `frontend/src/api/schema.d.ts` had `attr/` unspecified, and with `core.autocrlf=true` a
+  fresh Windows clone hands all three out as CRLF — at which point ci.ps1 gate 10 (`Get-FileHash`)
+  and `npm run check:api-drift` (string compare) both fail on line endings alone while
+  ubuntu-latest stays green. Same class as TASK-0034, one layer out: a byte-exact gate is only as
+  good as the bytes being reproducible. Root file mirrors `backend/.gitattributes`
+  (`* text=auto eol=lf`, `*.cmd`/`*.bat` CRLF, binary list) and names the three generated
+  artefacts explicitly so a future loosening of the blanket rule cannot silently take them.
+
+  **Worktree resync:** 25 files (20 CRLF, 5 mixed) rewritten to LF — 19 of them EF migration
+  scaffolds that were CRLF in the worktree DESPITE `backend/.gitattributes` already declaring
+  `eol=lf`, because git only applies attributes on checkout and they had never been re-checked-out.
+  Repo went 504→529 `i/lf w/lf`, zero CRLF, zero mixed; the 8 binaries and 1 empty file untouched.
+  Verified content-identical four ways on a sample (`git ls-files -s`, `git hash-object --path`,
+  `--no-filters`, and `rev-parse HEAD:`) — all four hashes equal.
+
+  **Gotcha worth keeping:** after rewriting endings, `git status` kept reporting all 25 as `M`
+  while `git diff` showed nothing, because the stat cache was stale and neither `git status` nor
+  `git update-index --refresh` cleared it. `git update-index --really-refresh -- <paths>` did.
+  `git checkout-index -f` is NOT a way to re-apply attributes to a stat-clean file — it silently
+  does nothing — and the documented alternative (`git rm --cached -r . && git reset --hard`) would
+  have destroyed uncommitted work, so it was not used.
+
+  **Gates re-run after the change:** contract still 160697 bytes / `9dca7f11…` matching
+  `CONTRACT.lock`; artefact-vs-contract hash match `true` (gate 10 equivalent); frontend
+  `check:api-drift` — "No drift".
+
+- 2026-09-07 **TASK-0034 closed — `contracts/openapi.json` was never reproducible across
+  platforms, and gate 10's byte-exact hash was right to say so.** Roslyn writes the XML doc files
+  (`bin/**/SchoolManagement.*.xml`) with `Environment.NewLine`, NOT the newline of the `.cs`
+  source (every one of which is LF via `backend/.gitattributes`): measured 1937 CRLF / 0 LF in
+  `SchoolManagement.Domain.xml`. `Microsoft.Extensions.ApiDescription.Server` lifts those
+  `<summary>` bodies into `description` fields, so a Windows-promoted document carried **93
+  escaped `\r\n` across 50 lines** — 160883 bytes / `73316bdb…` — while `ubuntu-latest` (both
+  workflows) regenerated the same commit as 160697 bytes / `9dca7f11…`. Every CI run of a
+  Windows-promoted contract was therefore red, on content that means nothing.
+
+  **Fix:** `generate-openapi.ps1` normalises the escaped CRLF (and any lone escaped CR) to LF on
+  the **generated artefact**, on every run, `-Promote` or not. Placement is the whole point: gate
+  10 hashes `backend/artifacts/openapi/SchoolManagement.Api.json`, so normalising only inside the
+  `-Promote` branch would have relocated the identical bug onto Windows workstations. Guarded by
+  `OpenApiContractTests.NoDescription_ContainsACarriageReturn`, which walks every `description`
+  recursively rather than trusting the 93 known offenders.
+
+  **Verified non-breaking, not assumed:** parsing both revisions and normalising newlines in each
+  makes them byte-identical; 21 paths, 38 schemas, key order unchanged; `git diff` on `contracts/`
+  is 51+/51- with ZERO non-`description` lines touched. Frontend needed nothing —
+  `openapi-typescript` already strips carriage returns, so `check:api-drift` stayed green and
+  `schema.d.ts` was unchanged. Committed as `8a31384`.
+
+  **Gates:** ALL TEN PASSED, `total=457 passed=457 failed=0 skipped=0`, line 80.19% / branch
+  64.74%, gate 10 "The committed contract matches the code."
+
+  **Costliest detour, worth not repeating:** two full runs failed on the hosted Postgres with
+  DISJOINT failure sets (1 failure in 13 m, then 3 different ones in 41 m 42 s), all socket drops
+  in fixture setup or a 500 where a 404 answers in milliseconds. Re-running those four filtered
+  gave 4/4 in **23 s**; the clean full run then did 125/125 in 9 m 51 s. Same commit throughout —
+  only the database's health differed. Separately, the first re-run attempt reported
+  `Skipped: 125, Total: 125` with **exit code 0**, because a bare `dotnet test` never receives
+  `POSTGRES_TEST_CONNECTION`: ci.ps1 resolves it via `lib/postgres-test-connection.ps1`
+  (`Initialize-PostgresTestConnection -HomeDirectory $HOME` — the parameter is mandatory). That is
+  exactly §13's false-pass shape. **Never verify a suite with a hand-rolled `dotnet test`; run
+  ci.ps1, or dot-source that library and check the executed count.**
 
 - 2026-09-07 **TASK-0033 — coordinator caught acceptance criterion 4 checked off with no test
   behind it in the entry immediately below; gap closed same session.** Criterion 4 reads "Prove
@@ -1047,17 +1124,6 @@ sign-off) resolved 2026-09-06 and archived there.
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
    decision clears all four.
-
-6. **Root `.gitattributes` is missing, and `core.autocrlf=true`.** `backend/.gitattributes`
-   normalises `backend/**` only, so `contracts/openapi.json`, `contracts/CONTRACT.lock` and
-   `frontend/src/api/schema.d.ts` are unnormalised. They are LF in the worktree today only
-   because generators wrote them, not a checkout — git already warns "LF will be replaced by
-   CRLF the next time Git touches it" on all three. After a fresh clone on Windows, gate 10 and
-   `check:api-drift` both fail locally on line endings alone while CI stays green. Same class of
-   bug as TASK-0034, one layer out. Fix is a root `.gitattributes` pinning at least the generated
-   artefacts to `eol=lf`, but it renormalises stored files repo-wide, so the blast radius wants a
-   human nod before it lands. Raised 2026-09-07 while diagnosing TASK-0034; recorded as
-   out-of-scope on that card. Orchestrator-owned. NOT blocking anything today.
 
 ## Reading this file
 
