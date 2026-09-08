@@ -68,8 +68,9 @@ failures were in whether they actually executed.
 | — | Rating scales, trait lists, development domains and indicators | BE | 04 §6.2.7, 6.2.13 | Scale is a property of the rating block, not school-wide (conflict item 6) |
 | — | Fee notice configuration and entry screens | BE+FE | 04 §6.2.13 | Notice only. No arithmetic beyond the printed total, and no result is ever withheld |
 | — | Audit log | BE | 03 §6.1.12, 14 §9.3 | Same transaction as the change; DB role holds no UPDATE/DELETE |
-| — | Sessions and terms | BE | 05 §6.3 | Term dates derive weekly-report weeks |
-| — | Class levels, arms, progression chain | BE | 06 §6.4 | `section` drives result-sheet routing — load-bearing, not descriptive |
+| TASK-0035 | Sessions and terms | BE | 05 §6.3 | **done** 2026-09-07. Term dates derive weekly-report weeks |
+| TASK-0038 | Sections, class levels, progression chain | BE | 06 §6.4.1-2, 6.4.7-9 | `section` drives result-sheet routing — load-bearing, not descriptive. Eight chain rules are the substance |
+| TASK-0039 | Arms: per-session rooms, capacity, display name | BE | 06 §6.4.3, 6.4.5-8 | Split from TASK-0038 on 2026-09-07: one card could not hold §6.4 under §1's ~400-line dispatch rule. Owns both TASK-0035 drifts; last blocker on TASK-0030 |
 | — | Back-office shell, navigation, settings screens | FE | 04, 06 | First real screens; delete `scaffold-status/` here |
 
 ## Phase 2 — the register

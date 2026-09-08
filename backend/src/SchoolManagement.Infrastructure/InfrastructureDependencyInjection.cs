@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
@@ -158,6 +159,10 @@ public static class InfrastructureDependencyInjection
         // TASK-0035: academic sessions and terms.
         services.AddScoped<IAcademicSessionRepository, AcademicSessionRepository>();
         services.AddScoped<ITermRepository, TermRepository>();
+
+        // TASK-0038: sections and class levels.
+        services.AddScoped<ISectionRepository, SectionRepository>();
+        services.AddScoped<IClassLevelRepository, ClassLevelRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

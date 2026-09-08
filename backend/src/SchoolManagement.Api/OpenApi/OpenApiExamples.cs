@@ -4,6 +4,7 @@ using SchoolManagement.Application.Auth;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
+using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -599,6 +600,98 @@ internal static class OpenApiExamples
             {
               "id": "{{ExampleId}}",
               "reason": "A mark was entered against the wrong subject and discovered after publication."
+            }
+            """,
+
+        [typeof(CreateSectionCommand)] = """
+            {
+              "name": "Secondary"
+            }
+            """,
+
+        [typeof(UpdateSectionCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Secondary"
+            }
+            """,
+
+        [typeof(SectionDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Primary"
+            }
+            """,
+
+        [typeof(SectionListResponse)] = $$"""
+            {
+              "sections": [
+                { "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45", "name": "Nursery" },
+                { "id": "{{ExampleId}}", "name": "Primary" }
+              ]
+            }
+            """,
+
+        [typeof(CreateLevelCommand)] = $$"""
+            {
+              "name": "Reception",
+              "sectionId": "{{ExampleId}}",
+              "progressionOrder": null,
+              "nextLevelId": null,
+              "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+            }
+            """,
+
+        [typeof(LevelDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+              "name": "Primary 1",
+              "sectionId": "{{ExampleId}}",
+              "section": "Primary",
+              "progressionOrder": 4,
+              "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+              "isEntryLevel": false,
+              "isGraduatingLevel": false,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<LevelDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+                  "name": "Primary 1",
+                  "sectionId": "{{ExampleId}}",
+                  "section": "Primary",
+                  "progressionOrder": 4,
+                  "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+                  "isEntryLevel": false,
+                  "isGraduatingLevel": false,
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+            }
+            """,
+
+        [typeof(UpdateLevelCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": null,
+              "sectionId": null,
+              "nextLevelId": null,
+              "progressionOrder": null,
+              "status": null
+            }
+            """,
+
+        [typeof(ReorderLevelsCommand)] = $$"""
+            {
+              "orderedLevelIds": [
+                "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+                "{{ExampleId}}"
+              ]
             }
             """,
     };

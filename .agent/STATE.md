@@ -77,13 +77,46 @@ backend:  `./backend/scripts/ci.ps1` — 10 gates cheapest-first, STOPS at the f
           gone, and the bare form above matches the `PowerShell(./backend/scripts/ci.ps1*)`
           allowlist rule instead of prompting. `local-env.ps1` and its template are DELETED —
           there is no wrapper any more, and there must not be a new one.
+
+          **GATE RUNS MUST BE STRICTLY SERIALIZED — added 2026-09-08, TASK-0038, after it cost
+          THREE wasted verifications.** There is ONE hosted Neon test database shared by every
+          runner on this machine, and `ResetDatabaseAsync` truncates every table then reseeds. Two
+          overlapping runs therefore interleave truncate-and-reseed against the same rows. Never
+          start a `ci.ps1` while another is live — not yours against a subagent's, not two
+          subagents'.
+          **The signature, so it is recognised on sight instead of diagnosed from scratch:** a
+          `23505 duplicate key` on a seeded table's primary key AND `Sequence contains no elements`
+          for a seeded row, *in the same run*. Those two are contradictory — one says the seeded
+          rows are present, the other that they are absent — and a single writer cannot produce
+          both. Concurrent builds separately give `MSB3021`/`MSB3026`/`MSB3027` copy-lock errors
+          with no `CS####` anywhere: a collision, not a compile failure.
+          **Checking for idleness: `Get-Process -Name dotnet, testhost, testhost.x86,
+          vstest.console, MSBuild`.** A `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"`
+          check does NOT see `testhost.exe` and will call a machine quiet while test hosts still
+          hold the database — that exact hole caused the third wasted run, and produced a REOPEN of
+          a card whose diff was fine. Idle MSBuild worker nodes (`MSBuild.dll /nodemode:1
+          /nodeReuse:true`) are harmless and expected; a `testhost` or a live `dotnet test` /
+          `dotnet build` command line is not.
 frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:api-drift`
           (§4.4 check 2, deliberately NOT folded into `verify`) plus `npm run test:e2e`
           (Playwright, own CI job). oxlint, not ESLint. `npm run generate:api` regenerates the
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: 9dca7f11ed2c4ed00cd444f2fe3d99af8334f7f48cc0a1b74ebc64d9d761a573
+openapi.json sha256: **`82870944982d77d2e540eb2ad455444151d670f439b6e6f9cc7fc54d41ba4168`** — moved
+          2026-09-08 by TASK-0038 (was `a618db62…`). Purely additive: five new paths
+          (`/sections`, `/sections/{id}`, `/levels`, `/levels/{id}`, `/levels/reorder`) carrying
+          nine operations, plus the `LevelDto`/`SectionDto`/command/`CursorPageOfLevelDto` schemas.
+          No existing path or schema changed shape. **Hash independently recomputed with
+          `sha256sum` against the committed file — matches `CONTRACT.lock` byte for byte.**
+          `X-CSRF-Token` required on all six mutations; `Idempotency-Key` REQUIRED on
+          `POST /levels` and `POST /sections`, ACCEPTED on the `PATCH`es, `DELETE` and
+          `POST /levels/reorder` — all declared by construction through the existing operation
+          transformers, never hand-annotated. **32 paths now.** ⚠ **Frontend client NOT yet
+          regenerated against this hash — §4.4 check 2 is RED until a TASK-0037-shaped card runs.**
+          History below.
+
+previous:  9dca7f11ed2c4ed00cd444f2fe3d99af8334f7f48cc0a1b74ebc64d9d761a573
           (was 73316bdb… until TASK-0034, 2026-09-07: the document is now newline-normalised so a
           Windows promote and a Linux CI run of the same commit produce identical bytes.)
           (was `618f730d…` before TASK-0028 dispatch 2; this dispatch moved it by adding
@@ -144,21 +177,67 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
-0033, 0034, 0035 and 0037 closed 2026-09-07) — closure notes and reopen
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037, 0038, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
+0033, 0034, 0035 and 0037 closed 2026-09-07; 0038 closed 2026-09-08) — closure notes and reopen
 history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0038 | Class levels, arms and the progression chain | backend-dev | queued (stub) — last blocker on TASK-0030; owns two TASK-0035 drifts |
+| TASK-0040 | Regenerate the frontend client for sections and class levels | frontend-dev | **queued, written in full 2026-09-08 — ready to dispatch.** §4.4 check 2 is RED until it lands |
+| TASK-0039 | Arms: per-session rooms, capacity, composed display name | backend-dev | **queued, written in full, unblocked 2026-09-08** — owns both TASK-0035 drifts; last blocker on TASK-0030 |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
-| TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs the sessions and arms cards |
+| TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs TASK-0039 (arms); the sessions half landed with TASK-0035 |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-08 **TASK-0038 CLOSED — sections, class levels and the eight progression-chain rules.**
+  All ten gates PASS: `total=594 passed=594 failed=0 skipped=0` (was 532), line **80.55%** /
+  branch **67.86%** (was 80.05 / 66.71). Contract moved to `82870944…`, hash independently
+  recomputed with `sha256sum` and matching `CONTRACT.lock` byte for byte; 32 paths.
+
+  **The eight rules live in a `ProgressionChainGuard` that is a pure function over a set of
+  levels**, unit-testable with no Postgres — TASK-0009's rule that database-free checks stay
+  database-free, applied to the substance of the card rather than to an afterthought. Nine levels
+  and two sections seeded by migration; `Chain_StillValidatesWithATenthLevelInsertedAcrossSections`
+  proves nothing assumes the nine, their names, or that the chain stays inside a section.
+  `Update_ThatBreaksAChainRule_RollsBackTheWholeRequest` asserts the ROLLBACK, not merely a 422.
+  Uniqueness of `name` and of `progression_order` is enforced by database index, proven by
+  `Uniqueness_IsEnforcedByADatabaseIndex_NotOnlyApplicationValidation`.
+
+  **A real finding the card did not anticipate, and the reason the criterion "each of the eight
+  rules has its own failing test" is only partly met.** Rules 4-plural (multiple graduating
+  levels), 5 (unreachable) and 6 (points at an inactive level) are **mathematically implied by
+  rule 3 and cannot be isolated as standalone `Validate` failures**. Counting argument, recorded
+  in full in `ASSUMPTIONS.md` §2.23 and the test class remarks: with `k` graduating levels among
+  `N`, exactly `N-k` levels emit an outgoing pointer, and covering all `N-1` non-entry levels needs
+  `N-k >= N-1`, so `k <= 1`; two graduating levels always leaves a level uncovered, which becomes a
+  second entry candidate, and rule 3 — checked first, per spec 6.4.2's own rule order — always
+  fires instead. Rule 4b (`k = 0`) is NOT subject to the proof and does have its own test. All
+  eight still run in `Validate` for defense-in-depth, and three tests construct the natural
+  real-world attempt at each and show rule 3 firing, rather than asserting the finding without
+  evidence. **Consequence, now an open question: spec 6.4.2's rejection messages for rules
+  4-plural, 5 and 6 are unreachable, so an administrator never sees the specific wording the spec
+  wrote for them.**
+
+  **Two rulings recorded rather than escalated.** Sections are gated under
+  `level.view`/`level.create`/`level.update` — spec 6.4.9 needs section endpoints and the fixed
+  93-row register has no `section.*` code; a section is a property of a level, and inventing
+  register rows is the larger deviation. `Domain/Security/` is untouched, verified by an empty
+  `git diff`. And `DELETE /levels/{id}`'s cross-table precondition is partial by design — see
+  `## Known drift`.
+
+  **Cost of this card, which is the orchestrator's lesson and not the implementing agent's.**
+  The production diff is **2,687 lines across `backend/src`** against §1's ~400-line guideline —
+  6.7x over, after I had already split spec 6.4 once into levels and arms. The levels half alone
+  needed splitting again: sections, the chain guard, and the reorder/insert-after rewiring are
+  three separable dispatches. **Next time §6.4-shaped work appears, split on the seam between the
+  entity CRUD and the invariant guard, not just between entities.** Separately, three
+  verification runs were wasted on gate-run collisions against the one shared database — the rule
+  and its signature are now in `## Gate commands`, and the full account is in TASK-0038's `## Log`.
 
 - 2026-09-07 **TASK-0037 implemented by frontend-dev — client regenerated against `a618db62…`,
   all eight sessions/terms operations reachable through the existing generic wrapper with ZERO
@@ -1078,6 +1157,22 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 
 **Live triggers**
 
+- 2026-09-08 **The committed frontend client is ONE contract move behind; §4.4 check 2 is RED.**
+  `npm run check:api-drift` → `src/api/schema.d.ts is stale or was hand-edited`, with the
+  regenerated file adding all five TASK-0038 paths and their nine operations. **Verified by
+  running it, not inferred from the hash moving.** This is the FOURTH occurrence of the identical
+  drift (TASK-0029, 0033, 0037, now this) — the fix is always "run TASK-0037's shape again", and
+  it is carded as **TASK-0040**. **Trigger: TASK-0040.** Owner `frontend-dev`.
+- 2026-09-08 **`DELETE /levels/{id}`'s reference check is PARTIAL and MORE PERMISSIVE than spec
+  6.4.2's "delete only where nothing has ever referenced the row".** TASK-0038 enforces the one
+  reference that exists today — another level's `nextLevelId`, backed by a `RESTRICT` foreign key
+  as well as a friendly 409 — and defers arms, enrolments, subject mappings and results, none of
+  which have tables yet. Accepted deliberately rather than shipping an always-true probe, which
+  would be a second bypass of the kind `SuperAdminFlagEffectivePrivilegeProvider` already is.
+  Seam marked `DEFERRED` at `DeleteLevelHandler.cs:17`; rationale in `backend/docs/ASSUMPTIONS.md`
+  §2.23. **Triggers: TASK-0039 must add the arm branch in the same dispatch that creates the arm
+  table; the Phase 2/3 cards own enrolments, mappings and results.** Owner `backend-dev`.
+
 - ~~2026-09-07 **The committed frontend client is TWO contract moves behind (TASK-0028).**~~
   **STRUCK 2026-09-07 — TASK-0033 regenerated it against `73316bdb…` and closed.** Superseded by
   the entry immediately below, which is the same drift recurring one contract move later.
@@ -1092,13 +1187,17 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
   (spec 06 §6.4) do not exist yet — the alternative was an always-satisfied arm probe, i.e. a
   second always-true bypass of the kind `SuperAdminFlagEffectivePrivilegeProvider` already is.
   Seam marked `DEFERRED` at `OpenTermHandler.cs:16`; rationale in `backend/docs/ASSUMPTIONS.md`
-  §2.22. **Trigger: TASK-0038 resolves this and rewrites that comment.** Owner `backend-dev`.
+  §2.22. **Trigger: TASK-0039 resolves this and rewrites that comment** (was TASK-0038 until the
+  2026-09-07 split moved arms into TASK-0039 — the trigger followed the arms, not the card id).
+  Owner `backend-dev`.
 - 2026-09-07 **`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition**
   (blocked by any set in Draft / Awaiting Approval / Approved, listing the offending arms), and
   the session list/detail omit spec 6.3.8's arm, pupil and publication counts rather than
   emitting a dishonest `0`. Both accepted by TASK-0035 on absent entities. Seams `DEFERRED` at
-  `CloseTermHandler.cs:15` and `SessionDto.cs:35`. **Triggers: TASK-0038 for the counts' arm
-  half; the Phase 3 result-set cards for the close precondition.** Owner `backend-dev`.
+  `CloseTermHandler.cs:15` and `SessionDto.cs:35`. **Triggers: TASK-0039 for the counts' arm
+  half (was TASK-0038 before the 2026-09-07 split); the Phase 3 result-set cards for the close
+  precondition.** The arm half is a re-date, not a strike: pupil and publication counts stay
+  absent after TASK-0039 lands. Owner `backend-dev`.
 - ~~2026-09-06 **Gate 9 (secret scan) is RED, and it is structurally one card late.**~~
   **STRUCK 2026-09-06 — TASK-0032 fixed both halves.** Gate 9 now runs two gitleaks passes:
   history as before, plus `--no-git` over the repo ROOT (not `backend/`, which would silently
@@ -1227,6 +1326,16 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 
 Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
 sign-off) resolved 2026-09-06 and archived there.
+
+13. **Spec 6.4.2's rejection messages for chain rules 4-plural, 5 and 6 are unreachable** — rule 3
+    always fires first, proven by a counting argument in `ASSUMPTIONS.md` §2.23 (TASK-0038). The
+    spec enumerates eight rules and wrote a distinct message for each; three of those messages can
+    never reach an administrator, who instead gets rule 3's "two levels have nothing leading into
+    them". **Question for the human: is rule 3's message acceptable for those cases, or should the
+    guard check the more specific rules FIRST so the administrator gets the message the spec
+    intended?** Not blocking — the guard rejects every invalid chain correctly either way; only the
+    wording the user sees is at stake. Raised 2026-09-08. Owner: product decision, then a small
+    `backend-dev` card if the order changes.
 
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one

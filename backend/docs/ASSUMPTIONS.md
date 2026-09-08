@@ -687,6 +687,105 @@ adding an always-null column now would be speculative, and a later migration add
 construction. Same reasoning as the counts above: nothing is emitted that cannot be populated
 honestly.
 
+### 2.23 TASK-0038 — sections, class levels and the progression chain
+
+**Sections and levels are gated under `level.*` privileges — no `section.*` register row invented.**
+The card's own ruling: a section is a property of a level, and the fixed 93-row register has no
+`section.*` code. `GET/POST /sections` gated by `level.view`/`level.create`; `PATCH /sections/{id}` by
+`level.update`. Flagged in the endpoint doc comments, not silently done.
+
+**Section's own `name` field has no spec-stated length/uniqueness rule.** Spec 6.4.2 gives `name`'s
+length/uniqueness only for a *level*; the section list itself is described only as "admin-editable."
+`Section.NameMaxLength = 40` and case-insensitive uniqueness (no status carve-out) mirror
+`ClassLevel.Name`/`Role.Name`'s own equivalent rules — a reasonable default, not a spec derivation.
+Nothing in spec 6.4 suggests a section name would ever need to be longer than a level's own.
+
+**`DELETE /levels/{id}`'s reference check is PARTIAL, by design, and the missing part is DEFERRED —
+not an always-true bypass.** Spec 6.4.2: "nothing has ever referenced it" spans arms, enrolments,
+subject mappings and results. None of those tables exist in this codebase yet (arms: TASK-0039;
+enrolments/subject mappings/results: later Phase 2/3 cards). `DeleteLevelHandler` checks the ONE
+reference that DOES exist today — another level's own `next_level_id` (the `class_levels` table
+being created in this very card) — via `IClassLevelRepository.FindReferencingNextLevelAsync`, backed
+by a real `RESTRICT` self-referencing foreign key (`ClassLevelConfiguration`) as a database backstop,
+the same "friendly check plus DB backstop" shape `TermConfiguration`'s single-active-term index has
+for `OpenTermHandler`. The arm/enrolment/mapping/result checks are marked `DEFERRED` in
+`DeleteLevelHandler`'s own remarks, naming this card and the missing tables, rather than answered with
+an always-true probe — the project already regrets exactly one such bypass
+(`SuperAdminFlagEffectivePrivilegeProvider`) and this card was explicitly told not to add a second.
+**Trigger: TASK-0039 (arms) and the later Phase 2/3 cards (enrolments, subject mappings, results) must
+each add their own branch to this same check, not a parallel one.**
+
+**A dedicated `ProgressionChainGuard.CanDeactivate` precondition exists ALONGSIDE `Validate`, not
+folded into it — a real design finding, not a stylistic choice.** Spec 6.4.2's own worked deactivation
+example ("Deactivating Primary 3 would leave Primary 4 unreachable...") and its own worked
+multiple-entry example ("Two levels have nothing leading into them: Nursery 1 and Reception...") are,
+from a pure graph-structure standpoint, THE SAME invalid shape: two disjoint components, each rooted
+at a node nothing points at. A single deterministic `Validate(activeLevels)` — which must return ONE
+answer for a GIVEN snapshot regardless of caller, the same discipline `TermTransitionGuard` and
+`RolePrivilegeEscalationGuard` already hold to — cannot distinguish "this level was just deactivated,
+stranding its successor" from "this level was just created as a second root" from the resulting state
+alone, because they are not structurally distinguishable. Proven, not asserted:
+`ProgressionChainGuardTests.Rule5And6_UnreachableAndPointsToInactive_AreImpliedByRule3` reconstructs
+spec's own deactivation scenario against `Validate` directly and shows it returns rule 3's message,
+not rule 5's. `ProgressionChainGuard.CanDeactivate` is therefore a SEPARATE, narrower, action-specific
+check — "does this specific level sit between a real predecessor and a successor with no other active
+predecessor" — run by `UpdateLevelHandler` immediately before a status change to `Inactive`, BEFORE
+the generic `Validate` re-run. It reproduces spec 6.4.2's exact wording
+(`CanDeactivate_MidChainLevel_RejectsNamingPredecessorAndSuccessor`) and correctly stays silent for
+the explicitly-allowed sequential-front-deactivation case (deactivating Nursery 1, 2, 3 in turn —
+`CanDeactivate_TheEntryLevel_Succeeds`).
+
+**Corollary, proven the same way: rules 4 (the PLURAL "multiple graduating levels" case), 5 and 6 are
+ALSO mathematically implied by rule 3, and cannot be isolated as a standalone `Validate` failure.** A
+counting argument (full derivation in `ProgressionChainGuardTests`' class remarks): with `k` graduating
+levels among `N` total, exactly `N-k` levels emit an outgoing pointer; covering all `N-1` non-entry
+levels with at least one incoming pointer each needs `N-k >= N-1`, i.e. `k <= 1` — so two or more
+graduating levels always leaves at least one level uncovered, which becomes a second entry candidate,
+and rule 3 (checked first, per spec 6.4.2's own rule order) always wins. The same backward-chain
+argument used for rule 5/6 applies. Every rule still runs in `Validate` (defense-in-depth, and spec
+6.4.2's literal enumeration), and `ValidChain_WithNoViolations_Succeeds` proves none of the three ever
+falsely rejects a genuinely valid chain; three dedicated tests
+(`Rule4_MultipleGraduatingLevels_IsImpliedByRule3`,
+`Rule5And6_UnreachableAndPointsToInactive_AreImpliedByRule3`) construct the natural real-world attempt
+at each and show rule 3 firing instead, rather than silently asserting the finding without evidence.
+Rule 4b (the SINGULAR "no graduating level" case, `k = 0`) is NOT subject to this proof — with zero
+graduating levels there is a SURPLUS of edges (all `N` emit one), so one can safely point outside the
+active set without leaving anything uncovered; `Rule4b_NoGraduatingLevel_Rejected` demonstrates this,
+genuinely isolated.
+
+**The partial unique index on `progression_order` is NOT deferrable, and a batch reassignment
+(reorder, or the insert-after shift) WILL hit it if written straight to final values — found by
+running the reorder endpoint for real against the hosted database, not by reasoning about it.**
+PostgreSQL has no deferrable PARTIAL constraint (deferrable applies only to table constraints; a
+partial rule needs an index), so `ix_class_levels_progression_order_active_unique` is checked
+immediately, per row, as each row is written — confirmed by a throwaway probe against the real
+database showing that even a SINGLE multi-row `UPDATE ... FROM (VALUES ...)` statement fails with a
+genuine `23505` unique violation when it swaps two rows' unique values, exactly like two separate
+single-row `UPDATE`s do. `IClassLevelRepository.NegateProgressionOrdersAsync` fixes this with a
+two-phase write: a raw SQL statement (executed immediately, inside the SAME ambient transaction
+`UnitOfWorkBehavior` already opened, NOT through change tracking) flips every affected row's
+`progression_order` to its negative — a value nothing else in the table can hold — before the normal
+tracked entity mutations write the real final values via the ordinary `SaveChangesAsync` at the end of
+the request. Both `ReorderLevelsHandler` and `CreateLevelHandler`'s insert-after shift call it before
+reassigning. This is the first raw, immediately-executed WRITE (as opposed to a raw *read*, which
+`RoleRepository`/`AcademicSessionRepository` already do for keyset pagination) in this codebase's
+Application-facing handler code; it is deliberately still a repository method, not inline SQL in the
+handler, to keep the "handlers describe intent, repositories own persistence mechanics" boundary
+`AGENTS.md` §4 draws.
+
+**`LevelDto.section` denormalises the section's current NAME for display, while `sectionId` carries
+the opaque id for writes — a read/write asymmetry, disclosed as an interpretation of the card's own
+"section... cross the wire as strings" line, not a certainty.** The card table says "`section` and
+`status` cross the wire as strings; the client tolerates unknown members" without fully specifying the
+DTO shape. Since sections are genuinely admin-editable (not a fixed enum — spec 6.4.9 gives them real
+CRUD), a level's read-side `section` value is treated the same way `status`'s enum values are: an
+open-ended string the client must tolerate, but resolved to the section's NAME (not its id) so a level
+list renders "Nursery"/"Primary" without forcing N+1 lookups against a two-row register — the same
+reasoning `RoleDto` never applies (it has no comparable denormalised foreign field). `sectionId` is
+additionally exposed alongside it purely for round-tripping into `PATCH`. Flagged for the orchestrator
+to confirm or overrule, since it is the one place this card interpreted rather than found an
+unambiguous instruction.
+
 ---
 
 ## 3. Open — a human must decide or supply

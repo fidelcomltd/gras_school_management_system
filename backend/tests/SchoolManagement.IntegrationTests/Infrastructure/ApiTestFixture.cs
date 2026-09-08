@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Observability;
 using SchoolManagement.Api.Security;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Infrastructure.Persistence;
@@ -207,6 +208,10 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // too, and RoleEndpointsTests' system-role 409 tests need the REAL seeded Super Admin row to
         // exist, not only the fixture-built one `CreateSystemRoleDirectlyAsync` still covers.
         await ReseedRolesAsync(context, cancellationToken);
+
+        // TASK-0038: same reasoning, for spec 6.4.2's two seeded sections and nine seeded levels —
+        // ClassLevelEndpointsTests' seeded-chain assertions need the REAL migration-seeded rows.
+        await ReseedClassLevelsAsync(context, cancellationToken);
     }
 
     /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
@@ -242,6 +247,46 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 VALUES
                     ({role.Id}, {SeededRoles.SeedTimestamp}, NULL, {role.Description}, {role.IsSystem},
                      NULL, NULL, {role.Name}, {nameKey}, {joinedPrivileges}, 'Active', {role.Version})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.4.2's two seeded sections and nine seeded levels, built from the SAME
+    /// <see cref="SeededClassLevels.Sections"/>/<see cref="SeededClassLevels.Levels"/> the
+    /// <c>SeedClassLevels</c> migration itself is generated from, so this can never drift from what
+    /// the migration actually seeds.
+    /// </summary>
+    private static async Task ReseedClassLevelsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        foreach (var section in SeededClassLevels.Sections)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO sections
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key, version)
+                VALUES
+                    ({section.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL,
+                     {section.Name}, {section.Name.ToLowerInvariant()}, {section.Version})
+                """,
+                cancellationToken);
+        }
+
+        // Reverse chain order (graduating level first) — next_level_id is a self-referencing FK, and
+        // an earlier row must already exist before a later row can point at it. Same reasoning as
+        // ClassLevelConfiguration's own seed.
+        foreach (var level in SeededClassLevels.Levels.Reverse())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO class_levels
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key,
+                     section_id, progression_order, next_level_id, status, version)
+                VALUES
+                    ({level.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL, {level.Name},
+                     {level.Name.ToLowerInvariant()}, {level.SectionId}, {level.ProgressionOrder},
+                     {level.NextLevelId}, 'Active', {level.Version})
                 """,
                 cancellationToken);
         }

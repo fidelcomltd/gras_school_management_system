@@ -1271,6 +1271,764 @@
         ]
       }
     },
+    "/api/v1/levels": {
+      "get": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "List class levels",
+        "description": "Spec 6.4.9: active by default, ordered by progressionOrder; `?status=all` also returns inactive levels. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.",
+        "operationId": "ListLevels",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfLevelDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "Create a class level",
+        "description": "Spec 6.4.2: give `insertAfterLevelId` and the server rewires the chain and reorders in one transaction (the worked case), or give `progressionOrder` directly. Reruns the eight chain rules before committing. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateLevel",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLevelCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/levels/reorder": {
+      "post": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "Reorder every active class level",
+        "description": "Spec 6.4.2, 6.4.9: whole ordered array of active level ids. Atomic — rewrites progressionOrder and infers nextLevelId from adjacency. Used by the drag-and-drop list.",
+        "operationId": "ReorderLevels",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderLevelsCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LevelDto"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/levels/{id}": {
+      "get": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "Read one class level",
+        "description": "No arm counts — that needs Arm, TASK-0039.",
+        "operationId": "GetLevel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "Edit a class level",
+        "description": "Spec 6.4.2: name, section, next level, order, status. Every field is independently optional; an absent field is left unchanged. An empty string for `nextLevelId` clears it (graduating candidate). Reruns the eight chain rules before committing. Changing `status` ADDITIONALLY requires `level.deactivate`, beyond the `level.update` this whole route requires.",
+        "operationId": "UpdateLevel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLevelCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Levels"
+        ],
+        "summary": "Delete a class level",
+        "description": "Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the one reference this codebase can see today (another level's nextLevelId); arm, enrolment, subject-mapping and result references are DEFERRED — those tables do not exist yet (TASK-0039 and later).",
+        "operationId": "DeleteLevel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/privileges": {
       "get": {
         "tags": [
@@ -2162,6 +2920,382 @@
                 "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sections": {
+      "get": {
+        "tags": [
+          "Sections"
+        ],
+        "summary": "List sections",
+        "description": "Spec 6.4.9: \"a two-row seeded list a school extends rarely.\" Not paged.",
+        "operationId": "ListSections",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sections"
+        ],
+        "summary": "Create a section",
+        "description": "Spec 6.4.2: 2..40 characters, unique, case-insensitive. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateSection",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSectionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sections/{id}": {
+      "patch": {
+        "tags": [
+          "Sections"
+        ],
+        "summary": "Rename a section",
+        "description": "Spec 6.4.9: name only.",
+        "operationId": "UpdateSection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSectionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -4343,6 +5477,62 @@
           "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
+      "CreateLevelCommand": {
+        "required": [
+          "name",
+          "sectionId",
+          "progressionOrder",
+          "nextLevelId",
+          "insertAfterLevelId"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "2..40 characters, trimmed. Unique, case-insensitive.",
+            "example": "Reception"
+          },
+          "sectionId": {
+            "type": "string",
+            "description": "Must reference an existing section.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "progressionOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Required when string? CreateLevelCommand.InsertAfterLevelId is absent; must be omitted when it is present.",
+            "format": "int32"
+          },
+          "nextLevelId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` for a graduating candidate. Must be omitted when string? CreateLevelCommand.InsertAfterLevelId is present."
+          },
+          "insertAfterLevelId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When given, must reference an active level; the server sets order and both neighbours'\n`nextLevelId` in one transaction, shifting every later active level's order up by one.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/levels` (spec 6.4.2, 6.4.9). Two mutually exclusive ways to place the new level\n        in the chain: give string? CreateLevelCommand.InsertAfterLevelId and the server rewires everything (spec 6.4.2's\n        worked case), OR give int? CreateLevelCommand.ProgressionOrder directly (spec 6.4.2: \"editable directly for\n        the administrator who prefers typing\") with an optional string? CreateLevelCommand.NextLevelId.",
+        "example": {
+          "name": "Reception",
+          "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "progressionOrder": null,
+          "nextLevelId": null,
+          "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+        }
+      },
       "CreateRoleCommand": {
         "required": [
           "name",
@@ -4431,6 +5621,24 @@
         "description": "Response to a successful CreateSampleRecordCommand.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+        }
+      },
+      "CreateSectionCommand": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "2..40 characters, trimmed. Unique, case-insensitive.",
+            "example": "Secondary"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/sections` (spec 6.4.9).",
+        "example": {
+          "name": "Secondary"
         }
       },
       "CreateSessionCommand": {
@@ -4653,6 +5861,61 @@
             }
           ],
           "nextCursor": "MQ=="
+        }
+      },
+      "CursorPageOfLevelDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LevelDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+                "name": "Primary 1",
+                "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "section": "Primary",
+                "progressionOrder": 4,
+                "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+                "isEntryLevel": false,
+                "isGraduatingLevel": false,
+                "status": "Active"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page.",
+            "example": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+              "name": "Primary 1",
+              "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "section": "Primary",
+              "progressionOrder": 4,
+              "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+              "isEntryLevel": false,
+              "isGraduatingLevel": false,
+              "status": "Active"
+            }
+          ],
+          "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
         }
       },
       "CursorPageOfRoleDto": {
@@ -4899,6 +6162,95 @@
             "abbreviationVersionNumber": 0
           }
         }
+      },
+      "LevelDto": {
+        "required": [
+          "id",
+          "name",
+          "sectionId",
+          "section",
+          "progressionOrder",
+          "nextLevelId",
+          "isEntryLevel",
+          "isGraduatingLevel",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+          },
+          "name": {
+            "type": "string",
+            "description": "2..40 characters.",
+            "example": "Primary 1"
+          },
+          "sectionId": {
+            "type": "string",
+            "description": "Opaque identifier of the owning section — supply this back on a write.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "section": {
+            "type": "string",
+            "description": "The section's CURRENT name, denormalised for display (spec 6.4.2's own field is a plain FK; this\nis a read convenience so a level list does not force N+1 lookups against a two-row admin-editable\nregister). Cross the wire as a string (§8): admin-editable, open-ended, tolerate any value.",
+            "example": "Primary"
+          },
+          "progressionOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1 upward, unique across active levels.",
+            "format": "int32",
+            "example": 4
+          },
+          "nextLevelId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` only on the graduating level.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47"
+          },
+          "isEntryLevel": {
+            "type": "boolean",
+            "description": "Derived, never stored (spec 6.4.2) — computed over the active set at read time.",
+            "example": false
+          },
+          "isGraduatingLevel": {
+            "type": "boolean",
+            "description": "Derived, never stored (spec 6.4.2) — computed over the active set at read time.",
+            "example": false
+          },
+          "status": {
+            "description": "active or inactive. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/LevelStatus"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of a ClassLevel (spec 6.4.2, 6.4.9). One shape for both the list item\nand the detail read — spec 6.4.9's `GET /levels/{id}` adds no field beyond what the list\nalready carries (no arm counts: that is TASK-0039).",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+          "name": "Primary 1",
+          "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "section": "Primary",
+          "progressionOrder": 4,
+          "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+          "isEntryLevel": false,
+          "isGraduatingLevel": false,
+          "status": "Active"
+        }
+      },
+      "LevelStatus": {
+        "enum": [
+          "Active",
+          "Inactive"
+        ],
+        "description": "A ClassLevel's status (spec 6.4.2). Defaults LevelStatus.Active.",
+        "example": "Active"
       },
       "PagedResultOfSampleRecordDto": {
         "required": [
@@ -5250,6 +6602,33 @@
           "reason": "A mark was entered against the wrong subject and discovered after publication."
         }
       },
+      "ReorderLevelsCommand": {
+        "required": [
+          "orderedLevelIds"
+        ],
+        "type": "object",
+        "properties": {
+          "orderedLevelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every currently ACTIVE level's id, in the new order. No duplicates.",
+            "example": [
+              "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+              "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/levels/reorder` (spec 6.4.2, 6.4.9): \"Whole ordered array of level ids. Atomic.\n        Rewrites progressionOrder and infers nextLevelId from adjacency.\" Used by the drag-and-drop list.",
+        "example": {
+          "orderedLevelIds": [
+            "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+            "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          ]
+        }
+      },
       "ResetAdminAccountPasswordResponse": {
         "required": [
           "id",
@@ -5411,6 +6790,70 @@
         ],
         "description": "How a role assignment's grant is bounded. Spec 4.2: \"Scope is one of two things: school-wide,\nor a list of specific arms in a specific session.\"",
         "example": "SchoolWide"
+      },
+      "SectionDto": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "name": {
+            "type": "string",
+            "description": "2..40 characters.",
+            "example": "Primary"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of a Section (spec 6.4.2, 6.4.9).",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "name": "Primary"
+        }
+      },
+      "SectionListResponse": {
+        "required": [
+          "sections"
+        ],
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SectionDto"
+            },
+            "description": "Every section, ordered by name.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+                "name": "Nursery"
+              },
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "name": "Primary"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`GET /api/v1/sections`'s response (spec 6.4.9): \"Not paged — a two-row seeded list a school\n        extends rarely,\" so this is a plain wrapped list, not a CursorPage&lt;TItem&gt; —\n        the same shape `PrivilegeRegisterResponse` uses for the other fixed, small register in this API.",
+        "example": {
+          "sections": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+              "name": "Nursery"
+            },
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "name": "Primary"
+            }
+          ]
+        }
       },
       "SecureArmResponse": {
         "required": [
@@ -5925,6 +7368,77 @@
           "isSuperAdmin": null
         }
       },
+      "UpdateLevelCommand": {
+        "required": [
+          "id",
+          "name",
+          "sectionId",
+          "nextLevelId",
+          "progressionOrder",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The level being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged."
+          },
+          "sectionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged. Must reference an existing section."
+          },
+          "nextLevelId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged; an EMPTY string clears it (the level becomes a\n        graduating candidate) — `null` here is indistinguishable from \"not provided,\"\n        exactly like `UpdateRoleCommand.Description`'s null-means-unchanged convention."
+          },
+          "progressionOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` to leave unchanged.",
+            "format": "int32"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "`null` to leave unchanged. Changing this ALSO requires `level.deactivate`\n        (checked in the handler, data-dependent — the route itself requires only `level.update`).",
+                "$ref": "#/components/schemas/LevelStatus"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/levels/{id}` (spec 6.4.2, 6.4.9): \"Name, section, next level, order, status.\n        Reruns the eight chain rules.\" Every field is independently optional — `null`\n        leaves it unchanged, the same convention `UpdateRoleCommand` established.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "name": null,
+          "sectionId": null,
+          "nextLevelId": null,
+          "progressionOrder": null,
+          "status": null
+        }
+      },
       "UpdateRoleCommand": {
         "required": [
           "id",
@@ -6061,6 +7575,32 @@
           "motto": "Excellence Through Character",
           "headTeacherName": "Chisom Maxwell",
           "expectedVersion": 2
+        }
+      },
+      "UpdateSectionCommand": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The section being renamed.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "name": {
+            "type": "string",
+            "description": "2..40 characters, trimmed. Unique, case-insensitive.",
+            "example": "Secondary"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/sections/{id}` (spec 6.4.9). Name only.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "name": "Secondary"
         }
       },
       "UpdateSessionCommand": {
@@ -6202,6 +7742,9 @@
       "name": "Auth"
     },
     {
+      "name": "Levels"
+    },
+    {
       "name": "Privileges"
     },
     {
@@ -6209,6 +7752,9 @@
     },
     {
       "name": "Roles"
+    },
+    {
+      "name": "Sections"
     },
     {
       "name": "Sessions"
