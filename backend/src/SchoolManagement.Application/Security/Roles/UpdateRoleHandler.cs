@@ -99,7 +99,9 @@ internal sealed class UpdateRoleCommandHandler(
             {
                 // Spec 6.1.7 preamble: an audit event on rejection, even though the whole request still
                 // fails and the SetPrivileges mutation above is rolled back with everything else.
-                await auditSink.RecordAsync(
+                // RecordRejectionAsync (not RecordAsync): this row must survive that same rollback
+                // (TASK-0048).
+                await auditSink.RecordRejectionAsync(
                     "role.privilege_escalation",
                     EntityType,
                     role.Id.ToString("D", CultureInfo.InvariantCulture),

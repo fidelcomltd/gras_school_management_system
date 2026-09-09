@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -59,6 +60,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<ConfigVersion> ConfigVersions => Set<ConfigVersion>();
 
+    /// <summary>TASK-0005c. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<RegistrationCounter> RegistrationCounters => Set<RegistrationCounter>();
+
     /// <summary>TASK-0028 dispatch 2. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Role> Roles => Set<Role>();
 
@@ -79,6 +83,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     /// <summary>TASK-0039. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Arm> Arms => Set<Arm>();
+
+    /// <summary>
+    /// TASK-0048. Internal, not public: only <see cref="Repositories.AuditEventRepository"/> and the
+    /// audit sinks in <c>Infrastructure/Audit</c> and <c>Infrastructure/Authorization</c> ever touch
+    /// this set — it has no update or delete path anywhere (spec 9.4).
+    /// </summary>
+    internal DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

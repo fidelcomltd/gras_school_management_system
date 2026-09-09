@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SchoolManagement.Application.Abstractions.Authorization;
@@ -9,6 +11,8 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Settings;
+using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
 
 namespace SchoolManagement.IntegrationTests;
@@ -26,6 +30,9 @@ public sealed class SettingsEndpointsTests(ApiTestFixture fixture) : Integration
     private const string SignInUrl = "/api/v1/auth/sign-in";
     private const string SettingsUrl = "/api/v1/settings";
     private const string IdentityUrl = "/api/v1/settings/identity";
+    private const string RegNumberUrl = "/api/v1/settings/reg-number";
+    private const string RegNumberPreviewUrl = "/api/v1/settings/reg-number/preview";
+    private const string AbbreviationUrl = "/api/v1/settings/abbreviation";
     private const string ConfigVersionsUrl = "/api/v1/config-versions";
 
     [Fact]
@@ -386,6 +393,345 @@ public sealed class SettingsEndpointsTests(ApiTestFixture fixture) : Integration
             rejection.UserId == "user-without-settings-privilege" &&
             rejection.Privilege == Privileges.Settings.IdentityUpdate);
     }
+
+    [Fact]
+    public async Task GetSettings_ReturnsTheSeededAbbreviationAndRegNumberGroupsWithTheirDefaults()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+
+        settings.Abbreviation.Abbreviation.ShouldBe("GRAS");
+        settings.Abbreviation.IssuedCount.ShouldBeNull(); // Amendment 2 — never 0.
+        settings.Abbreviation.VersionNumber.ShouldBe(0);
+        settings.RegNumber.Separator.ShouldBe("/");
+        settings.RegNumber.SerialWidth.ShouldBe(4);
+        settings.RegNumber.SerialReset.ShouldBe(RegNumberSerialReset.PerYear);
+        settings.RegNumber.YearSource.ShouldBe("AdmissionYear");
+        settings.RegNumber.VersionNumber.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task UpdateRegNumber_WhileAnonymous_Returns401()
+    {
+        RequireDatabase();
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, RegNumberUrl)
+        {
+            Content = JsonContent.Create(ValidRegNumberCommand(expectedVersion: 0)),
+        };
+
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task UpdateRegNumber_WithoutACsrfToken_Returns403CsrfMissing()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, RegNumberUrl)
+        {
+            Content = JsonContent.Create(ValidRegNumberCommand(expectedVersion: 0)),
+        };
+        jar.Apply(request); // Cookies, but deliberately no X-CSRF-Token.
+
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("csrf.missing");
+    }
+
+    [Fact]
+    public async Task UpdateRegNumber_HappyPath_SavesAndReturnsTheIncrementedVersion()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var response = await PatchAsync(
+            RegNumberUrl,
+            jar,
+            ValidRegNumberCommand(expectedVersion: 0) with { Separator = "-", SerialWidth = 5 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var regNumber = await ReadAsync<SettingsRegNumberGroupDto>(response);
+        regNumber.Separator.ShouldBe("-");
+        regNumber.SerialWidth.ShouldBe(5);
+        regNumber.VersionNumber.ShouldBe(1);
+
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        settings.RegNumber.Separator.ShouldBe("-");
+        settings.RegNumber.VersionNumber.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task UpdateRegNumber_TwoSavesAgainstTheSameVersion_TheFirstWinsAndTheSecondIsRejected()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var firstResponse = await PatchAsync(
+            RegNumberUrl, jar, ValidRegNumberCommand(expectedVersion: 0) with { Separator = "-" });
+        var secondResponse = await PatchAsync(
+            RegNumberUrl, jar, ValidRegNumberCommand(expectedVersion: 0) with { Separator = "." });
+
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        using var document = await ReadJsonAsync(secondResponse);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.regnumber.stale_version");
+
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        settings.RegNumber.Separator.ShouldBe("-"); // The winner's value stands.
+        settings.RegNumber.VersionNumber.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task UpdateRegNumber_ReducingWidthBelowAnIssuedSerial_Returns409NamingTheRealSerialAndTheMinimumWidth()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var currentYear = DateTimeOffset.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        await SeedRegistrationCounterAsync(currentYear, lastSerial: 1043);
+
+        var response = await PatchAsync(
+            RegNumberUrl, jar, ValidRegNumberCommand(expectedVersion: 0) with { SerialWidth = 3 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.regnumber.width_too_small");
+        document.RootElement.GetProperty("detail").GetString()
+            .ShouldBe("Serial 1043 will not fit in a width of 3. Choose 4 or more.");
+
+        // Nothing was written — the group's version pointer never moved.
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        settings.RegNumber.VersionNumber.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task GetRegNumberPreview_WithAnEmptyRegister_TheFirstSerialIsOne()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var response = await GetAsync($"{RegNumberPreviewUrl}?separator=%2F&serialWidth=4", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var preview = await ReadAsync<RegNumberPreviewDto>(response);
+        var currentYear = DateTimeOffset.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        preview.Preview.ShouldBe($"GRAS/{currentYear}/0001");
+    }
+
+    [Fact]
+    public async Task GetRegNumberPreview_UsesTheUnsavedQueryParametersAndTheSavedAbbreviation()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var currentYear = DateTimeOffset.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        await SeedRegistrationCounterAsync(currentYear, lastSerial: 39);
+
+        var response = await GetAsync($"{RegNumberPreviewUrl}?separator=-&serialWidth=5", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var preview = await ReadAsync<RegNumberPreviewDto>(response);
+        preview.Preview.ShouldBe($"GRAS-{currentYear}-00040"); // "-" and width 5 — neither is saved.
+    }
+
+    [Fact]
+    public async Task GetRegNumberPreview_UnderContinuous_ReadsTheAllPartitionInsteadOfTheYearPartition()
+    {
+        // Amendment 1, proven end to end: the SAME real request, only the SAVED serialReset differs,
+        // reads a completely different counter row.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var currentYear = DateTimeOffset.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        await SeedRegistrationCounterAsync(currentYear, lastSerial: 39);
+        await SeedRegistrationCounterAsync(RegistrationCounterPartition.ContinuousKey, lastSerial: 999);
+
+        var underPerYear = await ReadAsync<RegNumberPreviewDto>(
+            await GetAsync($"{RegNumberPreviewUrl}?separator=%2F&serialWidth=4", jar));
+        underPerYear.Preview.ShouldBe($"GRAS/{currentYear}/0040");
+
+        var switchResponse = await PatchAsync(
+            RegNumberUrl,
+            jar,
+            ValidRegNumberCommand(expectedVersion: 0) with { SerialReset = RegNumberSerialReset.Continuous });
+        switchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var underContinuous = await ReadAsync<RegNumberPreviewDto>(
+            await GetAsync($"{RegNumberPreviewUrl}?separator=%2F&serialWidth=4", jar));
+        underContinuous.Preview.ShouldBe($"GRAS/{currentYear}/1000"); // From the "ALL" row, not "2026".
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_WhileAnonymous_Returns401()
+    {
+        RequireDatabase();
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, AbbreviationUrl)
+        {
+            Content = JsonContent.Create(ValidAbbreviationCommand(expectedVersion: 0)),
+        };
+
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_WithoutTheLiteralConfirmationToken_Returns422()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var response = await PatchAsync(
+            AbbreviationUrl,
+            jar,
+            ValidAbbreviationCommand(expectedVersion: 0) with { ConfirmationToken = "change" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errors").TryGetProperty("ConfirmationToken", out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_WithAnEmptyReason_Returns422()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var response = await PatchAsync(
+            AbbreviationUrl,
+            jar,
+            ValidAbbreviationCommand(expectedVersion: 0) with { Reason = "   " });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errors").TryGetProperty("Reason", out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_HappyPath_SavesAndRewritesNothingElse()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var response = await PatchAsync(AbbreviationUrl, jar, ValidAbbreviationCommand(expectedVersion: 0));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var abbreviation = await ReadAsync<SettingsAbbreviationGroupDto>(response);
+        abbreviation.Abbreviation.ShouldBe("GRA");
+        abbreviation.IssuedCount.ShouldBeNull();
+        abbreviation.VersionNumber.ShouldBe(1);
+
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        settings.Abbreviation.Abbreviation.ShouldBe("GRA");
+        settings.Identity.VersionNumber.ShouldBe(0); // Untouched — independent version pointer.
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_ToAValueAlreadyUsedHistorically_IsAllowed()
+    {
+        // Spec 6.2.11: "Allowed. Abbreviations are not unique over time..."
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var firstChange = await PatchAsync(AbbreviationUrl, jar, ValidAbbreviationCommand(expectedVersion: 0));
+        firstChange.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var backToOriginal = await PatchAsync(
+            AbbreviationUrl,
+            jar,
+            ValidAbbreviationCommand(expectedVersion: 1) with { Abbreviation = "GRAS" });
+
+        backToOriginal.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var abbreviation = await ReadAsync<SettingsAbbreviationGroupDto>(backToOriginal);
+        abbreviation.Abbreviation.ShouldBe("GRAS");
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_DoesNotTouchTheRegistrationCounter()
+    {
+        // Approved delta: "the serial counter is keyed on the admission year alone and not on the
+        // abbreviation" — proven directly by seeding a counter row and asserting the preview built
+        // from the NEW abbreviation still reflects that exact seeded serial, unrestarted.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var currentYear = DateTimeOffset.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        await SeedRegistrationCounterAsync(currentYear, lastSerial: 39);
+
+        var changeResponse = await PatchAsync(AbbreviationUrl, jar, ValidAbbreviationCommand(expectedVersion: 0));
+        changeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var preview = await ReadAsync<RegNumberPreviewDto>(
+            await GetAsync($"{RegNumberPreviewUrl}?separator=%2F&serialWidth=4", jar));
+
+        preview.Preview.ShouldBe($"GRA/{currentYear}/0040"); // New abbreviation, SAME counter position.
+    }
+
+    [Fact]
+    public async Task UpdateAbbreviation_TwoSavesAgainstTheSameVersion_TheFirstWinsAndTheSecondIsRejected()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var firstResponse = await PatchAsync(AbbreviationUrl, jar, ValidAbbreviationCommand(expectedVersion: 0));
+        var secondResponse = await PatchAsync(
+            AbbreviationUrl,
+            jar,
+            ValidAbbreviationCommand(expectedVersion: 0) with { Abbreviation = "GOLD" });
+
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        using var document = await ReadJsonAsync(secondResponse);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.abbreviation.stale_version");
+
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        settings.Abbreviation.Abbreviation.ShouldBe("GRA"); // The winner's value stands.
+    }
+
+    /// <summary>Inserts a <c>registration_counter</c> row directly, bypassing the application layer —
+    /// this card exposes no write path, so seeding real counter state for a test has no other route.</summary>
+    private async Task SeedRegistrationCounterAsync(string counterKey, int lastSerial)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO registration_counter (counter_key, last_serial) VALUES ({counterKey}, {lastSerial})",
+            TestContext.Current.CancellationToken);
+    }
+
+    private static UpdateRegNumberCommand ValidRegNumberCommand(int expectedVersion) => new(
+        "/",
+        4,
+        RegNumberSerialReset.PerYear,
+        expectedVersion);
+
+    private static UpdateAbbreviationCommand ValidAbbreviationCommand(int expectedVersion) => new(
+        "GRA",
+        UpdateAbbreviationCommandValidator.RequiredConfirmationToken,
+        "The school shortened its registered trading name.",
+        expectedVersion);
 
     private static UpdateSchoolIdentityCommand ValidIdentityCommand(int expectedVersion) => new(
         "Golden Royal Ark School",

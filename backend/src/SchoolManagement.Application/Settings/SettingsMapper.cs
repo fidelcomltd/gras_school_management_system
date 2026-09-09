@@ -22,4 +22,30 @@ internal static class SettingsMapper
             profile.Timezone,
             profile.IdentityVersionNumber);
     }
+
+    /// <summary>
+    /// Maps <paramref name="profile"/>'s abbreviation fields to the wire DTO.
+    /// <paramref name="issuedCount"/> is supplied by the caller rather than read here — amendment 2:
+    /// no pupil register exists yet, so this card can only ever pass <see langword="null"/>
+    /// (TASK-0051 wires the real count).
+    /// </summary>
+    public static SettingsAbbreviationGroupDto ToAbbreviationDto(SchoolProfile profile, int? issuedCount)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        return new SettingsAbbreviationGroupDto(profile.Abbreviation, issuedCount, profile.AbbreviationVersionNumber);
+    }
+
+    /// <summary>Maps <paramref name="profile"/>'s registration-number pattern fields to the wire DTO.</summary>
+    public static SettingsRegNumberGroupDto ToRegNumberDto(SchoolProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        return new SettingsRegNumberGroupDto(
+            profile.Separator,
+            profile.SerialWidth,
+            profile.SerialReset,
+            SchoolProfile.YearSource,
+            profile.RegNumberVersionNumber);
+    }
 }

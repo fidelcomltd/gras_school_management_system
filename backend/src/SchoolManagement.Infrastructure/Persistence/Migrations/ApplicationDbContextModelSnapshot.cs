@@ -22,6 +22,92 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SchoolManagement.Domain.Audit.AuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_admin_id");
+
+                    b.Property<string>("ActorLabel")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("actor_label");
+
+                    b.Property<string>("AfterJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after_json");
+
+                    b.Property<string>("BeforeJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before_json");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SourceIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("source_ip");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_event");
+
+                    b.HasIndex("ActorAdminId")
+                        .HasDatabaseName("ix_audit_event_actor_admin_id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_audit_event_occurred_at");
+
+                    b.HasIndex("Outcome")
+                        .HasDatabaseName("ix_audit_event_outcome");
+
+                    b.ToTable("audit_event", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Auth.AdminAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1071,6 +1157,23 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("config_versions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.RegistrationCounter", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("counter_key");
+
+                    b.Property<int>("LastSerial")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_serial");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registration_counter");
+
+                    b.ToTable("registration_counter", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1120,11 +1223,31 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
 
+                    b.Property<int>("RegNumberVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("reg_number_version_number");
+
                     b.Property<string>("SchoolName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
                         .HasColumnName("school_name");
+
+                    b.Property<string>("Separator")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("separator");
+
+                    b.Property<string>("SerialReset")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("serial_reset");
+
+                    b.Property<int>("SerialWidth")
+                        .HasColumnType("integer")
+                        .HasColumnName("serial_width");
 
                     b.Property<string>("ShortName")
                         .IsRequired()
@@ -1154,7 +1277,11 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             HeadTeacherName = "",
                             IdentityVersionNumber = 0,
                             Phone = "",
+                            RegNumberVersionNumber = 0,
                             SchoolName = "",
+                            Separator = "/",
+                            SerialReset = "PerYear",
+                            SerialWidth = 4,
                             ShortName = "",
                             Timezone = "Africa/Lagos"
                         });

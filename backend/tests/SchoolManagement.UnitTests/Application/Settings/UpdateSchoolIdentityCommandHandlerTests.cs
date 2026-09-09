@@ -87,7 +87,9 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
 
         await _configVersionRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, TestContext.Current.CancellationToken);
 
-        await _auditSink.Received(1).RecordAsync(
+        // RecordRejectionAsync, not RecordAsync (TASK-0048): this row must survive the ambient
+        // transaction's rollback, which a same-transaction write would not.
+        await _auditSink.Received(1).RecordRejectionAsync(
             "settings.identity.save_rejected_stale_version",
             Arg.Any<string>(),
             Arg.Any<string>(),

@@ -5,10 +5,12 @@ namespace SchoolManagement.Application.Abstractions.Authorization;
 /// rejected, so an account probing routes it does not hold is visible."
 /// </summary>
 /// <remarks>
-/// A SEAM. The audit log module itself (spec 6.1.12 — the <c>audit_event</c> table, its retention
-/// and its read endpoints) is out of scope for TASK-0002. The registered implementation
-/// (<c>LoggingAuthorizationAuditSink</c>) writes a structured log entry rather than a persisted
-/// row; replace it with real <c>audit_event</c> persistence when that module lands.
+/// Persists a real, durable <c>audit_event</c> row (spec 6.1.12) — TASK-0048 replaced the previous
+/// log-only implementation (<c>LoggingAuthorizationAuditSink</c>, DELETED) with
+/// <c>Infrastructure/Authorization/AuthorizationAuditSink</c>. This call runs from
+/// <c>PrivilegeAuthorizationHandler</c>, in authorization middleware BEFORE the MediatR pipeline —
+/// there is no ambient unit-of-work transaction to join here at all, so the row is written and
+/// committed directly, the same durable way <c>ISystemAuditSink.RecordRejectionAsync</c> is.
 /// </remarks>
 public interface IAuthorizationAuditSink
 {

@@ -38,6 +38,9 @@ public sealed class SettingsEndpoints : IEndpointModule
 
         MapGetSettings(settingsGroup);
         MapUpdateIdentity(settingsGroup);
+        MapUpdateRegNumber(settingsGroup);
+        MapGetRegNumberPreview(settingsGroup);
+        MapUpdateAbbreviation(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -87,6 +90,89 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "`GET /settings`) or the save is rejected `409` before anything is written, and BOTH " +
                 "the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).")
             .Produces<SettingsIdentityGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateRegNumber(RouteGroupBuilder group) =>
+        group.MapPatch("/reg-number", async (
+                UpdateRegNumberCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.RegNumberUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateRegNumber")
+            .WithSummary("Update the registration-number pattern")
+            .WithDescription(
+                "Separator, serial width, reset rule (spec 6.2.4). `yearSource` is fixed and not " +
+                "editable here. Reducing `serialWidth` below what the counter partition currently " +
+                "active under the SAVED `serialReset` already needs is rejected `409`, naming the " +
+                "real serial and the minimum width that fits it (spec 6.2.10). `expectedVersion` " +
+                "must match the reg-number group's current `versionNumber` (from `GET /settings`) or " +
+                "the save is rejected `409` before anything is written.")
+            .Produces<SettingsRegNumberGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetRegNumberPreview(RouteGroupBuilder group) =>
+        group.MapGet("/reg-number/preview", async (
+                [FromQuery] string separator,
+                [FromQuery] int serialWidth,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(
+                    new GetRegNumberPreviewQuery(separator, serialWidth),
+                    cancellationToken);
+
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetRegNumberPreview")
+            .WithSummary("Preview the next registration number under unsaved parameters")
+            .WithDescription(
+                "`separator`/`serialWidth` are UNSAVED — supplied as query parameters, not read from " +
+                "settings. The abbreviation and the counter partition (which the currently SAVED " +
+                "`serialReset` selects, spec 6.2.4) both come from saved configuration. Uses the next " +
+                "serial that would actually be issued; with an empty register that is serial 1.")
+            .Produces<RegNumberPreviewDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateAbbreviation(RouteGroupBuilder group) =>
+        group.MapPatch("/abbreviation", async (
+                UpdateAbbreviationCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.AbbreviationUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateAbbreviation")
+            .WithSummary("Change the school's registration-number abbreviation")
+            .WithDescription(
+                "Requires the literal confirmation token `CHANGE` and a reason (spec 6.2.4). " +
+                "Rewrites no issued number — the counter is keyed on admission year alone, never the " +
+                "abbreviation, so a mid-session change neither restarts the serial nor produces two " +
+                "pupils whose numbers differ only by prefix. A value already used historically is " +
+                "allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's " +
+                "current `versionNumber` or the save is rejected `409` before anything is written.")
+            .Produces<SettingsAbbreviationGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

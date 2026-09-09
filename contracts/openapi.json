@@ -5363,6 +5363,389 @@
         }
       }
     },
+    "/api/v1/settings/reg-number": {
+      "patch": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Update the registration-number pattern",
+        "description": "Separator, serial width, reset rule (spec 6.2.4). `yearSource` is fixed and not editable here. Reducing `serialWidth` below what the counter partition currently active under the SAVED `serialReset` already needs is rejected `409`, naming the real serial and the minimum width that fits it (spec 6.2.10). `expectedVersion` must match the reg-number group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written.",
+        "operationId": "UpdateRegNumber",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRegNumberCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRegNumberGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/reg-number/preview": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Preview the next registration number under unsaved parameters",
+        "description": "`separator`/`serialWidth` are UNSAVED — supplied as query parameters, not read from settings. The abbreviation and the counter partition (which the currently SAVED `serialReset` selects, spec 6.2.4) both come from saved configuration. Uses the next serial that would actually be issued; with an empty register that is serial 1.",
+        "operationId": "GetRegNumberPreview",
+        "parameters": [
+          {
+            "name": "separator",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serialWidth",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegNumberPreviewDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/abbreviation": {
+      "patch": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Change the school's registration-number abbreviation",
+        "description": "Requires the literal confirmation token `CHANGE` and a reason (spec 6.2.4). Rewrites no issued number — the counter is keyed on admission year alone, never the abbreviation, so a mid-session change neither restarts the serial nor produces two pupils whose numbers differ only by prefix. A value already used historically is allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's current `versionNumber` or the save is rejected `409` before anything is written.",
+        "operationId": "UpdateAbbreviation",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAbbreviationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsAbbreviationGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config-versions": {
       "get": {
         "tags": [
@@ -8251,6 +8634,32 @@
           "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       },
+      "RegNumberPreviewDto": {
+        "required": [
+          "preview"
+        ],
+        "type": "object",
+        "properties": {
+          "preview": {
+            "type": "string",
+            "description": "The full registration number that would be issued right now under the supplied unsaved\nparameters, for example `GRAS/2026/0041`. Uses the next serial that would actually be\nissued — with an empty register that is serial 1.",
+            "example": "GRAS/2026/0040"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response body of GetRegNumberPreviewQuery.",
+        "example": {
+          "preview": "GRAS/2026/0040"
+        }
+      },
+      "RegNumberSerialReset": {
+        "enum": [
+          "PerYear",
+          "Continuous"
+        ],
+        "description": "How the registration-number serial resets (spec 6.2.4, 6.5.10). Stored as a string\n(`SchoolProfileConfiguration.HasConversion&lt;string&gt;()`), so a future member is a\ncode-only change.",
+        "example": "PerYear"
+      },
       "ReopenTermCommand": {
         "required": [
           "id",
@@ -8857,19 +9266,71 @@
         "description": "Lifecycle of an AcademicSession (spec 6.3.3). Only one session system-wide may be\nSessionState.Active — enforced by a partial unique index (spec 6.3.9), not application code.",
         "example": "Active"
       },
+      "SettingsAbbreviationGroupDto": {
+        "required": [
+          "abbreviation",
+          "issuedCount",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "abbreviation": {
+            "type": "string",
+            "description": "2 to 8 characters. Frozen into every registration number issued from now on.",
+            "example": "GRAS"
+          },
+          "issuedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "How many issued registration numbers currently begin with string SettingsAbbreviationGroupDto.Abbreviation — the count\nspec 6.2.4's confirmation dialogue names before an admin types `CHANGE`.\n`null` means \"no register exists yet to count\" (TASK-0005c ships this field\npermanently `null`; wiring the real count is TASK-0051's). NEVER `0` — that\nwould claim zero pupils hold the abbreviation as a fact this card cannot support.",
+            "format": "int32"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The abbreviation group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next `PATCH`.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The abbreviation group, both inside SettingsDto and as\n`PATCH /api/v1/settings/abbreviation`'s own success body (spec 6.2.4).",
+        "example": {
+          "abbreviation": "GRAS",
+          "issuedCount": null,
+          "versionNumber": 0
+        }
+      },
       "SettingsDto": {
         "required": [
-          "identity"
+          "identity",
+          "abbreviation",
+          "regNumber"
         ],
         "type": "object",
         "properties": {
           "identity": {
             "description": "The school identity group.",
             "$ref": "#/components/schemas/SettingsIdentityGroupDto"
+          },
+          "abbreviation": {
+            "description": "The registration-number abbreviation group.",
+            "$ref": "#/components/schemas/SettingsAbbreviationGroupDto"
+          },
+          "regNumber": {
+            "description": "The registration-number pattern group.",
+            "$ref": "#/components/schemas/SettingsRegNumberGroupDto"
           }
         },
         "additionalProperties": false,
-        "description": "The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of\nTASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups\n(logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather\nthan a new top-level field, and registration-number/abbreviation get their own group here).",
+        "description": "The response body of `GET /api/v1/settings`. TASK-0005b extends this same envelope\nadditively (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving\nendpoints rather than a new top-level field here).",
         "example": {
           "identity": {
             "schoolName": "Golden Royal Ark School",
@@ -8881,6 +9342,18 @@
             "headTeacherName": "Chisom Maxwell",
             "timezone": "Africa/Lagos",
             "versionNumber": 3
+          },
+          "abbreviation": {
+            "abbreviation": "GRAS",
+            "issuedCount": null,
+            "versionNumber": 0
+          },
+          "regNumber": {
+            "separator": "/",
+            "serialWidth": 4,
+            "serialReset": "PerYear",
+            "yearSource": "AdmissionYear",
+            "versionNumber": 0
           }
         }
       },
@@ -8964,6 +9437,61 @@
           "headTeacherName": "Chisom Maxwell",
           "timezone": "Africa/Lagos",
           "versionNumber": 3
+        }
+      },
+      "SettingsRegNumberGroupDto": {
+        "required": [
+          "separator",
+          "serialWidth",
+          "serialReset",
+          "yearSource",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "separator": {
+            "type": "string",
+            "description": "One of `/`, `-`, `.`.",
+            "example": "/"
+          },
+          "serialWidth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "3 to 6. Serials are zero-padded to this width.",
+            "format": "int32",
+            "example": 4
+          },
+          "serialReset": {
+            "description": "Whether the serial restarts each admission year or runs continuously.",
+            "$ref": "#/components/schemas/RegNumberSerialReset"
+          },
+          "yearSource": {
+            "type": "string",
+            "description": "Always `AdmissionYear` — fixed, spec 6.2.4: \"a number that changes meaning with the calendar\nis not an identifier.\" No `PATCH` can change it.",
+            "example": "AdmissionYear"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The reg-number group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next `PATCH`.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The registration-number pattern group, both inside SettingsDto and as\n`PATCH /api/v1/settings/reg-number`'s own success body (spec 6.2.4).",
+        "example": {
+          "separator": "/",
+          "serialWidth": 4,
+          "serialReset": "PerYear",
+          "yearSource": "AdmissionYear",
+          "versionNumber": 0
         }
       },
       "SignInCommand": {
@@ -9108,6 +9636,50 @@
         ],
         "description": "Lifecycle of a Term (spec 6.3.4, 6.3.6). Only one term system-wide may be\nTermState.Active — enforced by a partial unique index (spec 6.3.9), not application code.",
         "example": "Upcoming"
+      },
+      "UpdateAbbreviationCommand": {
+        "required": [
+          "abbreviation",
+          "confirmationToken",
+          "reason",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "abbreviation": {
+            "type": "string",
+            "description": "2 to 8 characters. A value already used historically is allowed (spec 6.2.11).",
+            "example": "GRA"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Must equal the literal string `CHANGE`, typed by the administrator.",
+            "example": "CHANGE"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Non-empty once trimmed. Capped but not floored — see `backend/docs/ASSUMPTIONS.md` for both\nauthored choices.",
+            "example": "The school shortened its registered trading name."
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The abbreviation group's current `versionNumber`, as last read from `GET /settings`. A\nstale value is rejected `409 settings.abbreviation.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token\n        string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: \"the\n        save writes an audit event with a mandatory reason\") — deliberately NO 10-character floor, unlike\n        6.2.9's grading/assessment/traits/trait-scale/result-rules family: 6.2.10 confirms the abbreviation\n        is never locked and never triggers that warning (approved delta, confirmed as proposed).",
+        "example": {
+          "abbreviation": "GRA",
+          "confirmationToken": "CHANGE",
+          "reason": "The school shortened its registered trading name.",
+          "expectedVersion": 0
+        }
       },
       "UpdateAdminAccountCommand": {
         "required": [
@@ -9290,6 +9862,54 @@
           "nextLevelId": null,
           "progressionOrder": null,
           "status": null
+        }
+      },
+      "UpdateRegNumberCommand": {
+        "required": [
+          "separator",
+          "serialWidth",
+          "serialReset",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "separator": {
+            "type": "string",
+            "description": "One of `/`, `-`, `.`.",
+            "example": "/"
+          },
+          "serialWidth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "3 to 6. Serials are zero-padded to this width.",
+            "format": "int32",
+            "example": 4
+          },
+          "serialReset": {
+            "description": "Whether the serial restarts each admission year (RegNumberSerialReset.PerYear) or\nruns continuously (RegNumberSerialReset.Continuous) — approved delta amendment 1: the\ncounter itself carries a partition per mode, so this genuinely changes which numbers get issued\nnext, not merely a stored-but-inert flag.",
+            "$ref": "#/components/schemas/RegNumberSerialReset"
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The reg-number group's current `versionNumber`, as last read from `GET /settings`. A\nstale value is rejected `409 settings.regnumber.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/settings/reg-number` (spec 6.2.4). `yearSource` is deliberately absent\n        from this body — it is fixed (admission year) and never editable.",
+        "example": {
+          "separator": "/",
+          "serialWidth": 4,
+          "serialReset": "PerYear",
+          "expectedVersion": 0
         }
       },
       "UpdateRoleCommand": {

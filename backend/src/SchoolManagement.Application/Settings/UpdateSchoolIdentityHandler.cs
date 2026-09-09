@@ -54,7 +54,10 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
 
         if (profile.IdentityVersionNumber != request.ExpectedVersion)
         {
-            await auditSink.RecordAsync(
+            // RecordRejectionAsync (not RecordAsync): this row must survive the ambient
+            // transaction's rollback below, which a same-transaction write would not (TASK-0048) —
+            // otherwise this rejection, like every other one, would be silently lost.
+            await auditSink.RecordRejectionAsync(
                 "settings.identity.save_rejected_stale_version",
                 SchoolProfileEntityType,
                 profileIdText,

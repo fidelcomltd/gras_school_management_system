@@ -176,7 +176,10 @@ internal sealed class ChangeAdminAccountStatusCommandHandler(
             target.Id.ToString("D", CultureInfo.InvariantCulture),
             metadata: null,
             actorAdminId: currentUser.UserId,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            // Spec 6.1.12: "A reason is mandatory on: ... admin deactivation." Null for every other
+            // transition — the validator only requires it when request.Status is Deactivated.
+            reason: request.Reason).ConfigureAwait(false);
 
         return Result.Success(AdminAccountMapper.ToDetailDto(target));
     }

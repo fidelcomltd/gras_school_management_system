@@ -43,7 +43,9 @@ internal sealed class RevokeRoleAssignmentCommandHandler(
 
         if (selfAssignment.IsFailure)
         {
-            await auditSink.RecordAsync(
+            // RecordRejectionAsync (not RecordAsync): escalation rule 1 on revoke — same reasoning
+            // as CreateRoleAssignmentCommandHandler's own rule-1 check (TASK-0048).
+            await auditSink.RecordRejectionAsync(
                 selfAssignment.Error.Code,
                 EntityType,
                 assignment.Id.ToString("D", CultureInfo.InvariantCulture),

@@ -116,7 +116,7 @@ public static class InfrastructureDependencyInjection
         // non-super-admin account — replaces SuperAdminFlagEffectivePrivilegeProvider (TASK-0003),
         // DELETED, not left registered behind a flag. See the class remarks.
         services.AddScoped<IEffectivePrivilegeProvider, RoleAssignmentEffectivePrivilegeProvider>();
-        services.AddScoped<IAuthorizationAuditSink, LoggingAuthorizationAuditSink>();
+        services.AddScoped<IAuthorizationAuditSink, AuthorizationAuditSink>();
         services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
         services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
 
@@ -140,18 +140,27 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();
 
         // TASK-0019: the idempotency substrate. IIdempotencyStore is called once, from the API
-        // layer's RequireIdempotencyKey() endpoint filter — never per-endpoint. ISystemAuditSink is
-        // the same log-only seam IAuthorizationAuditSink already is, until real audit_event
-        // persistence exists. The hosted service runs the retention purge (§9.9) on a schedule; a
-        // test that needs a deterministic run resolves IdempotencyPurgeJob directly instead.
+        // layer's RequireIdempotencyKey() endpoint filter — never per-endpoint. The hosted service
+        // runs the retention purge (§9.9) on a schedule; a test that needs a deterministic run
+        // resolves IdempotencyPurgeJob directly instead.
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
-        services.AddScoped<ISystemAuditSink, LoggingSystemAuditSink>();
         services.AddScoped<IdempotencyPurgeJob>();
         services.AddHostedService<IdempotencyPurgeBackgroundService>();
+
+        // TASK-0048: the real, persisted audit_event trail (spec 6.1.12, spec 14 §9.3), replacing
+        // both LoggingSystemAuditSink and LoggingAuthorizationAuditSink (DELETED) together — see
+        // ISystemAuditSink's own remarks for why a rejection needs its own writer.
+        services.AddScoped<IAuditEventRepository, AuditEventRepository>();
+        services.AddScoped<AuditEventFactory>();
+        services.AddScoped<RejectedAuditEventWriter>();
+        services.AddScoped<ISystemAuditSink, SystemAuditSink>();
 
         // TASK-0005a: school identity and the append-only config_version ledger.
         services.AddScoped<ISchoolProfileRepository, SchoolProfileRepository>();
         services.AddScoped<IConfigVersionRepository, ConfigVersionRepository>();
+
+        // TASK-0005c: registration-number counter, read paths only — see the port's own remarks.
+        services.AddScoped<IRegistrationCounterRepository, RegistrationCounterRepository>();
 
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();

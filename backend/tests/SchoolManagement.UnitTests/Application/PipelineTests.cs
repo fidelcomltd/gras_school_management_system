@@ -64,6 +64,10 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IConfigVersionRepository>());
         services.AddSingleton(Substitute.For<ISystemAuditSink>());
 
+        // TASK-0005c: the reg-number handlers depend on this port too, implemented by Infrastructure —
+        // same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IRegistrationCounterRepository>());
+
         // TASK-0028 dispatch 2: the Roles/* handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRoleRepository>());

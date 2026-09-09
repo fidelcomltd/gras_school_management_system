@@ -63,7 +63,10 @@ internal sealed class CreateRoleAssignmentCommandHandler(
 
         if (selfAssignment.IsFailure)
         {
-            await auditSink.RecordAsync(
+            // RecordRejectionAsync (not RecordAsync): this is escalation rule 1 — the row must
+            // survive the ambient transaction's rollback below (TASK-0048, root CLAUDE.md §4.1
+            // decision 2026-09-09 — this is the exact scenario that decision exists for).
+            await auditSink.RecordRejectionAsync(
                 selfAssignment.Error.Code,
                 EntityType,
                 entityId: null,
@@ -172,7 +175,9 @@ internal sealed class CreateRoleAssignmentCommandHandler(
 
         if (withinScope.IsFailure)
         {
-            await auditSink.RecordAsync(
+            // RecordRejectionAsync (not RecordAsync): this is escalation rule 3 — same reasoning as
+            // rule 1 above (TASK-0048).
+            await auditSink.RecordRejectionAsync(
                 withinScope.Error.Code,
                 EntityType,
                 entityId: null,

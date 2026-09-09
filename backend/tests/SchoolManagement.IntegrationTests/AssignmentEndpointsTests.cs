@@ -9,6 +9,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Security.Assignments;
+using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
@@ -225,6 +226,93 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role_assignment.scope_exceeds_actor");
 
         auditSink.Records.ShouldContain(record => record.Action == "role_assignment.scope_exceeds_actor");
+    }
+
+    /// <summary>
+    /// TASK-0048's own criterion, proven against the REAL, DI-registered <c>ISystemAuditSink</c> —
+    /// no <c>RecordingSystemAuditSink</c> substitute, unlike every other test in this class.
+    /// Queries Postgres directly, AFTER the command has already returned its 403, so a
+    /// same-transaction implementation (which <c>UnitOfWork.ExecuteAtomicallyAsync</c> would have
+    /// rolled back) cannot pass this test by accident.
+    /// </summary>
+    [Fact]
+    public async Task Create_RuleOne_SelfAssignment_PersistsADurableRejectedAuditEventRow()
+    {
+        RequireDatabase();
+
+        var (actorId, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        var jar = new CookieJar();
+        await GetAsync(CsrfUrl, jar);
+        var signIn = await PostAsync(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password));
+        signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var roleId = await SeedRoleAsync("Self Assign Durable Role", [Privileges.Pupil.View]);
+        var sessionId = await SeedSessionAsync("2026/2027");
+
+        var response = await PostAsync(
+            $"{AdminsUrl}/{actorId}/assignments",
+            jar,
+            new CreateRoleAssignmentCommand(actorId.ToString(), roleId.ToString(), sessionId.ToString(), ScopeType.SchoolWide, null),
+            idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var persisted = await context.AuditEvents
+            .AsNoTracking()
+            .Where(e => e.Action == "role_assignment.self_assignment_forbidden" && e.ActorAdminId == actorId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        persisted.ShouldHaveSingleItem();
+        persisted[0].Outcome.ShouldBe(AuditOutcome.Rejected);
+    }
+
+    /// <summary>Same proof as the rule-1 test above, for escalation rule 3.</summary>
+    [Fact]
+    public async Task Create_RuleThree_ActorArmScopedNarrowerThanRequested_PersistsADurableRejectedAuditEventRow()
+    {
+        RequireDatabase();
+
+        var sessionId = await SeedSessionAsync("2026/2027");
+        var actorArm = await SeedArmAsync(sessionId, "3C");
+        var outsideArm = await SeedArmAsync(sessionId, "3D");
+
+        var (actorId, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        var (granterId, _) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+
+        var scopeAssignRoleId = await SeedRoleAsync("Narrow Scope Assigner Durable", [Privileges.Role.ScopeAssign]);
+        await SeedAssignmentAsync(actorId, scopeAssignRoleId, sessionId, ScopeType.ArmList, [actorArm], granterId);
+
+        var jar = new CookieJar();
+        await GetAsync(CsrfUrl, jar);
+        var signIn = await PostAsync(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password));
+        signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var (targetId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        var grantedRoleId = await SeedRoleAsync("Class Reader Durable", [Privileges.Pupil.View]);
+
+        var response = await PostAsync(
+            $"{AdminsUrl}/{targetId}/assignments",
+            jar,
+            new CreateRoleAssignmentCommand(
+                targetId.ToString(), grantedRoleId.ToString(), sessionId.ToString(), ScopeType.ArmList,
+                [outsideArm.ToString()]),
+            idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var persisted = await context.AuditEvents
+            .AsNoTracking()
+            .Where(e => e.Action == "role_assignment.scope_exceeds_actor" && e.ActorAdminId == actorId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        persisted.ShouldHaveSingleItem();
+        persisted[0].Outcome.ShouldBe(AuditOutcome.Rejected);
     }
 
     [Fact]

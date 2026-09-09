@@ -148,7 +148,61 @@ internal static class OpenApiExamples
                 "headTeacherName": "Chisom Maxwell",
                 "timezone": "Africa/Lagos",
                 "versionNumber": 3
+              },
+              "abbreviation": {
+                "abbreviation": "GRAS",
+                "issuedCount": null,
+                "versionNumber": 0
+              },
+              "regNumber": {
+                "separator": "/",
+                "serialWidth": 4,
+                "serialReset": "PerYear",
+                "yearSource": "AdmissionYear",
+                "versionNumber": 0
               }
+            }
+            """,
+
+        [typeof(SettingsAbbreviationGroupDto)] = """
+            {
+              "abbreviation": "GRAS",
+              "issuedCount": null,
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateAbbreviationCommand)] = """
+            {
+              "abbreviation": "GRA",
+              "confirmationToken": "CHANGE",
+              "reason": "The school shortened its registered trading name.",
+              "expectedVersion": 0
+            }
+            """,
+
+        [typeof(SettingsRegNumberGroupDto)] = """
+            {
+              "separator": "/",
+              "serialWidth": 4,
+              "serialReset": "PerYear",
+              "yearSource": "AdmissionYear",
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateRegNumberCommand)] = """
+            {
+              "separator": "/",
+              "serialWidth": 4,
+              "serialReset": "PerYear",
+              "expectedVersion": 0
+            }
+            """,
+
+        [typeof(RegNumberPreviewDto)] = """
+            {
+              "preview": "GRAS/2026/0040"
             }
             """,
 

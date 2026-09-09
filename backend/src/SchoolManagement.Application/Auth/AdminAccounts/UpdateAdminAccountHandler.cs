@@ -75,8 +75,9 @@ internal sealed class UpdateAdminAccountCommandHandler(
         if (wantsSuperAdminChange && !actorIsSuperAdmin)
         {
             // Spec 6.1.7 preamble: "all [four rules], producing an audit event on rejection so that
-            // an attempt is visible even though it failed."
-            await auditSink.RecordAsync(
+            // an attempt is visible even though it failed." RecordRejectionAsync (not RecordAsync):
+            // this row must survive the ambient transaction's rollback below (TASK-0048).
+            await auditSink.RecordRejectionAsync(
                 "admin.super_admin_grant_denied",
                 EntityType,
                 target.Id.ToString("D", CultureInfo.InvariantCulture),

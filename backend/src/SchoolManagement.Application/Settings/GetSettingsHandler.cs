@@ -16,6 +16,10 @@ internal sealed class GetSettingsQueryHandler(ISchoolProfileRepository schoolPro
             .GetReadOnlySingletonAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success(new SettingsDto(SettingsMapper.ToIdentityDto(profile)));
+        return Result.Success(new SettingsDto(
+            SettingsMapper.ToIdentityDto(profile),
+            // Amendment 2: no pupil register exists yet, so this can only ever be null — never 0.
+            SettingsMapper.ToAbbreviationDto(profile, issuedCount: null),
+            SettingsMapper.ToRegNumberDto(profile)));
     }
 }

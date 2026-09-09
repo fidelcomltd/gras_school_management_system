@@ -34,7 +34,11 @@ internal static class SettingsSnapshotBuilder
             profile.HeadTeacherName,
             profile.Timezone,
             profile.IdentityVersionNumber,
-            profile.AbbreviationVersionNumber));
+            profile.AbbreviationVersionNumber,
+            profile.Separator,
+            profile.SerialWidth,
+            profile.SerialReset,
+            profile.RegNumberVersionNumber));
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
@@ -52,5 +56,9 @@ internal static class SettingsSnapshotBuilder
         string HeadTeacherName,
         string Timezone,
         int IdentityVersionNumber,
-        int AbbreviationVersionNumber);
+        int AbbreviationVersionNumber,
+        string Separator,
+        int SerialWidth,
+        RegNumberSerialReset SerialReset,
+        int RegNumberVersionNumber);
 }

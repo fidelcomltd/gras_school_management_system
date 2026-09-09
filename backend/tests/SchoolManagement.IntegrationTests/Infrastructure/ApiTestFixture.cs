@@ -220,10 +220,13 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
             $"""
             INSERT INTO school_profile
                 (id, school_name, short_name, abbreviation, address, phone, email, motto,
-                 head_teacher_name, timezone, identity_version_number, abbreviation_version_number)
+                 head_teacher_name, timezone, identity_version_number, abbreviation_version_number,
+                 separator, serial_width, serial_reset, reg_number_version_number)
             VALUES
                 ({SchoolProfile.SingletonId}, '', '', {SchoolProfile.SeededAbbreviation}, '', '', '',
-                 NULL, '', {SchoolProfile.FixedTimezone}, 0, 0)
+                 NULL, '', {SchoolProfile.FixedTimezone}, 0, 0,
+                 {SchoolProfile.DefaultSeparator}, {SchoolProfile.DefaultSerialWidth},
+                 {SchoolProfile.DefaultSerialReset.ToString()}, 0)
             """,
             cancellationToken);
 

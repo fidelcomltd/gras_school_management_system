@@ -845,6 +845,174 @@ now archives instead of hard-deleting, still returning 204.
 
 ---
 
+### 2.25 TASK-0048 — `audit_event` persistence and the append-only guarantee
+
+**Two methods on `ISystemAuditSink`, one per outcome, rather than an `outcome` parameter on one.**
+`RecordAsync` (unchanged shape and behaviour for every pre-existing SUCCESS call site) joins the
+ambient `DbContext`'s change tracker with no `SaveChangesAsync` of its own, committed by
+`UnitOfWorkBehavior` alongside the change it records. A NEW `RecordRejectionAsync` — same parameter
+shape — writes through `RejectedAuditEventWriter` on its own short-lived connection and commits
+immediately, so it survives the ambient transaction's rollback. The seven existing call sites that
+were actually recording a REJECTION (not a success) were switched from `RecordAsync` to
+`RecordRejectionAsync` by renaming the method at the call site — no parameter list changed at any of
+them: `CreateRoleCommandHandler` and `UpdateRoleCommandHandler` (rule 2, `role.privilege_escalation`),
+`CreateRoleAssignmentCommandHandler` (rule 1 and rule 3), `RevokeRoleAssignmentCommandHandler` (rule
+1 on revoke), `UpdateAdminAccountCommandHandler` (`admin.super_admin_grant_denied`), and
+`UpdateSchoolIdentityCommandHandler` (`settings.identity.save_rejected_stale_version` — see below).
+The remaining ~29 call sites are untouched.
+
+**`settings.identity.save_rejected_stale_version` also moved to `RecordRejectionAsync`, beyond the
+task card's two NAMED criteria (escalation rule 1 and rule 3).** It precedes a `return Result.Failure`
+exactly like the escalation rejections do, so a same-transaction write would have silently dropped it
+too — the card's own reasoning applied consistently rather than left as a second, undocumented gap
+the moment real persistence replaced the log-only seam. Not spec 6.1.12's "privilege failure or
+escalation attempt" by category, but leaving it on `RecordAsync` would have been a silent regression
+from the log-only seam's behaviour (which never lost anything, since a log line isn't transactional).
+
+**`reason` is a NEW, trailing, optional parameter on both `ISystemAuditSink` methods — placed AFTER
+`CancellationToken`, not before it.** Every existing call site passes `cancellationToken` as the last
+POSITIONAL argument; inserting an optional parameter between it and the method's other arguments
+would have silently rebound that positional `cancellationToken` value onto the new parameter instead.
+Placing `reason` after it is the only additive-safe position. Threaded for exactly one call site
+(`ChangeAdminAccountStatusCommandHandler`, spec 6.1.12's admin-deactivation reason) — the other seven
+actions in spec 6.1.12's reason list have no module yet (card's own out-of-scope list).
+
+**`entity_type` stays `string?` on the interface (unchanged) even though spec 6.1.12 marks the
+database column required.** Every real call site already supplies a non-null value except
+`IAuthorizationAuditSink.RecordRejectionAsync` (a rejected privilege check has no natural entity) —
+`AuthorizationAuditSink` supplies the fixed literal `"privilege_check"` for that one case, and
+`SystemAuditSink`'s shared `AuditEventFactory` falls back to `"unspecified"` defensively should a
+future caller ever pass null. The column itself is `NOT NULL`.
+
+**`actor_label` resolution**: `null` actor id → the literal `"System"`; a non-null id that no longer
+resolves to an `AdminAccount` (should not happen in practice, since it only ever comes from
+`ICurrentUser.UserId`/an authenticated caller) → `"(unknown account)"`, rather than throwing. Resolved
+via the existing `IAdminAccountRepository.FindReadOnlyByIdAsync` — a plain read against whichever
+`DbContext` scope is ambient, safe even when the eventual write goes through a different connection
+(`RejectedAuditEventWriter`'s own), because reading a pre-existing row inside a transaction that later
+rolls back is unaffected by that rollback.
+
+**`ICurrentUser` gained two members — `RemoteIpAddress`, `UserAgent`** — rather than giving
+Infrastructure a new `Microsoft.AspNetCore.Http.Abstractions` package reference for
+`IHttpContextAccessor` directly. `ICurrentUser`'s own remarks already state its purpose: "so the
+Application and Infrastructure layers can record who did this without taking a dependency on ASP.NET
+Core." `HttpCurrentUser` (Api layer, already holds `IHttpContextAccessor`) implements both;
+`NoOneCurrentUser` and every test double return `null`. `RemoteIpAddress` reads
+`HttpContext.Connection.RemoteIpAddress`, never an `X-Forwarded-For` header — trusting a
+client-suppliable header for an audit column would let a caller forge the value spec 9.3 exists to
+keep honest. Revisit once a reverse-proxy deployment target is chosen (Open question 5).
+
+**The rejection writer builds a second `ApplicationDbContext` from a fresh `DbContextOptionsBuilder`
+(same `DatabaseOptions`: connection string, retry policy, command timeout, migrations history table),
+not `IDbContextFactory<ApplicationDbContext>`.** `AddDbContextFactory`'s options-configuration
+delegate runs against the ROOT service provider (the factory is a singleton), so any interceptor
+requiring a SCOPED dependency (`AuditingInterceptor` needs `ICurrentUser`) could not be attached
+correctly there. `AuditEvent` needs no interceptor at all (neither `IAuditableEntity` nor
+`ISoftDeletable`), so the simpler, DI-registration-free option — duplicate the few Npgsql
+configuration lines, read from the same `IOptions<DatabaseOptions>` everything else already reads
+from — avoided the pitfall entirely rather than working around it.
+
+**Migration REVOKE targets `CURRENT_USER`, not a named role**, because no separate "application role"
+distinct from the migrating/connecting role is configured anywhere this migration runs (hosted Neon
+test database, CI's service container both connect as a single owner role — see STATE.md's Known
+drift entry, human-signed 2026-09-09). PostgreSQL revoking a privilege from a table's OWNER is always
+a harmless no-op (ownership rights are not represented as a revocable ACL entry), so this statement is
+a genuine guarantee the moment a deployment provisions a real, separate, non-owner application role,
+and a documented no-op everywhere it does not yet.
+
+**`AuditEvent.Id` is the first `long`/BIGSERIAL-identity primary key in the schema** — every other
+entity assigns its own `Guid` v7 at construction. Spec 6.1.12 requires monotonic ordering unambiguous
+within one millisecond, which a client-generated time-ordered GUID does not guarantee as strictly as
+a database identity sequence does. Left at EF Core's ordinary `ValueGeneratedOnAdd` convention for an
+integer key, stated explicitly in `AuditEventConfiguration` rather than left implicit, since it is the
+first entity where that convention is actually exercised.
+
+**`before_json`/`after_json` columns exist but nothing populates `before_json` yet** — per the card's
+own out-of-scope line, no handler's before/after state is wired in this card. `after_json` DOES carry
+the pre-existing `metadata` argument (JSON-serialized) for the handful of callers that already used
+it (`IdempotencyPurgeJob`'s purge count, `AuthorizationAuditSink`'s captured `routePath`) — the
+closest existing column to "additional structured detail," not a new mechanism.
+
+### 2.26 TASK-0005c — registration-number configuration: the counter's two partitions, and two authored user-facing sentences
+
+**Authored copy, not spec copy (approved delta amendment 3, following §2.15's own precedent for the
+`identity` group).** 6.2.11's stale-save sentence names the grading scale; this card's two groups get
+their own sentences, substituting the group name into the spec's pattern but written by this card, not
+quoted from it:
+
+- `settings.regnumber.stale_version` (409): "The registration number configuration was changed by
+  another administrator while you were editing. Reload and make your change again."
+- `settings.abbreviation.stale_version` (409): "The abbreviation was changed by another administrator
+  while you were editing. Reload and make your change again."
+
+Both await the school's confirmation, exactly as §2.15 flagged for the identity sentence before it.
+
+**The width-reduction rejection (spec 6.2.10) is `409 Conflict`, not `422`, and not audited.** Spec
+6.2.10 names no status code. Chosen `409` over `422` because the check is not a pure function of the
+submitted body — it depends on server-side state (the counter's already-issued serial), the same
+reasoning that makes a stale-version save a `409` rather than a `422` elsewhere in this file. The
+message is spec 6.2.10's own, with the real numbers substituted: `Serial 1043 will not fit in a width
+of 3. Choose 4 or more.` — the suggested minimum width is the exact digit count of the real serial, so
+`9999` (4 digits) suggests 4, not an arbitrary bump. Deliberately NOT run through the audit-rejection
+seam the way a stale-version conflict is: spec 6.2.11's "both attempts appear in the audit log"
+requirement is written specifically for the concurrency case (two administrators racing the same
+save), and nothing in 6.2.10 or 6.2.11 asks for an audit trail on a width that simply does not fit —
+flagged here rather than silently deciding it by omission.
+
+**Confirmation token is an exact, case-sensitive match on the literal string `CHANGE`.** Spec 6.2.4:
+"The confirmation requires the literal word CHANGE typed into a field." Read strictly — `change` or
+`Change` is rejected `422` like any other malformed field, not case-folded before comparing. No spec
+sentence says case-insensitivity is intended; a typed confirmation is exactly the kind of control
+where guessing looser than the letter of the spec would defeat the point of requiring it verbatim.
+
+**Abbreviation-change reason: non-empty (trimmed), capped at 500 characters, no floor.** Card AC and
+the approved delta both confirm no 10-character floor (6.2.9's floor is scoped to
+grading/assessment/traits/trait-scale/result-rules by its own prose, and 6.2.10 confirms the
+abbreviation is never locked). Spec sets no ceiling either; 500 is this card's own authored cap
+(`UpdateAbbreviationCommandValidator.ReasonMaxLength`), chosen for parity with the generous headroom
+`ConfigVersionConfiguration.ReasonMaxLength` (1000) already gives the storage column — well short of
+it, so no future group's longer reason is constrained by this one's choice.
+
+**Amendment 1, concretely: `registration_counter` is `Entity<string>` keyed on the counter itself, not
+a Guid.** Every other entity in this codebase keys on `Guid.CreateVersion7()`; this is the second
+non-Guid key after `ConfigVersion.VersionNumber`'s database identity column, and the first entity
+whose PRIMARY key is a plain business string — spec 6.5.10 defines the table as exactly
+`(counter_key, last_serial)`, so inventing a surrogate Guid id would add a column the spec's own
+schema does not have, for no reader this card has. `RegistrationCounterPartition.Resolve` is the one
+place both this card's reads (preview, width check — called with `TimeProvider`'s current year) and
+TASK-0051's future writes (to be called with the real admission year) must agree on; it is placed in
+`Domain/Settings` specifically so TASK-0051 reuses it rather than re-deriving the same rule.
+
+**The width check and the preview both resolve the partition from the group's CURRENTLY SAVED
+`serialReset` — not a request's incoming value, even for `PATCH /settings/reg-number` itself, which
+receives a new `serialReset` in the same body it is validating against.** Reasoned through in
+`UpdateRegNumberCommandHandler`'s own remarks: the counter partition that could genuinely reject a
+narrower width is the one that has actually been accumulating issued serials up to this moment, which
+is necessarily the one selected by whatever `serialReset` was in effect BEFORE this save — a partition
+the request is switching TO has no issuance history under this card's scope (there is no increment
+path anywhere yet) and so can never itself be too narrow. This is an authored reading of "current
+counter" in spec 6.2.10's own sentence ("if any issued serial in the current counter exceeds the new
+width"), not a literal instruction — the spec does not anticipate `serialReset` and `serialWidth`
+changing in the same request, so this card had to decide which of the two plausible readings applies.
+
+**`abbreviation.issuedCount` ships permanently `null` in this card, exactly as `STATE.md`'s
+2026-09-06 `## Known drift` entry and this file's §2.15 both already anticipated.** Nothing new to
+record beyond confirming the shipped shape matches what was pre-agreed: `SettingsMapper.ToAbbreviationDto`
+takes `issuedCount` as a caller-supplied parameter (never computed inside the mapper), and both call
+sites (`GetSettingsQueryHandler`, `UpdateAbbreviationCommandHandler`) pass `null` explicitly with a
+comment naming amendment 2 — so a future TASK-0051 change need only touch those two call sites, not
+the mapper's shape.
+
+**`RegNumberSerialReset` and the reg-number DTOs' fields cross the wire in PascalCase (`PerYear`,
+`Continuous`), not the spec prose's literal snake_case (`per_year`, `continuous`).** Matches this
+codebase's own established convention for every other enum that crosses the wire (`TermState`,
+`SessionState`, `LevelStatus`, `ArmStatus`, `RoleAssignmentStatus`) — none of them reproduce the
+spec's literal casing either. `YearSource` similarly ships as the fixed string `"AdmissionYear"`
+rather than spec 6.2.4's literal `admission_year` cell text, for the same reason: a stable,
+PascalCase, machine-readable token, not a copy of the spec table's prose.
+
+---
+
 ## 3. Open — a human must decide or supply
 
 Ordered by how much they block.

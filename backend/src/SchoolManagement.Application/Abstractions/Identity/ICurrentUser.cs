@@ -30,4 +30,20 @@ public interface ICurrentUser
 
     /// <summary>Whether the request carries an authenticated identity.</summary>
     bool IsAuthenticated { get; }
+
+    /// <summary>
+    /// The caller's raw remote address, or <see langword="null"/> when there is no HTTP request
+    /// (a background job, a migration). TASK-0048: <c>audit_event.source_ip</c> (spec 6.1.12) is
+    /// truncated from this value — see <c>SchoolManagement.Domain.Audit.AuditFieldTruncation</c> —
+    /// never stored full, so this property itself stays untruncated and reusable for anything else
+    /// that might need the real address.
+    /// </summary>
+    string? RemoteIpAddress { get; }
+
+    /// <summary>
+    /// The caller's raw <c>User-Agent</c> request header, or <see langword="null"/> when absent or
+    /// there is no HTTP request. TASK-0048: <c>audit_event.user_agent</c> (spec 6.1.12) is
+    /// truncated from this value at write time.
+    /// </summary>
+    string? UserAgent { get; }
 }
