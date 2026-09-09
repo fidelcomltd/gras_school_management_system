@@ -115,6 +115,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List arms
+         * @description Spec 6.4.5: filtered by session, level, label (substring match against the composed display name), status and form teacher. Sorted by the owning level's chain order, then label collated naturally — not alphabetical. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListArms"];
+        put?: never;
+        /**
+         * Create an arm
+         * @description Spec 6.4.3, 6.4.4: the level must be active and the session upcoming or active. Label must be unique within the level and session, case-insensitive. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateArm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/next-label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest the next unused arm label
+         * @description Spec 6.4.3: A if the level has no arm this session, B if it has A, and so on. Pre-filled and editable, not reserved.
+         */
+        get: operations["GetNextArmLabel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create arms for a session, level by level
+         * @description Spec 6.4.3: "Create arms for session" — one level entry per row, each carrying an arm count and a capacity. Labels continue from each level's highest existing label. Levels given zero arms are skipped. `dryRun` returns the preview without writing. The whole run is one transaction. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["BulkCreateArms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm
+         * @description Roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are out of scope — those need pupils, enrolments, subject mappings and results.
+         */
+        get: operations["GetArm"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete an arm
+         * @description Spec 6.4.7: permitted only where no enrolment has ever existed.
+         */
+        delete: operations["DeleteArm"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit an arm
+         * @description Spec 6.4.3, 6.4.7: label, capacity, form teacher, status. Every field is independently optional; an absent field is left unchanged. Rejected outright against a closed arm. Setting `formTeacherAdminId` ADDITIONALLY requires `arm.formteacher.assign`, beyond the `arm.update` this route requires.
+         */
+        patch: operations["UpdateArm"];
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -233,6 +325,78 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List class levels
+         * @description Spec 6.4.9: active by default, ordered by progressionOrder; `?status=all` also returns inactive levels. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListLevels"];
+        put?: never;
+        /**
+         * Create a class level
+         * @description Spec 6.4.2: give `insertAfterLevelId` and the server rewires the chain and reorders in one transaction (the worked case), or give `progressionOrder` directly. Reruns the eight chain rules before committing. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateLevel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/levels/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reorder every active class level
+         * @description Spec 6.4.2, 6.4.9: whole ordered array of active level ids. Atomic — rewrites progressionOrder and infers nextLevelId from adjacency. Used by the drag-and-drop list.
+         */
+        post: operations["ReorderLevels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/levels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one class level
+         * @description No arm counts — that needs Arm, TASK-0039.
+         */
+        get: operations["GetLevel"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a class level
+         * @description Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the two references this codebase can see today (another level's nextLevelId, and any arm under this level); enrolment, subject-mapping and result references remain DEFERRED — those tables do not exist yet.
+         */
+        delete: operations["DeleteLevel"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a class level
+         * @description Spec 6.4.2: name, section, next level, order, status. Every field is independently optional; an absent field is left unchanged. An empty string for `nextLevelId` clears it (graduating candidate). Reruns the eight chain rules before committing. Changing `status` ADDITIONALLY requires `level.deactivate`, beyond the `level.update` this whole route requires.
+         */
+        patch: operations["UpdateLevel"];
         trace?: never;
     };
     "/api/v1/privileges": {
@@ -369,6 +533,50 @@ export interface paths {
          * @description Every field is independently optional; an absent field is left unchanged (spec 6.1.4, 6.1.9). A system role (the seeded Super Admin) rejects the whole request with 409, regardless of which fields it touches. A `privileges` array REPLACES the whole set; spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role — removal is unrestricted. `Idempotency-Key` is accepted, not required.
          */
         patch: operations["UpdateRole"];
+        trace?: never;
+    };
+    "/api/v1/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sections
+         * @description Spec 6.4.9: "a two-row seeded list a school extends rarely." Not paged.
+         */
+        get: operations["ListSections"];
+        put?: never;
+        /**
+         * Create a section
+         * @description Spec 6.4.2: 2..40 characters, unique, case-insensitive. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename a section
+         * @description Spec 6.4.9: name only.
+         */
+        patch: operations["UpdateSection"];
         trace?: never;
     };
     "/api/v1/sessions": {
@@ -717,6 +925,73 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description The wire shape of an Arm (spec 6.4.3, 6.4.9). One shape for the list item and the
+         *     detail read — roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are
+         *     out of scope until pupils, enrolments, subject mappings and results exist.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *       "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "classLevel": "Primary 2",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "label": "C",
+         *       "displayName": "Primary 2C",
+         *       "capacity": 22,
+         *       "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+         *       "status": "Active"
+         *     }
+         */
+        ArmDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48
+             */
+            id: string;
+            /**
+             * @description Opaque identifier of the owning level — supply this back on a write.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            classLevelId: string;
+            /**
+             * @description The level's CURRENT name, denormalised for display, same convention as `LevelDto.Section`.
+             * @example Primary 2
+             */
+            classLevel: string;
+            /**
+             * @description Opaque identifier of the owning session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description 1..16 characters, as stored (already normalised on save).
+             * @example C
+             */
+            label: string;
+            /**
+             * @description Composed by ArmDisplayName at read time — never stored (spec 6.4.3).
+             * @example Primary 2C
+             */
+            displayName: string;
+            /**
+             * Format: int32
+             * @description 1..100, a soft limit (spec 6.4.6).
+             * @example 22
+             */
+            capacity: number | string;
+            /**
+             * @description `null` when unassigned.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42
+             */
+            formTeacherAdminId: null | string;
+            /** @description active, inactive or closed. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["ArmStatus"];
+        };
+        /**
+         * @description An Arm's status (spec 6.4.3). Defaults ArmStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        ArmStatus: "Active" | "Inactive" | "Closed";
+        /**
          * @description Shared response shape returned by `sign-in`, `me`, `refresh` and `password`
          *     (approved contract delta §0), so the frontend never needs a second round trip to learn its own
          *     state after any of the four.
@@ -787,6 +1062,111 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             sessionAbsoluteExpiresAt: string;
+        };
+        /**
+         * @description `POST /api/v1/arms/bulk` (spec 6.4.3, 6.4.9): "Create arms for session" — an administrator
+         *             opening a new session creates every level's rooms in one action instead of one form per level.
+         *             Labels continue from each level's highest existing label (spec 6.4.8, same rule as
+         *             `GET /arms/next-label`). Levels given zero arms are skipped. The whole run is one transaction;
+         *             bool BulkCreateArmsCommand.DryRun returns the preview without writing anything.
+         * @example {
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "levels": [
+         *         {
+         *           "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "armCount": 3,
+         *           "capacity": 30
+         *         }
+         *       ],
+         *       "dryRun": false
+         *     }
+         */
+        BulkCreateArmsCommand: {
+            /**
+             * @description Must reference an upcoming or active session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description One entry per level to size. A level omitted from this list gets no arms.
+             * @example [
+             *       {
+             *         "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "armCount": 3,
+             *         "capacity": 30
+             *       }
+             *     ]
+             */
+            levels: components["schemas"]["BulkCreateArmsLevelEntry"][];
+            /**
+             * @description When `true`, computes and returns the preview but adds nothing.
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description One level's row in a BulkCreateArmsCommand request.
+         * @example {
+         *       "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "armCount": 3,
+         *       "capacity": 30
+         *     }
+         */
+        BulkCreateArmsLevelEntry: {
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            levelId: string;
+            /**
+             * Format: int32
+             * @description 0 skips the level entirely (spec 6.4.3).
+             * @example 3
+             */
+            armCount: number | string;
+            /**
+             * Format: int32
+             * @description `null` defaults to int Arm.DefaultCapacity for every new arm at this level.
+             * @example 30
+             */
+            capacity: null | number | string;
+        };
+        /**
+         * @description The response to BulkCreateArmsCommand.
+         * @example {
+         *       "created": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *           "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "classLevel": "Primary 2",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "label": "A",
+         *           "displayName": "Primary 2A",
+         *           "capacity": 30,
+         *           "formTeacherAdminId": null,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        BulkCreateArmsResponse: {
+            /**
+             * @description The arms created (or, for a bool BulkCreateArmsCommand.DryRun, previewed).
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+             *         "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "classLevel": "Primary 2",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "label": "A",
+             *         "displayName": "Primary 2A",
+             *         "capacity": 30,
+             *         "formTeacherAdminId": null,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            created: components["schemas"]["ArmDto"][];
         };
         /**
          * @description `POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is
@@ -1030,6 +1410,84 @@ export interface components {
             temporaryPassword: null | string;
         };
         /**
+         * @description `POST /api/v1/arms` (spec 6.4.3, 6.4.9). Single-arm creation — the flow spec 6.4.4 exists for:
+         *             opening a new room mid-term under an active level, permitted with no privilege beyond
+         *             `arm.create`.
+         * @example {
+         *       "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "label": "C",
+         *       "capacity": 22,
+         *       "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+         *     }
+         */
+        CreateArmCommand: {
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            classLevelId: string;
+            /**
+             * @description Must reference an upcoming or active session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description 1..16 characters, letters/digits/single internal spaces. Unique within the level and session, case-insensitive.
+             * @example C
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description `null` defaults to int Arm.DefaultCapacity. 1..100.
+             * @example 22
+             */
+            capacity: null | number | string;
+            /**
+             * @description Optional. Must reference an active admin account when given.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42
+             */
+            formTeacherAdminId: null | string;
+        };
+        /**
+         * @description `POST /api/v1/levels` (spec 6.4.2, 6.4.9). Two mutually exclusive ways to place the new level
+         *             in the chain: give string? CreateLevelCommand.InsertAfterLevelId and the server rewires everything (spec 6.4.2's
+         *             worked case), OR give int? CreateLevelCommand.ProgressionOrder directly (spec 6.4.2: "editable directly for
+         *             the administrator who prefers typing") with an optional string? CreateLevelCommand.NextLevelId.
+         * @example {
+         *       "name": "Reception",
+         *       "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "progressionOrder": null,
+         *       "nextLevelId": null,
+         *       "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+         *     }
+         */
+        CreateLevelCommand: {
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Reception
+             */
+            name: string;
+            /**
+             * @description Must reference an existing section.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sectionId: string;
+            /**
+             * Format: int32
+             * @description Required when string? CreateLevelCommand.InsertAfterLevelId is absent; must be omitted when it is present.
+             */
+            progressionOrder: null | number | string;
+            /** @description `null` for a graduating candidate. Must be omitted when string? CreateLevelCommand.InsertAfterLevelId is present. */
+            nextLevelId: null | string;
+            /**
+             * @description When given, must reference an active level; the server sets order and both neighbours'
+             *     `nextLevelId` in one transaction, shifting every later active level's order up by one.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46
+             */
+            insertAfterLevelId: null | string;
+        };
+        /**
          * @description `POST /api/v1/roles` (spec 6.1.4; approved delta
          *             `.agent/decisions/2026-Q3-contract-deltas.md` entry `TASK-0028` §2). Rejects the reserved
          *             name `Super Admin`, case-insensitive, and an unknown privilege code naming the offender.
@@ -1097,6 +1555,19 @@ export interface components {
              * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
              */
             id: string;
+        };
+        /**
+         * @description `POST /api/v1/sections` (spec 6.4.9).
+         * @example {
+         *       "name": "Secondary"
+         *     }
+         */
+        CreateSectionCommand: {
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Secondary
+             */
+            name: string;
         };
         /**
          * @description `POST /api/v1/sessions` (spec 6.3.5). Creates the session AND its three terms in one
@@ -1246,6 +1717,48 @@ export interface components {
          * @example {
          *       "items": [
          *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *           "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "classLevel": "Primary 2",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "label": "C",
+         *           "displayName": "Primary 2C",
+         *           "capacity": 22,
+         *           "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfArmDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+             *         "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "classLevel": "Primary 2",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "label": "C",
+             *         "displayName": "Primary 2C",
+             *         "capacity": 22,
+             *         "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["ArmDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
          *           "versionNumber": 3,
          *           "changedGroup": "Identity",
@@ -1273,6 +1786,51 @@ export interface components {
             /**
              * @description `null` when this is the last page.
              * @example MQ==
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *           "name": "Primary 1",
+         *           "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "section": "Primary",
+         *           "progressionOrder": 4,
+         *           "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+         *           "isEntryLevel": false,
+         *           "isGraduatingLevel": false,
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+         *     }
+         */
+        CursorPageOfLevelDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+             *         "name": "Primary 1",
+             *         "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "section": "Primary",
+             *         "progressionOrder": 4,
+             *         "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+             *         "isEntryLevel": false,
+             *         "isGraduatingLevel": false,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["LevelDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2
              */
             nextCursor: null | string;
         };
@@ -1332,7 +1890,8 @@ export interface components {
          *           "name": "2026/2027",
          *           "startDate": "2026-09-14",
          *           "endDate": "2027-07-25",
-         *           "state": "Active"
+         *           "state": "Active",
+         *           "armCount": 24
          *         }
          *       ],
          *       "nextCursor": "MjAyNi8yMDI3"
@@ -1347,7 +1906,8 @@ export interface components {
              *         "name": "2026/2027",
              *         "startDate": "2026-09-14",
              *         "endDate": "2027-07-25",
-             *         "state": "Active"
+             *         "state": "Active",
+             *         "armCount": 24
              *       }
              *     ]
              */
@@ -1452,6 +2012,88 @@ export interface components {
          *     }
          */
         JsonElement: unknown;
+        /**
+         * @description The wire shape of a ClassLevel (spec 6.4.2, 6.4.9). One shape for both the list item
+         *     and the detail read — spec 6.4.9's `GET /levels/{id}` adds no field beyond what the list
+         *     already carries (no arm counts: that is TASK-0039).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *       "name": "Primary 1",
+         *       "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "section": "Primary",
+         *       "progressionOrder": 4,
+         *       "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+         *       "isEntryLevel": false,
+         *       "isGraduatingLevel": false,
+         *       "status": "Active"
+         *     }
+         */
+        LevelDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46
+             */
+            id: string;
+            /**
+             * @description 2..40 characters.
+             * @example Primary 1
+             */
+            name: string;
+            /**
+             * @description Opaque identifier of the owning section — supply this back on a write.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sectionId: string;
+            /**
+             * @description The section's CURRENT name, denormalised for display (spec 6.4.2's own field is a plain FK; this
+             *     is a read convenience so a level list does not force N+1 lookups against a two-row admin-editable
+             *     register). Cross the wire as a string (§8): admin-editable, open-ended, tolerate any value.
+             * @example Primary
+             */
+            section: string;
+            /**
+             * Format: int32
+             * @description 1 upward, unique across active levels.
+             * @example 4
+             */
+            progressionOrder: number | string;
+            /**
+             * @description `null` only on the graduating level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47
+             */
+            nextLevelId: null | string;
+            /**
+             * @description Derived, never stored (spec 6.4.2) — computed over the active set at read time.
+             * @example false
+             */
+            isEntryLevel: boolean;
+            /**
+             * @description Derived, never stored (spec 6.4.2) — computed over the active set at read time.
+             * @example false
+             */
+            isGraduatingLevel: boolean;
+            /** @description active or inactive. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["LevelStatus"];
+        };
+        /**
+         * @description A ClassLevel's status (spec 6.4.2). Defaults LevelStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        LevelStatus: "Active" | "Inactive";
+        /**
+         * @description The response to NextArmLabelQuery.
+         * @example {
+         *       "label": "C"
+         *     }
+         */
+        NextArmLabelResponse: {
+            /**
+             * @description The suggested next label. Pre-filled and editable — not reserved by asking.
+             * @example C
+             */
+            label: string;
+        };
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
          *     frontend write a single generic paging hook instead of one per endpoint.
@@ -1716,6 +2358,26 @@ export interface components {
             reason: string;
         };
         /**
+         * @description `POST /api/v1/levels/reorder` (spec 6.4.2, 6.4.9): "Whole ordered array of level ids. Atomic.
+         *             Rewrites progressionOrder and infers nextLevelId from adjacency." Used by the drag-and-drop list.
+         * @example {
+         *       "orderedLevelIds": [
+         *         "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *         "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+         *       ]
+         *     }
+         */
+        ReorderLevelsCommand: {
+            /**
+             * @description Every currently ACTIVE level's id, in the new order. No duplicates.
+             * @example [
+             *       "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+             *       "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+             *     ]
+             */
+            orderedLevelIds: string[];
+        };
+        /**
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -1845,6 +2507,58 @@ export interface components {
          */
         ScopeType: "SchoolWide" | "ArmList";
         /**
+         * @description The wire shape of a Section (spec 6.4.2, 6.4.9).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Primary"
+         *     }
+         */
+        SectionDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description 2..40 characters.
+             * @example Primary
+             */
+            name: string;
+        };
+        /**
+         * @description `GET /api/v1/sections`'s response (spec 6.4.9): "Not paged — a two-row seeded list a school
+         *             extends rarely," so this is a plain wrapped list, not a CursorPage&lt;TItem&gt; —
+         *             the same shape `PrivilegeRegisterResponse` uses for the other fixed, small register in this API.
+         * @example {
+         *       "sections": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+         *           "name": "Nursery"
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "name": "Primary"
+         *         }
+         *       ]
+         *     }
+         */
+        SectionListResponse: {
+            /**
+             * @description Every section, ordered by name.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+             *         "name": "Nursery"
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "name": "Primary"
+             *       }
+             *     ]
+             */
+            sections: components["schemas"]["SectionDto"][];
+        };
+        /**
          * @description The arm-scoped resource `GetSecureArm` returns once the privilege check passes.
          * @example {
          *       "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
@@ -1859,15 +2573,17 @@ export interface components {
             armId: string;
         };
         /**
-         * @description The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms. Arms
-         *     grouped by level, enrolment counts and the publication position are deferred for the same reason
-         *     as SessionDto; the promotion panel is all of TASK-0036.
+         * @description The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms.
+         *     int SessionDetailDto.ArmCount was added by TASK-0039; arms grouped by level, enrolment counts and the
+         *     publication position stay deferred for the same reason as SessionDto — the promotion
+         *     panel is all of TASK-0036.
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
          *       "name": "2026/2027",
          *       "startDate": "2026-09-14",
          *       "endDate": "2027-07-25",
          *       "state": "Active",
+         *       "armCount": 24,
          *       "terms": [
          *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -1981,18 +2697,26 @@ export interface components {
              *     ]
              */
             terms: components["schemas"]["TermDto"][];
+            /**
+             * Format: int32
+             * @description The number of arms (any status) that exist for this session (spec 6.3.8).
+             * @example 24
+             */
+            armCount: number | string;
         };
         /**
-         * @description The list-item shape of a session (spec 6.3.8). Arms, enrolled-pupil and publication counts are
-         *     deliberately absent — spec 6.3.8 asks for them, but Arm/Pupil/result sets do not exist in this
-         *     codebase yet, and this module ships nothing it cannot populate honestly (never a fabricated
-         *     `0`). See TASK-0035's Log for the tracked deferral.
+         * @description The list-item shape of a session (spec 6.3.8). int SessionDto.ArmCount was added by TASK-0039, now
+         *     that `Arm` exists; enrolled-pupil and publication counts stay absent — spec 6.3.8 asks for
+         *     them too, but Pupil and result sets do not exist in this codebase yet, and this module ships
+         *     nothing it cannot populate honestly (never a fabricated `0`). See TASK-0035's Log for the
+         *     original deferral and TASK-0039's Log for the arm half landing.
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
          *       "name": "2026/2027",
          *       "startDate": "2026-09-14",
          *       "endDate": "2027-07-25",
-         *       "state": "Upcoming"
+         *       "state": "Upcoming",
+         *       "armCount": 0
          *     }
          */
         SessionDto: {
@@ -2020,6 +2744,12 @@ export interface components {
             endDate: string;
             /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
             state: components["schemas"]["SessionState"];
+            /**
+             * Format: int32
+             * @description The number of arms (any status) that exist for this session (spec 6.3.8).
+             * @example 0
+             */
+            armCount: number | string;
         };
         /**
          * @description Lifecycle of an AcademicSession (spec 6.3.3). Only one session system-wide may be
@@ -2266,6 +2996,77 @@ export interface components {
             isSuperAdmin: null | boolean;
         };
         /**
+         * @description `PATCH /api/v1/arms/{id}` (spec 6.4.3, 6.4.9): "Label, capacity, form teacher, status." Every
+         *             field is independently optional — `null` leaves it unchanged, the same convention
+         *             `UpdateLevelCommand` established. Rejected outright against a closed arm (spec 6.4.7).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "label": null,
+         *       "capacity": 25,
+         *       "formTeacherAdminId": null,
+         *       "status": null
+         *     }
+         */
+        UpdateArmCommand: {
+            /**
+             * Format: uuid
+             * @description The arm being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. Must stay unique within the level and session. */
+            label: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged. 1..100.
+             * @example 25
+             */
+            capacity: null | number | string;
+            /**
+             * @description `null` to leave unchanged; an EMPTY string clears it. Setting this ADDITIONALLY
+             *             requires `arm.formteacher.assign`, beyond the `arm.update` this route requires.
+             */
+            formTeacherAdminId: null | string;
+            status: null | components["schemas"]["ArmStatus"];
+        };
+        /**
+         * @description `PATCH /api/v1/levels/{id}` (spec 6.4.2, 6.4.9): "Name, section, next level, order, status.
+         *             Reruns the eight chain rules." Every field is independently optional — `null`
+         *             leaves it unchanged, the same convention `UpdateRoleCommand` established.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": null,
+         *       "sectionId": null,
+         *       "nextLevelId": null,
+         *       "progressionOrder": null,
+         *       "status": null
+         *     }
+         */
+        UpdateLevelCommand: {
+            /**
+             * Format: uuid
+             * @description The level being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. */
+            name: null | string;
+            /** @description `null` to leave unchanged. Must reference an existing section. */
+            sectionId: null | string;
+            /**
+             * @description `null` to leave unchanged; an EMPTY string clears it (the level becomes a
+             *             graduating candidate) — `null` here is indistinguishable from "not provided,"
+             *             exactly like `UpdateRoleCommand.Description`'s null-means-unchanged convention.
+             */
+            nextLevelId: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged.
+             */
+            progressionOrder: null | number | string;
+            status: null | components["schemas"]["LevelStatus"];
+        };
+        /**
          * @description `PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):
          *             "`UpdateRoleRequest name?, description?, privileges?, status? (all optional; absent =
          *             unchanged)`." Every field is independently optional — `null` leaves that field
@@ -2359,6 +3160,26 @@ export interface components {
              * @example 2
              */
             expectedVersion: number | string;
+        };
+        /**
+         * @description `PATCH /api/v1/sections/{id}` (spec 6.4.9). Name only.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Secondary"
+         *     }
+         */
+        UpdateSectionCommand: {
+            /**
+             * Format: uuid
+             * @description The section being renamed.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Secondary
+             */
+            name: string;
         };
         /**
          * @description `PATCH /api/v1/sessions/{id}` (spec 6.3.10): "Name and dates, while upcoming or active."
@@ -2996,6 +3817,538 @@ export interface operations {
             };
         };
     };
+    ListArms: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                sessionId?: string;
+                levelId?: string;
+                label?: string;
+                status?: components["schemas"]["ArmStatus"];
+                formTeacherAdminId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateArmCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetNextArmLabel: {
+        parameters: {
+            query: {
+                levelId: string;
+                sessionId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextArmLabelResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BulkCreateArms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCreateArmsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCreateArmsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetArm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateArmCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetCsrfToken: {
         parameters: {
             query?: never;
@@ -3279,6 +4632,466 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListLevels: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfLevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLevelCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReorderLevels: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderLevelsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLevelCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3871,6 +5684,238 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSectionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSectionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionDto"];
                 };
             };
             /** @description Unauthorized */
