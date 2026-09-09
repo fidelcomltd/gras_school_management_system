@@ -49,8 +49,22 @@ backend:  `./backend/scripts/ci.ps1` — 10 gates cheapest-first, STOPS at the f
           `Failed`/`Skipped > 0` exit non-zero (latter unless `-AllowSkipped`); `-NoFailFast` runs
           all, as CI does. Ends in a `SUMMARY` block — paste that alone for §9. CI: `backend-ci.yml`.
 
+          **WHO RUNS THE FULL GATE — changed 2026-09-09, after it cost THREE dispatches.**
+          The **orchestrator** runs the canonical full gate, ONCE per card, with
+          `run_in_background: true`, and reviews the diff while it runs. A **subagent does NOT run
+          `ci.ps1` at all** — it verifies with `dotnet test --filter` over what it touched, reports
+          counts, and stops. Rationale: the suite is now 700+ tests plus a Release build, coverage
+          merge, gitleaks over the whole history and an OpenAPI regeneration, and no longer fits
+          the `PowerShell` tool's 600000 ms ceiling. A foreground call therefore times out showing
+          NOTHING (`## Gate commands` rule 1's failure mode), the subagent ends its turn, and the
+          orchestrator pays a full round trip to collect a result that was always going to arrive
+          late. Backgrounding runs detached ACROSS turns, so the 10-minute cap stops applying and
+          the gate overlaps the diff review instead of blocking it. Do not "helpfully" run the full
+          gate from a subagent to save a step — that is the behaviour this rule exists to stop, and
+          two concurrent runs corrupt the shared Neon database (see the serialization rule below).
+
           **THE CANONICAL INVOCATION — copy it verbatim, do not improvise a variant.** One
-          `PowerShell` tool call, `timeout: 600000`, from the repo root:
+          `PowerShell` tool call, `run_in_background: true`, from the repo root:
 
           ```
           ./backend/scripts/ci.ps1 -NoFailFast
@@ -58,10 +72,12 @@ backend:  `./backend/scripts/ci.ps1` — 10 gates cheapest-first, STOPS at the f
 
           Four rules, each of which cost a wasted multi-minute run on 2026-09-06 (TASK-0028
           dispatch 1) when an agent improvised around them:
-          1. **`timeout: 600000`.** The tool default is 120 s; a full run is restore + Release
-             build + ~390 tests incl. hosted-Neon integration + coverage merge + gitleaks over the
-             whole history + an OpenAPI regeneration. It cannot finish in two minutes, and a
-             timeout kills the run showing nothing.
+          1. **`run_in_background: true`, NOT a foreground `timeout`.** A full run is restore +
+             Release build + 700+ tests incl. hosted-Neon integration + coverage merge + gitleaks
+             over the whole history + an OpenAPI regeneration. It exceeded the 600000 ms ceiling on
+             2026-09-09 (TASK-0005c) and the foreground call returned nothing, which is the whole
+             reason the orchestrator now owns this run. Background it and read the SUMMARY from the
+             completion notification.
           2. **Never `2>&1`.** Windows PowerShell 5.1 wraps a native command's stderr in
              `NativeCommandError` and sets `$?` false, so a run with all ten gates green is
              reported as exit 1. `dotnet` writes to stderr routinely.
@@ -103,9 +119,22 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: **`c3cb88ff74b931ba58057a11b781fbad58d72d1778ff91584dbfe712f661a4c9`** — moved
+openapi.json sha256: **`e86e1b187bbacd9f83b8bd725cb8c9066bf41c5fd936b606da331646d2080e90`** — moved
+          2026-09-09 by TASK-0005c. Additive: `/settings/reg-number`,
+          `/settings/reg-number/preview`, `/settings/abbreviation` (**41 paths**, was 38), plus two
+          new groups on `SettingsDto`. +623/-3; the 3 deletions are a `SettingsDto` doc-comment
+          rewording and its `required` list gaining two entries — nothing removed or narrowed.
+          Recomputed independently with `sha256sum`, matches `CONTRACT.lock`.
+          ⚠ **Frontend client NOT regenerated — §4.4 check 2 RED until TASK-0052 lands.**
+
+previous:  **`c3cb88ff74b931ba58057a11b781fbad58d72d1778ff91584dbfe712f661a4c9`** — moved
           2026-09-08 by TASK-0030. Additive: three assignment endpoints. Recomputed independently,
-          matches `CONTRACT.lock`. ⚠ **Frontend client NOT regenerated — check 2 RED (TASK-0047).**
+          matches `CONTRACT.lock`. **Frontend regenerated against this same hash by TASK-0047
+          (2026-09-09): `frontend/src/api/schema.d.ts` re-run through `npm run generate:api`,
+          `check:api-drift` green. All five §4.4 checks verified GREEN by contract-guardian on
+          2026-09-09 — backend→contract byte-identical (38 paths, 342413 bytes), contract→client
+          no drift, no client bypass, lockfile matched, generated header intact.** See TASK-0047 in
+          `## Decisions` below for the full account.
 
 previous:  **`84a3444a5172a524a64860e7b296ee6c15fc6f8d35d62cd7c873c803dd61b420`** — moved
           2026-09-08 by TASK-0039 (arms). Additive: the `/arms*` paths plus `ArmCount` on
@@ -189,24 +218,197 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
-0033, 0034, 0035 and 0037 closed 2026-09-07; 0038-0044 closed 2026-09-08) — closure notes and
-reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0005a, 0005c
+(0021, 0005a, 0027 and 0029 closed 2026-09-06; 0033, 0034, 0035 and 0037 closed 2026-09-07;
+0038-0044 closed 2026-09-08; 0047, 0048 and 0005c closed 2026-09-09) — closure notes and reopen history in
+[decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0042 | Academic structure screens: sessions & terms, levels & sections | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
+| TASK-0049 | Audit log read surface and CSV export | backend-dev | **queued 2026-09-09** — depends on TASK-0048's table. Contract additive |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
-| TASK-0047 | Regenerate the frontend client for assignments | frontend-dev | **queued 2026-09-08** — §4.4 check 2 RED until it lands |
+| TASK-0050 | Pupil entity, pending-exclusion invariant, register read surface | backend-dev | **queued 2026-09-09** — first of four pupil cards. Contract additive |
+| TASK-0052 | Regenerate the frontend client for reg-number settings | frontend-dev | **queued 2026-09-09** — §4.4 check 2 RED until it lands |
+| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — TASK-0005c dependency CLEARED 2026-09-09; still needs TASK-0050 and an `enrolment` entity |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
-| TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-09 **Rejected audit events are written on their own connection, NOT the ambient
+  transaction. HUMAN SIGN-OFF 2026-09-09.** Spec 14 §9.3 ("the audit write shares the transaction
+  with the change it records") and spec 03 §6.1.12 ("Rejected entries are written for privilege
+  failures and for escalation attempts") are in direct conflict here, because
+  `UnitOfWork.ExecuteAtomicallyAsync` rolls back on a failure `Result` — so a rejection event added
+  to the DbContext is rolled back and lost. Ruling: a rejection records NO change, so §9.3's clause
+  does not bind it; `outcome = success` events join the ambient transaction, `outcome = rejected`
+  events are written synchronously on a separate short-lived connection that commits immediately.
+  Still no queue, no fire-and-forget, no separate service. **Why this mattered enough to escalate:
+  TASK-0030's rejection tests assert against a `RecordingSystemAuditSink` fake that has no
+  transaction, so the literal §9.3 implementation would have left every one of those tests GREEN
+  while production silently lost every rejection record** — the same "a green result that means
+  nothing" class as all of Phase 0b. Owner TASK-0048.
+- 2026-09-09 **`audit_event` append-only is enforced at BOTH layers, and the two-role provisioning
+  is deliberate drift. HUMAN SIGN-OFF 2026-09-09.** The migration emits `REVOKE UPDATE, DELETE ON
+  audit_event` against the application role so a correctly-provisioned deployment gets the real
+  §9.3 database guarantee; the application layer additionally exposes no update or delete path on
+  the audit repository, held by an architecture test so it cannot be added back quietly. The
+  separate administrative role for retention pruning is NOT provisioned on the hosted Neon test
+  database or in CI — both connect as an owner role that a `REVOKE` cannot bind, so locally and in
+  CI the code-level guarantee is the operative one. Recorded in `## Known drift`, owner TASK-0048.
+
+- 2026-09-09 **TASK-0048 implemented by backend-dev — `audit_event` persistence and the append-only
+  guarantee, both human-signed rulings above carried out. Status table and closure left to the
+  orchestrator per this dispatch's instructions.**
+
+  Both `LoggingSystemAuditSink` and `LoggingAuthorizationAuditSink` **DELETED** (git `D`), both
+  `TODO(TASK-0002)` markers gone with them. Still exactly two Application-facing audit abstractions:
+  `ISystemAuditSink` gained a second method, `RecordRejectionAsync` (identical parameter shape to
+  `RecordAsync`), rather than an `outcome` flag on one method — the two outcomes persist through
+  entirely different mechanisms, so two methods made that visible at the call site rather than
+  buried in a branch. `IAuthorizationAuditSink`'s single method is unchanged in shape.
+
+  **Ruling 1, proven against Postgres, not `RecordingSystemAuditSink`** — the criterion the card
+  exists for. `RecordAsync` (success) adds to the ambient `DbContext`'s change tracker with no
+  `SaveChangesAsync`, committed by `UnitOfWorkBehavior` alongside the change. `RecordRejectionAsync`
+  builds a FRESH `ApplicationDbContext` (new `DbContextOptionsBuilder`, same `DatabaseOptions`) via a
+  new `RejectedAuditEventWriter` and calls a bare `SaveChangesAsync` — no explicit transaction, so
+  EF Core's own `EnableRetryOnFailure` execution strategy applies automatically without hand-rolling a
+  raw `NpgsqlConnection`, per the card's own instruction. `AssignmentEndpointsTests` gained two new
+  facts using the REAL DI-registered sink (no `RemoveAll<ISystemAuditSink>()` swap):
+  `Create_RuleOne_SelfAssignment_PersistsADurableRejectedAuditEventRow` and
+  `Create_RuleThree_ActorArmScopedNarrowerThanRequested_PersistsADurableRejectedAuditEventRow` — each
+  drives the real HTTP endpoint to a 403, then opens a fresh scope and queries `context.AuditEvents`
+  directly, asserting exactly one row with `Outcome == Rejected`. A new
+  `AuditEventPersistenceTests.PrivilegeMiddlewareRejection_PersistsADurableRejectedAuditEventRow` does
+  the same for `PrivilegeAuthorizationHandler` (outside any MediatR pipeline, no ambient transaction
+  at all), leaving `IAuthorizationAuditSink` un-swapped for the first time in that test family. Two
+  more facts in the same file prove the success-path half directly against `IUnitOfWork`: a
+  successful atomic operation commits both an entity and its audit row together; one that THROWS
+  mid-way (not a failure `Result` — a genuine exception) leaves neither behind.
+
+  **~7 of the ~36 existing call sites renamed `RecordAsync` → `RecordRejectionAsync`** — method name
+  only, no parameter list touched at any of them: `CreateRoleCommandHandler`/
+  `UpdateRoleCommandHandler` (rule 2), `CreateRoleAssignmentCommandHandler` (rule 1, rule 3),
+  `RevokeRoleAssignmentCommandHandler` (rule 1 on revoke), `UpdateAdminAccountCommandHandler`
+  (`admin.super_admin_grant_denied`), and — beyond the card's two NAMED criteria, flagged rather than
+  silently folded in — `UpdateSchoolIdentityCommandHandler`
+  (`settings.identity.save_rejected_stale_version`), which also precedes a `Result.Failure` and would
+  otherwise have silently regressed from the log-only seam's own non-transactional behaviour. The
+  remaining ~29 call sites are untouched; no 36-site mechanical edit was needed or done.
+
+  **Ruling 2**: migration emits `REVOKE UPDATE, DELETE ON TABLE audit_event FROM CURRENT_USER;` (and
+  the `Down()` GRANT back) — targets `CURRENT_USER`, not a named role, since no separate application
+  role is provisioned anywhere this migration runs; a harmless no-op against the table owner (Neon,
+  CI), a real guarantee the moment a deployment provisions a genuinely separate role.
+  `IAuditEventRepository` exposes only `AddAsync`; a new architecture test
+  (`AuditAppendOnlyTests.IAuditEventRepository_HasNoUpdateOrDeleteMethod`) reflects over the interface
+  and fails if any other method name ever appears on it.
+
+  **Thirteen fields, all present.** `id` BIGSERIAL identity (`long`, EF Core's ordinary
+  `ValueGeneratedOnAdd`, stated explicitly — the first non-Guid-v7 key in the schema). `actor_label`
+  resolved at write time via `IAdminAccountRepository.FindReadOnlyByIdAsync`, never joined on read —
+  proven by `ActorLabel_IsCapturedAtWriteTime_NotJoinedOnRead` (audit, rename the account, re-read:
+  label still shows the ORIGINAL name/email). `source_ip`/`user_agent` truncated by a new pure
+  `AuditFieldTruncation` static class (IPv4 → /24, IPv6 → /48, IPv4-mapped IPv6 unwrapped first,
+  `user_agent` cut at 300, never throws) — 12 unit tests. `ICurrentUser` gained
+  `RemoteIpAddress`/`UserAgent` (raw, untruncated) rather than a new Infrastructure package
+  reference for `IHttpContextAccessor` — `HttpCurrentUser` (Api) implements both over its existing
+  accessor. `reason` is a new trailing OPTIONAL parameter on both `ISystemAuditSink` methods, placed
+  AFTER `CancellationToken` (every existing call site passes it as the last positional argument;
+  inserting an optional parameter before it would have silently rebound that value) — threaded for
+  the one call site with a real value today (`ChangeAdminAccountStatusCommandHandler`). `before_json`/
+  `after_json` columns added, unpopulated (out of scope, forward obligation recorded below and in
+  `docs/ASSUMPTIONS.md` §2.25); `after_json` reuses the pre-existing `metadata` argument for the
+  handful of callers that already had one.
+
+  **Size**: ~900 hand-written production lines (Domain + Application + Infrastructure, excluding the
+  auto-generated migration `Designer.cs`/model-snapshot, net of the ~95 lines the two deleted sinks
+  removed) — under the card's ~1,200-line stop-and-report threshold; no split needed.
+
+  **Gates, `./backend/scripts/ci.ps1 -NoFailFast`, one run, machine confirmed idle first
+  (`Get-Process -Name dotnet, testhost, testhost.x86, vstest.console, MSBuild` — only idle
+  `MSBuild.dll /nodemode:1` workers, no live test host)**: all ten PASS —
+  `Tests: total=706 passed=706 failed=0 skipped=0`, `Coverage: line=80.58% branch=68.63%`, secret scan
+  clean both passes, `OpenAPI contract drift`: "The committed contract matches the code" —
+  `openapi.json` byte-unchanged, exactly as this card's contract delta ("None") predicted.
+
+  **Confirmed out of scope, not built**: `GET /audit-events` and the whole read surface (TASK-0049);
+  before/after backfill for any existing handler beyond the `metadata`→`after_json` reuse noted
+  above; retention/pruning job or the administrative role it would need; the other seven
+  `reason`-mandated actions (no module exists yet for any of them). Full text: TASK-0048's own
+  `## Log`.
+
+- 2026-09-09 **TASK-0047 implemented by frontend-dev — client regenerated against `c3cb88ff…`
+  (TASK-0030's role-assignments move), all three assignment operations reachable through the
+  existing generic wrapper with ZERO new lines in `client.ts`/`client-types.ts`. Status table and
+  closure left to the orchestrator per this dispatch's instructions.**
+
+  Hash independently recomputed (`sha256sum contracts/openapi.json`) before starting — matched
+  `CONTRACT.lock` byte for byte. `npm run generate:api` rewrote `frontend/src/api/schema.d.ts`
+  (+398/-4 per `git diff --stat`), purely additive: `ListRoleAssignments`, `CreateRoleAssignment`,
+  `RevokeRoleAssignment` plus `RoleAssignmentDto`, `CreateRoleAssignmentCommand`,
+  `RoleAssignmentStatus`, `ScopeType`. `check:api-drift` → "No drift." Seventh confirmation of the
+  TASK-0033/0037/0040/0044 finding: a new operation on an already-supported HTTP method needs no
+  hand-written code in `client.ts`/`client-types.ts`.
+
+  Both negative typing directions proven on the card's named pair: `CreateRoleAssignment` rejects
+  an omitted required `Idempotency-Key`; `ListRoleAssignments` (declares `header?: never` — no
+  such header at all) rejects a passed `idempotencyKey`. `RevokeRoleAssignment` deliberately not
+  used for either, per the card's own instruction (accepts the header optionally, proves neither
+  direction). All three operations proven to reject an omitted required `id` path parameter. §8
+  enum tolerance proven for **both** new enums (`RoleAssignmentStatus`, `ScopeType`) in one
+  `server.use(...)` override on `GET /admins/:id/assignments` — route written as `:id`, never the
+  contract's literal `{id}`, per the card's explicit warning (TASK-0037 lost a run to this once).
+
+  **The card's named trap, hit exactly as predicted**: `ListRoleAssignments`'s 200 body is an
+  inline `array` of `$ref RoleAssignmentDto` with no top-level `example`, so the contract-derived
+  default MSW handler answered an empty body instead of an array (same shape as TASK-0040's
+  `ReorderLevels` finding). Fixed with an explicit `server.use(...)` override in every test calling
+  it; `openapi-handlers.ts` untouched, no assertion loosened.
+
+  New test file, under CONVENTIONS.md §3's 180-line cap: `client-assignments.test.ts` (126
+  lines, all three operations, 9 test cases). `src/api/README.md` updated (tests table and
+  zero-new-code precedent list now name TASK-0047). All 5 `@ts-expect-error`s verified
+  load-bearing by the removal-probe method (all five deleted at once, `npm run typecheck`
+  reproduced exactly five errors at exactly the five expected call sites, then restored).
+
+  **One discrepancy in the card's own notes, flagged not silently corrected**: the card states
+  "`RoleAssignmentDto.armIds` is nullable in the contract." The committed schema shows
+  `RoleAssignmentDto.armIds` is `required` and typed plain `"type": "array"` — never nullable;
+  only `CreateRoleAssignmentCommand.armIds` (the request body) is nullable. No client code was
+  built either way (client-seam-only card), so this had no effect on what shipped — recorded so a
+  later screen card does not inherit the wrong assumption from this card's text.
+
+  **`npm run test:e2e` deliberately SKIPPED** — no screen, route, or auth/session code touched,
+  client-seam-only per the card's own Out of scope, same call TASK-0040/TASK-0044 made. Note: the
+  card's own AC text says "Last known green: 4 passed / Skipped 0 (TASK-0043)", but TASK-0043's
+  own Log and this file's Decisions both record **8 passed, Skipped: 0** as the actual last run —
+  flagged rather than silently using either number, since this dispatch did not re-run the suite.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **44 files,
+  317 passed, 0 failed, Skipped: 0** (confirmed against a clean stash immediately before this
+  file existed: 43 files/308 tests, so +1 file/+9 tests matches the new file exactly); `npm run
+  build` (`tsc -b && vite build`) succeeded, 537 modules; `npm run check:api-drift` "No drift"
+  (re-confirmed after the gate run). `gitleaks detect --source . --no-git --config
+  backend/.gitleaks.toml --redact --no-banner` → "no leaks found" (5.94 MB scanned) — every
+  fixture is the same fixed UUID-shaped constant pattern already used throughout
+  `src/api/client-*.test.ts`, nothing resembling a real credential.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +398/-4),
+  `frontend/src/api/client-assignments.test.ts` (new, 126 lines), `frontend/src/api/README.md`
+  (+9/-4). Nothing under `contracts/**` or `backend/**` touched; hash unmoved at `c3cb88ff…`.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no assignments UI, no
+  role-grant form, no scope picker, no TanStack Query hooks, no `features/assignments` folder, no
+  changes to `client.ts`/`client-types.ts` beyond the (zero) proven gap. Full text: TASK-0047's
+  own `## Log`.
 
 - 2026-09-08 **TASK-0044 implemented by frontend-dev — client regenerated against `84a3444a…`
   (TASK-0039's arms move), all seven arms operations reachable through the existing generic
@@ -1591,12 +1793,43 @@ DB-credential split, TASK-0001 close).
 
 ## Known drift
 
+- 2026-09-09 **An unaudited 403 becomes a 500.** `RejectedAuditEventWriter.WriteAsync` is awaited
+  with no `try`/`catch` in either `SystemAuditSink.RecordRejectionAsync` or
+  `AuthorizationAuditSink`, so a database failure while recording a rejection propagates out of
+  authorization middleware and surfaces as a 500 instead of the 403 the contract declares.
+  **Defensible and NOT being overridden** — spec 6.1.12 says "a gap in the log is a failure, not a
+  silent omission", and failing loudly beats allowing an unlogged rejection. But it was never a
+  stated decision, and the contract declares no 500 on these routes. **Trigger: TASK-0049, the
+  audit read surface** — decide there whether to declare it in the contract or swallow-and-log, and
+  record the choice. Owner `backend-dev`. Found by orchestrator review of TASK-0048.
+- 2026-09-09 **`PrivilegeDecision.cs:21` carries a `TODO(TASK-0002)` pointing at a CLOSED card.**
+  Unrelated to TASK-0048's audit sinks — it is session-bearing scope filtering, blocked on
+  `IPupilArmOfRecordLookup`/`IResultSetArmLookup` having no real target to resolve. §10.4 wants a
+  live card number on every TODO. **Trigger: TASK-0050**, which creates the pupil entity and so
+  makes the pupil lookup resolvable for the first time — re-point or resolve it there. Owner
+  `backend-dev`.
+- 2026-09-09 **`before_json`/`after_json` are a STANDING obligation, not a backfill card.**
+  TASK-0048 shipped the columns and an optional seam parameter, reusing `metadata`→`after_json`
+  where a caller already had one. Spec 6.1.12's load-bearing before/after case is score entry,
+  which does not exist. **Trigger: every future module card populates before/after for its own
+  writes** — there is deliberately no one-time backfill card. Owner: each module card.
+
 Split by whether it can bite a dispatch. **Live triggers** are below — check them before every
 dispatch. The rest are accepted deviations with no trigger, dated here, full text in
 `drift/2026-Q3.md`.
 
 **Live triggers**
 
+- 2026-09-09 **`audit_event.before_json` is never populated; `after_json` only carries the
+  pre-existing `metadata` argument for the handful of callers that already had one.** TASK-0048 added
+  both JSONB columns and the real, append-only, transaction-correct persistence mechanism, but
+  populating before/after state for any of the ~36 existing audited handlers was explicitly out of
+  this card's scope — the card's own load-bearing case (spec 6.1.12: "Every mark change writes an
+  event with... the old value and the new value") is score entry, which does not exist yet. **Trigger:
+  each future module card that calls `ISystemAuditSink.RecordAsync`/`RecordRejectionAsync` for a
+  field-level change populates `before_json`/`after_json` for its OWN writes — this is not a single
+  future backfill card, it is a standing obligation on every such card from here on.** Owner
+  `backend-dev`.
 - 2026-09-08 **THE FLAG BYPASS IS GONE.** `SuperAdminFlagEffectivePrivilegeProvider` deleted by
   TASK-0030 and replaced with `RoleAssignmentEffectivePrivilegeProvider`, which resolves real
   `role_assignment` rows. **TASK-0003's super-admin flag-bypass ruling is now FINAL, not
@@ -1780,6 +2013,12 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 
 Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
 sign-off) resolved 2026-09-06 and archived there.
+
+13. ~~**TASK-0005c is on the pupils critical path**~~ **RESOLVED 2026-09-09 by the human:
+   TASK-0005c goes first**, ahead of TASK-0050. Card expanded from stub the same day.
+   **Still open beneath it:** approval opens the first enrolment (6.5.14) and no `enrolment` entity
+   exists, so TASK-0051 likely needs an enrolment card before it rather than inside it — decide at
+   TASK-0051 write-up time, not now.
 
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one

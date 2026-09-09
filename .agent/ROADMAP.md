@@ -67,7 +67,8 @@ failures were in whether they actually executed.
 | — | Grading scale editor + assessment structure | BE | 04 §6.2.5, 6.2.6, **6.2.13** | Seed = nine bands incl. `F 0-19`; 20/20/60. Component count must never be assumed anywhere |
 | — | Rating scales, trait lists, development domains and indicators | BE | 04 §6.2.7, 6.2.13 | Scale is a property of the rating block, not school-wide (conflict item 6) |
 | — | Fee notice configuration and entry screens | BE+FE | 04 §6.2.13 | Notice only. No arithmetic beyond the printed total, and no result is ever withheld |
-| — | Audit log | BE | 03 §6.1.12, 14 §9.3 | Same transaction as the change; DB role holds no UPDATE/DELETE |
+| TASK-0048 | Audit log — `audit_event` persistence, append-only | BE | 03 §6.1.12, 14 §9.3 | **in-progress** 2026-09-09. Same transaction as the change; DB role holds no UPDATE/DELETE. Retires both `TODO(TASK-0002)` logging seams. Two human-signed rulings: rejected events on a separate connection (they would otherwise roll back), append-only at both layers |
+| TASK-0049 | Audit log — read surface, five filters, CSV export | BE | 03 §6.1.12 | **queued** 2026-09-09, behind 0048. Export is itself an audit event |
 | TASK-0035 | Sessions and terms | BE | 05 §6.3 | **done** 2026-09-07. Term dates derive weekly-report weeks |
 | TASK-0038 | Sections, class levels, progression chain | BE | 06 §6.4.1-2, 6.4.7-9 | `section` drives result-sheet routing — load-bearing, not descriptive. Eight chain rules are the substance |
 | TASK-0039 | Arms: per-session rooms, capacity, display name | BE | 06 §6.4.3, 6.4.5-8 | Split from TASK-0038 on 2026-09-07: one card could not hold §6.4 under §1's ~400-line dispatch rule. Owns both TASK-0035 drifts; last blocker on TASK-0030 |
@@ -77,7 +78,8 @@ failures were in whether they actually executed.
 
 | Task | Title | Owner | Spec | Notes |
 |---|---|---|---|---|
-| — | Pupil entity, `pending` status, registration number issue | BE | 07 §6.5.4, 6.5.10, 6.5.14 | Every pupil query except the admissions queue filters `pending` out |
+| TASK-0050 | Pupil entity, `pending`-exclusion invariant, register read surface | BE | 07 §6.5.4, 6.5.15 | **queued** 2026-09-09. Every pupil query except the admissions queue filters `pending` out — built as a structural default, not a per-query filter |
+| TASK-0051 | Registration number issue + admission approval | BE | 07 §6.5.10, 6.5.14 | **blocked (stub)** — split from 0050 on 2026-09-09: 6.5.10's number is composed from TASK-0005c's settings, which is itself an unwritten stub. Also needs `enrolment`. Counter is a row lock, never `MAX+1` |
 | — | Contacts, health, pickup/barred persons, document checklist | BE | 07 §6.5.5–6.5.9 | Health and barred data behind `pupil.safeguarding.view`, audited on read |
 | — | Nine-step resumable admission flow | BE+FE | 07 §6.5.11, 6.5.12 | Largest single flow in the product; split if the card exceeds ~400 lines |
 | — | Bulk import | BE | 07 §6.5.13 | Background job with progress; 5000 rows max |
