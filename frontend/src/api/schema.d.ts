@@ -271,6 +271,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audit events
+         * @description Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-events/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a filtered audit log to CSV
+         * @description Spec 6.1.12: "Export to CSV requires audit.export and is itself an audit event." Same filters as the list endpoint, no paging — the whole matching set is streamed, never buffered in memory. Before any row is written to the response, this call writes its OWN `audit_event` row (action `audit.export`) recording the filters used, so a later read of the log can answer "who exported what." Columns are exactly spec 6.1.12's thirteen; `sourceIp` stays truncated as stored.
+         */
+        get: operations["ExportAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -1184,6 +1224,94 @@ export interface components {
          */
         ArmStatus: "Active" | "Inactive" | "Closed";
         /**
+         * @description One row of the audit trail (spec 6.1.12), rendered for the read surface. Carries every column
+         *     the spec's table defines and no more — `source_ip` is already truncated as stored (root
+         *     `CLAUDE.md` §8, PII), never widened here.
+         * @example {
+         *       "id": "48213",
+         *       "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+         *       "action": "settings.grading.update",
+         *       "entityType": "grading_band",
+         *       "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "outcome": "Success",
+         *       "beforeJson": null,
+         *       "afterJson": null,
+         *       "reason": null,
+         *       "sourceIp": "197.210.64.0/24",
+         *       "userAgent": "Mozilla/5.0"
+         *     }
+         */
+        AuditEventDto: {
+            /**
+             * @description Opaque to the frontend (root CLAUDE.md §8) — the underlying BIGSERIAL is an Application/Infrastructure concern only.
+             * @example 48213
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description Stored UTC; the UI converts to WAT for display (spec 6.1.12).
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            occurredAtUtc: string;
+            /**
+             * @description Null for a system-initiated action.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            actorAdminId: null | string;
+            /**
+             * @description Staff name and email captured at write time (spec 6.1.12).
+             * @example Chisom Maxwell <chisom.maxwell@example.com>
+             */
+            actorLabel: string;
+            /**
+             * @description The privilege string of the operation, or a fixed system code.
+             * @example settings.grading.update
+             */
+            action: string;
+            /**
+             * @description For example `grading_band`, `result_set`, `pupil`.
+             * @example grading_band
+             */
+            entityType: string;
+            /**
+             * @description Null for a bulk action, which carries a batch id in AfterJson instead.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            entityId: null | string;
+            /** @description Either `Success` or `Rejected`; crosses the wire as a string (root CLAUDE.md §8) via the global enum converter. */
+            outcome: components["schemas"]["AuditOutcome"];
+            /**
+             * @description The prior state of changed fields only, or null on create. Raw JSON text, not a parsed
+             *     JsonElement — TASK-0049 keeps it a plain string deliberately, so a
+             *     second/third use of `JsonElement` alongside `ConfigVersionDetailDto.Snapshot` never
+             *     forces the OpenAPI generator to hoist a shared, description-less component schema for it.
+             */
+            beforeJson: null | string;
+            /** @description The new state of changed fields only, or null on delete. Same raw-text shape as string? AuditEventDto.BeforeJson. */
+            afterJson: null | string;
+            /** @description Present only for the actions spec 6.1.12 mandates a reason for. */
+            reason: null | string;
+            /**
+             * @description Already truncated to /24 (IPv4) or /48 (IPv6) at write time.
+             * @example 197.210.64.0/24
+             */
+            sourceIp: null | string;
+            /**
+             * @description Already truncated to 300 characters at write time.
+             * @example Mozilla/5.0
+             */
+            userAgent: null | string;
+        };
+        /**
+         * @description Spec 6.1.12's `outcome` column: "success or rejected. Rejected entries are written for
+         *     privilege failures and for escalation attempts."
+         * @example Success
+         * @enum {unknown}
+         */
+        AuditOutcome: "Success" | "Rejected";
+        /**
          * @description Shared response shape returned by `sign-in`, `me`, `refresh` and `password`
          *     (approved contract delta §0), so the frontend never needs a second round trip to learn its own
          *     state after any of the four.
@@ -2054,6 +2182,56 @@ export interface components {
              *     ]
              */
             items: components["schemas"]["ArmDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "48213",
+         *           "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+         *           "action": "settings.grading.update",
+         *           "entityType": "grading_band",
+         *           "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "outcome": "Success",
+         *           "beforeJson": null,
+         *           "afterJson": null,
+         *           "reason": null,
+         *           "sourceIp": "197.210.64.0/24",
+         *           "userAgent": "Mozilla/5.0"
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfAuditEventDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "48213",
+             *         "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+             *         "action": "settings.grading.update",
+             *         "entityType": "grading_band",
+             *         "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "outcome": "Success",
+             *         "beforeJson": null,
+             *         "afterJson": null,
+             *         "reason": null,
+             *         "sourceIp": "197.210.64.0/24",
+             *         "userAgent": "Mozilla/5.0"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["AuditEventDto"][];
             /** @description `null` when this is the last page. */
             nextCursor: null | string;
         };
@@ -5452,6 +5630,136 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAuditEvents: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                fromUtc?: string;
+                toUtc?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                entityId?: string;
+                outcome?: components["schemas"]["AuditOutcome"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfAuditEventDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportAuditEvents: {
+        parameters: {
+            query?: {
+                fromUtc?: string;
+                toUtc?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                entityId?: string;
+                outcome?: components["schemas"]["AuditOutcome"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
