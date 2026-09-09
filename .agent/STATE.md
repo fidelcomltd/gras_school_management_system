@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-09 by orchestrator (TASK-0055 closure, TASK-0054 dispatch) · no size cap, see `## Reading this file`
+Last reconciled: 2026-09-10 by orchestrator (TASK-0054 closure) · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -183,7 +183,11 @@ previous: **`a1bd936b1e5bff709b8891c5c55e1918805e48ce3ef1e8a8afedd14bd87ee9f0`**
           no operation transformer and no shared file touched. Guarded against regression by
           `OpenApiContractTests.ExportAuditEvents_200Response_DeclaresTextCsvContent`, which asserts
           on the generated document. Recomputed with `sha256sum`, matches `CONTRACT.lock`.
-          Frontend client regeneration still NOT done — §4.4 check 2 RED until TASK-0054 runs.
+          ✅ **Frontend client REGENERATED against this hash by TASK-0054 (2026-09-10) — §4.4
+          check 2 GREEN.** `check:api-drift` "No drift.", verified independently by the
+          orchestrator. Both audit operations reachable. **First run of that recurring card to add
+          a client-seam line in eight** — a proven `never` on the `text/csv` response, not an
+          assumed gap; see the TASK-0054 entry in `## Decisions`.
 
 superseded within TASK-0049: **`f9b73118c6f6b14dd872374754f2113d3ecb7712c7ca9c3856829cd1129ca795`** — moved
           2026-09-09 by TASK-0049. Additive: `/audit-events`, `/audit-events/export` (**47 paths**,
@@ -322,9 +326,9 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0049, 0050, 0052, 0055, 0005a, 0005c
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0049, 0050, 0052, 0054, 0055, 0005a, 0005c
 (0021, 0005a, 0027 and 0029 closed 2026-09-06; 0033, 0034, 0035 and 0037 closed 2026-09-07;
-0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050, 0052, 0049 and 0055 closed 2026-09-09 — 0049 after
+0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050, 0052, 0049 and 0055 closed 2026-09-09 and 0054 on 2026-09-10 — 0049 after
 one orchestrator reopen for a contract hole) — closure notes and reopen history in
 [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
@@ -333,7 +337,6 @@ one orchestrator reopen for a contract hole) — closure notes and reopen histor
 | TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0042 | Academic structure screens: sessions & terms, levels & sections | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
-| TASK-0054 | Regenerate the frontend client for the audit log read surface | frontend-dev | **in-progress 2026-09-09** — both dependencies (0049, 0055) CLOSED; dispatched. §4.4 check 2 RED until it lands. Target hash `7a3c84e6…`, 47 paths. §4.4 check 2 RED. Eighth run of the recurring card; first contract move carrying a **non-JSON (`text/csv`) response body**, so it may be the first run to need a real `client.ts` addition |
 | TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review, not by the implementing agent. Not a TASK-0049 defect; encoding-only, contract must not move |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
@@ -343,6 +346,143 @@ one orchestrator reopen for a contract hole) — closure notes and reopen histor
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-10 **TASK-0054 CLOSED by orchestrator.** Audit-log client seam regenerated against
+  `7a3c84e6…`, consuming TASK-0049's and TASK-0055's moves in one pass. §4.4 check 2 RED→GREEN.
+  Gates re-run independently: `check:api-drift` "No drift.", **49 files / 350 tests / Skipped 0**,
+  build and lint green, gitleaks clean. Two new test files (125 and 80 lines, both under the cap).
+
+  **The eight-run streak of zero client-seam lines ENDED here, correctly.** `SuccessBody` resolved
+  `never` for `ExportAuditEvents`: the old `JsonOf` helper matched only an `application/json`
+  content key, and this is the contract's first non-JSON response body (`text/csv`). The agent
+  proved it with a throwaway type probe BEFORE writing transport code — `error TS2322: ... is not
+  assignable to type 'never'` — exactly the "report the failing output, then keep the addition as
+  narrow as the gap" discipline the card asked for. Fix is one type-level helper, `ResponseBodyOf`,
+  in `client-types.ts`; `client.ts` untouched.
+
+  **How the shared-file risk was discharged — the reusable part.** Green tests cannot prove a type
+  *widening* is safe: nothing breaks when a type gets looser. So rather than trusting the gates,
+  the orchestrator enumerated every 2xx response across all 47 paths lacking `application/json`:
+  **exactly one, `GET /api/v1/audit-events/export`.** Since `ResponseBodyOf` matches
+  `application/json` first and falls through only when it is absent, it is byte-identical to
+  `JsonOf` for every other operation, and no other operation can even reach the new branch. That
+  is a proof about reachability, not an absence of counter-evidence. **Reuse this shape whenever a
+  shared type-level helper changes: enumerate what can reach the new branch; do not rely on a
+  green suite.**
+
+  **Negative-typing proofs, all honest.** The list/export parameter asymmetry (nine params vs
+  seven — no `cursor`/`pageSize` on the export) proven in both directions. For the
+  omitted-required-header and omitted-required-path-parameter directions the agent **stated plainly
+  that this move offers no new instance** rather than manufacturing one; both operations are
+  header-free reads on a path with no `{id}`. Third card running where that instruction produced
+  the right behaviour — and it was the honest "no instance here" record on TASK-0054's first draft
+  that made the genuine asymmetry instance findable when the facts were re-derived for TASK-0055.
+
+  **One raised risk investigated and closed WITHOUT a card:** `unwrap()` in `src/lib/http/` maps
+  any empty response body to `undefined` regardless of content-type, which would mistype an empty
+  CSV as `undefined` where the type says `string`. Mechanism real, but unreachable —
+  `AuditEventCsvWriter` writes the 13-column header unconditionally before iterating rows, so a
+  zero-row export returns the header, never an empty body. Reachable only if that header is ever
+  made conditional; recorded on TASK-0054 so the connection stays findable. The agent worked around
+  it in its own test rather than reaching into `src/lib/http/` outside its scope — right call.
+
+- 2026-09-10 **TASK-0054 implemented by frontend-dev — client regenerated against `7a3c84e6…`**
+  (both TASK-0049's audit read surface and TASK-0055's `entityId` filter, consumed in one pass).
+  Status table and closure left to the orchestrator per this dispatch's instructions.
+
+  Hash independently recomputed (`sha256sum contracts/openapi.json`) before starting — matched
+  `CONTRACT.lock` byte for byte (`7a3c84e6a1872d014e519c8fa15227ba040b8b31ade41e20d9e98d32be509325`,
+  47 paths, 86 schemas). `npm run generate:api` rewrote `frontend/src/api/schema.d.ts` (+308/-0 per
+  `git diff --numstat`), purely additive: `ListAuditEvents`, `ExportAuditEvents`, `AuditEventDto`,
+  `CursorPageOfAuditEventDto`, `AuditOutcome`. `check:api-drift` → "No drift." Every contract fact
+  in the card (nine list params all optional, seven export params, no `cursor`/`pageSize` on the
+  export, no header or path parameter on either operation, `AuditOutcome` = `Success`/`Rejected`,
+  `beforeJson`/`afterJson`/`sourceIp` all nullable) independently re-derived with `jq` against the
+  promoted document before writing a test — none had drifted from the card.
+
+  **This is the ninth run of the recurring card and the first to need real code in
+  `client-types.ts`.** `ExportAuditEvents`' `200` is `{"text/csv": {"schema": {"type": "string"}}}`
+  — the contract's first non-`application/json` response body. `SuccessBody<Op>` resolved a `200`
+  through `JsonOf<C>`, which only matches an `application/json` content key, so for this operation
+  it resolved to `never`. **Proven with a throwaway probe file** (`src/api/_gap-probe.ts`, deleted
+  before committing) assigning a string literal to `SuccessBody<ExportAuditEventsOp>`: `error
+  TS2322: Type '"..."' is not assignable to type 'never'.` A real mistype, not a hypothetical one —
+  axios does not JSON-parse a `text/csv` body, so the payload exists and is a string at runtime;
+  the type just couldn't say so. Fixed with a new `ResponseBodyOf<Content>` helper, narrower than a
+  general "any content-type" widening: it only changes the two `SuccessBody` response branches,
+  falling through to a response's single content-type value when it isn't `application/json`.
+  `RequestBodyOf` (request bodies) still calls the original `JsonOf` unchanged — every request body
+  in this contract remains JSON, so widening that side had no proof behind it. Re-ran the same
+  probe after the fix: zero errors, and a companion assertion confirmed the JSON list operation's
+  body type is untouched. `client.ts` itself needed nothing — both operations reach through the
+  existing `apiGet`, confirmed byte-identical (`git diff` on `client.ts` is empty).
+
+  **List/export parameter asymmetry proven in both directions**, per the card's own instruction not
+  to fabricate a proof where none exists: `client-audit-events.test.ts` typechecks `ListAuditEvents`
+  with `cursor`/`pageSize` supplied (accepted); `client-audit-events-export.test.ts` has two
+  `@ts-expect-error` cases showing `ExportAuditEvents` rejects each individually. **Neither operation
+  takes `X-CSRF-Token`, `Idempotency-Key`, nor a path parameter** (both reads, no `{id}` segment) —
+  stated plainly in both test files' header comments as offering no new instance of the
+  omitted-required-header or omitted-required-path-parameter directions, rather than reusing or
+  inventing one, per the card's explicit "do not fabricate a proof" instruction.
+
+  **The inline-array/no-example MSW trap, ninth confirmation** — `CursorPageOfAuditEventDto` has an
+  `example` so `ListAuditEvents`' default handler works out of the box, but `ExportAuditEvents`'
+  `text/csv` response has no `application/json` key at all, so `exampleFor` in
+  `openapi-handlers.ts` (which only ever reads that key) answers empty. Fixed with an explicit
+  `server.use(...)` override per test in `client-audit-events-export.test.ts`; `openapi-handlers.ts`
+  untouched. One incidental interaction surfaced and deliberately left alone: `request.ts`'s
+  `unwrap()` treats `response.data === ''` as equivalent to `204 No Content` and returns
+  `undefined` — a pre-existing rule for genuinely empty bodies, unrelated to this card's `never`
+  gap. An early draft test used an empty-string CSV mock and got exactly that collision
+  (`expected 'undefined' to be 'string'`); the test was fixed to use a non-empty CSV body instead
+  of touching `request.ts`, which is out of this card's scope (`src/lib/http/`, not `client.ts`/
+  `client-types.ts`) and not something a proven gap here licenses touching. Flagged below as a risk
+  worth a look, not fixed.
+
+  Two new test files, both under CONVENTIONS.md §3's 180-line cap: `client-audit-events.test.ts`
+  (125 lines — `ListAuditEvents`: nine-params-optional, all-nine-together typecheck, unknown-key
+  rejection, `AuditOutcome` §8 tolerance, null `beforeJson`/`afterJson`/`sourceIp` passthrough) and
+  `client-audit-events-export.test.ts` (80 lines — `ExportAuditEvents`: string body returned intact,
+  seven-params-together typecheck, `cursor`/`pageSize` rejection both directions, unknown-key
+  rejection, plus the full gap/fix rationale in its header comment). `src/api/README.md` updated
+  (tests table, zero-new-code precedent list, and a new paragraph on the one case that needed code).
+
+  All four `@ts-expect-error`s verified load-bearing by the TASK-0044 removal-probe method (both
+  files backed up, all four comment lines deleted at once, `npm run typecheck` reproduced exactly
+  four errors at exactly the four expected lines, then restored and re-confirmed clean).
+
+  **Gates**: `npm run typecheck` 0 errors; `npm run lint` 0 warnings; `npm run test` **49 files, 350
+  passed, 0 failed, Skipped: 0** (was 47/340 after TASK-0052, +2 files/+10 tests matches exactly);
+  `npm run build` succeeded, 537 modules unchanged; `npm run check:api-drift` "No drift" (re-confirmed
+  after the README edit); `gitleaks detect --source . --no-git --config backend/.gitleaks.toml
+  --redact --no-banner` → "no leaks found" (6.91 MB scanned). `npm run test:e2e` deliberately
+  **NOT re-run**: no screen, route, or auth/session code touched, and the one production-code change
+  (`client-types.ts`) is type-level only — erased at compile time, so it has zero runtime footprint;
+  the build's module count (537) is unchanged from TASK-0052's last build, confirming this. Same call
+  TASK-0040/0044/0047/0052 made for the client-seam-only reason; this run adds the type-erasure
+  reason on top since, unlike those four, this one did change `client-types.ts`. Last known green
+  remains **8 passed / Skipped 0 (TASK-0043)**, unchanged by this dispatch.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +308/-0),
+  `frontend/src/api/client-types.ts` (+24/-5 per `git diff --numstat` — the `ResponseBodyOf`
+  addition), `frontend/src/api/client-audit-events.test.ts` (new, 125 lines), `frontend/src/api/
+  client-audit-events-export.test.ts` (new, 80 lines), `frontend/src/api/README.md` (updated).
+  Nothing under `contracts/**` or `backend/**` touched; hash unmoved at `7a3c84e6…`. `client.ts`
+  confirmed byte-identical (`git diff` empty).
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no audit-log screen, no filter
+  UI, no date pickers, no results table, no download button, no TanStack Query hooks, no CSV parsing
+  or rendering, no `features/audit` folder, no changes to `client.ts` at all, no changes to
+  `client-types.ts` beyond the one proven gap.
+
+  **Risk flagged for the orchestrator, not fixed under this card**: `src/lib/http/request.ts`'s
+  `unwrap()` returns `undefined` for any `response.data === ''`, regardless of content-type. If the
+  backend ever returns a genuinely empty body for `ExportAuditEvents` (e.g. a filtered export with
+  zero rows and no header line), a caller typed to receive `string` would get `undefined` at
+  runtime instead — a latent type/runtime mismatch in the shared transport layer, not introduced by
+  this card and out of its scope (`src/lib/http/`, not `src/api/`) to fix. Worth a card of its own
+  if the export's CSV format is ever specified without a guaranteed header row.
 
 - 2026-09-09 **TASK-0055 CLOSED by orchestrator, first-run pass.** `entityId` filter added to both
   audit operations, resolving open question 14 the way the human directed. Contract
