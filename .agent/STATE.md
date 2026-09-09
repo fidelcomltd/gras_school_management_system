@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-06 by orchestrator · no size cap, see `## Reading this file`
+Last reconciled: 2026-09-08 by frontend-dev (TASK-0044 append) · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -103,7 +103,19 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: **`82870944982d77d2e540eb2ad455444151d670f439b6e6f9cc7fc54d41ba4168`** — moved
+openapi.json sha256: **`c3cb88ff74b931ba58057a11b781fbad58d72d1778ff91584dbfe712f661a4c9`** — moved
+          2026-09-08 by TASK-0030. Additive: three assignment endpoints. Recomputed independently,
+          matches `CONTRACT.lock`. ⚠ **Frontend client NOT regenerated — check 2 RED (TASK-0047).**
+
+previous:  **`84a3444a5172a524a64860e7b296ee6c15fc6f8d35d62cd7c873c803dd61b420`** — moved
+          2026-09-08 by TASK-0039 (arms). Additive: the `/arms*` paths plus `ArmCount` on
+          `SessionDto`/`SessionDetailDto` and a new 409 case on `POST /terms/{id}/open`. Hash
+          independently recomputed with `sha256sum`, matches `CONTRACT.lock`. **Frontend
+          regenerated against this same hash by TASK-0044 (2026-09-08): `frontend/src/api/
+          schema.d.ts` re-run through `npm run generate:api`, `check:api-drift` green.** See
+          TASK-0044 in `## Decisions` below for the full account.
+
+previous:  `82870944982d77d2e540eb2ad455444151d670f439b6e6f9cc7fc54d41ba4168` — moved
           2026-09-08 by TASK-0038 (was `a618db62…`). Purely additive: five new paths
           (`/sections`, `/sections/{id}`, `/levels`, `/levels/{id}`, `/levels/reorder`) carrying
           nine operations, plus the `LevelDto`/`SectionDto`/command/`CursorPageOfLevelDto` schemas.
@@ -177,22 +189,450 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037, 0038, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
-0033, 0034, 0035 and 0037 closed 2026-09-07; 0038 closed 2026-09-08) — closure notes and reopen
-history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0005a (0021, 0005a, 0027 and 0029 closed 2026-09-06;
+0033, 0034, 0035 and 0037 closed 2026-09-07; 0038-0044 closed 2026-09-08) — closure notes and
+reopen history in [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0040 | Regenerate the frontend client for sections and class levels | frontend-dev | **queued, written in full 2026-09-08 — ready to dispatch.** §4.4 check 2 is RED until it lands |
-| TASK-0039 | Arms: per-session rooms, capacity, composed display name | backend-dev | **queued, written in full, unblocked 2026-09-08** — owns both TASK-0035 drifts; last blocker on TASK-0030 |
+| TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
+| TASK-0042 | Academic structure screens: sessions & terms, levels & sections | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
+| TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
-| TASK-0030 | Role assignments, scopes, escalation rules 1 and 3 | backend-dev | **blocked** — needs TASK-0039 (arms); the sessions half landed with TASK-0035 |
+| TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
+| TASK-0047 | Regenerate the frontend client for assignments | frontend-dev | **queued 2026-09-08** — §4.4 check 2 RED until it lands |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 | TASK-0005c | Registration number configuration | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-08 **TASK-0044 implemented by frontend-dev — client regenerated against `84a3444a…`
+  (TASK-0039's arms move), all seven arms operations reachable through the existing generic
+  wrapper with ZERO new lines in `client.ts`/`client-types.ts`; closed same session
+  (client-seam-only card, no screen to review).**
+
+  Hash independently recomputed with `sha256sum` before starting — matched `CONTRACT.lock` byte
+  for byte. `npm run generate:api` rewrote `src/api/schema.d.ts` (+965/-16 per `git diff --stat`),
+  purely additive: `ListArms`, `CreateArm`, `GetNextArmLabel`, `BulkCreateArms`, `GetArm`,
+  `UpdateArm`, `DeleteArm` plus their schemas, and the additive `ArmCount` field on
+  `SessionDto`/`SessionDetailDto`. `check:api-drift` → "No drift." Sixth confirmation of the
+  TASK-0033/0037/0040 finding: a new operation on an already-supported HTTP method needs no
+  hand-written code in `client.ts`/`client-types.ts`.
+
+  Both negative typing directions proven on the card's named pairs: `POST /arms` and
+  `POST /arms/bulk` both reject an omitted required `Idempotency-Key`; `GET /arms` (real optional
+  filters) and `GET /arms/next-label` (required `levelId`/`sessionId`) both reject a passed
+  `idempotencyKey` — two differently-shaped query types, not just "an empty type rejects
+  everything". Every path-parameter operation (`GetArm`, `UpdateArm`, `DeleteArm`) proven to
+  reject an omitted `id`. §8 enum tolerance proven for `ArmStatus` via two `server.use(...)`
+  overrides, one of them on `GET /arms/{id}` written as `apiUrl('/api/v1/arms/:id')` — the route
+  that actually exercises the `{id}` → `:id` MSW conversion the card warned about (TASK-0037 lost
+  a run to writing it as literal `{id}`). All 7 `@ts-expect-error`s verified load-bearing by the
+  removal-probe method (all seven removed at once, `npm run typecheck` reproduced exactly seven
+  errors at exactly the seven expected lines, then restored).
+
+  New tests, both under CONVENTIONS.md §3's 180-line cap: `client-arms.test.ts` (111 lines) and
+  `client-arms-detail.test.ts` (90 lines), colocated with `client.ts`. `src/api/README.md` updated
+  to name both and add TASK-0044 to the zero-new-code precedent list.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **40 files,
+  286 passed, 0 failed, Skipped: 0** (was 38/270 after TASK-0043; +16 new cases matches the two
+  new files exactly); `npm run build` (`tsc -b && vite build`) succeeded, 521 modules, unchanged;
+  `npm run check:api-drift` "No drift". `gitleaks detect --source . --no-git --config
+  backend/.gitleaks.toml --redact --no-banner` → "no leaks found" (5.60 MB scanned) — every
+  fixture value is the same fixed UUID-shaped constant pattern already used throughout
+  `src/api/client-*.test.ts`, nothing resembling a real credential.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +965/-16),
+  `frontend/src/api/client-arms.test.ts` (new, 111 lines),
+  `frontend/src/api/client-arms-detail.test.ts` (new, 90 lines), `frontend/src/api/README.md`
+  (+12/-6). Nothing under `contracts/**` or `backend/**` touched; hash unmoved at `84a3444a…`.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no arms screen, no
+  bulk-create UI, no TanStack Query hooks, no `features/arms` folder — client seam only. Full
+  text: `TASK-0044`'s own `## Log`.
+
+- 2026-09-08 **TASK-0043 implemented by frontend-dev — admin accounts and roles screens; status →
+  review.** No contract change; client already current at `82870944…`, all 13 operations
+  (`ListAdminAccounts`, `CreateAdminAccount`, `GetAdminAccount`, `UpdateAdminAccount`,
+  `ChangeAdminAccountStatus`, `ResetAdminAccountPassword`, `RevokeAdminAccountSessions`,
+  `GetPrivilegeRegister`, `ListRoles`, `CreateRole`, `GetRole`, `UpdateRole`, `DeleteRole`)
+  reachable through the generated `src/api/` client without regeneration. Built on TASK-0041/42's
+  shell, guards and `hasFieldError` helper — nothing there was re-implemented or forked.
+
+  **Privilege codes — one open assumption, flagged for verification, not silently guessed.**
+  `admin.view`, `admin.update`, `admin.suspend`, `admin.deactivate`, `admin.password.reset`,
+  `admin.session.revoke`, `role.view`, `role.create`, `role.update`, `role.delete` are all
+  attested verbatim in `.agent/decisions/2026-Q3-contract-deltas.md` (TASK-0019/0027 Part 2 and
+  TASK-0028 §2's own privilege tables) — none invented. **`admin.create` is NOT attested anywhere
+  in the contract, the decisions archive, or any task card** (`POST /admins`'s own AC only says
+  "per the privilege column in spec 6.1.2," which is backend spec this agent does not load). Used
+  `admin.create` anyway, by symmetry with the confirmed `role.create`/`level.create`/`session.create`
+  naming convention every other module follows — gates the "New admin" button and nothing else, so
+  a wrong guess fails safe (the button simply would not appear for its true holder) rather than
+  exposing the action to someone who shouldn't have it. **Orchestrator: please confirm `admin.create`
+  against the backend's actual `Privileges.Admin.*` registration** (`AdminAccountEndpoints.cs` per
+  TASK-0027's Log) and correct `AdminsListScreen`'s one `hasPrivilege(me.data, 'admin.create')` call
+  if it differs — the only place the string appears.
+
+  **Temporary password handling (the card's own emphasis)**: `useCreateAdmin`/`useResetAdminPassword`
+  both set `gcTime: 0` — discovered necessary because `useMutation`'s `reset()` only detaches the
+  observer, it does NOT evict the underlying `Mutation` from `queryClient`'s mutation cache (that
+  needs zero observers AND its `gcTime` to elapse); without `gcTime: 0` the plaintext value would
+  have lingered in the mutation cache for the default 5 minutes after the dialog closed. Both
+  dialogs (`CreateAdminDialog`, `ResetPasswordDialog`) copy `temporaryPassword` into local
+  component state in the SAME tick as calling `.reset()`, never read it back from the mutation's
+  own `data` again, and the query cache never receives it at all — `AdminAccountDetailDto`/
+  `AdminAccountSummaryDto` (every subsequent read's shape) structurally has no such field.
+  `admins-list-screen.test.tsx` and `admin-detail-screen.test.tsx` both assert the value is absent
+  from the DOM and from `queryClient.getQueryCache()`/`getMutationCache()` after the dialog closes.
+
+  **Status-change cache patch (AC: "list reflects the new status without a full refetch")**:
+  `useChangeAdminStatus`'s `onSuccess` calls `setQueryData` on the detail cache AND
+  `setQueriesData` on every matching `admins.list` page, replacing the row in place —
+  `AdminAccountDetailDto` and `AdminAccountSummaryDto` share an identical field set, so the
+  response can stand in for either directly. Proven in `admin-detail-screen.test.tsx` by seeding
+  the list cache WITHOUT ever rendering the list screen or calling `GET /admins`, then asserting
+  the seeded cache reflects each of two status transitions (suspend, then reactivate) — a network
+  call this test never made cannot be the source of the update.
+
+  **Privilege picker — the card's own cut line, taken**: `GET /privileges` already returns the
+  93-row register pre-grouped by module (`groups[].key`/`.title`), so `PrivilegePicker` renders
+  those groups as-is with plain checkboxes — no client-side re-grouping, no search. A role's
+  existing privilege code absent from the current register (a legacy alias, or a register that has
+  moved on) renders in its own "Other" bucket, still togglable, rather than being silently dropped
+  or crashing (§8) — covered by `roles-list-screen.test.tsx`.
+
+  **Self-edit carve-out (spec 6.1.2) deliberately NOT built**: `EditAdminDialog` only covers the
+  `admin.update` path (every field, full replace, `isSuperAdmin` shown only to a caller who already
+  holds it). The narrower "the account itself may change only its own `staffName`/`phone`, not
+  email" carve-out has no surface in this card's scope line and no AC naming it — recorded here
+  rather than silently omitted.
+
+  **Role assignments/scopes**: confirmed out of scope (TASK-0030, blocked on arms) — no
+  assignment or scope UI was built against endpoints that do not exist.
+
+  **All 13 operations exercised against contract-derived MSW handlers** (`buildHandlersFromContract`
+  for the default happy path; `server.use(...)` overrides for every 401/409/422 scenario), never
+  hand-written fixtures.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` 0 errors; `npm run
+  lint` 0 warnings (one real finding fixed, not suppressed: `no-non-null-assertion` on `x!.y` in
+  `roles-list-screen.test.tsx`'s MSW handlers, replaced with a typed local `const`); `npm run test`
+  **38 files, 270 passed, 0 failed, Skipped: 0** (was 35/254 after TASK-0042); `npm run build`
+  succeeded, 521 modules; `npm run check:api-drift` "No drift" (this card changes no contract and
+  no generated file). `npm run test:e2e` **8 passed, Skipped: 0** — the five pre-existing specs
+  unmodified and still green, plus this card's new `e2e/admins.spec.ts` (create-admin → reveal
+  temp password once → suspend). One e2e flake diagnosed and fixed, not worked around: Base UI's
+  `Dialog`/`Select` keep their DOM mounted through the exit transition, so asserting on plain text
+  immediately after closing the status-change dialog was ambiguous against the still-detaching
+  `Select` popup's own leftover text node; fixed by waiting for the dialog's `role="dialog"` to
+  detach before asserting, and scoping the final assertion to `getByRole('definition')` rather than
+  bare text.
+
+  Full text: this card's own `## Log`.
+
+- 2026-09-08 **TASK-0042 implemented by frontend-dev — sessions & terms and levels & sections
+  screens; status → review.** No contract change; client already current at `82870944…` from
+  TASK-0040. Built on TASK-0041's still-uncommitted shell/routing/guards — nothing there was
+  re-implemented or forked.
+
+  **Privilege codes** (none declared in the OpenAPI operations themselves, only in their prose
+  descriptions) were taken from the committed task cards that shipped the endpoints, never
+  invented: `session.view`/`session.create`/`session.update`, `term.open`, `term.close` (also
+  gating `reopen`, plus a handler-checked `isSuperAdmin` — TASK-0035's table; `TASK-0038`'s table
+  for `level.view`/`level.create`/`level.update`/`level.deactivate`/`level.delete`, and its ruling
+  that sections are gated under `level.*` too since the 93-row register has no `section.*` code.
+
+  **Folder shape — one deliberate deviation from `src/features/README.md`'s "one folder per
+  OpenAPI tag" rule, both directed by this card's own scope line**: `features/sessions/` holds
+  both the `Sessions` and `Terms` tags (a term is never managed except from its owning session's
+  detail screen); `features/classes/` holds both `Levels` and `Sections` (a section is edited from
+  the same screen as the level chain it feeds, and the backend itself gates both under `level.*`).
+
+  **Verbatim server messages (AC)**: `ApiError.message` already prefers the problem document's
+  `detail` (confirmed by reading `lib/http/http-error.ts` before writing anything), so every
+  general-error banner in these six dialogs renders `error.message` directly. The one subtlety:
+  `SchoolIdentityForm`'s existing pattern of suppressing the banner whenever `kind === 'validation'`
+  would have swallowed a chain-rule 422 that names no known field. Fixed via a new
+  `hasFieldError(fieldErrors, knownFieldNames)` helper (promoted alongside `fieldMessage`, see
+  below) — the banner now shows whenever the error is non-validation OR none of the form's own
+  fields matched, so a business-rule rejection reaches the user regardless of which key (or none)
+  the backend attaches it to.
+
+  **`src/shared/` created** (TASK-0042 is its first commit, per CONVENTIONS.md §4's "promote in its
+  own commit, on the second/third genuine consumer" and this card's own instruction): promoted the
+  422 field-error tolerant-lookup helper, duplicated by design in `sign-in-form.tsx` and
+  `school-identity-form.tsx` since TASK-0021/0041, to `shared/forms/field-message.ts` as this
+  card's third user (`fieldMessage` plus the new `hasFieldError`). Both call sites updated to
+  import it; the duplicated local copies deleted.
+
+  **Level list ordering (AC)**: `GET /levels` already returns `progressionOrder` order server-side,
+  but `LevelList` additionally sorts client-side before rendering (`Number(a.progressionOrder) -
+  Number(b.progressionOrder)`) so the guarantee holds even against a test double that doesn't
+  bother re-sorting — proven by a fixture whose mock response is deliberately NOT in that order.
+
+  **Reorder (AC)**: `POST /levels/reorder` returns the new `LevelDto[]` directly (not a
+  `CursorPage`), so `useReorderLevels`'s `onSuccess` calls `setQueryData` on the exact
+  `[classes.levels, undefined]` cache entry with that response, and only invalidates (does not
+  overwrite) the separate `status: 'all'` entry, which can hold rows this response omits — the list
+  re-renders from the mutation's own response, no extra round trip. **Cut line taken, as the card
+  named**: reorder ships as move-up/move-down buttons, each building the identical whole-ordered-
+  array body drag-and-drop would post — reported as the cut, not shipped half-tested.
+
+  **Insert-after (AC)**: `CreateLevelDialog` defaults to the insert-after placement (a `Select` of
+  existing levels) with a manual-order fallback (explicit `progressionOrder` + optional
+  `nextLevelId`) for "the administrator who prefers typing," per the contract's own two mutually
+  exclusive shapes. `create-level-dialog.test.tsx` and `e2e/classes.spec.ts` both assert the
+  resulting list ORDER after creation (the new level lands between its chosen predecessor and the
+  old successor), not merely a 201.
+
+  **Idempotency-Key (AC)**: generated with `crypto.randomUUID()` INSIDE each mutation's
+  `mutationFn` (`useCreateSession`, `useCreateLevel`, `useCreateSection`) — since a `mutate()` call
+  runs `mutationFn` fresh and TanStack Query mutations never retry (§10), this is a fresh key per
+  submit by construction, never a value captured once and reused. Proven for sessions by
+  `sessions-list-screen.test.tsx` (two distinct submits, two distinct captured keys) and for levels
+  by `create-level-dialog.test.tsx`/`e2e/classes.spec.ts` (key present on the real request).
+
+  **Term reopen (AC)**: `TermCard`'s `canReopen` requires BOTH `term.close` and
+  `session.isSuperAdmin` client-side (the route itself checks `isSuperAdmin` in the handler, not a
+  privilege code, per TASK-0035) — a non-super-admin holder of `term.close` sees no Reopen button
+  at all; `reopen-term-schema.ts` enforces the ≥10-character reason client-side, mirrored
+  server-side. Both asserted directly in `session-detail-screen.test.tsx`.
+
+  **All 17 operations exercised against contract-derived MSW handlers** (`buildHandlersFromContract`,
+  never hand-written fixtures) — enumerated once to be sure none was skipped: `ListSessions`,
+  `CreateSession`, `GetSession`, `UpdateSession`, `UpdateTerm`, `OpenTerm`, `CloseTerm`,
+  `ReopenTerm`, `ListLevels`, `CreateLevel`, `GetLevel`, `UpdateLevel`, `DeleteLevel`,
+  `ReorderLevels`, `ListSections`, `CreateSection`, `UpdateSection`. `GetLevel` in particular has no
+  scope-mandated screen of its own (no arm counts yet — TASK-0039), so `EditLevelDialog` calls
+  `useLevel(id)` to refetch the one level being edited before prefilling the form (via react-hook-
+  form's `values` option, which re-syncs the form whenever that query's data changes) rather than
+  trusting the possibly-stale list-cached row — a real design justification, not a test-coverage
+  fig leaf, and asserted directly (`edit-level-dialog.test.tsx` shows the freshly-fetched name, not
+  the stale list one).
+
+  **Enums tolerate unknown members (§8)**: `SessionState`/`TermState`/`LevelStatus` are all rendered
+  as their raw string (`{term.state}`, `{level.status}`) — nothing narrows or switches on them, so
+  an additive new member renders as its own text rather than throwing or blanking, unverified by a
+  dedicated test in this dispatch (the existing `client-sessions.test.ts`-style precedent at the
+  `src/api/` layer already proves the client-side plumbing tolerates it; these screens just never
+  branch on the value at all).
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings (one real finding along the way: `watch()`
+  from react-hook-form tripped the `react(incompatible-library)` rule in `CreateLevelDialog` —
+  fixed by switching to `useWatch`, not suppressed); `npm run test` (`vitest run`) **35 files, 254
+  passed, 0 failed, Skipped: 0** (was 29/224 after TASK-0041); `npm run build` (`tsc -b && vite
+  build`) succeeded, 502 modules; `npm run check:api-drift` "No drift" (re-confirmed, this card
+  changes no contract and no generated file). `npm run test:e2e` (`playwright test`) **7 passed,
+  Skipped: 0** — the three pre-existing specs unmodified and still green, plus the two new specs
+  this card's AC named explicitly: `e2e/sessions.spec.ts` (create-session → open-term) and
+  `e2e/classes.spec.ts` (create-level-by-insert-after, asserting the resulting order).
+
+  **Two wasted verification cycles, the orchestrator's lesson**: this session first ran `npm run
+  verify` via `run_in_background` (twice), losing the result to a fresh turn each time without
+  reading it back before reporting; the second background run also shipped a lint-breaking dead
+  variable (`idempotencyKeySeen` assigned, never read, in `e2e/sessions.spec.ts`) that only a human
+  -equivalent full run caught. Fixed by exposing it (`getIdempotencyKeySeen()`) and asserting it in
+  the spec, then re-running `verify`/`test:e2e` synchronously to completion before reporting. §9's
+  "a subagent reporting success without pasting gate output has not finished" applies equally to a
+  background dispatch whose output the dispatching session never actually read.
+
+  Full text: this card's own `## Log`.
+
+- 2026-09-08 **TASK-0041 implemented by frontend-dev — authenticated back-office shell, protected
+  routing, and the School Settings screen; status → review.** No contract change; client already
+  current at `82870944…` from TASK-0040. `GET /settings` gated `settings.view`, `PATCH
+  /settings/identity` gated `settings.identity.update` — both verified against
+  `decisions/2026-Q3-contract-deltas.md`'s TASK-0005 entry (all five settings privilege strings
+  confirmed to exist verbatim in the shipped register), not invented.
+
+  **Shell**: `components/layout/authenticated-shell.tsx` wraps (does not fork) `AppShell`, adding
+  a nav row — item list filtered by `hasPrivilege(session, item.requires)`, a new export on
+  `lib/auth/auth-session.ts` (the one place session shape lives) checking either an explicit grant
+  in `effectivePrivileges` or the `isSuperAdmin` flag-bypass. An item the caller cannot use is
+  absent from the DOM, not rendered disabled — asserted directly (`queryByRole('link', ...)).not
+  .toBeInTheDocument()`), not inferred from a disabled attribute. Sign-out is now the shell's own
+  control (`useSignOut` from `features/auth/api.ts`, unchanged ordering logic — mutate, THEN
+  `terminateSession()` in `onSuccess`) rather than a per-screen button, so there is exactly one
+  Sign-out affordance once authenticated; `features/auth/components/sign-out-button.tsx` deleted as
+  the now-superseded duplicate, and `LandingScreen` no longer renders its own.
+
+  **Routing**: `app/router/protected-layout.tsx` is the one guard — unauthenticated (401 from `GET
+  /auth/me`) → `<Navigate to={paths.signIn}>`, pending → a loading region, other error → retry,
+  success → `AuthenticatedShell` wrapping every protected route's `<Outlet/>` in one
+  `ErrorBoundary`. Also the single subscriber to `onSessionEnded` for every protected route now
+  (previously only `LandingScreen` had one). `app/router/require-privilege.tsx` is the per-route
+  403 gate, rendering the new `components/feedback/forbidden-screen.tsx` — distinct from the also-
+  new `components/feedback/not-found-screen.tsx` (extracted from the old inline wildcard-route
+  JSX), proven distinct by asserting the "Access denied" heading appears and "Page not found" does
+  not. `app-router.tsx` rewritten per its own comment's instruction to split per-feature past a
+  handful of routes: `features/auth/auth-routes.tsx` (public `sign-in` + protected index
+  `LandingScreen`) and `features/settings/settings-routes.tsx` (protected `settings`, wrapped in
+  `RequirePrivilege privilege="settings.view"`) are spread into the router; `paths.ts` gained one
+  entry, `settings: '/settings'`.
+
+  **Settings screen**: `features/settings/` follows `features/auth/`'s shape exactly (`api.ts`,
+  `types.ts` re-exporting `SettingsDto`/`SettingsIdentityGroupDto`/`UpdateSchoolIdentityCommand`
+  from `schema.d.ts`, `components/school-identity-form.tsx`, `settings-screen.tsx`). Read-only for
+  a caller holding `settings.view` but not `settings.identity.update` (a `<dl>` of the identity
+  fields); the form (react-hook-form + zod, `identity-schema.ts`) for a caller holding both.
+  `expectedVersion` is round-tripped from the last-read `versionNumber`, never user-edited, so a
+  concurrent editor's `409 settings.identity.stale_version` surfaces as the mutation's own
+  non-field error banner. A 422's `errors` (PascalCase keys) map onto the matching camelCase form
+  field via a case-insensitive lookup — the same tolerant-lookup shape `sign-in-form.tsx`
+  established, duplicated rather than promoted to `src/shared/` per CONVENTIONS.md §4's "promote
+  only when a second consumer appears, in its own commit" — this dispatch is not that commit.
+  `motto`'s wire nullability is handled at the form/command boundary (`''` ↔ `null`), never by
+  making the zod field itself nullable, since an `<Input>` can only ever produce a string. No
+  distinct "empty" state for either `me` or `settings` — both are single-object profile/settings
+  reads, same precedent `LandingScreen` already established for `me`.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings (one real finding: `jsx-a11y/prefer-tag-
+  over-role` rejected `<p role="status">` for the save-confirmation banner — fixed to `<output>`,
+  not suppressed); `npm run test` (`vitest run`) **29 files, 224 passed, 0 failed, Skipped: 0**
+  (was 25/205 after TASK-0040); `npm run build` (`tsc -b && vite build`) succeeded, 334 modules;
+  `npm run check:api-drift` "No drift" (re-confirmed, this card changes no contract and no
+  generated file). `npm run test:e2e` (`playwright test`) **5 passed, Skipped: 0** — the two
+  pre-existing specs (`smoke.spec.ts`, `auth.spec.ts`) unmodified and still green (proving the
+  shell rewrite didn't regress the existing sign-in/sign-out flow), plus the new
+  `e2e/settings.spec.ts` covering the full sign-in → settings edit (nav click, field edit, save,
+  confirmation) → sign-out round trip this card's acceptance criteria named explicitly.
+
+  **Order-of-operations and privilege-absence, proven, not asserted**: `authenticated-shell.test
+  .tsx`'s sign-out case stalls the mocked `POST /auth/sign-out` response, asserts the request had
+  already fired (a local flag, not a spy on the module) while `getSession()` is still non-null,
+  then resolves the response and asserts `getSession()` only becomes null after — the real
+  `@/lib/auth/auth-session` module state, not a mock of `terminateSession`. Nav-visibility asserted
+  with two callers (`settings.view` granted vs. an empty `effectivePrivileges`), absence via
+  `queryByRole(...).not.toBeInTheDocument()`. `protected-layout.test.tsx` builds a standalone
+  `createMemoryRouter` around the real `ProtectedLayout` (not the full app router) to prove the
+  unauthenticated→sign-in redirect and that the shell chrome renders alongside protected content
+  once authenticated; `require-privilege.test.tsx` proves the 403-not-404 distinction the same way.
+
+  **Files changed**: `frontend/src/lib/auth/auth-session.ts` (+`hasPrivilege`),
+  `frontend/src/lib/auth/auth-session.test.ts` (+ tests), `frontend/src/app/router/paths.ts`
+  (+`settings`), `frontend/src/app/router/app-router.tsx` (rewritten, split per-feature),
+  `frontend/src/app/router/protected-layout.tsx` + `.test.tsx` (new),
+  `frontend/src/app/router/require-privilege.tsx` + `.test.tsx` (new),
+  `frontend/src/components/layout/authenticated-shell.tsx` + `.test.tsx` (new),
+  `frontend/src/components/feedback/forbidden-screen.tsx` (new),
+  `frontend/src/components/feedback/not-found-screen.tsx` (new),
+  `frontend/src/features/auth/auth-routes.tsx` (new), `frontend/src/features/auth/landing-
+  screen.tsx` (own sign-out button removed, four-state handling otherwise unchanged),
+  `frontend/src/features/auth/landing-screen.test.tsx` (sign-out assertions removed accordingly),
+  `frontend/src/features/auth/components/sign-out-button.tsx` (deleted, superseded),
+  `frontend/src/features/settings/**` (new: `types.ts`, `api.ts`, `identity-schema.ts`,
+  `settings-screen.tsx` + `.test.tsx`, `components/school-identity-form.tsx`,
+  `settings-routes.tsx`), `frontend/e2e/settings.spec.ts` (new). Nothing under `src/api/**`,
+  `contracts/**` or `backend/**` touched. Not committed — left for the orchestrator per this
+  session's instructions.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no sessions/terms,
+  levels/sections or admins/roles screens; no pupil/result/pin/portal surface; no new component
+  library or styling approach beyond existing tokens and Base UI; `src/api/**` untouched.
+
+  **Pre-existing, unrelated to this dispatch — flagged, not fixed**: `git status` at the start of
+  this session already showed uncommitted changes from TASK-0040 (`frontend/src/api/schema.d.ts`,
+  `client-levels.test.ts`, `client-sections.test.ts`, `src/api/README.md`) and to
+  `.agent/STATE.md`/`.agent/tasks/TASK-0040.md` themselves, despite `STATE.md` recording TASK-0040
+  as closed. This session did not touch, revert, or build on top of resolving that gap — it is a
+  repo-hygiene item for the orchestrator (nothing to commit vs. nothing committed), not a frontend
+  concern this card owns.
+
+- 2026-09-08 **Open question 13 RESOLVED by the human: LEAVE IT.** Spec 6.4.2's rejection messages
+  for chain rules 4-plural, 5 and 6 stay unreachable; rule 3's message is accepted for those cases.
+  Validation is correct either way — only the wording an administrator sees was at stake, and rule
+  3's message ("Two levels have nothing leading into them: X and Y") is actionable. **No card, no
+  reorder of `ProgressionChainGuard.Validate`.** The counting proof stays in `ASSUMPTIONS.md`
+  §2.23 so the three messages are never re-implemented as live paths by a later dispatch.
+- 2026-09-08 **Priority ruling by the human: product surface comes before further backend
+  modules.** Five backend modules ship with one screen built (auth sign-in). After TASK-0040 the
+  queue jumps to the back-office shell and real screens (TASK-0041 onward); TASK-0039 (arms) and
+  therefore TASK-0030's retirement of `SuperAdminFlagEffectivePrivilegeProvider` wait. **The
+  standing auth bypass therefore stays live longer — accepted deliberately, recorded here so it is
+  not rediscovered as an oversight.**
+
+- 2026-09-08 **TASK-0040 implemented by frontend-dev — client regenerated against `82870944…`,
+  all nine sections/levels operations reachable through the existing generic wrapper with ZERO new
+  lines in `client.ts`/`client-types.ts`; closed same session (client-seam-only card, no screen to
+  review).**
+
+  Hash independently recomputed with `sha256sum` before starting — matched `CONTRACT.lock` byte
+  for byte (`82870944982d77d2e540eb2ad455444151d670f439b6e6f9cc7fc54d41ba4168`), so regenerated
+  against the already-committed document rather than a moving target. `npm run generate:api`
+  rewrote `src/api/schema.d.ts` — **+1107/-5 lines** per `git diff --stat`, purely additive: the
+  `ListSections`, `CreateSection`, `UpdateSection`, `ListLevels`, `CreateLevel`, `GetLevel`,
+  `UpdateLevel`, `DeleteLevel`, `ReorderLevels` operations plus their schemas (`SectionDto`,
+  `SectionListResponse`, `CreateSectionCommand`, `UpdateSectionCommand`, `LevelDto`,
+  `LevelStatus`, `CreateLevelCommand`, `UpdateLevelCommand`, `ReorderLevelsCommand`,
+  `CursorPageOfLevelDto`). `check:api-drift` → "No drift." Fourth confirmation of the same finding
+  TASK-0033/0037 established: a new operation on an already-supported HTTP method needs no
+  hand-written code in `client.ts`/`client-types.ts` — regenerating the schema is what makes the
+  path callable.
+
+  **Both negative typing directions proven on two different operation shapes, per the card's
+  explicit repeat of TASK-0037's first-dispatch miss**: `ListSections` (options carries nothing
+  beyond `signal`/`timeout` — the "trivially empty" shape) and `ListLevels` (query has real
+  optional fields — the "not trivially empty" shape) both reject a passed `idempotencyKey`;
+  `CreateSection` and `CreateLevel` both reject an omitted required `Idempotency-Key`. Every
+  `PATCH`/`DELETE`/`GET`-by-id operation (`UpdateSection`, `GetLevel`, `UpdateLevel`,
+  `DeleteLevel`) proven to reject an omitted required path parameter.
+
+  **§8 enum tolerance proven for `LevelStatus`** via a `server.use(...)` override on `ListLevels`
+  returning `status: "SomeFutureLevelStatus"`, asserted to pass through unchanged. Wrote the
+  override route as `apiUrl('/api/v1/levels')` — no path parameter on this route, so the `:id`
+  trap TASK-0037 hit does not apply here, but the comment names `toMswRoute` anyway for the next
+  person who copies this file for a route that does have one.
+
+  **One real, non-type test failure caught and fixed, not a contract defect**: `ReorderLevels`'s
+  200 response schema (`type: array` of `LevelDto`, no `$ref`) carries no top-level `example`,
+  unlike every other operation in this contract, so `openapi-handlers.ts`'s `exampleFor` finds
+  nothing and the contract-derived default handler answers with an empty body instead of an
+  array. `Array.isArray(result)` failed on the un-overridden call. Fixed with an explicit
+  `server.use(...)` override supplying an array body for that one test, not by loosening the
+  assertion or touching `openapi-handlers.ts`; re-ran green. Not filed as drift — the contract
+  owes no example, and every other operation's assertion already tolerates whatever the default
+  handler returns.
+
+  **Tests split into two new files**, neither growing an existing one past CONVENTIONS.md §3's
+  180-line cap: `client-sections.test.ts` (67 lines — `ListSections`/`CreateSection`/
+  `UpdateSection`) and `client-levels.test.ts` (162 lines — `ListLevels`/`CreateLevel`/`GetLevel`/
+  `UpdateLevel`/`DeleteLevel`/`ReorderLevels`), colocated with `client.ts` alongside the four
+  existing test files. `src/api/README.md` updated to name both and add TASK-0040 to the
+  zero-new-code precedent list.
+
+  **All 8 `@ts-expect-error`s verified load-bearing by the removal-probe method**: each removed
+  one at a time from a `.bak` copy, `npm run typecheck` re-run, confirmed a failure at exactly
+  that line (`TS2554: Expected 3 (or 2) arguments, but got fewer` for the required-path-parameter/
+  required-`Idempotency-Key` cases, `TS2353: Object literal may only specify known properties,
+  and 'idempotencyKey' does not exist` for both declares-no-`Idempotency-Key` cases), then
+  restored from the `.bak` and re-verified `npm run typecheck` clean before deleting the backups.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **25 files,
+  205 passed, 0 failed, Skipped: 0** (was 24 files / 186 passed; the two new files' 19 cases — 6 +
+  13 — account for the delta exactly); `npm run build` (`tsc -b && vite build`) succeeded, 323
+  modules, 9 chunks, unchanged (test files aren't bundled); `npm run check:api-drift` "No drift".
+  §4.4 check 3 (`src/test/http-boundary.test.ts`) re-run directly: 2 passed, no raw `fetch`/
+  `axios` outside `src/lib/http/`. **`npm run test:e2e` NOT re-run** — nothing e2e-relevant
+  changed (no screen, no route, no auth/session touch; client-seam-only card per its own Out of
+  scope), last known green at 4 passed/Skipped 0 from TASK-0037.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +1107/-5),
+  `frontend/src/api/client-sections.test.ts` (new, 67 lines),
+  `frontend/src/api/client-levels.test.ts` (new, 162 lines), `frontend/src/api/README.md`
+  (+8/-7). Nothing under `contracts/**` or `backend/**` touched; hash unmoved at `82870944…`.
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no sections/levels screen, no
+  drag-and-drop reorder UI, no TanStack Query hooks, no `features/sections`/`features/levels`
+  folder, no client-side recomputation of `isEntryLevel`/`isGraduatingLevel` (backend-owned per
+  §4.5) — client seam only. Full text: `TASK-0040`'s own `## Log`.
 
 - 2026-09-08 **TASK-0038 CLOSED — sections, class levels and the eight progression-chain rules.**
   All ten gates PASS: `total=594 passed=594 failed=0 skipped=0` (was 532), line **80.55%** /
@@ -1157,12 +1597,25 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
 
 **Live triggers**
 
+- 2026-09-08 **THE FLAG BYPASS IS GONE.** `SuperAdminFlagEffectivePrivilegeProvider` deleted by
+  TASK-0030 and replaced with `RoleAssignmentEffectivePrivilegeProvider`, which resolves real
+  `role_assignment` rows. **TASK-0003's super-admin flag-bypass ruling is now FINAL, not
+  provisional** — the consequence the 2026-09-06 TASK-0028 split entry said would hold "until
+  TASK-0030 closes, not until 0028 does". No drift remains here; recorded as a live entry for one
+  cycle so the change is not missed, then archive it.
 - 2026-09-08 **The committed frontend client is ONE contract move behind; §4.4 check 2 is RED.**
-  `npm run check:api-drift` → `src/api/schema.d.ts is stale or was hand-edited`, with the
-  regenerated file adding all five TASK-0038 paths and their nine operations. **Verified by
-  running it, not inferred from the hash moving.** This is the FOURTH occurrence of the identical
-  drift (TASK-0029, 0033, 0037, now this) — the fix is always "run TASK-0037's shape again", and
-  it is carded as **TASK-0040**. **Trigger: TASK-0040.** Owner `frontend-dev`.
+  Fifth occurrence of the identical drift. **Trigger: TASK-0047.** Owner `frontend-dev`.
+
+- 2026-09-08 **Spec 6.1.2's self-edit carve-out is not built** — an admin editing their OWN
+  `staffName`/`phone` without holding `admin.update`. TASK-0043 shipped only the `admin.update`
+  path; no acceptance criterion named the carve-out and the agent reported the omission rather
+  than silently covering it. Frontend-only gap; the backend endpoint's own authorization is
+  unaffected. **Trigger: the next admins-screen card.** Owner `frontend-dev`.
+
+- ~~2026-09-08 **The committed frontend client is ONE contract move behind; §4.4 check 2 is RED.**~~
+  **STRUCK 2026-09-08 — TASK-0040 regenerated it against `82870944…` and closed.** This was the
+  fourth occurrence of the identical drift (TASK-0029, 0033, 0037, now 0040), fixed the same way
+  each time. Full text: TASK-0040's entry in `## Decisions` below and its card's `## Log`.
 - 2026-09-08 **`DELETE /levels/{id}`'s reference check is PARTIAL and MORE PERMISSIVE than spec
   6.4.2's "delete only where nothing has ever referenced the row".** TASK-0038 enforces the one
   reference that exists today — another level's `nextLevelId`, backed by a `RESTRICT` foreign key
@@ -1182,14 +1635,15 @@ dispatch. The rest are accepted deviations with no trigger, dated here, full tex
   card that moves the contract leaves the client stale until a separate frontend card lands — no
   fourth occurrence expected to need a new pattern, the fix is always "run TASK-0037's shape
   again." Full text: TASK-0037's own entry below and its card's `## Log`.
-- 2026-09-07 **`POST /terms/{id}/open` is MORE PERMISSIVE than spec 6.3.6: it does not enforce
+- ~~2026-09-07 **`POST /terms/{id}/open` is MORE PERMISSIVE than spec 6.3.6: it does not enforce
   "at least one arm exists for the session".** Accepted deliberately by TASK-0035 because arms
   (spec 06 §6.4) do not exist yet — the alternative was an always-satisfied arm probe, i.e. a
   second always-true bypass of the kind `SuperAdminFlagEffectivePrivilegeProvider` already is.
   Seam marked `DEFERRED` at `OpenTermHandler.cs:16`; rationale in `backend/docs/ASSUMPTIONS.md`
-  §2.22. **Trigger: TASK-0039 resolves this and rewrites that comment** (was TASK-0038 until the
-  2026-09-07 split moved arms into TASK-0039 — the trigger followed the arms, not the card id).
-  Owner `backend-dev`.
+  §2.22.**~~ STRUCK 2026-09-08 — TASK-0039 resolved it.** `TermTransitionGuard.CanOpen` now takes
+  `hasArmsForSession` and rejects `term.no_arms_for_session` naming the session; covered by
+  `TermTransitionGuardTests.CanOpen_WithNoArmsForSession_Rejects` and
+  `TermEndpointsTests.Open_WithNoArmsForSession_Returns409NamingTheSession`.
 - 2026-09-07 **`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition**
   (blocked by any set in Draft / Awaiting Approval / Approved, listing the offending arms), and
   the session list/detail omit spec 6.3.8's arm, pupil and publication counts rather than
@@ -1326,16 +1780,6 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 
 Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
 sign-off) resolved 2026-09-06 and archived there.
-
-13. **Spec 6.4.2's rejection messages for chain rules 4-plural, 5 and 6 are unreachable** — rule 3
-    always fires first, proven by a counting argument in `ASSUMPTIONS.md` §2.23 (TASK-0038). The
-    spec enumerates eight rules and wrote a distinct message for each; three of those messages can
-    never reach an administrator, who instead gets rule 3's "two levels have nothing leading into
-    them". **Question for the human: is rule 3's message acceptable for those cases, or should the
-    guard check the more specific rules FIRST so the administrator gets the message the spec
-    intended?** Not blocking — the guard rejects every invalid chain correctly either way; only the
-    wording the user sees is at stake. Raised 2026-09-08. Owner: product decision, then a small
-    `backend-dev` card if the order changes.
 
 5. **Production database target** undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
