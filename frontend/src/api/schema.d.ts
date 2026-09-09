@@ -207,6 +207,50 @@ export interface paths {
         patch: operations["UpdateArm"];
         trace?: never;
     };
+    "/api/v1/admins/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an account's role assignments
+         * @description Spec 6.1.5: every assignment for this account, active and revoked, with role, scope type, scope ids and session. Not paginated — assignment counts per account are admin-configuration-sized.
+         */
+        get: operations["ListRoleAssignments"];
+        put?: never;
+        /**
+         * Grant a role to an account
+         * @description Spec 6.1.5: role, session and either school-wide or a non-empty arm list; every arm must belong to the named session. Requires `role.assign` for a school-wide grant, or `role.scope.assign` for an arm-scoped one. Escalation rule 1 (spec 6.1.7): rejects an attempt to assign a role to yourself — `You cannot change your own roles. Ask another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for the privilege it is exercising. Both rejections write an audit event. The seeded Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateRoleAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a role assignment
+         * @description Spec 6.1.14. Requires `role.assign`. Escalation rule 1 (spec 6.1.7): rejects revoking your own assignment, with an audit event on rejection. Always `204`.
+         */
+        delete: operations["RevokeRoleAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -523,7 +567,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a role
-         * @description Spec 9.4: hard-deletes unconditionally today, because no `role_assignment` table exists yet, so nothing can ever have referenced a role (TASK-0030 adds the has-ever-been-assigned branch that archives instead). A system role returns 409.
+         * @description Spec 9.4: hard-deletes when no assignment has ever referenced the role; archives it instead (still 204) when at least one has, active or revoked. A system role returns 409.
          */
         delete: operations["DeleteRole"];
         options?: never;
@@ -1039,8 +1083,10 @@ export interface components {
              */
             mustChangePassword: boolean;
             /**
-             * @description The caller's resolved effective privilege set. For this card, populated only via the
-             *     bool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.
+             * @description The caller's resolved effective privilege set, from whatever `IEffectivePrivilegeProvider` is
+             *     registered — the bool AuthSessionResponse.IsSuperAdmin flag path for a super admin, or (since TASK-0030's
+             *     provider graduation) the union of a non-super-admin's own active `role_assignment` grants.
+             *     This endpoint's SHAPE is unchanged by TASK-0030; only the data behind it improved.
              * @example [
              *       {
              *         "privilege": "admin.view",
@@ -1486,6 +1532,47 @@ export interface components {
              * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46
              */
             insertAfterLevelId: null | string;
+        };
+        /**
+         * @description `POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a
+         *             school-wide grant or `role.scope.assign` for an arm-scoped grant — data-dependent on
+         *             ScopeType CreateRoleAssignmentCommand.ScopeType, so the handler resolves and enforces it rather than a route-declarative
+         *             privilege. Subject to escalation rules 1 and 3 (spec 6.1.7).
+         * @example {
+         *       "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "scopeType": "ArmList",
+         *       "armIds": [
+         *         "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+         *       ]
+         *     }
+         */
+        CreateRoleAssignmentCommand: {
+            /**
+             * @description The account receiving the role — bound from the route, not the body.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            adminAccountId: string;
+            /**
+             * @description Must reference an active role, not the seeded Super Admin role.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            roleId: string;
+            /**
+             * @description Must reference an existing session. Every arm in IReadOnlyList&lt;string&gt;? CreateRoleAssignmentCommand.ArmIds must belong to it.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /** @description School-wide or arm-list. */
+            scopeType: components["schemas"]["ScopeType"];
+            /**
+             * @description Required and non-empty when ScopeType CreateRoleAssignmentCommand.ScopeType is arm-list; otherwise must be empty or omitted.
+             * @example [
+             *       "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+             *     ]
+             */
+            armIds: null | string[];
         };
         /**
          * @description `POST /api/v1/roles` (spec 6.1.4; approved delta
@@ -2398,6 +2485,74 @@ export interface components {
             temporaryPassword: null | string;
         };
         /**
+         * @description Wire shape of a RoleAssignment (spec 6.1.5).
+         * @example {
+         *       "id": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+         *       "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "scopeType": "ArmList",
+         *       "armIds": [
+         *         "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+         *       ],
+         *       "grantedBy": "0192f0c4-d183-7f60-e472-8030af1b6295",
+         *       "status": "Active",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        RoleAssignmentDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51
+             */
+            id: string;
+            /**
+             * @description The account this assignment grants a role to.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            adminAccountId: string;
+            /**
+             * @description The role granted.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            roleId: string;
+            /**
+             * @description The session this assignment applies to, or `null` only for the sessionless Super
+             *     Admin assignment — TASK-0030 never actually produces that case (see RoleAssignment's
+             *     remarks) but the wire shape stays honest to the entity rather than asserting non-null.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: null | string;
+            /** @description Either `SchoolWide` or `ArmList`. */
+            scopeType: components["schemas"]["ScopeType"];
+            /**
+             * @description Non-empty only when ScopeType is `ArmList`.
+             * @example [
+             *       "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+             *     ]
+             */
+            armIds: string[];
+            /**
+             * @description The acting account that created this assignment.
+             * @example 0192f0c4-d183-7f60-e472-8030af1b6295
+             */
+            grantedBy: string;
+            /** @description Either `Active` or `Revoked`. */
+            status: components["schemas"]["RoleAssignmentStatus"];
+            /**
+             * Format: date-time
+             * @description When this assignment was created.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+        };
+        /**
+         * @description Lifecycle of a RoleAssignment (spec 6.1.5).
+         * @example Active
+         * @enum {unknown}
+         */
+        RoleAssignmentStatus: "Active" | "Revoked";
+        /**
          * @description The wire shape of a role (spec 6.1.4; approved delta `.agent/decisions/2026-Q3-contract-deltas.md`
          *     entry `TASK-0028` §2). Returned by every role endpoint — create, get, list (as the item
          *     shape) and update all share this one DTO, matching how `AdminAccountDetailDto` is reused
@@ -2502,7 +2657,7 @@ export interface components {
         /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
          *     or a list of specific arms in a specific session."
-         * @example SchoolWide
+         * @example ArmList
          * @enum {unknown}
          */
         ScopeType: "SchoolWide" | "ArmList";
@@ -4334,6 +4489,245 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRoleAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignmentDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateRoleAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleAssignmentCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignmentDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RevokeRoleAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Too Many Requests */
