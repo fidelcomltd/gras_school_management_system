@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Persistence;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -178,6 +179,8 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0039: arms.
         services.AddScoped<IArmRepository, ArmRepository>();
+
+        services.AddScoped<IPupilRepository, PupilRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

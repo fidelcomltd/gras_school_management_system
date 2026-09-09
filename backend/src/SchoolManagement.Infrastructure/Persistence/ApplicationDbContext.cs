@@ -5,6 +5,7 @@ using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Idempotency;
+using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Reference;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
@@ -90,6 +91,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// this set — it has no update or delete path anywhere (spec 9.4).
     /// </summary>
     internal DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    /// <summary>
+    /// TASK-0050. Internal, not public: only this assembly's repositories may query it. Carries the
+    /// pending-exclusion model-level query filter (spec 6.5.14) — see
+    /// <c>Configurations.PupilConfiguration</c>.
+    /// </summary>
+    internal DbSet<Pupil> Pupils => Set<Pupil>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

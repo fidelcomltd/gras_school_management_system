@@ -1013,6 +1013,134 @@ PascalCase, machine-readable token, not a copy of the spec table's prose.
 
 ---
 
+### 2.27 TASK-0050 — pupil entity, the pending-exclusion invariant, arm-scoped `pupil.view`/`pupil.update` with no arm on the entity, and the Nigerian state/LGA reference data
+
+**The central tension this card had to resolve, named up front because it shapes everything below:**
+spec 6.5.3 marks `pupil.view`/`pupil.update` "arm-scoped for a Class Teacher," but spec 6.5.4's own
+entity table carries NO arm reference at all — a pupil's arm comes only from its OPEN ENROLMENT (spec
+07's own line 9: "the dated history of which arm the child sat in"), and this card's own hard boundary
+is "do not model an enrolment." Every pupil this card can create is `Pending`, and a pending pupil is
+by definition not in any arm. The route-declarative scope mechanism TASK-0002 built
+(`RequirePrivilege(privilege, ScopeParameterKind.Pupil, "id")`, resolving via
+`IPupilArmOfRecordLookup`) is therefore UNUSABLE here: with no enrolment, that lookup can only ever
+return `null`, which `ScopeResolver` turns into `ScopeResolution.Unresolvable`, which
+`PrivilegeDecision.IsAuthorized` fails closed for — including a SCHOOL-WIDE holder. Using it would
+make `PATCH /pupils/{id}` permanently unusable for the one thing this card exists to let the office
+do: edit a pending pupil's own biographical fields.
+
+**Resolution, and where the mechanism actually lives.** `GET /pupils`, `GET /pupils/{id}` and
+`PATCH /pupils/{id}` are mapped with `.RequireAuthenticatedCaller()`, not `RequirePrivilege(...)` — the
+same "data-dependent privilege requirement" pattern `UpdateAdminAccountCommandHandler` already
+established for spec 6.1.2's self-edit carve-out. Each handler calls `IEffectivePrivilegeProvider`
+directly (never re-deriving arm resolution, per the card's own instruction) and resolves one of three
+outcomes via a new `PupilAccessGuard`/`PupilAccessScope` (`Application/Pupils/PupilAccessGuard.cs`):
+`Forbidden` (no matching grant at all → 403), `SchoolWide` (unrestricted), or `ArmRestricted` (every
+matching grant is arm-scoped, none school-wide). Because no pupil carries an arm today,
+`ArmRestricted` is handled as: an EMPTY page for `GET /pupils` (a real, non-error answer — the caller
+genuinely holds the privilege, just over arms that currently contain nothing) and a 403 for
+`GET/PATCH /pupils/{id}` (the specific target is never within the caller's granted arms, the same
+"resolved-but-out-of-scope" outcome `PrivilegeDecision` already gives everywhere else). `POST /pupils`
+(create) and `GET /pupils/duplicates` stay on the ordinary declarative `RequirePrivilege(...)` gate,
+because `pupil.create` is NOT scopable (spec 4.4.4, `PrivilegeRegistry`) — no data-dependent handling
+needed. `GET /admissions` is declared `RequirePrivilege(Privileges.Pupil.View, ScopeParameterKind.None)`
+— SCHOOL-WIDE only — on the reasoning that a pending record has no arm for an arm-scoped grant to mean
+anything over, so admissions processing is inherently a school-wide operation; this is an authored
+reading, not a spec sentence, and is disclosed here rather than silently assumed.
+
+**Proven against the REAL `RoleAssignmentEffectivePrivilegeProvider`, not a fake, both directions —
+the card's own second named criterion.** `PupilEndpointsTests.List_ArmScopedCaller_SeesAnEmptyPage_
+SchoolWideCallerSeesTheRecord` and `Get_ArmScopedCaller_Returns403_SchoolWideCallerReturns200` seed a
+regular admin account, a role, and a real `role_assignment` row directly through the DbContext (the
+same accepted technique `AssignmentEndpointsTests.SeedAssignmentAsync` uses), sign in for real over
+HTTP, and assert the divergent outcome — an arm-scoped caller sees nothing / gets 403, a school-wide
+caller sees the same record. Both callers query the SAME seeded `Pending` record via `status=Pending`
+(the ordinary list's own opt-out), so the divergence is genuinely caused by the scope check, not by
+one caller simply having no matching data to find.
+
+**Consequence for `PrivilegeDecision.cs:21`'s `TODO(TASK-0002)` — STATE.md's live drift trigger fired,
+and is RE-POINTED, not resolved.** That TODO is about ignoring `PrivilegeGrant.SessionId` because "no
+session-bearing scope target (pupil, result set) has a real lookup yet." This card does NOT give
+`IPupilArmOfRecordLookup` a real implementation (see above — it remains impossible without enrolment),
+so the pupil half of that TODO is still not resolvable. The trigger is re-pointed here rather than
+closed: the enrolment card (whichever one first opens a real enrolment and can therefore answer "what
+arm is this pupil in, right now") is what makes `IPupilArmOfRecordLookup` implementable for real, and
+only then does filtering matching grants by `SessionId` become meaningful for the pupil scope target.
+`NotYetImplementedPupilArmOfRecordLookup` is untouched by this card — still throws, still registered.
+
+**The pending-exclusion invariant is a model-level EF Core query filter, not a per-query
+`.Where()`.** `PupilConfiguration.Configure` calls `builder.HasQueryFilter(pupil => pupil.Status !=
+PupilStatus.Pending)` — the exact same mechanism (and reviewed precedent) `ApplicationDbContext.
+ApplySoftDeleteQueryFilters` already uses for `ISoftDeletable`, applied here to one named entity
+directly rather than by reflection over an interface (no second pending-shaped entity exists yet). A
+caller that genuinely needs a pending row calls `.IgnoreQueryFilters()` explicitly, at exactly three
+call sites: `FindTrackedByIdAsync`/`FindReadOnlyByIdAsync` (direct-id access is never subject to the
+invariant — editing a pending record before admission is this card's whole point), `ListAsync` when
+`status=Pending` is explicitly requested, and `ListAdmissionsQueueAsync`/`FindDuplicatesAsync`
+(unconditionally, since the queue and duplicate detection both NEED pending rows by design). This is
+deliberately NOT enforced via raw SQL text repeated per query — the card's own named risk
+("`.Where(p => p.Status != Pending)` in more than one place is the wrong shape").
+
+**Raw `Database.SqlQuery<T>` (`AdminAccountRepository`'s own pattern) was deliberately NOT reused for
+`PupilRepository.ListAsync`, and this is why.** `SqlQuery<T>` materialises into an arbitrary POCO with
+no entity-model context, so EF Core's model-level query filter cannot compose onto it — using it here
+would have silently bypassed the very invariant this card exists to build. `ListAsync`/
+`ListAdmissionsQueueAsync` instead query `context.Pupils` (a plain `DbSet<Pupil>` LINQ source) directly,
+so `HasQueryFilter` composes automatically. The composite `(surname, id)` keyset comparison
+`AdminAccountRepository`'s own comment says C# cannot express with a relational operator is instead
+written as `string.Compare(a, b, StringComparison.Ordinal) > 0` / `Guid.CompareTo(...) > 0` inside the
+LINQ predicate, which the Npgsql provider DOES translate to the equivalent SQL comparison — verified
+empirically against real Postgres (not assumed from documentation), by `PupilEndpointsTests`' list and
+search cases actually executing the translated query end-to-end.
+
+**Default sort is surname ascending then id, NOT spec 6.5.15's stated "class in progression order then
+surname ascending."** With no arm/enrolment reference on `Pupil` (see the entity's own remarks), there
+is no class to order by yet — disclosed here and in `PupilListCursor`'s own remarks, not silently
+substituted. **Trigger: the card that gives a pupil a resolvable class (enrolment) widens the cursor's
+key rather than replacing it.** Owner `backend-dev`.
+
+**Search's "registration number... or its serial alone" requirement (spec 6.5.15, "typing 41 finds
+GRAS/2026/0041") is satisfied by ORDINARY substring matching on the full registration number, with no
+separate serial-extraction step.** `"41"` is literally a substring of `"...0041"`, so
+`EF.Functions.ILike(registrationNumber, "%41%")` already finds it — verified by
+`PupilEndpointsTests.Search_BySerialAlone_FindsTheFullRegistrationNumber` against a real seeded
+registration number. Accepted looseness, disclosed rather than engineered around: a search term that
+happens to match the YEAR segment (e.g. `"26"` against `"GRAS/2026/0041"`) also matches, which a
+strict serial-only implementation would not do. Not treated as a defect — the spec's own worked example
+is satisfied exactly, and over-matching on a free-text search box is a materially smaller cost than
+the SQL complexity a strict serial-only extraction would add (see the ruled-out `regexp_replace`/
+`split_part` approaches this card's own investigation considered and rejected).
+
+**`state_of_origin`/`lga` are validated against a real closed list (`Domain/Pupils/
+NigerianGeography.cs`), never free text — but the 774 LGA names were compiled from general knowledge
+with NO authoritative source (e.g. the NPopC/INEC gazette) available to check against in this
+environment.** The 37 state names are low-risk, well-known and not flagged. The LGA data should be
+diffed against an authoritative source before being relied on for compliance-grade reporting — a
+transcription error would show up as a legitimate LGA being wrongly rejected (a real support
+complaint), not as silently accepting bad data, so the failure mode is at least safe rather than
+silent. **Trigger: before this data is used for anything reported on (spec 6.5.4's own stated reason
+for the closed list existing at all), verify it against an authoritative source.** Owner unassigned.
+
+**`registration_number` gets its unique index NOW (`ix_pupils_registration_number_unique`, nullable +
+unique — Postgres treats every `NULL` as distinct, so any number of `Pending` rows coexist under it),
+per the card's own instruction, so TASK-0051 does not need to alter the `pupils` table.** No counter,
+no issuance path, no status-change endpoint — `Pupil.RegistrationNumber` has no setter anywhere except
+inside the private constructor, proven by
+`PupilTests.UpdateBiographical_WithRegistrationNumberNotOfferedOnTheEntity_HasNoPublicSetter`'s
+reflective check rather than merely an absence of a call site in this file.
+
+**Size: this card measured 2,452 hand-written production lines (Domain + Application + Infrastructure
++ Api, the migration's own 63-line `Up`/`Down`, excluding the auto-generated `Designer.cs`/model
+snapshot) — well past the card's own ~1,000-line stop-and-report threshold, discovered only after the
+work was complete and tested rather than mid-way through.** Breakdown: `NigerianGeography.cs` is 337
+lines, almost entirely the state/LGA reference table itself (data, not branching logic — the lookup
+methods are ~40 of those lines); `Pupil.cs` is 507 lines, carrying two full field-by-field validation
+methods (`Create` and `UpdateBiographical`, each independently handling 12 fields) plus this
+codebase's standing convention of an XML doc comment on every public member (the OpenAPI description
+source). Even excluding the reference-data file as "data, not logic," the remainder is still roughly
+double the guideline. Flagged prominently in this card's own report rather than silently absorbed —
+the orchestrator's call whether a later card of this shape should split the entity-plus-invariant work
+from the CRUD-handler work, the same lesson TASK-0038's own retrospective drew for `Domain/Classes/`.
+
 ## 3. Open — a human must decide or supply
 
 Ordered by how much they block.

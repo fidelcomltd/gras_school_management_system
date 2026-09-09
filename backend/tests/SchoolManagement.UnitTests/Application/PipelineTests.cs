@@ -10,6 +10,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Behaviors;
@@ -87,6 +88,10 @@ public sealed class PipelineTests
         // read) depend on this port, implemented by Infrastructure — same treatment as every other
         // repository stubbed above.
         services.AddSingleton(Substitute.For<IArmRepository>());
+
+        // TASK-0050: the Pupils/* handlers depend on this port, implemented by Infrastructure — same
+        // treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IPupilRepository>());
 
         services.AddOptions<PipelineOptions>();
 

@@ -897,6 +897,89 @@
         }
       }
     },
+    "/api/v1/admissions": {
+      "get": {
+        "tags": [
+          "Admissions"
+        ],
+        "summary": "List the admissions queue",
+        "description": "Spec 6.5.14: \"A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else.\" This IS that queue — every pending pupil, unconditionally. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.",
+        "operationId": "ListAdmissionsQueue",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfPupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/arms": {
       "get": {
         "tags": [
@@ -3336,6 +3419,572 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils": {
+      "post": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Register a new pupil",
+        "description": "Spec 6.5.4: always creates a PENDING record with no registration number — nothing reaches active until admission approval (a later card) issues one. `pupil.create` is not arm-scoped. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreatePupil",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePupilCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "List pupils",
+        "description": "Spec 6.5.15. Cursor-paginated per spec 9.5, page size 50 by default. Sorted by surname ascending then id (spec 6.5.15's own default additionally orders by class progression, which no pupil in this card can carry — see backend/docs/ASSUMPTIONS.md §2.27). EXCLUDES pending unless `status=Pending` is passed explicitly (the pending-exclusion invariant, spec 6.5.14) — `GET /admissions` is the queue that always shows it. `search` matches surname, first name, middle name or the registration number (in full, or its trailing serial — spec 6.5.15's own worked example, \"41\" finding \"GRAS/2026/0041\", is satisfied by ordinary substring matching); contact-phone and authorised-pickup-person search are the NEXT card's, once `pupil_contact` exists. `pupil.view` is arm-scoped for a Class Teacher: no pupil carries an arm reference until enrolment exists, so an arm-scoped caller sees an empty page today rather than a 403 — a real answer, not a placeholder.",
+        "operationId": "ListPupils",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PupilStatus"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfPupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils/duplicates": {
+      "get": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Find pupil records that may be duplicates",
+        "description": "Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.",
+        "operationId": "FindPupilDuplicates",
+        "parameters": [
+          {
+            "name": "surname",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "firstName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateOfBirth",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PupilDto"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils/{id}": {
+      "get": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Read one pupil",
+        "description": "Renders only what exists after this card — no contacts, health, documents or enrolment-history blocks yet. Reachable for a PENDING record (finding it again to edit it is this card's own goal), unlike the list. `pupil.view` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.",
+        "operationId": "GetPupil",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Edit a pupil's biographical fields",
+        "description": "Spec 6.5.10: `registrationNumber` in the payload is REJECTED with 409 — it is issued once at admission approval and never edited afterwards, \"no ordinary edit path exists.\" Every other field is independently optional; an absent field is left unchanged, an empty string clears an optional one. `pupil.update` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.",
+        "operationId": "UpdatePupilBiographical",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePupilBiographicalCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7462,6 +8111,113 @@
           "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
         }
       },
+      "CreatePupilCommand": {
+        "required": [
+          "surname",
+          "firstName",
+          "middleName",
+          "sex",
+          "dateOfBirth",
+          "nationality",
+          "stateOfOrigin",
+          "lga",
+          "homeAddress",
+          "previousSchool",
+          "previousClass",
+          "otherInformation"
+        ],
+        "type": "object",
+        "properties": {
+          "surname": {
+            "type": "string",
+            "description": "1..60 characters, letters/spaces/hyphens/apostrophes.",
+            "example": "Okafor"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Same rule as Surname.",
+            "example": "Chidera"
+          },
+          "middleName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional. Same rule as Surname when supplied.",
+            "example": "Ngozi"
+          },
+          "sex": {
+            "description": "Male or female.",
+            "$ref": "#/components/schemas/PupilSex"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "In the past; must give an age between 2 and 20.",
+            "format": "date",
+            "example": "2020-05-03"
+          },
+          "nationality": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` defaults to `Nigerian`.",
+            "example": "Nigerian"
+          },
+          "stateOfOrigin": {
+            "type": "string",
+            "description": "One of the 36 states or the Federal Capital Territory — free text is rejected.",
+            "example": "Anambra"
+          },
+          "lga": {
+            "type": "string",
+            "description": "Must belong to StateOfOrigin — free text is rejected.",
+            "example": "Awka South"
+          },
+          "homeAddress": {
+            "type": "string",
+            "description": "The child's own address. Multi-line permitted.",
+            "example": "14 Zik Avenue, Awka"
+          },
+          "previousSchool": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional."
+          },
+          "previousClass": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional."
+          },
+          "otherInformation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional, section G free text."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/pupils` (spec 6.5.4). Always creates a PupilStatus.Pending\n        record with a `null` registration number — see the task card's own goal: \"Nothing\n        can reach active yet.\"",
+        "example": {
+          "surname": "Okafor",
+          "firstName": "Chidera",
+          "middleName": "Ngozi",
+          "sex": "Female",
+          "dateOfBirth": "2020-05-03",
+          "nationality": "Nigerian",
+          "stateOfOrigin": "Anambra",
+          "lga": "Awka South",
+          "homeAddress": "14 Zik Avenue, Awka",
+          "previousSchool": null,
+          "previousClass": null,
+          "otherInformation": null
+        }
+      },
       "CreateRoleAssignmentCommand": {
         "required": [
           "adminAccountId",
@@ -7954,6 +8710,80 @@
             }
           ],
           "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+        }
+      },
+      "CursorPageOfPupilDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+                "registrationNumber": null,
+                "surname": "Okafor",
+                "firstName": "Chidera",
+                "middleName": "Ngozi",
+                "sex": "Female",
+                "dateOfBirth": "2020-05-03",
+                "ageYears": 6,
+                "nationality": "Nigerian",
+                "stateOfOrigin": "Anambra",
+                "lga": "Awka South",
+                "homeAddress": "14 Zik Avenue, Awka",
+                "previousSchool": null,
+                "previousClass": null,
+                "status": "Pending",
+                "otherInformation": null,
+                "matchedField": null,
+                "createdAtUtc": "2026-08-03T09:30:00+00:00",
+                "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "registrationNumber": null,
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": "Ngozi",
+              "sex": "Female",
+              "dateOfBirth": "2020-05-03",
+              "ageYears": 6,
+              "nationality": "Nigerian",
+              "stateOfOrigin": "Anambra",
+              "lga": "Awka South",
+              "homeAddress": "14 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "status": "Pending",
+              "otherInformation": null,
+              "matchedField": null,
+              "createdAtUtc": "2026-08-03T09:30:00+00:00",
+              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+            }
+          ],
+          "nextCursor": null
         }
       },
       "CursorPageOfRoleDto": {
@@ -8633,6 +9463,190 @@
           "errorCode": "sample_record.label_taken",
           "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
+      },
+      "PupilDto": {
+        "required": [
+          "id",
+          "registrationNumber",
+          "surname",
+          "firstName",
+          "middleName",
+          "sex",
+          "dateOfBirth",
+          "ageYears",
+          "nationality",
+          "stateOfOrigin",
+          "lga",
+          "homeAddress",
+          "previousSchool",
+          "previousClass",
+          "status",
+          "otherInformation",
+          "matchedField",
+          "createdAtUtc",
+          "createdBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque to the client.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` while pending — always null within this card."
+          },
+          "surname": {
+            "type": "string",
+            "description": "As typed (spec 6.5.4: displayed uppercase only on the result sheet, out of scope here).",
+            "example": "Okafor"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "As typed.",
+            "example": "Chidera"
+          },
+          "middleName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied.",
+            "example": "Ngozi"
+          },
+          "sex": {
+            "description": "Male or female.",
+            "$ref": "#/components/schemas/PupilSex"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "ISO-8601 date.",
+            "format": "date",
+            "example": "2020-05-03"
+          },
+          "ageYears": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Derived, not stored — whole years as of today (spec 6.5.4's term-end computation is result-sheet-specific and out of scope; see `backend/docs/ASSUMPTIONS.md` §2.27).",
+            "format": "int32",
+            "example": 6
+          },
+          "nationality": {
+            "type": "string",
+            "description": "Free text; defaults `Nigerian`.",
+            "example": "Nigerian"
+          },
+          "stateOfOrigin": {
+            "type": "string",
+            "description": "One of the 36 states or the FCT.",
+            "example": "Anambra"
+          },
+          "lga": {
+            "type": "string",
+            "description": "One of string PupilDto.StateOfOrigin's Local Government Areas.",
+            "example": "Awka South"
+          },
+          "homeAddress": {
+            "type": "string",
+            "description": "The child's own address.",
+            "example": "14 Zik Avenue, Awka"
+          },
+          "previousSchool": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied."
+          },
+          "previousClass": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied."
+          },
+          "status": {
+            "description": "Pending for every record this card creates; the other members exist for the column's shape only.",
+            "$ref": "#/components/schemas/PupilStatus"
+          },
+          "otherInformation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied."
+          },
+          "matchedField": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Which field a search term matched (`\"Surname\"`, `\"FirstName\"`, `\"MiddleName\"` or\n`\"RegistrationNumber\"`), or `null` when no search term was given. Contact and\nauthorised-pickup-person search (spec 6.5.15) are the NEXT card's — never a value here."
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "System.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "createdBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The admin account id that created the record, or `null`.",
+            "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates\nall use this one DTO — 6.5.15's extra detail-view sections (contacts, health, enrolment history)\nand list-view completeness column do not exist yet (see the task card's own out-of-scope list),\nso there is nothing today that would make a Summary/Detail split carry different fields.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "registrationNumber": null,
+          "surname": "Okafor",
+          "firstName": "Chidera",
+          "middleName": "Ngozi",
+          "sex": "Female",
+          "dateOfBirth": "2020-05-03",
+          "ageYears": 6,
+          "nationality": "Nigerian",
+          "stateOfOrigin": "Anambra",
+          "lga": "Awka South",
+          "homeAddress": "14 Zik Avenue, Awka",
+          "previousSchool": null,
+          "previousClass": null,
+          "status": "Pending",
+          "otherInformation": null,
+          "matchedField": null,
+          "createdAtUtc": "2026-08-03T09:30:00+00:00",
+          "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+        }
+      },
+      "PupilSex": {
+        "enum": [
+          "Male",
+          "Female"
+        ],
+        "description": "A Pupil's sex (spec 6.5.4). Required, no default.",
+        "example": "Female"
+      },
+      "PupilStatus": {
+        "enum": [
+          "Pending",
+          "Active",
+          "Transferred",
+          "Withdrawn",
+          "Graduated"
+        ],
+        "description": "A Pupil's status (spec 6.5.4, 6.5.14). Defaults PupilStatus.Pending.",
+        "example": "Pending"
       },
       "RegNumberPreviewDto": {
         "required": [
@@ -9864,6 +10878,150 @@
           "status": null
         }
       },
+      "UpdatePupilBiographicalCommand": {
+        "required": [
+          "id",
+          "surname",
+          "firstName",
+          "middleName",
+          "sex",
+          "dateOfBirth",
+          "nationality",
+          "stateOfOrigin",
+          "lga",
+          "homeAddress",
+          "previousSchool",
+          "previousClass",
+          "otherInformation",
+          "registrationNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The pupil being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "surname": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1..60 characters, letters/spaces/hyphens/apostrophes.",
+            "example": "Okafor"
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Same rule as Surname.",
+            "example": "Chidera"
+          },
+          "middleName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          },
+          "sex": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Male or female.",
+                "$ref": "#/components/schemas/PupilSex"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "In the past; must give an age between 2 and 20.",
+            "format": "date"
+          },
+          "nationality": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string resets it to the default (`Nigerian`)."
+          },
+          "stateOfOrigin": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Must resolve to one of the 36 states or the Federal Capital Territory."
+          },
+          "lga": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Must resolve to one of StateOfOrigin's LGAs (the record's current state when StateOfOrigin is not also supplied)."
+          },
+          "homeAddress": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The child's own address.",
+            "example": "22 Zik Avenue, Awka"
+          },
+          "previousSchool": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          },
+          "previousClass": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          },
+          "otherInformation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "DECLARED ONLY SO ITS PRESENCE CAN BE DETECTED AND REJECTED — spec 6.5.10: \"the number is\nimmutable and no ordinary edit path exists.\" Any non-null value here, including one identical to\nthe pupil's current number, is a 409. Never written."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/pupils/{id}` (spec 6.5.4, 6.5.10). Biographical fields only. Every field is\n        independently optional — `null` leaves it unchanged, the same convention\n        `UpdateArmCommand` established; an empty string clears an optional field\n        (MiddleName, PreviousSchool, PreviousClass,\n        OtherInformation).",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "surname": "Okafor",
+          "firstName": "Chidera",
+          "middleName": null,
+          "sex": null,
+          "dateOfBirth": null,
+          "nationality": null,
+          "stateOfOrigin": null,
+          "lga": null,
+          "homeAddress": "22 Zik Avenue, Awka",
+          "previousSchool": null,
+          "previousClass": null,
+          "otherInformation": null,
+          "registrationNumber": null
+        }
+      },
       "UpdateRegNumberCommand": {
         "required": [
           "separator",
@@ -10212,6 +11370,9 @@
       "name": "Admins"
     },
     {
+      "name": "Admissions"
+    },
+    {
       "name": "Arms"
     },
     {
@@ -10225,6 +11386,9 @@
     },
     {
       "name": "Privileges"
+    },
+    {
+      "name": "Pupils"
     },
     {
       "name": "Reference"

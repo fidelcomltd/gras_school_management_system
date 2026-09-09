@@ -6,6 +6,7 @@ using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Security.Assignments;
@@ -876,6 +877,95 @@ internal static class OpenApiExamples
                   "status": "Active"
                 }
               ]
+            }
+            """,
+
+        [typeof(CreatePupilCommand)] = """
+            {
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": "Ngozi",
+              "sex": "Female",
+              "dateOfBirth": "2020-05-03",
+              "nationality": "Nigerian",
+              "stateOfOrigin": "Anambra",
+              "lga": "Awka South",
+              "homeAddress": "14 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "otherInformation": null
+            }
+            """,
+
+        [typeof(PupilDto)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "registrationNumber": null,
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": "Ngozi",
+              "sex": "Female",
+              "dateOfBirth": "2020-05-03",
+              "ageYears": 6,
+              "nationality": "Nigerian",
+              "stateOfOrigin": "Anambra",
+              "lga": "Awka South",
+              "homeAddress": "14 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "status": "Pending",
+              "otherInformation": null,
+              "matchedField": null,
+              "createdAtUtc": "2026-08-03T09:30:00+00:00",
+              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+            }
+            """,
+
+        [typeof(CursorPage<PupilDto>)] = """
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+                  "registrationNumber": null,
+                  "surname": "Okafor",
+                  "firstName": "Chidera",
+                  "middleName": "Ngozi",
+                  "sex": "Female",
+                  "dateOfBirth": "2020-05-03",
+                  "ageYears": 6,
+                  "nationality": "Nigerian",
+                  "stateOfOrigin": "Anambra",
+                  "lga": "Awka South",
+                  "homeAddress": "14 Zik Avenue, Awka",
+                  "previousSchool": null,
+                  "previousClass": null,
+                  "status": "Pending",
+                  "otherInformation": null,
+                  "matchedField": null,
+                  "createdAtUtc": "2026-08-03T09:30:00+00:00",
+                  "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(UpdatePupilBiographicalCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": null,
+              "sex": null,
+              "dateOfBirth": null,
+              "nationality": null,
+              "stateOfOrigin": null,
+              "lga": null,
+              "homeAddress": "22 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "otherInformation": null,
+              "registrationNumber": null
             }
             """,
     };
