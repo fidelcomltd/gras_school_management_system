@@ -156,6 +156,10 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<RejectedAuditEventWriter>();
         services.AddScoped<ISystemAuditSink, SystemAuditSink>();
 
+        // TASK-0049: the read surface — filters, cursor paging, CSV export. Deliberately a SEPARATE
+        // port from IAuditEventRepository, which stays ADD-ONLY (see its own remarks).
+        services.AddScoped<IAuditEventQueryRepository, AuditEventQueryRepository>();
+
         // TASK-0005a: school identity and the append-only config_version ledger.
         services.AddScoped<ISchoolProfileRepository, SchoolProfileRepository>();
         services.AddScoped<IConfigVersionRepository, ConfigVersionRepository>();

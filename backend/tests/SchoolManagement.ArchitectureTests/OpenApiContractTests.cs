@@ -340,6 +340,39 @@ public sealed class OpenApiContractTests
     }
 
     [Fact]
+    public void ExportAuditEvents_200Response_DeclaresTextCsvContent()
+    {
+        // TASK-0049, reopened: .Produces(StatusCodes.Status200OK, contentType: "text/csv") — with no
+        // response TYPE argument — was silently emitted as {"description": "OK"} with no "content" at
+        // all, while every OTHER response on this same operation (401/403/422/429) and ListAuditEvents'
+        // own 200 all carried "content". Runtime already streamed real text/csv
+        // (Export_ReturnsCsvWithTheThirteenColumnsAndTheMatchingRows in the integration suite proves
+        // that), so this was purely a documentation gap — but a silent one: a frontend generating a
+        // typed client from this document had no sanctioned way to learn the response is CSV. Fixed by
+        // using the generic .Produces<string>(...) overload instead, which supplies a response type the
+        // generator will actually describe. Pinned here the same way the other tests in this file pin a
+        // DECLARED shape, so the content type cannot silently disappear from the document again.
+        var responses = Document
+            .GetProperty("paths")
+            .GetProperty("/api/v1/audit-events/export")
+            .GetProperty("get")
+            .GetProperty("responses");
+
+        var ok = responses.GetProperty("200");
+
+        ok.TryGetProperty("content", out var content).ShouldBeTrue(
+            "GET /api/v1/audit-events/export's 200 response must declare a 'content' section — it " +
+            "returns text/csv, not an empty body.");
+
+        content.TryGetProperty("text/csv", out var textCsv).ShouldBeTrue(
+            "GET /api/v1/audit-events/export's 200 response must declare 'text/csv' as its content type.");
+
+        textCsv.TryGetProperty("schema", out var schema).ShouldBeTrue(
+            "The declared text/csv content must carry a schema.");
+        schema.GetProperty("type").GetString().ShouldBe("string");
+    }
+
+    [Fact]
     public void Document_HasApiLevelDocumentation()
     {
         var info = Document.GetProperty("info");

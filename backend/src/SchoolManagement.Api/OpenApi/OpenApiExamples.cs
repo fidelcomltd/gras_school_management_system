@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
+using SchoolManagement.Application.Audit;
 using SchoolManagement.Application.Auth;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.ChangePassword;
@@ -966,6 +967,47 @@ internal static class OpenApiExamples
               "previousClass": null,
               "otherInformation": null,
               "registrationNumber": null
+            }
+            """,
+
+        [typeof(AuditEventDto)] = $$"""
+            {
+              "id": "48213",
+              "occurredAtUtc": "{{CanonicalTimestamp}}",
+              "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+              "action": "settings.grading.update",
+              "entityType": "grading_band",
+              "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "outcome": "Success",
+              "beforeJson": null,
+              "afterJson": null,
+              "reason": null,
+              "sourceIp": "197.210.64.0/24",
+              "userAgent": "Mozilla/5.0"
+            }
+            """,
+
+        [typeof(CursorPage<AuditEventDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "48213",
+                  "occurredAtUtc": "{{CanonicalTimestamp}}",
+                  "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                  "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+                  "action": "settings.grading.update",
+                  "entityType": "grading_band",
+                  "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                  "outcome": "Success",
+                  "beforeJson": null,
+                  "afterJson": null,
+                  "reason": null,
+                  "sourceIp": "197.210.64.0/24",
+                  "userAgent": "Mozilla/5.0"
+                }
+              ],
+              "nextCursor": null
             }
             """,
     };

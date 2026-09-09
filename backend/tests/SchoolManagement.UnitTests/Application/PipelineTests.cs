@@ -93,6 +93,10 @@ public sealed class PipelineTests
         // treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IPupilRepository>());
 
+        // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAuditEventQueryRepository>());
+
         services.AddOptions<PipelineOptions>();
 
         services.AddApplication();
