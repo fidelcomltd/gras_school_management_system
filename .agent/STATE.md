@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-09 by orchestrator (TASK-0049 closure) · no size cap, see `## Reading this file`
+Last reconciled: 2026-09-09 by orchestrator (TASK-0055 closure, TASK-0054 dispatch) · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -162,7 +162,16 @@ at closure time the correct baseline is the WORKING TREE.** Uncommitted-but-corr
 state, because the orchestrator commits only after review. Before reporting any contract-history
 contradiction, check whether one side of the comparison came from `git show HEAD:`.
 
-openapi.json sha256: **`a1bd936b1e5bff709b8891c5c55e1918805e48ce3ef1e8a8afedd14bd87ee9f0`** — moved
+openapi.json sha256: **`7a3c84e6a1872d014e519c8fa15227ba040b8b31ade41e20d9e98d32be509325`** — moved
+          2026-09-09 by TASK-0055 (implemented, not yet closed). Additive: one new `entityId`
+          (string, optional) query parameter on EACH of `ListAuditEvents` and `ExportAuditEvents`,
+          plus two `description` text edits naming it. Still **47 paths** and still **86 schemas** —
+          both key sets independently diffed byte-for-byte identical against the prior committed
+          document; no path or schema added, removed or reshaped. Diff is +18/-3 lines. Hash
+          independently recomputed with `sha256sum`, matches `CONTRACT.lock`. Frontend client
+          regeneration explicitly out of this card's scope — TASK-0054 runs next, against this hash.
+
+previous: **`a1bd936b1e5bff709b8891c5c55e1918805e48ce3ef1e8a8afedd14bd87ee9f0`** — moved
           2026-09-09 by TASK-0049's REOPEN dispatch, superseding `f9b73118…` below within the same
           card. Sole delta: `GET /api/v1/audit-events/export`'s 200 response gained
           `content."text/csv".schema.type = "string"`, which it should have carried from the start.
@@ -313,9 +322,9 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0049, 0050, 0052, 0005a, 0005c
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0049, 0050, 0052, 0055, 0005a, 0005c
 (0021, 0005a, 0027 and 0029 closed 2026-09-06; 0033, 0034, 0035 and 0037 closed 2026-09-07;
-0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050, 0052 and 0049 closed 2026-09-09 — 0049 after
+0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050, 0052, 0049 and 0055 closed 2026-09-09 — 0049 after
 one orchestrator reopen for a contract hole) — closure notes and reopen history in
 [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
@@ -324,7 +333,7 @@ one orchestrator reopen for a contract hole) — closure notes and reopen histor
 | TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0042 | Academic structure screens: sessions & terms, levels & sections | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
-| TASK-0054 | Regenerate the frontend client for the audit log read surface | frontend-dev | **queued 2026-09-09** — blocked on TASK-0049 closing. §4.4 check 2 RED. Eighth run of the recurring card; first contract move carrying a **non-JSON (`text/csv`) response body**, so it may be the first run to need a real `client.ts` addition |
+| TASK-0054 | Regenerate the frontend client for the audit log read surface | frontend-dev | **in-progress 2026-09-09** — both dependencies (0049, 0055) CLOSED; dispatched. §4.4 check 2 RED until it lands. Target hash `7a3c84e6…`, 47 paths. §4.4 check 2 RED. Eighth run of the recurring card; first contract move carrying a **non-JSON (`text/csv`) response body**, so it may be the first run to need a real `client.ts` addition |
 | TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review, not by the implementing agent. Not a TASK-0049 defect; encoding-only, contract must not move |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
@@ -334,6 +343,93 @@ one orchestrator reopen for a contract hole) — closure notes and reopen histor
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-09 **TASK-0055 CLOSED by orchestrator, first-run pass.** `entityId` filter added to both
+  audit operations, resolving open question 14 the way the human directed. Contract
+  **`7a3c84e6…`** — **47 paths and 86 schemas, both sets diffed key-for-key against HEAD as
+  IDENTICAL**, so the move added no path and no schema, only one optional query parameter on two
+  existing operations. That set-identity diff is a stronger additive proof than a line-count diff
+  and is worth reusing for any parameter-only move. Gate ALL TEN GREEN: `total=906 passed=906
+  failed=0 skipped=0`, coverage line=81.51%. ~26 production lines across 7 files.
+
+  **The design detail that matters:** the filter is implemented once, in the shared
+  `AuditEventQueryRepository.ApplyFilters`, which both `ListAsync` and `StreamAsync` call. The card
+  warned that "the export honouring a filter the list ignores" was the bug to avoid; with a single
+  filter implementation that class of bug is structurally impossible rather than merely tested
+  against. `BuildFilterMetadata` now writes seven keys, which is what finally makes TASK-0049's
+  "exporting one pupil's rows must be distinguishable after the fact" criterion fully satisfiable —
+  it was only half-satisfiable while no per-entity filter existed.
+
+  **Sequencing decision, vindicated:** this card was deliberately put AHEAD of TASK-0054 rather
+  than after it, so the frontend client is regenerated once against a contract already carrying all
+  nine parameters. Running TASK-0054 first would have made its output dead within the hour — the
+  same reasoning that widened TASK-0052 to consume two moves in one pass.
+
+  **Side benefit found while re-deriving TASK-0054's facts with `jq`:** the two operations carry
+  deliberately DIFFERENT parameter sets — the list nine, the export seven, with no `cursor`/
+  `pageSize` on the export because it streams the whole filtered set. TASK-0054 previously had to
+  state that this contract move offered no negative-typing instance; that asymmetry is a real one,
+  and is now an acceptance criterion there. Worth noting that the honest "no instance available,
+  do not fabricate one" record is precisely what made the genuine instance findable later.
+
+- 2026-09-09 **TASK-0055 implemented by backend-dev — `entityId` filter added to both audit
+  operations.** Status table and closure left to the orchestrator per this dispatch's instructions.
+
+  One optional `entityId` (string, exact match, no format validation — symmetric with the existing
+  `entityType`/`action` filters) threaded through `ListAuditEventsQuery`, `ExportAuditEventsCommand`,
+  `IAuditEventQueryRepository.ListAsync`/`StreamAsync`, `AuditEventQueryRepository.ApplyFilters`
+  (one more `if (entityId is not null)` clause, same idiom as the other five) and both endpoint
+  parameter lists. `BuildFilterMetadata` now writes seven keys (was six) — `entityId` present but
+  `null` when unfiltered, so a one-entity export and an unfiltered export stay distinguishable.
+
+  **Tests added to `AuditEventEndpointsTests`** (all against real Neon Postgres): `List_Filters_
+  ByEntityIdAlone` (filters by entityId alone); `List_Filters_EntityIdAndEntityType_
+  CombineAsAnIntersectionNotAnUnion` (two rows share `entityId`, differ `entityType` — only the row
+  matching BOTH filters returns), following `List_Filters_CombineAsAnIntersectionNotAnUnion`'s exact
+  shape; `Export_SelfLogRecordsTheEntityIdFilter_DistinguishableFromAnUnfilteredExport` (exports once
+  narrowed by `entityId`, once unfiltered, then reads the self-log back through this same card's own
+  `GET /audit-events?action=audit.export` and asserts the two self-log rows are different rows with
+  different recorded `entityId` values — same pattern as TASK-0049's own self-log test, generalised
+  the shared `LoggedEntityTypeIs` helper into `LoggedFilterValueIs(item, key, expected)` so both the
+  `entityType` and `entityId` self-log assertions share one implementation). `SeedAuditEventAsync`
+  gained an optional `entityId` parameter (default `null`), backward-compatible with every existing
+  call site (all positional through `outcome`, none broken).
+
+  **Size**: ~26 production lines added across seven files (`AuditEventEndpoints.cs`,
+  `IAuditEventQueryRepository.cs`, `ExportAuditEvents.cs`, `ExportAuditEventsHandler.cs`,
+  `ListAuditEvents.cs`, `ListAuditEventsHandler.cs`, `AuditEventQueryRepository.cs`) — far under the
+  card's ~150-line stop-and-report threshold; no split needed, no deviation.
+
+  **No format validation added on `entityId`**, per the card's explicit instruction — it is an
+  opaque string spanning several entity types (Guid-shaped today, not guaranteed to stay so), and
+  the sibling `entityType`/`action` filters have none either.
+
+  **Gates, scoped** (subagent does not run the full `ci.ps1` per `## Gate commands`): `dotnet build
+  -warnaserror` → 0 warnings, 0 errors. `dotnet format --verify-no-changes` → clean, exit 0.
+  `dotnet test tests/SchoolManagement.ArchitectureTests` → `Failed: 0, Passed: 33, Skipped: 0, Total:
+  33` (all pass against the freshly regenerated document; re-run filtered to `OpenApiContractTests`
+  alone against the PROMOTED document: `Failed: 0, Passed: 13, Skipped: 0, Total: 13`).
+  `dotnet test tests/SchoolManagement.UnitTests` → `Failed: 0, Passed: 618, Skipped: 0, Total: 618`
+  (unchanged — no unit-test-level surface touched by this card). `dotnet test
+  tests/SchoolManagement.IntegrationTests --filter "FullyQualifiedName~AuditEventEndpointsTests"`
+  against REAL Neon Postgres (`POSTGRES_TEST_CONNECTION` exported from `$HOME/.gras/pg-test.txt` for
+  this scoped run) → `Failed: 0, Passed: 12, Skipped: 0, Total: 12` (was 9, +3 new). No suite run had
+  any skip.
+
+  **Contract**: promoted via `scripts/generate-openapi.ps1 -Promote`. New hash
+  `7a3c84e6a1872d014e519c8fa15227ba040b8b31ade41e20d9e98d32be509325`, still **47 paths** (unchanged
+  set, independently diffed key-for-key against the prior committed document), still **86 schemas**
+  (unchanged set) — no new path, no new schema, confirming nothing widened beyond the card's own
+  delta. Diff against the prior committed document is +18/-3 lines: one new `entityId` string query
+  parameter on each of `ListAuditEvents` and `ExportAuditEvents`, plus two `description` text edits
+  (`"entityType` and `outcome"` → `"entityType`, `entityId` and `outcome"`, and `"Same five filters"`
+  → `"Same filters"`) — no existing parameter, path or schema shape changed. Hash independently
+  recomputed with `sha256sum`, matches `CONTRACT.lock`. Baseline for this diff was the working tree
+  at dispatch start (git status was clean, so HEAD and working tree agreed) — not a HEAD-vs-working-
+  tree comparison, per the standing rule above.
+
+  **Frontend client regeneration is explicitly out of this card's scope** — TASK-0054 runs next,
+  now against a contract carrying all nine query parameters in one pass.
 
 - 2026-09-09 **TASK-0049 CLOSED by orchestrator after one reopen.** Audit log read surface:
   `GET /api/v1/audit-events` (cursor-paged, eight optional filters) and
@@ -2669,9 +2765,10 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
 sign-off) resolved 2026-09-06 and archived there.
 
-14. **Does the audit log need an `entityId` filter?** Raised by `backend-dev` on TASK-0049 and
-   confirmed real by the orchestrator. **Needs a human product decision — do not let an agent
-   invent it.**
+14. ~~**Does the audit log need an `entityId` filter?**~~ **RESOLVED 2026-09-09 by the human:
+   add it.** Carded as **TASK-0055** and sequenced AHEAD of TASK-0054 so the frontend client is
+   regenerated once, against a contract already carrying the parameter, rather than twice.
+   Original question, kept for the reasoning:
    TASK-0049's contract-delta table named five filters (`fromUtc`/`toUtc`, `actorAdminId`,
    `action`, `entityType`, `outcome`) and the agent built exactly those, flagging the tension
    rather than adding a sixth — the right call under §1's "do not invent product behaviour".
