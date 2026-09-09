@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-09 by orchestrator (TASK-0052 closure) · no size cap, see `## Reading this file`
+Last reconciled: 2026-09-09 by orchestrator (TASK-0049 closure) · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -119,7 +119,78 @@ frontend: `npm run verify` (typecheck, lint, test, build) plus `npm run check:ap
           client when the contract moves. CI: `.github/workflows/frontend-ci.yml`.
 
 ## Contract
-openapi.json sha256: **`53820aa5feb23ef8d34b4962b250a74ef202faa3cbc3f066873a6a2c38f0da9b`** — moved
+**2026-09-09, TASK-0049 REOPENED point closed by backend-dev — orchestrator still needs to reconcile
+the hash history below.** `GET /api/v1/audit-events/export`'s 200 response was documented as an empty
+`{"description": "OK"}` — no `content`, no `text/csv`, no schema — while every other response on the
+same operation (401/403/422/429) and `ListAuditEvents`' own 200 both carried `content`. Root cause:
+`.Produces(StatusCodes.Status200OK, contentType: "text/csv")` in
+`backend/src/SchoolManagement.Api/Endpoints/AuditEventEndpoints.cs` supplies no response `Type`, and
+the generator silently drops `content` for an untyped response even when a `contentType` is given.
+Fix: switched to the generic `.Produces<string>(StatusCodes.Status200OK, contentType: "text/csv")`
+overload — one line, no operation transformer needed (the existing `CsrfHeaderOperationTransformer`
+/ `IdempotencyHeaderOperationTransformer` pattern was considered but is unnecessary here: the generic
+overload alone supplies enough type information for the built-in generator to describe the body).
+Regenerated + promoted: new hash **`a1bd936b1e5bff709b8891c5c55e1918805e48ce3ef1e8a8afedd14bd87ee9f0`**,
+still **47 paths**. Diff against the prior committed document (`jq -S` on both, line diff) touches
+**only** that one operation's 200 response — every other path/operation byte-identical; independently
+confirmed additive (a `content` block appearing where none existed takes nothing away). New regression
+test: `OpenApiContractTests.ExportAuditEvents_200Response_DeclaresTextCsvContent` (asserts on the
+generated document directly, following this file's existing precedent — no new assertion style
+introduced). `dotnet build -warnaserror` clean, `dotnet format --verify-no-changes` clean (exit 0),
+targeted `dotnet test` on `SchoolManagement.ArchitectureTests` filtered to `OpenApiContractTests`:
+13/13 passed, 0 skipped. Did NOT run the full `ci.ps1` gate (reserved for the orchestrator per the
+rule below) and did NOT run the Postgres-backed integration suite (out of this fix's scope — no
+runtime code touched, and the export's CSV behavior was already reviewed/accepted). **Not committed.**
+**Discrepancy raised by backend-dev, INVESTIGATED AND DISMISSED by the orchestrator 2026-09-09 —
+the ledger below is correct and no history was swapped or unlogged.** The agent reported that the
+contract it started from "already carried hash `53820aa5…` AND already contained `/audit-events` at
+47 paths", which would indeed be contradictory. Verified directly, it is not what was on disk:
+
+- `git show HEAD:contracts/openapi.json` → `53820aa5…`, **45 paths, ZERO `audit-events` paths**.
+  Exactly what the history below says.
+- the WORKING TREE at that moment → `f9b73118…`, 47 paths, with `audit-events` — because the
+  agent's OWN first dispatch had already promoted it, uncommitted.
+
+**Root cause: it compared a committed value against an uncommitted one** — HEAD's `CONTRACT.lock`
+(or HEAD's document) against the working tree's `openapi.json`, which of course disagree while a
+promote is uncommitted. Nothing needed reconciling. Raising it rather than silently rewriting the
+ledger was still the right instinct, and is why this correction is cheap to write.
+
+⚠ **Second instance in one day of the same failure mode** — the contract-guardian incident recorded
+in `## Known drift` was also a HEAD-vs-working-tree comparison. **Standing rule for every agent:
+at closure time the correct baseline is the WORKING TREE.** Uncommitted-but-correct is the expected
+state, because the orchestrator commits only after review. Before reporting any contract-history
+contradiction, check whether one side of the comparison came from `git show HEAD:`.
+
+openapi.json sha256: **`a1bd936b1e5bff709b8891c5c55e1918805e48ce3ef1e8a8afedd14bd87ee9f0`** — moved
+          2026-09-09 by TASK-0049's REOPEN dispatch, superseding `f9b73118…` below within the same
+          card. Sole delta: `GET /api/v1/audit-events/export`'s 200 response gained
+          `content."text/csv".schema.type = "string"`, which it should have carried from the start.
+          Still **47 paths** — no path or schema added or removed, so the reopen widened nothing.
+          Purely additive: the document previously said *nothing* about that response body and no
+          generated client consumed it. Root cause was the non-generic
+          `.Produces(200, contentType: "text/csv")` overload, which supplies no response `Type` and
+          so emits no `content` even when given a media type; `.Produces<string>(...)` fixes it with
+          no operation transformer and no shared file touched. Guarded against regression by
+          `OpenApiContractTests.ExportAuditEvents_200Response_DeclaresTextCsvContent`, which asserts
+          on the generated document. Recomputed with `sha256sum`, matches `CONTRACT.lock`.
+          Frontend client regeneration still NOT done — §4.4 check 2 RED until TASK-0054 runs.
+
+superseded within TASK-0049: **`f9b73118c6f6b14dd872374754f2113d3ecb7712c7ca9c3856829cd1129ca795`** — moved
+          2026-09-09 by TASK-0049. Additive: `/audit-events`, `/audit-events/export` (**47 paths**,
+          was 45), plus three new schemas (`AuditEventDto`, `CursorPageOfAuditEventDto`,
+          `AuditOutcome`). +427/-0 per `git diff --stat` — the new paths and schemas appended
+          without reshuffling any existing line (unlike TASK-0050's move, no alphabetical
+          resort landed in the middle of the document this time). Independently verified purely
+          additive: `components.schemas` keys diffed directly (3 added, 0 removed), `paths` keys
+          diffed directly (2 added, 0 removed). Recomputed independently with `sha256sum`, matches
+          `CONTRACT.lock`.
+          Frontend client regeneration NOT done — out of this card's scope per its own text
+          ("Any frontend work... is a separate later card"); §4.4 check 2 will show drift until
+          that follow-up card runs `npm run generate:api`. Owner: a TASK-0047-shaped card, not yet
+          created.
+
+previous: **`53820aa5feb23ef8d34b4962b250a74ef202faa3cbc3f066873a6a2c38f0da9b`** — moved
           2026-09-09 by TASK-0050. Additive: `/admissions`, `/pupils`, `/pupils/{id}`,
           `/pupils/duplicates` (**45 paths**, was 41), plus six new schemas (`PupilDto`,
           `CursorPageOfPupilDto`, `CreatePupilCommand`, `UpdatePupilBiographicalCommand`,
@@ -242,9 +313,10 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0050, 0052, 0005a, 0005c
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0049, 0050, 0052, 0005a, 0005c
 (0021, 0005a, 0027 and 0029 closed 2026-09-06; 0033, 0034, 0035 and 0037 closed 2026-09-07;
-0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050 and 0052 closed 2026-09-09) — closure notes and reopen history in
+0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050, 0052 and 0049 closed 2026-09-09 — 0049 after
+one orchestrator reopen for a contract hole) — closure notes and reopen history in
 [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
@@ -252,7 +324,8 @@ Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 
 | TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0042 | Academic structure screens: sessions & terms, levels & sections | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
 | TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, all frontend gates green incl. `test:e2e`; awaiting orchestrator diff review against §7 |
-| TASK-0049 | Audit log read surface and CSV export | backend-dev | **queued 2026-09-09** — depends on TASK-0048's table. Contract additive |
+| TASK-0054 | Regenerate the frontend client for the audit log read surface | frontend-dev | **queued 2026-09-09** — blocked on TASK-0049 closing. §4.4 check 2 RED. Eighth run of the recurring card; first contract move carrying a **non-JSON (`text/csv`) response body**, so it may be the first run to need a real `client.ts` addition |
+| TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review, not by the implementing agent. Not a TASK-0049 defect; encoding-only, contract must not move |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
 | TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — TASK-0005c and TASK-0050 dependencies both CLEARED 2026-09-09; still needs an `enrolment` entity |
@@ -261,6 +334,163 @@ Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-09 **TASK-0049 CLOSED by orchestrator after one reopen.** Audit log read surface:
+  `GET /api/v1/audit-events` (cursor-paged, eight optional filters) and
+  `GET /api/v1/audit-events/export` (`text/csv`, streamed, self-auditing). Contract
+  **`a1bd936b…`, 47 paths**, additive. Final gate **ALL TEN GREEN: total=903 passed=903 failed=0
+  skipped=0**, coverage line=81.50% branch=69.35%. ~780 production lines against a ~900 budget.
+
+  **Reviewed sound against §6:** cursor keyed on the composite `(occurred_at DESC, id DESC)` with a
+  `0x1F` separator neither field can produce and a `TryDecode` that returns false rather than
+  throwing on a tampered value; the tie-break test seeds five rows at one identical instant and
+  walks three pages at `pageSize=2` asserting the exact sequence (a distinct-timestamp test would
+  never catch a skip); the filter test uses three near-miss rows each matching exactly two of three
+  filters, so it proves intersection rather than merely that each filter runs; the export is
+  modelled as an `ICommand` so `UnitOfWorkBehavior` commits the self-log row before the caller can
+  touch the stream, making "an export that does not log itself fails this card" true by
+  construction rather than by convention; filter metadata writes every key even when null, so an
+  unfiltered and a narrowed export are distinguishable; CSV is 13 columns with no widening and
+  `source_ip` passed through as stored.
+
+  **REOPENED once, for a contract hole the gate could not catch.** The export's 200 declared no
+  `content` — no `text/csv`, no schema — while the same operation's 401/403/422/429 and
+  `ListAuditEvents`' own 200 all carried content. Runtime was correct and tested; only the document
+  was silent. Reopened rather than carded because §3 makes `openapi.json` the single source of
+  truth for every byte crossing the boundary and §1 forbids a frontend agent learning a response
+  shape from backend source — TASK-0054 would have had no sanctioned way to know the body is CSV.
+  Cause: the non-generic `.Produces(200, contentType:)` overload supplies no response `Type`, and
+  the generator drops `content` for an untyped response even when given a media type.
+  `.Produces<string>(...)` fixed it in one line, no transformer, no shared file, now regression-
+  guarded by a test asserting on the generated document.
+  **Generalisable: `ci.ps1`'s contract-drift gate proves the document matches the BUILD, not that
+  the document is complete.** A response the code produces but the metadata never declares is
+  invisible to it. Reviewing the promoted document's own shape stays a human/orchestrator step.
+
+  **Closure needed two gate runs; the first failure was infrastructure and was not treated as a
+  defect.** One test (`RoleEndpointsTests`, unrelated) died with a transport drop inside
+  `ApiTestFixture.ReseedClassLevelsAsync` during `InitializeAsync()` — before any assertion — after
+  49 m 29 s, on code that had passed 902/902 an hour earlier. No VPN up, so not the port-filtering
+  signature (which fails every integration test). Confirmed idle, re-ran, clean.
+
+  **Two items raised out of this card, neither a defect in it:** TASK-0053 (CSV formula injection —
+  RFC 4180 quoting does not stop formula interpretation, and `user_agent` is attacker-controlled
+  with failed sign-ins audited, so the victim is the product's most privileged reader; found in
+  review, not reported by the agent) and open question 14 (no `entityId` filter, so 6.1.12's
+  own motivating scenario is not expressible — escalated, since filter dimensions are product
+  behaviour). Accepted drift: the GET-that-writes CSRF surface and the raw-JSON-text
+  `beforeJson`/`afterJson` typing, both in `## Known drift` with triggers.
+
+- 2026-09-09 **TASK-0049 implemented by backend-dev — audit log read surface and CSV export
+  (spec 6.1.12), both new endpoints built exactly to the card's contract delta. Status table and
+  closure left to the orchestrator per this dispatch's instructions.**
+
+  `GET /api/v1/audit-events` (`audit.view`, cursor-paginated per spec 9.5) and
+  `GET /api/v1/audit-events/export` (`audit.export`, streamed `text/csv`) — route names follow the
+  TASK-0049 card's own contract delta table verbatim (`/audit-events*`), which differs from spec
+  6.1.14's shorthand listing (`GET /audit`, `GET /audit/export`); the card is the authority per this
+  dispatch's own instructions, so no escalation was raised over the naming difference.
+
+  **The tie-break (the card's named crux).** `occurred_at` is not unique, so the read surface sorts
+  `occurred_at DESC, id DESC` — a NEW dedicated codec, `AuditEventListCursor` (composite
+  `(DateTimeOffset, long)`, base64 of `ticks<0x1F>id`), not a reuse of `OpaqueCursor` (single key)
+  or `AdminAccountListCursor` (string tie-break needing raw SQL). Since both fields are ordinary
+  scalars, plain LINQ expresses the keyset predicate directly
+  (`OccurredAt < cursor || (OccurredAt == cursor && Id < cursorId)`) — no raw SQL needed, unlike
+  `AdminAccountRepository.ListAsync`'s row-value comparison for its string tie-break.
+  `AuditEventListCursorTests.TwoRowsWithTheIdenticalOccurredAt_EncodeToDifferentCursors` plus
+  `AuditEventEndpointsTests.List_RowsWithIdenticalOccurredAt_ArePagedInStableIdDescendingOrder`
+  seed FIVE rows at one identical `occurred_at`, walk every page at `pageSize=2` against real
+  Postgres, and assert the collected id sequence is the exact reverse-insertion-order set — no
+  duplicate, no gap.
+
+  **The export's self-log (the card's other named criterion).** `ExportAuditEventsCommand` is an
+  `ICommand`, not a query — deliberately, because every call WRITES one `audit_event` row (action
+  `audit.export`, via the existing `ISystemAuditSink.RecordAsync`, TASK-0048's mechanism) before
+  returning the filtered stream. The handler builds the (unexecuted, lazy) `IAsyncEnumerable` from
+  `IAuditEventQueryRepository.StreamAsync` and returns `Result.Success` alongside it;
+  `UnitOfWorkBehavior` then commits the self-log INSERT before the endpoint ever starts writing CSV
+  bytes to the response — "before returning" is true by construction, not by convention. The
+  self-log's `after_json` records all six filters, present-but-null when unfiltered, so an
+  unfiltered export and a narrowed one are distinguishable after the fact — proven by
+  `Export_WritesItsOwnAuditEventRecordingTheFiltersUsed_DistinguishableFromAnUnfilteredExport`,
+  which reads the self-log back through this card's OWN `GET /audit-events?action=audit.export`
+  rather than a raw query.
+
+  **CSV.** Hand-rolled RFC 4180 encoding (`AuditEventCsvWriter`, ~45 lines) — no new package
+  dependency for thirteen well-known columns. `TypedResults.Stream(Func<Stream,Task>, "text/csv")`
+  (`PushStreamHttpResult`) writes rows as they are pulled off the lazy `IAsyncEnumerable`
+  (`AsNoTracking` all the way down), never materialising the filtered set as a list — the card's
+  "stream, don't buffer" instruction. Columns are exactly spec 6.1.12's thirteen; `source_ip` is
+  emitted as already truncated (stored truncated by TASK-0048, never re-widened here).
+
+  **Two ports, deliberately kept separate.** `IAuditEventRepository` (TASK-0048) stays add-only,
+  exactly as its own remarks reserve; this card's reads go through a NEW
+  `IAuditEventQueryRepository` (`ListAsync` + `StreamAsync`), so the append-only guarantee cannot be
+  quietly reopened by a read-surface change.
+
+  **A schema-generation quirk changed one design choice.** `AuditEventDto.Outcome` is typed as the
+  real `AuditOutcome` enum (matching `AdminAccountSummaryDto.Status`/`PupilDto.Status` precedent,
+  not `string` as first drafted) because a NULLABLE enum used ONLY as a `[FromQuery]` parameter
+  (never non-nullably anywhere else) produced a component schema with no XML-doc description or
+  example — .NET's OpenAPI XML-comment enrichment appears not to reach that particular nullable-only
+  shape. Giving `Outcome` one non-nullable DTO-property usage fixed it and is the better convention
+  match anyway. Separately, `BeforeJson`/`AfterJson` are plain `string?` (raw JSON text), NOT
+  `JsonElement?` like `ConfigVersionDetailDto.Snapshot` — introducing a SECOND and THIRD use of
+  `JsonElement` made the generator hoist a shared, description-less `JsonElement` component (the
+  existing single-use case stays inline and keeps its description attached at the property level,
+  so this had never surfaced before). Both are recorded as deviations below rather than spending a
+  dispatch inside `SchemaExampleTransformer.cs`, a shared cross-cutting Api file, to fix a generator
+  internal this card does not otherwise need to touch.
+
+  **Assumption, stated plainly (no entityId filter).** 6.1.14's prose example ("exporting one
+  pupil's rows") reads as if a per-entity filter existed, but the card's contract delta table lists
+  exactly five filters — `fromUtc`/`toUtc`, `actorAdminId`, `action`, `entityType`, `outcome` — with
+  no `entityId`. Built exactly those five; `entityType=pupil` is the closest available narrowing.
+  Not escalated because the card's own text ("The card's acceptance criteria are the spec") settles
+  it; flagged here in case entityId filtering was actually intended and simply left off the table.
+
+  **Assumption: no CSRF token or Idempotency-Key on `GET /audit-events/export`** despite it writing
+  a row. Every existing GET route in this codebase (`ListAdminAccounts`, `ListPupils`, `GetPupil`,
+  `FindPupilDuplicates`, …) omits both, and both mechanisms are otherwise reserved for
+  POST/PATCH/DELETE routes; inventing a per-route exception for the one GET with a side effect would
+  itself be the "second convention" root CLAUDE.md §13 warns against. Flagged rather than decided
+  silently — a `SameSite=Lax` cookie still rides a top-level GET navigation, so this is a real CSRF
+  surface if the frontend ever triggers the download via `window.location` rather than a
+  fetch+blob pattern; worth a look when the frontend card for this screen is scoped.
+
+  **Size**: ~780 hand-written production lines (Domain: none needed; Application 335, Infrastructure
+  191, Api 214, excluding tests) — under the card's ~900-line stop-and-report threshold, no split
+  needed. Test lines (not counted against that budget): 365 (`AuditEventEndpointsTests`) + 84
+  (`AuditEventListCursorTests`) + 4 (a `PipelineTests` DI-stub addition, see below).
+
+  **One unrelated fix forced by adding a new handler pair**:
+  `tests/.../PipelineTests.BuildProvider` builds the whole Application DI container to prove every
+  request resolves a handler; it needed `IAuditEventQueryRepository` stubbed alongside every other
+  repository port already stubbed there (same treatment, one line, matching the file's own existing
+  per-task comments).
+
+  **Gates, scoped (subagent does not run the full `ci.ps1` per the amended `## Gate commands`
+  rule)**: `dotnet build -warnaserror` → 0 warnings, 0 errors. `dotnet format --verify-no-changes` →
+  clean. `dotnet test tests/SchoolManagement.ArchitectureTests` → `Failed: 0, Passed: 32, Skipped:
+  0, Total: 32`. `dotnet test tests/SchoolManagement.UnitTests` → `Failed: 0, Passed: 618, Skipped:
+  0, Total: 618` (611 pre-existing + 7 new `AuditEventListCursorTests`). `dotnet test
+  tests/SchoolManagement.IntegrationTests --filter "FullyQualifiedName~AuditEventEndpointsTests|
+  FullyQualifiedName~AuditEventPersistenceTests"` against REAL Neon Postgres (`POSTGRES_TEST_CONNECTION`
+  exported from `$HOME/.gras/pg-test.txt` for this scoped run — the VPN-blocks-Postgres failure
+  mode in this machine's own memory did NOT reproduce this session; port 5432 tested reachable) →
+  `Failed: 0, Passed: 13, Skipped: 0, Total: 13`. No suite run had any skip.
+
+  **Contract**: promoted via `scripts/generate-openapi.ps1 -Promote`. New hash
+  `f9b73118c6f6b14dd872374754f2113d3ecb7712c7ca9c3856829cd1129ca795`, 47 paths (was 45), 3 new
+  schemas, 0 removed paths or schemas, diff is +427/-0 — see `## Contract` above for the full
+  entry. Frontend client regeneration is explicitly out of this card's scope.
+
+  **Confirmed out of scope, not built** (per the card): any frontend work; retention/the cold
+  archive/pruning job; backfilling `before_json`/`after_json` in any existing handler; any mutating
+  audit endpoint (6.1.12 requires its absence, and none was added — held by `IAuditEventRepository`
+  staying add-only).
+
 
 - 2026-09-09 **TASK-0052 CLOSED by orchestrator.** Client regenerated against `53820aa5…`
   consuming both contract moves (0005c reg-number settings + 0050 pupils) in one pass; §4.4 check 2
@@ -2096,6 +2326,30 @@ DB-credential split, TASK-0001 close).
 
 ## Known drift
 
+- 2026-09-09 **`GET /api/v1/audit-events/export` writes a row on a GET, and carries no CSRF
+  token.** TASK-0049, raised by the implementing agent. The card *required* this shape ("writes an
+  `audit_event` with action `audit.export` before returning"), so it is spec-mandated, not an
+  implementation slip — but a GET with a side effect and no CSRF token is a real surface under the
+  project's `SameSite=Lax` cookie session (§5). It is currently unreachable in the way that
+  matters: the write is confined to the audit trail itself (no business state moves), an attacker
+  cannot read the CSV response cross-origin, and forcing a victim's browser to log one spurious
+  `audit.export` row is close to harmless. **It stops being harmless if the eventual screen
+  triggers the download by top-level navigation** (`window.location`, a plain `<a href>`) rather
+  than fetch-plus-blob, because that path sends cookies on a cross-site initiation. **Trigger: the
+  audit-log screen card** — it must use fetch+blob, and that constraint belongs in its text.
+  Owner: whoever writes that screen card. Not fixable at the backend alone without either breaking
+  the card's mandated GET shape or adding a CSRF check to a read verb.
+
+- 2026-09-09 **`beforeJson`/`afterJson` cross the wire as raw JSON *text*, not parsed objects.**
+  TASK-0049. Typed `string?` rather than `JsonElement?` to stop the OpenAPI generator hoisting a
+  shared description-less component schema for a second/third `JsonElement` use (the first being
+  `ConfigVersionDetailDto.Snapshot`). Consequence: every consumer must `JSON.parse` them, and the
+  contract cannot describe their inner shape — which is arguably honest, since the shape genuinely
+  varies per audited entity. Documented in the property descriptions in the promoted document, so
+  no consumer is misled. **Accepted.** Revisit only if a third case appears and the generator
+  workaround starts costing more than fixing `SchemaExampleTransformer.cs` would.
+  TASK-0054 is told explicitly not to parse at the client seam.
+
 - 2026-09-09 **PROCESS INCIDENT, repaired: `contract-guardian` reverted a dev agent's uncommitted
   work.** On TASK-0052 closure the guardian was dispatched for the §4.4 check and, while performing
   check 2, ran an in-place generator (and/or a working-tree-restoring `git` command) that reverted
@@ -2414,6 +2668,22 @@ Thirteen resolved/struck entries are archive-only — latest: the two frontend l
 
 Live only; eleven resolved questions are in `decisions/2026-Q3.md` — question 12 (TASK-0027's §5
 sign-off) resolved 2026-09-06 and archived there.
+
+14. **Does the audit log need an `entityId` filter?** Raised by `backend-dev` on TASK-0049 and
+   confirmed real by the orchestrator. **Needs a human product decision — do not let an agent
+   invent it.**
+   TASK-0049's contract-delta table named five filters (`fromUtc`/`toUtc`, `actorAdminId`,
+   `action`, `entityType`, `outcome`) and the agent built exactly those, flagging the tension
+   rather than adding a sixth — the right call under §1's "do not invent product behaviour".
+   **But the card's own goal says exporting "one pupil's rows" must be distinguishable, and with
+   only `entityType` you can narrow to ALL pupils, not one.** Spec 6.1.12's motivating scenario is
+   "a parent comes to the office in March insisting their child scored 62 in Mathematics" — that
+   is one child's trail, which the five filters cannot express. `entity_id` IS stored and IS
+   returned on `AuditEventDto`; only the filter is missing.
+   **Orchestrator's recommendation: add it.** Purely additive (one optional query parameter on
+   both operations), small, and it makes the endpoint able to answer the question it was built
+   for. Deliberately NOT actioned pending sign-off, because "which dimensions the office can
+   filter the audit trail by" is product behaviour, not an implementation detail.
 
 13. ~~**TASK-0005c is on the pupils critical path**~~ **RESOLVED 2026-09-09 by the human:
    TASK-0005c goes first**, ahead of TASK-0050. Card expanded from stub the same day.
