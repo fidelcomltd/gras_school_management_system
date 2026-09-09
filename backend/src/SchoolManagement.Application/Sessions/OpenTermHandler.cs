@@ -1,5 +1,6 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -13,17 +14,20 @@ namespace SchoolManagement.Application.Sessions;
 /// Handles <see cref="OpenTermCommand"/>.
 /// </summary>
 /// <remarks>
-/// DEFERRED (spec 6.3.6, no task card yet): "at least one arm exists for the session" is one of
-/// open's three preconditions. <c>Arm</c> is spec 06 §6.4 and does not exist anywhere in this
-/// codebase, so it is not checked below — this makes <c>open</c> MORE PERMISSIVE than spec until the
-/// arms card lands. Deliberate and visible, not a silent omission: see TASK-0035's Log and STATE.md
-/// <c>## Known drift</c> for the tracked entry. The third precondition ("the session has a start and
-/// end date") needs no runtime check at all — <see cref="AcademicSession.Create"/> makes both dates
-/// mandatory, so it is structurally guaranteed rather than merely tested.
+/// RESOLVED by TASK-0039 (was DEFERRED under TASK-0035, spec 6.3.6, tracked in STATE.md's known
+/// drift): "at least one arm exists for the session" — now that <c>Arm</c> exists, this handler loads
+/// <see cref="IArmRepository.AnyForSessionAsync"/> and passes it to
+/// <see cref="TermTransitionGuard.CanOpen"/>, which now enforces it. The remaining precondition ("the
+/// session has a start and end date") still needs no runtime check — <see cref="AcademicSession.Create"/>
+/// makes both dates mandatory, so it is structurally guaranteed rather than merely tested. TASK-0039
+/// also closes every arm in <c>previouslyActiveSession</c> below, in the same transaction as that
+/// session's own <see cref="AcademicSession.Close"/> (spec 6.4.7: "Status moves to closed
+/// automatically as part of closing the session").
 /// </remarks>
 internal sealed class OpenTermHandler(
     ITermRepository terms,
     IAcademicSessionRepository sessions,
+    IArmRepository arms,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<OpenTermCommand, Result<TermDto>>
@@ -76,7 +80,8 @@ internal sealed class OpenTermHandler(
             previouslyActiveSession = await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var canOpen = TermTransitionGuard.CanOpen(term, session, previousTermInSession, activeElsewhere);
+        var hasArmsForSession = await arms.AnyForSessionAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        var canOpen = TermTransitionGuard.CanOpen(term, session, previousTermInSession, activeElsewhere, hasArmsForSession);
 
         if (canOpen.IsFailure)
         {
@@ -100,6 +105,17 @@ internal sealed class OpenTermHandler(
             if (previouslyActiveSession is not null && previouslyActiveSession.Id != session.Id)
             {
                 previouslyActiveSession.Close();
+
+                // Spec 6.4.7: "Status moves to closed automatically as part of closing the session" —
+                // every arm in the session that just closed, in this same transaction.
+                var armsToClose = await arms
+                    .ListBySessionTrackedAsync(previouslyActiveSession.Id, cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var arm in armsToClose)
+                {
+                    arm.Close();
+                }
             }
         }
 

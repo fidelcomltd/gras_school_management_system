@@ -171,6 +171,85 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("admin_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.Arm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<Guid>("ClassLevelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_level_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("FormTeacherAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_teacher_admin_id");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("LabelKey")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("label_key");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_arms");
+
+                    b.HasIndex("FormTeacherAdminId")
+                        .HasDatabaseName("ix_arms_form_teacher_admin_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_arms_session_id");
+
+                    b.HasIndex("ClassLevelId", "SessionId", "LabelKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_arms_level_session_label_unique");
+
+                    b.ToTable("arms", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Classes.ClassLevel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -710,6 +789,86 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Security.RoleAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AdminAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admin_account_id");
+
+                    b.Property<string>("ArmIds")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("arm_ids");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_type");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_role_assignments");
+
+                    b.HasIndex("AdminAccountId")
+                        .HasDatabaseName("ix_role_assignments_admin_account_id");
+
+                    b.HasIndex("GrantedBy")
+                        .HasDatabaseName("ix_role_assignments_granted_by");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_role_assignments_role_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_role_assignments_session_id");
+
+                    b.ToTable("role_assignments", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Sessions.AcademicSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1001,6 +1160,29 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.Arm", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("ClassLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_arms_class_levels_class_level_id");
+
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("FormTeacherAdminId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_arms_admin_accounts_form_teacher_admin_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_arms_academic_sessions_session_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Classes.ClassLevel", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
@@ -1008,6 +1190,36 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasForeignKey("NextLevelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_class_levels_class_levels_next_level_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Security.RoleAssignment", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AdminAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_admin_accounts_admin_account_id");
+
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_admin_accounts_granted_by");
+
+                    b.HasOne("SchoolManagement.Domain.Security.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_roles_role_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_role_assignments_academic_sessions_session_id");
                 });
 #pragma warning restore 612, 618
         }

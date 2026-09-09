@@ -26,9 +26,27 @@ public sealed class TermTransitionGuardTests
         var session = CreateSession();
         var term = CreateTerm(1, "First Term", session.Id);
 
-        var result = TermTransitionGuard.CanOpen(term, session, previousTermInSession: null, activeTermElsewhere: null);
+        var result = TermTransitionGuard.CanOpen(
+            term, session, previousTermInSession: null, activeTermElsewhere: null, hasArmsForSession: true);
 
         result.IsSuccess.ShouldBeTrue();
+    }
+
+    // TASK-0039, spec 6.3.6's third precondition, and spec 12's own worked flow example verbatim:
+    // "No arms exist for 2026/2027. Create at least one arm before opening a term."
+    [Fact]
+    public void CanOpen_WithNoArmsForSession_Rejects()
+    {
+        var session = CreateSession("2026/2027");
+        var term = CreateTerm(1, "First Term", session.Id);
+
+        var result = TermTransitionGuard.CanOpen(
+            term, session, previousTermInSession: null, activeTermElsewhere: null, hasArmsForSession: false);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("term.no_arms_for_session");
+        result.Error.Description.ShouldBe(
+            "No arms exist for 2026/2027. Create at least one arm before opening a term.");
     }
 
     // Spec 6.3.6's own example: "First Term 2026/2027 cannot be opened because Third Term 2025/2026
@@ -40,7 +58,8 @@ public sealed class TermTransitionGuardTests
         var term = CreateTerm(1, "First Term", session.Id);
 
         var result = TermTransitionGuard.CanOpen(
-            term, session, previousTermInSession: null, activeTermElsewhere: ("Third Term", "2025/2026"));
+            term, session, previousTermInSession: null, activeTermElsewhere: ("Third Term", "2025/2026"),
+            hasArmsForSession: true);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("term.previous_session_still_active");
@@ -58,7 +77,7 @@ public sealed class TermTransitionGuardTests
         previous.Close(DateTimeOffset.UtcNow, "admin-1");
         var term = CreateTerm(2, "Second Term", session.Id);
 
-        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null);
+        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null, hasArmsForSession: true);
 
         result.IsSuccess.ShouldBeTrue();
     }
@@ -71,7 +90,7 @@ public sealed class TermTransitionGuardTests
         previous.Open();
         var term = CreateTerm(2, "Second Term", session.Id);
 
-        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null);
+        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null, hasArmsForSession: true);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("term.previous_term_not_closed");
@@ -85,7 +104,7 @@ public sealed class TermTransitionGuardTests
         var previous = CreateTerm(1, "First Term", session.Id);
         var term = CreateTerm(2, "Second Term", session.Id);
 
-        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null);
+        var result = TermTransitionGuard.CanOpen(term, session, previous, activeTermElsewhere: null, hasArmsForSession: true);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("term.previous_term_not_closed");
@@ -99,7 +118,7 @@ public sealed class TermTransitionGuardTests
         var term = CreateTerm(1, "First Term", session.Id);
         term.Open();
 
-        var result = TermTransitionGuard.CanOpen(term, session, previousTermInSession: null, activeTermElsewhere: null);
+        var result = TermTransitionGuard.CanOpen(term, session, previousTermInSession: null, activeTermElsewhere: null, hasArmsForSession: true);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("term.open_invalid_state");

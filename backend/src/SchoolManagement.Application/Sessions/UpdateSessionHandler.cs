@@ -1,5 +1,6 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -13,6 +14,7 @@ namespace SchoolManagement.Application.Sessions;
 internal sealed class UpdateSessionHandler(
     IAcademicSessionRepository sessions,
     ITermRepository terms,
+    IArmRepository arms,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<UpdateSessionCommand, Result<SessionDetailDto>>
@@ -92,6 +94,7 @@ internal sealed class UpdateSessionHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(SessionMapper.ToDetailDto(session, sessionTerms));
+        var armCount = await arms.CountBySessionAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        return Result.Success(SessionMapper.ToDetailDto(session, sessionTerms, armCount));
     }
 }

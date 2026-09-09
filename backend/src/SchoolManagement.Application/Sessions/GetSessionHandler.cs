@@ -1,3 +1,4 @@
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
@@ -5,7 +6,7 @@ using SchoolManagement.Domain.Common;
 namespace SchoolManagement.Application.Sessions;
 
 /// <summary>Handles <see cref="GetSessionQuery"/>.</summary>
-internal sealed class GetSessionHandler(IAcademicSessionRepository sessions, ITermRepository terms)
+internal sealed class GetSessionHandler(IAcademicSessionRepository sessions, ITermRepository terms, IArmRepository arms)
     : IRequestHandler<GetSessionQuery, Result<SessionDetailDto>>
 {
     /// <inheritdoc />
@@ -23,7 +24,8 @@ internal sealed class GetSessionHandler(IAcademicSessionRepository sessions, ITe
         }
 
         var sessionTerms = await terms.ListBySessionReadOnlyAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        var armCount = await arms.CountBySessionAsync(session.Id, cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(SessionMapper.ToDetailDto(session, sessionTerms));
+        return Result.Success(SessionMapper.ToDetailDto(session, sessionTerms, armCount));
     }
 }

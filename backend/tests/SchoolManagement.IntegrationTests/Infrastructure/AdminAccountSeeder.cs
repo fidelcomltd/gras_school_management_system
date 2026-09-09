@@ -64,11 +64,11 @@ internal static class AdminAccountSeeder
 
     /// <summary>
     /// Seeds a REGULAR (non-super-admin) account through <see cref="AdminAccount.Create"/> — TASK-0027's
-    /// own factory, not the bootstrap seam. Under the current flag-bypass privilege provider
-    /// (<c>SuperAdminFlagEffectivePrivilegeProvider</c>), a signed-in account created this way holds
-    /// NO privileges at all, which is exactly what the self-edit-carve-out and no-privilege 403 tests
-    /// need — a real, HTTP-signed-in caller rather than the test-only authentication substitute
-    /// <c>PrivilegeAuthorizationTests</c> uses elsewhere.
+    /// own factory, not the bootstrap seam. Under the graduated <c>IEffectivePrivilegeProvider</c>
+    /// (TASK-0030), a signed-in account created this way holds NO privileges at all until a
+    /// <c>role_assignment</c> row grants it one, which is exactly what the self-edit-carve-out and
+    /// no-privilege 403 tests need — a real, HTTP-signed-in caller rather than the test-only
+    /// authentication substitute <c>PrivilegeAuthorizationTests</c> uses elsewhere.
     /// </summary>
     public static async Task<(Guid AccountId, string Email, string Phone)> SeedRegularAsync(
         ApiTestFixture fixture,

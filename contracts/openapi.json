@@ -897,6 +897,1272 @@
         }
       }
     },
+    "/api/v1/arms": {
+      "get": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "List arms",
+        "description": "Spec 6.4.5: filtered by session, level, label (substring match against the composed display name), status and form teacher. Sorted by the owning level's chain order, then label collated naturally — not alphabetical. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.",
+        "operationId": "ListArms",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ArmStatus"
+            }
+          },
+          {
+            "name": "formTeacherAdminId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfArmDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Create an arm",
+        "description": "Spec 6.4.3, 6.4.4: the level must be active and the session upcoming or active. Label must be unique within the level and session, case-insensitive. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateArm",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateArmCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArmDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/next-label": {
+      "get": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Suggest the next unused arm label",
+        "description": "Spec 6.4.3: A if the level has no arm this session, B if it has A, and so on. Pre-filled and editable, not reserved.",
+        "operationId": "GetNextArmLabel",
+        "parameters": [
+          {
+            "name": "levelId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextArmLabelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/bulk": {
+      "post": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Create arms for a session, level by level",
+        "description": "Spec 6.4.3: \"Create arms for session\" — one level entry per row, each carrying an arm count and a capacity. Labels continue from each level's highest existing label. Levels given zero arms are skipped. `dryRun` returns the preview without writing. The whole run is one transaction. `Idempotency-Key` is REQUIRED.",
+        "operationId": "BulkCreateArms",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCreateArmsCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCreateArmsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/{id}": {
+      "get": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Read one arm",
+        "description": "Roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are out of scope — those need pupils, enrolments, subject mappings and results.",
+        "operationId": "GetArm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArmDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Edit an arm",
+        "description": "Spec 6.4.3, 6.4.7: label, capacity, form teacher, status. Every field is independently optional; an absent field is left unchanged. Rejected outright against a closed arm. Setting `formTeacherAdminId` ADDITIONALLY requires `arm.formteacher.assign`, beyond the `arm.update` this route requires.",
+        "operationId": "UpdateArm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateArmCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArmDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Arms"
+        ],
+        "summary": "Delete an arm",
+        "description": "Spec 6.4.7: permitted only where no enrolment has ever existed.",
+        "operationId": "DeleteArm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admins/{id}/assignments": {
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "List an account's role assignments",
+        "description": "Spec 6.1.5: every assignment for this account, active and revoked, with role, scope type, scope ids and session. Not paginated — assignment counts per account are admin-configuration-sized.",
+        "operationId": "ListRoleAssignments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleAssignmentDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Grant a role to an account",
+        "description": "Spec 6.1.5: role, session and either school-wide or a non-empty arm list; every arm must belong to the named session. Requires `role.assign` for a school-wide grant, or `role.scope.assign` for an arm-scoped one. Escalation rule 1 (spec 6.1.7): rejects an attempt to assign a role to yourself — `You cannot change your own roles. Ask another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for the privilege it is exercising. Both rejections write an audit event. The seeded Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateRoleAssignment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleAssignmentCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{id}": {
+      "delete": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Revoke a role assignment",
+        "description": "Spec 6.1.14. Requires `role.assign`. Escalation rule 1 (spec 6.1.7): rejects revoking your own assignment, with an audit event on rejection. Always `204`.",
+        "operationId": "RevokeRoleAssignment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/csrf": {
       "get": {
         "tags": [
@@ -1894,7 +3160,7 @@
           "Levels"
         ],
         "summary": "Delete a class level",
-        "description": "Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the one reference this codebase can see today (another level's nextLevelId); arm, enrolment, subject-mapping and result references are DEFERRED — those tables do not exist yet (TASK-0039 and later).",
+        "description": "Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the two references this codebase can see today (another level's nextLevelId, and any arm under this level); enrolment, subject-mapping and result references remain DEFERRED — those tables do not exist yet.",
         "operationId": "DeleteLevel",
         "parameters": [
           {
@@ -2882,7 +4148,7 @@
           "Roles"
         ],
         "summary": "Delete a role",
-        "description": "Spec 9.4: hard-deletes unconditionally today, because no `role_assignment` table exists yet, so nothing can ever have referenced a role (TASK-0030 adds the has-ever-been-assigned branch that archives instead). A system role returns 409.",
+        "description": "Spec 9.4: hard-deletes when no assignment has ever referenced the role; archives it instead (still 204) when at least one has, active or revoked. A system role returns 409.",
         "operationId": "DeleteRole",
         "parameters": [
           {
@@ -5093,6 +6359,96 @@
           "createdAtUtc": "2026-08-03T09:30:00+00:00"
         }
       },
+      "ArmDto": {
+        "required": [
+          "id",
+          "classLevelId",
+          "classLevel",
+          "sessionId",
+          "label",
+          "displayName",
+          "capacity",
+          "formTeacherAdminId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48"
+          },
+          "classLevelId": {
+            "type": "string",
+            "description": "Opaque identifier of the owning level — supply this back on a write.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "classLevel": {
+            "type": "string",
+            "description": "The level's CURRENT name, denormalised for display, same convention as `LevelDto.Section`.",
+            "example": "Primary 2"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Opaque identifier of the owning session.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "label": {
+            "type": "string",
+            "description": "1..16 characters, as stored (already normalised on save).",
+            "example": "C"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Composed by ArmDisplayName at read time — never stored (spec 6.4.3).",
+            "example": "Primary 2C"
+          },
+          "capacity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1..100, a soft limit (spec 6.4.6).",
+            "format": "int32",
+            "example": 22
+          },
+          "formTeacherAdminId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when unassigned.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+          },
+          "status": {
+            "description": "active, inactive or closed. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/ArmStatus"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of an Arm (spec 6.4.3, 6.4.9). One shape for the list item and the\ndetail read — roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are\nout of scope until pupils, enrolments, subject mappings and results exist.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+          "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "classLevel": "Primary 2",
+          "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "label": "C",
+          "displayName": "Primary 2C",
+          "capacity": 22,
+          "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+          "status": "Active"
+        }
+      },
+      "ArmStatus": {
+        "enum": [
+          "Active",
+          "Inactive",
+          "Closed"
+        ],
+        "description": "An Arm's status (spec 6.4.3). Defaults ArmStatus.Active.",
+        "example": "Active"
+      },
       "AuthSessionResponse": {
         "required": [
           "accountId",
@@ -5136,7 +6492,7 @@
             "items": {
               "$ref": "#/components/schemas/EffectivePrivilegeDto"
             },
-            "description": "The caller's resolved effective privilege set. For this card, populated only via the\nbool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.",
+            "description": "The caller's resolved effective privilege set, from whatever `IEffectivePrivilegeProvider` is\nregistered — the bool AuthSessionResponse.IsSuperAdmin flag path for a super admin, or (since TASK-0030's\nprovider graduation) the union of a non-super-admin's own active `role_assignment` grants.\nThis endpoint's SHAPE is unchanged by TASK-0030; only the data behind it improved.",
             "example": [
               {
                 "privilege": "admin.view",
@@ -5175,6 +6531,141 @@
           ],
           "sessionExpiresAt": "2026-08-03T09:30:00+00:00",
           "sessionAbsoluteExpiresAt": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "BulkCreateArmsCommand": {
+        "required": [
+          "sessionId",
+          "levels",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Must reference an upcoming or active session.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkCreateArmsLevelEntry"
+            },
+            "description": "One entry per level to size. A level omitted from this list gets no arms.",
+            "example": [
+              {
+                "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "armCount": 3,
+                "capacity": 30
+              }
+            ]
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "When `true`, computes and returns the preview but adds nothing.",
+            "example": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/arms/bulk` (spec 6.4.3, 6.4.9): \"Create arms for session\" — an administrator\n        opening a new session creates every level's rooms in one action instead of one form per level.\n        Labels continue from each level's highest existing label (spec 6.4.8, same rule as\n        `GET /arms/next-label`). Levels given zero arms are skipped. The whole run is one transaction;\n        bool BulkCreateArmsCommand.DryRun returns the preview without writing anything.",
+        "example": {
+          "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "levels": [
+            {
+              "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "armCount": 3,
+              "capacity": 30
+            }
+          ],
+          "dryRun": false
+        }
+      },
+      "BulkCreateArmsLevelEntry": {
+        "required": [
+          "levelId",
+          "armCount",
+          "capacity"
+        ],
+        "type": "object",
+        "properties": {
+          "levelId": {
+            "type": "string",
+            "description": "Must reference an active level.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "armCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 skips the level entirely (spec 6.4.3).",
+            "format": "int32",
+            "example": 3
+          },
+          "capacity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` defaults to int Arm.DefaultCapacity for every new arm at this level.",
+            "format": "int32",
+            "example": 30
+          }
+        },
+        "additionalProperties": false,
+        "description": "One level's row in a BulkCreateArmsCommand request.",
+        "example": {
+          "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "armCount": 3,
+          "capacity": 30
+        }
+      },
+      "BulkCreateArmsResponse": {
+        "required": [
+          "created"
+        ],
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArmDto"
+            },
+            "description": "The arms created (or, for a bool BulkCreateArmsCommand.DryRun, previewed).",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "classLevel": "Primary 2",
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "label": "A",
+                "displayName": "Primary 2A",
+                "capacity": 30,
+                "formTeacherAdminId": null,
+                "status": "Active"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response to BulkCreateArmsCommand.",
+        "example": {
+          "created": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+              "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "classLevel": "Primary 2",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "A",
+              "displayName": "Primary 2A",
+              "capacity": 30,
+              "formTeacherAdminId": null,
+              "status": "Active"
+            }
+          ]
         }
       },
       "ChangeAdminAccountStatusCommand": {
@@ -5477,6 +6968,61 @@
           "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
+      "CreateArmCommand": {
+        "required": [
+          "classLevelId",
+          "sessionId",
+          "label",
+          "capacity",
+          "formTeacherAdminId"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "description": "Must reference an active level.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Must reference an upcoming or active session.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "label": {
+            "type": "string",
+            "description": "1..16 characters, letters/digits/single internal spaces. Unique within the level and session, case-insensitive.",
+            "example": "C"
+          },
+          "capacity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` defaults to int Arm.DefaultCapacity. 1..100.",
+            "format": "int32",
+            "example": 22
+          },
+          "formTeacherAdminId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional. Must reference an active admin account when given.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/arms` (spec 6.4.3, 6.4.9). Single-arm creation — the flow spec 6.4.4 exists for:\n        opening a new room mid-term under an active level, permitted with no privilege beyond\n        `arm.create`.",
+        "example": {
+          "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "label": "C",
+          "capacity": 22,
+          "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+        }
+      },
       "CreateLevelCommand": {
         "required": [
           "name",
@@ -5531,6 +7077,61 @@
           "progressionOrder": null,
           "nextLevelId": null,
           "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+        }
+      },
+      "CreateRoleAssignmentCommand": {
+        "required": [
+          "adminAccountId",
+          "roleId",
+          "sessionId",
+          "scopeType",
+          "armIds"
+        ],
+        "type": "object",
+        "properties": {
+          "adminAccountId": {
+            "type": "string",
+            "description": "The account receiving the role — bound from the route, not the body.",
+            "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "Must reference an active role, not the seeded Super Admin role.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Must reference an existing session. Every arm in IReadOnlyList&lt;string&gt;? CreateRoleAssignmentCommand.ArmIds must belong to it.",
+            "example": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073"
+          },
+          "scopeType": {
+            "description": "School-wide or arm-list.",
+            "$ref": "#/components/schemas/ScopeType"
+          },
+          "armIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Required and non-empty when ScopeType CreateRoleAssignmentCommand.ScopeType is arm-list; otherwise must be empty or omitted.",
+            "example": [
+              "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a\n        school-wide grant or `role.scope.assign` for an arm-scoped grant — data-dependent on\n        ScopeType CreateRoleAssignmentCommand.ScopeType, so the handler resolves and enforces it rather than a route-declarative\n        privilege. Subject to escalation rules 1 and 3 (spec 6.1.7).",
+        "example": {
+          "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+          "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+          "scopeType": "ArmList",
+          "armIds": [
+            "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          ]
         }
       },
       "CreateRoleCommand": {
@@ -5816,6 +7417,60 @@
           "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
         }
       },
+      "CursorPageOfArmDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArmDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                "classLevel": "Primary 2",
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "label": "C",
+                "displayName": "Primary 2C",
+                "capacity": 22,
+                "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+                "status": "Active"
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+              "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "classLevel": "Primary 2",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "C",
+              "displayName": "Primary 2C",
+              "capacity": 22,
+              "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+              "status": "Active"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
       "CursorPageOfConfigVersionSummaryDto": {
         "required": [
           "items",
@@ -5992,7 +7647,8 @@
                 "name": "2026/2027",
                 "startDate": "2026-09-14",
                 "endDate": "2027-07-25",
-                "state": "Active"
+                "state": "Active",
+                "armCount": 24
               }
             ]
           },
@@ -6014,7 +7670,8 @@
               "name": "2026/2027",
               "startDate": "2026-09-14",
               "endDate": "2027-07-25",
-              "state": "Active"
+              "state": "Active",
+              "armCount": 24
             }
           ],
           "nextCursor": "MjAyNi8yMDI3"
@@ -6251,6 +7908,24 @@
         ],
         "description": "A ClassLevel's status (spec 6.4.2). Defaults LevelStatus.Active.",
         "example": "Active"
+      },
+      "NextArmLabelResponse": {
+        "required": [
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The suggested next label. Pre-filled and editable — not reserved by asking.",
+            "example": "C"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response to NextArmLabelQuery.",
+        "example": {
+          "label": "C"
+        }
       },
       "PagedResultOfSampleRecordDto": {
         "required": [
@@ -6657,6 +8332,97 @@
           "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
+      "RoleAssignmentDto": {
+        "required": [
+          "id",
+          "adminAccountId",
+          "roleId",
+          "sessionId",
+          "scopeType",
+          "armIds",
+          "grantedBy",
+          "status",
+          "createdAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51"
+          },
+          "adminAccountId": {
+            "type": "string",
+            "description": "The account this assignment grants a role to.",
+            "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "The role granted.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "sessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The session this assignment applies to, or `null` only for the sessionless Super\nAdmin assignment — TASK-0030 never actually produces that case (see RoleAssignment's\nremarks) but the wire shape stays honest to the entity rather than asserting non-null.",
+            "example": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073"
+          },
+          "scopeType": {
+            "description": "Either `SchoolWide` or `ArmList`.",
+            "$ref": "#/components/schemas/ScopeType"
+          },
+          "armIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Non-empty only when ScopeType is `ArmList`.",
+            "example": [
+              "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+            ]
+          },
+          "grantedBy": {
+            "type": "string",
+            "description": "The acting account that created this assignment.",
+            "example": "0192f0c4-d183-7f60-e472-8030af1b6295"
+          },
+          "status": {
+            "description": "Either `Active` or `Revoked`.",
+            "$ref": "#/components/schemas/RoleAssignmentStatus"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "description": "When this assignment was created.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Wire shape of a RoleAssignment (spec 6.1.5).",
+        "example": {
+          "id": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+          "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+          "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+          "scopeType": "ArmList",
+          "armIds": [
+            "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          ],
+          "grantedBy": "0192f0c4-d183-7f60-e472-8030af1b6295",
+          "status": "Active",
+          "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "RoleAssignmentStatus": {
+        "enum": [
+          "Active",
+          "Revoked"
+        ],
+        "description": "Lifecycle of a RoleAssignment (spec 6.1.5).",
+        "example": "Active"
+      },
       "RoleDto": {
         "required": [
           "id",
@@ -6789,7 +8555,7 @@
           "ArmList"
         ],
         "description": "How a role assignment's grant is bounded. Spec 4.2: \"Scope is one of two things: school-wide,\nor a list of specific arms in a specific session.\"",
-        "example": "SchoolWide"
+        "example": "ArmList"
       },
       "SectionDto": {
         "required": [
@@ -6881,7 +8647,8 @@
           "startDate",
           "endDate",
           "state",
-          "terms"
+          "terms",
+          "armCount"
         ],
         "type": "object",
         "properties": {
@@ -6958,16 +8725,27 @@
                 "closedBy": null
               }
             ]
+          },
+          "armCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of arms (any status) that exist for this session (spec 6.3.8).",
+            "format": "int32",
+            "example": 24
           }
         },
         "additionalProperties": false,
-        "description": "The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms. Arms\ngrouped by level, enrolment counts and the publication position are deferred for the same reason\nas SessionDto; the promotion panel is all of TASK-0036.",
+        "description": "The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms.\nint SessionDetailDto.ArmCount was added by TASK-0039; arms grouped by level, enrolment counts and the\npublication position stay deferred for the same reason as SessionDto — the promotion\npanel is all of TASK-0036.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
           "name": "2026/2027",
           "startDate": "2026-09-14",
           "endDate": "2027-07-25",
           "state": "Active",
+          "armCount": 24,
           "terms": [
             {
               "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -7017,7 +8795,8 @@
           "name",
           "startDate",
           "endDate",
-          "state"
+          "state",
+          "armCount"
         ],
         "type": "object",
         "properties": {
@@ -7046,16 +8825,27 @@
           "state": {
             "description": "upcoming, active or closed. The client tolerates an unknown member (§8).",
             "$ref": "#/components/schemas/SessionState"
+          },
+          "armCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The number of arms (any status) that exist for this session (spec 6.3.8).",
+            "format": "int32",
+            "example": 0
           }
         },
         "additionalProperties": false,
-        "description": "The list-item shape of a session (spec 6.3.8). Arms, enrolled-pupil and publication counts are\ndeliberately absent — spec 6.3.8 asks for them, but Arm/Pupil/result sets do not exist in this\ncodebase yet, and this module ships nothing it cannot populate honestly (never a fabricated\n`0`). See TASK-0035's Log for the tracked deferral.",
+        "description": "The list-item shape of a session (spec 6.3.8). int SessionDto.ArmCount was added by TASK-0039, now\nthat `Arm` exists; enrolled-pupil and publication counts stay absent — spec 6.3.8 asks for\nthem too, but Pupil and result sets do not exist in this codebase yet, and this module ships\nnothing it cannot populate honestly (never a fabricated `0`). See TASK-0035's Log for the\noriginal deferral and TASK-0039's Log for the arm half landing.",
         "example": {
           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
           "name": "2026/2027",
           "startDate": "2026-09-14",
           "endDate": "2027-07-25",
-          "state": "Upcoming"
+          "state": "Upcoming",
+          "armCount": 0
         }
       },
       "SessionState": {
@@ -7366,6 +9156,69 @@
           "email": "ngozi.adeyemi@example.com",
           "phone": "08012345678",
           "isSuperAdmin": null
+        }
+      },
+      "UpdateArmCommand": {
+        "required": [
+          "id",
+          "label",
+          "capacity",
+          "formTeacherAdminId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The arm being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged. Must stay unique within the level and session."
+          },
+          "capacity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` to leave unchanged. 1..100.",
+            "format": "int32",
+            "example": 25
+          },
+          "formTeacherAdminId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged; an EMPTY string clears it. Setting this ADDITIONALLY\n        requires `arm.formteacher.assign`, beyond the `arm.update` this route requires."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "`null` to leave unchanged. `closed` is set automatically when the arm's\n        session closes and cannot be requested here.",
+                "$ref": "#/components/schemas/ArmStatus"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/arms/{id}` (spec 6.4.3, 6.4.9): \"Label, capacity, form teacher, status.\" Every\n        field is independently optional — `null` leaves it unchanged, the same convention\n        `UpdateLevelCommand` established. Rejected outright against a closed arm (spec 6.4.7).",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "label": null,
+          "capacity": 25,
+          "formTeacherAdminId": null,
+          "status": null
         }
       },
       "UpdateLevelCommand": {
@@ -7737,6 +9590,12 @@
   "tags": [
     {
       "name": "Admins"
+    },
+    {
+      "name": "Arms"
+    },
+    {
+      "name": "Assignments"
     },
     {
       "name": "Auth"

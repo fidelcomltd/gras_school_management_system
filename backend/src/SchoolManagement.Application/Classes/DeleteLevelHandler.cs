@@ -12,21 +12,23 @@ namespace SchoolManagement.Application.Classes;
 /// Handles <see cref="DeleteLevelCommand"/>.
 /// </summary>
 /// <remarks>
-/// Spec 6.4.2's "nothing has ever referenced it" spans arms, enrolments, subject mappings and results
-/// — NONE of those tables exist in this codebase yet (TASK-0039 and later Phase 2/3 cards), so that
-/// part of the precondition is DEFERRED (TASK-0038; tracked in <c>backend/docs/ASSUMPTIONS.md</c> §2
+/// Spec 6.4.2's "nothing has ever referenced it" spans arms, enrolments, subject mappings and results.
+/// TASK-0039 resolves the ARM half, now that <c>Arm</c> exists — enrolments, subject mappings and
+/// results remain DEFERRED (later Phase 2/3 cards; tracked in <c>backend/docs/ASSUMPTIONS.md</c> §2
 /// and <c>STATE.md</c>'s known drift) rather than faked with an always-true probe — the project
 /// already regrets one such bypass (<c>SuperAdminFlagEffectivePrivilegeProvider</c>).
 /// <para>
-/// The ONE reference this card CAN check honestly today: another level's <c>nextLevelId</c> — that
-/// table exists right now, in this same migration. See
-/// <see cref="IClassLevelRepository.FindReferencingNextLevelAsync"/>; the database also carries a
-/// <c>RESTRICT</c> foreign key on the same column as a backstop (<c>ClassLevelConfiguration</c>),
-/// mirroring how <c>TermConfiguration</c>'s partial unique index backstops its own friendly check.
+/// The references this card CAN check honestly today: another level's <c>nextLevelId</c> (see
+/// <see cref="IClassLevelRepository.FindReferencingNextLevelAsync"/>, backstopped by a <c>RESTRICT</c>
+/// foreign key in <c>ClassLevelConfiguration</c>) and, as of TASK-0039, any arm under this level (see
+/// <c>IArmRepository.AnyForLevelAsync</c>, backstopped by the same shape of <c>RESTRICT</c> foreign
+/// key in <c>ArmConfiguration</c>) — mirroring how <c>TermConfiguration</c>'s partial unique index
+/// backstops its own friendly check.
 /// </para>
 /// </remarks>
 internal sealed class DeleteLevelHandler(
     IClassLevelRepository levels,
+    IArmRepository arms,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<DeleteLevelCommand, Result>
@@ -56,6 +58,14 @@ internal sealed class DeleteLevelHandler(
                 $"{level.Name} cannot be deleted because {referencingLevel.Name} points to it as its " +
                 $"next level. Point {referencingLevel.Name} elsewhere first, or deactivate " +
                 $"{level.Name} instead."));
+        }
+
+        if (await arms.AnyForLevelAsync(level.Id, cancellationToken).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Conflict(
+                "level.referenced_by_arm",
+                $"{level.Name} cannot be deleted because it has arms. Delete those arms first, or " +
+                $"deactivate {level.Name} instead."));
         }
 
         await levels.RemoveAsync(level, cancellationToken).ConfigureAwait(false);

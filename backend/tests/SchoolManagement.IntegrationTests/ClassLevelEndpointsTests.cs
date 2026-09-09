@@ -368,6 +368,39 @@ public sealed class ClassLevelEndpointsTests : IAsyncLifetime
         (json.RootElement.GetProperty("detail").GetString() ?? string.Empty).ShouldContain("Nursery 3");
     }
 
+    // TASK-0039: the arm branch DeleteLevelHandler adds in the same dispatch that creates the arm
+    // table (STATE.md's own live trigger for this card).
+    [Fact]
+    public async Task Delete_ALevelWithAnArmUnderIt_Returns409NamingArms()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantsAsync(Privileges.Level.Delete);
+
+        // Nursery 1: the entry level, unreferenced by any other level's nextLevelId (see
+        // Delete_TheUnreferencedEntryLevel_Succeeds) — so the ONLY reason delete is refused here is
+        // the arm this test seeds under it, not the other reference check.
+        var nursery1Id = (await FindSeededAsync("Nursery 1", "Nursery 2")).FirstId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var session = SchoolManagement.Domain.Sessions.AcademicSession
+                .Create(Guid.CreateVersion7(), "2026/2027", new DateOnly(2026, 9, 14), new DateOnly(2027, 7, 25))
+                .Value;
+            var arm = Arm.Create(Guid.CreateVersion7(), nursery1Id, session.Id, "A", null, null).Value;
+            context.Add(session);
+            context.Add(arm);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await DeleteAsync($"{LevelsUrl}/{nursery1Id}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var json = await ReadJsonAsync(response);
+        json.RootElement.GetProperty("errorCode").GetString().ShouldBe("level.referenced_by_arm");
+    }
+
     [Fact]
     public async Task Delete_WhenNotFound_Returns404()
     {

@@ -12,6 +12,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Sessions;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Infrastructure.Persistence;
@@ -108,12 +109,30 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         json.RootElement.GetProperty("errorCode").GetString().ShouldBe("term.times_school_opened_immutable");
     }
 
+    // TASK-0039, spec 6.3.6's third precondition — opening blocked with no arm anywhere in the session.
+    [Fact]
+    public async Task Open_WithNoArmsForSession_Returns409NamingTheSession()
+    {
+        RequireDatabase();
+
+        var (_, termIds) = await SeedSessionAsync("2026/2027", SessionState.Upcoming, [TermState.Upcoming, TermState.Upcoming, TermState.Upcoming]);
+        var jar = await SignInWithGrantsAsync(Privileges.Term.Open);
+
+        var response = await PostAsync($"{TermsUrl}/{termIds[0]}/open", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var json = await ReadJsonAsync(response);
+        json.RootElement.GetProperty("errorCode").GetString().ShouldBe("term.no_arms_for_session");
+        (json.RootElement.GetProperty("detail").GetString() ?? string.Empty).ShouldContain("2026/2027");
+    }
+
     [Fact]
     public async Task Open_OrdinalOne_WithNoActiveTermAnywhere_ActivatesTermAndSession()
     {
         RequireDatabase();
 
         var (sessionId, termIds) = await SeedSessionAsync("2026/2027", SessionState.Upcoming, [TermState.Upcoming, TermState.Upcoming, TermState.Upcoming]);
+        await SeedArmAsync(sessionId);
         var jar = await SignInWithGrantsAsync(Privileges.Term.Open);
 
         var response = await PostAsync($"{TermsUrl}/{termIds[0]}/open", jar);
@@ -129,16 +148,19 @@ public sealed class TermEndpointsTests : IAsyncLifetime
     }
 
     // Spec 6.3.5: opening a new session's First Term also closes the previously active session — even
-    // though that session's OWN terms are already all closed (the "lame duck" window).
+    // though that session's OWN terms are already all closed (the "lame duck" window). Spec 6.4.7,
+    // TASK-0039: every arm in that session closes in the SAME transaction.
     [Fact]
-    public async Task Open_OrdinalOne_ClosesThePreviouslyActiveSession()
+    public async Task Open_OrdinalOne_ClosesThePreviouslyActiveSessionAndItsArms()
     {
         RequireDatabase();
 
         var (oldSessionId, _) = await SeedSessionAsync(
             "2025/2026", SessionState.Active, [TermState.Closed, TermState.Closed, TermState.Closed],
             timesSchoolOpened: [60, 61, 62]);
-        var (_, newTermIds) = await SeedSessionAsync("2026/2027", SessionState.Upcoming, [TermState.Upcoming, TermState.Upcoming, TermState.Upcoming]);
+        var oldArmId = await SeedArmAsync(oldSessionId);
+        var (newSessionId, newTermIds) = await SeedSessionAsync("2026/2027", SessionState.Upcoming, [TermState.Upcoming, TermState.Upcoming, TermState.Upcoming]);
+        await SeedArmAsync(newSessionId);
 
         var jar = await SignInWithGrantsAsync(Privileges.Term.Open);
 
@@ -150,6 +172,9 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var oldSession = await context.AcademicSessions.SingleAsync(x => x.Id == oldSessionId, TestContext.Current.CancellationToken);
         oldSession.State.ShouldBe(SessionState.Closed);
+
+        var oldArm = await context.Arms.AsNoTracking().SingleAsync(a => a.Id == oldArmId, TestContext.Current.CancellationToken);
+        oldArm.Status.ShouldBe(ArmStatus.Closed);
     }
 
     [Fact]
@@ -432,6 +457,20 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return (session.Id, terms.Select(term => term.Id).ToArray());
+    }
+
+    /// <summary>Seeds one active arm for <paramref name="sessionId"/> under the first seeded level, so an open-term call satisfies TASK-0039's precondition. Returns the new arm's id.</summary>
+    private async Task<Guid> SeedArmAsync(Guid sessionId)
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var level = await context.ClassLevels.AsNoTracking().FirstAsync(TestContext.Current.CancellationToken);
+        var arm = Arm.Create(Guid.CreateVersion7(), level.Id, sessionId, "A", null, null).Value;
+
+        context.Add(arm);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return arm.Id;
     }
 
     private async Task<CookieJar> SignInWithGrantsAsync(params string[] privileges)

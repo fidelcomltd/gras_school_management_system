@@ -8,6 +8,7 @@ using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
 using SchoolManagement.Application.Sessions;
@@ -48,6 +49,13 @@ internal static class OpenApiExamples
 
     /// <summary>An example identifier, shaped like the version 7 GUIDs this service generates.</summary>
     private const string ExampleId = "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40";
+
+    /// <summary>Example identifiers for the role-assignment examples, each a distinct entity.</summary>
+    private const string ExampleAssignmentId = "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51";
+    private const string ExampleAdminAccountId = "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62";
+    private const string ExampleSessionId = "0192f0c4-af61-7d4e-c250-6e1b8d9f4073";
+    private const string ExampleArmId = "0192f0c4-c072-7e5f-d361-7f2c9e0a5184";
+    private const string ExampleGrantedById = "0192f0c4-d183-7f60-e472-8030af1b6295";
 
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
@@ -429,6 +437,30 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(CreateRoleAssignmentCommand)] = $$"""
+            {
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "roleId": "{{ExampleId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "scopeType": "ArmList",
+              "armIds": ["{{ExampleArmId}}"]
+            }
+            """,
+
+        [typeof(RoleAssignmentDto)] = $$"""
+            {
+              "id": "{{ExampleAssignmentId}}",
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "roleId": "{{ExampleId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "scopeType": "ArmList",
+              "armIds": ["{{ExampleArmId}}"],
+              "grantedBy": "{{ExampleGrantedById}}",
+              "status": "Active",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
         // The error contract matters more to a client author than any success shape: it is what they
         // have to handle and cannot easily provoke on demand. Both framework types are given examples
         // showing the extension members this API adds — errorCode and traceId — which a consumer would
@@ -506,7 +538,8 @@ internal static class OpenApiExamples
               "name": "2026/2027",
               "startDate": "2026-09-14",
               "endDate": "2027-07-25",
-              "state": "Upcoming"
+              "state": "Upcoming",
+              "armCount": 0
             }
             """,
 
@@ -517,6 +550,7 @@ internal static class OpenApiExamples
               "startDate": "2026-09-14",
               "endDate": "2027-07-25",
               "state": "Active",
+              "armCount": 24,
               "terms": [
                 {
                   "id": "{{ExampleId}}",
@@ -569,7 +603,8 @@ internal static class OpenApiExamples
                   "name": "2026/2027",
                   "startDate": "2026-09-14",
                   "endDate": "2027-07-25",
-                  "state": "Active"
+                  "state": "Active",
+                  "armCount": 24
                 }
               ],
               "nextCursor": "MjAyNi8yMDI3"
@@ -691,6 +726,101 @@ internal static class OpenApiExamples
               "orderedLevelIds": [
                 "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
                 "{{ExampleId}}"
+              ]
+            }
+            """,
+
+        [typeof(CreateArmCommand)] = $$"""
+            {
+              "classLevelId": "{{ExampleId}}",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "C",
+              "capacity": 22,
+              "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+            }
+            """,
+
+        [typeof(ArmDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+              "classLevelId": "{{ExampleId}}",
+              "classLevel": "Primary 2",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "C",
+              "displayName": "Primary 2C",
+              "capacity": 22,
+              "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<ArmDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                  "classLevelId": "{{ExampleId}}",
+                  "classLevel": "Primary 2",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "label": "C",
+                  "displayName": "Primary 2C",
+                  "capacity": 22,
+                  "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(NextArmLabelResponse)] = """
+            {
+              "label": "C"
+            }
+            """,
+
+        [typeof(UpdateArmCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "label": null,
+              "capacity": 25,
+              "formTeacherAdminId": null,
+              "status": null
+            }
+            """,
+
+        [typeof(BulkCreateArmsLevelEntry)] = $$"""
+            {
+              "levelId": "{{ExampleId}}",
+              "armCount": 3,
+              "capacity": 30
+            }
+            """,
+
+        [typeof(BulkCreateArmsCommand)] = $$"""
+            {
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "levels": [
+                { "levelId": "{{ExampleId}}", "armCount": 3, "capacity": 30 }
+              ],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(BulkCreateArmsResponse)] = $$"""
+            {
+              "created": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                  "classLevelId": "{{ExampleId}}",
+                  "classLevel": "Primary 2",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "label": "A",
+                  "displayName": "Primary 2A",
+                  "capacity": 30,
+                  "formTeacherAdminId": null,
+                  "status": "Active"
+                }
               ]
             }
             """,

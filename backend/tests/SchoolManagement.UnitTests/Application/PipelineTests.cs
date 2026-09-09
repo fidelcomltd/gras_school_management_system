@@ -67,6 +67,7 @@ public sealed class PipelineTests
         // TASK-0028 dispatch 2: the Roles/* handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRoleRepository>());
+        services.AddSingleton(Substitute.For<IRoleAssignmentRepository>());
 
         // TASK-0035: the Sessions/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
@@ -77,6 +78,11 @@ public sealed class PipelineTests
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());
         services.AddSingleton(Substitute.For<IClassLevelRepository>());
+
+        // TASK-0039: the Arms/* handlers (plus UpdateSessionHandler/GetSessionHandler's new arm-count
+        // read) depend on this port, implemented by Infrastructure — same treatment as every other
+        // repository stubbed above.
+        services.AddSingleton(Substitute.For<IArmRepository>());
 
         services.AddOptions<PipelineOptions>();
 

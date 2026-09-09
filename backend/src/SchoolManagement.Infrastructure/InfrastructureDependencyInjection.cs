@@ -112,10 +112,10 @@ public static class InfrastructureDependencyInjection
 
         services.AddScoped<ISecretProvider, ConfigurationSecretProvider>();
 
-        // TASK-0003: real (super-admin-flag-only) implementation, replacing
-        // NullEffectivePrivilegeProvider — see the class remarks. TASK-0019 replaces this again once
-        // real role/assignment persistence exists for non-super-admin accounts.
-        services.AddScoped<IEffectivePrivilegeProvider, SuperAdminFlagEffectivePrivilegeProvider>();
+        // TASK-0030: the graduated implementation, resolving real role_assignment rows for every
+        // non-super-admin account — replaces SuperAdminFlagEffectivePrivilegeProvider (TASK-0003),
+        // DELETED, not left registered behind a flag. See the class remarks.
+        services.AddScoped<IEffectivePrivilegeProvider, RoleAssignmentEffectivePrivilegeProvider>();
         services.AddScoped<IAuthorizationAuditSink, LoggingAuthorizationAuditSink>();
         services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
         services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
@@ -156,6 +156,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();
 
+        // TASK-0030: role assignments — the graduated provider above depends on this.
+        services.AddScoped<IRoleAssignmentRepository, RoleAssignmentRepository>();
+
         // TASK-0035: academic sessions and terms.
         services.AddScoped<IAcademicSessionRepository, AcademicSessionRepository>();
         services.AddScoped<ITermRepository, TermRepository>();
@@ -163,6 +166,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0038: sections and class levels.
         services.AddScoped<ISectionRepository, SectionRepository>();
         services.AddScoped<IClassLevelRepository, ClassLevelRepository>();
+
+        // TASK-0039: arms.
+        services.AddScoped<IArmRepository, ArmRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

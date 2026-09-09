@@ -15,8 +15,10 @@ namespace SchoolManagement.Application.Auth;
 /// <param name="IsSuperAdmin">Whether the flag-bypass privilege path applies (TASK-0003 §1).</param>
 /// <param name="MustChangePassword">Whether the forced-change gate currently applies to this account.</param>
 /// <param name="EffectivePrivileges">
-/// The caller's resolved effective privilege set. For this card, populated only via the
-/// <see cref="IsSuperAdmin"/> flag path — see <c>SuperAdminFlagEffectivePrivilegeProvider</c>.
+/// The caller's resolved effective privilege set, from whatever <c>IEffectivePrivilegeProvider</c> is
+/// registered — the <see cref="IsSuperAdmin"/> flag path for a super admin, or (since TASK-0030's
+/// provider graduation) the union of a non-super-admin's own active <c>role_assignment</c> grants.
+/// This endpoint's SHAPE is unchanged by TASK-0030; only the data behind it improved.
 /// </param>
 /// <param name="SessionExpiresAt">
 /// The sooner of the session's idle and absolute deadlines, recomputed on every response.

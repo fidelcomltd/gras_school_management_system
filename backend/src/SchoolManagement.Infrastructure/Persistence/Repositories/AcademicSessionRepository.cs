@@ -85,8 +85,13 @@ internal sealed class AcademicSessionRepository(ApplicationDbContext context) : 
         var stateFilterGiven = state is not null;
         var stateFilterValue = state?.ToString() ?? string.Empty;
 
+        // TASK-0039: arm_count is a per-row scalar subquery, not a JOIN + GROUP BY — a session with
+        // zero arms must still return exactly one row (an inner join would drop it, and a LEFT JOIN
+        // would need the same GROUP BY anyway), and this table is admin-configuration-sized.
         var sql = """
-            SELECT id, name, start_date, end_date, state
+            SELECT
+                id, name, start_date, end_date, state,
+                (SELECT COUNT(*)::int FROM arms WHERE arms.session_id = academic_sessions.id) AS arm_count
             FROM academic_sessions
             WHERE
                 ({0} = FALSE OR state = {1}::varchar(20))
@@ -109,7 +114,8 @@ internal sealed class AcademicSessionRepository(ApplicationDbContext context) : 
                 row.Name,
                 row.StartDate,
                 row.EndDate,
-                Enum.Parse<SessionState>(row.State)))
+                Enum.Parse<SessionState>(row.State),
+                row.ArmCount))
             .ToArray();
 
         var nextCursor = hasNextPage ? SessionListCursor.Encode(page[^1].Name) : null;
@@ -129,5 +135,7 @@ internal sealed class AcademicSessionRepository(ApplicationDbContext context) : 
         public DateOnly EndDate { get; init; }
 
         public string State { get; init; } = string.Empty;
+
+        public int ArmCount { get; init; }
     }
 }

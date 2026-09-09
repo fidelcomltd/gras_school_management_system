@@ -111,6 +111,8 @@ internal sealed class CreateSessionHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(SessionMapper.ToDetailDto(session, termEntities));
+        // TASK-0039: a brand-new session never carries arms over (spec 6.4.7) — 0 by construction,
+        // no repository round trip needed.
+        return Result.Success(SessionMapper.ToDetailDto(session, termEntities, armCount: 0));
     }
 }

@@ -786,6 +786,63 @@ additionally exposed alongside it purely for round-tripping into `PATCH`. Flagge
 to confirm or overrule, since it is the one place this card interpreted rather than found an
 unambiguous instruction.
 
+### 2.24 TASK-0030 — role assignments, escalation rules 1 and 3, the provider graduation
+
+**`SuperAdminFlagEffectivePrivilegeProvider` is DELETED**, replaced by
+`RoleAssignmentEffectivePrivilegeProvider`, which resolves a non-super-admin's grants from real
+`role_assignment` rows and still resolves a super admin's grants directly from the `is_super_admin`
+flag (unchanged — spec 6.1.7 rule 4). No flag or config switch keeps the old class reachable.
+
+**Rule 3's "own scope" is interpreted as the actor's own grant of the SAME assigning privilege it is
+exercising (`role.assign` for a school-wide target, `role.scope.assign` for an arm-list target), not
+as some other aggregate notion of the actor's overall reach.** Spec 6.1.7 says "An arm-scoped holder
+of `role.scope.assign` may only assign over arms inside its own scope," but `role.scope.assign` is
+itself non-scopable in the register (`PrivilegeRegistry`), and `RoleScopeGuard.ValidateAssignable`
+already rejects assigning ANY role containing a non-scopable privilege with `ArmList` scope — so
+under the current registry, no assignment can ever grant `role.scope.assign` itself with anything but
+`SchoolWide` scope, and the rule's own worked scenario ("an arm-scoped holder of `role.scope.assign`")
+cannot be produced through the live endpoint. The interpretation shipped here
+(`RoleScopeGuard.ValidateGrantWithinActorScope`) is real, tested logic — not an always-true stub — and
+activates correctly the moment a future card makes `role.scope.assign` scopable, or against a
+directly-seeded assignment in a test (`AssignmentEndpointsTests`'s two rule-3 tests do exactly this,
+the same accepted "seed the otherwise-unreachable prerequisite state directly" technique
+`RoleEndpointsTests.CreateRoleDirectlyAsync` already uses). Flagged for the orchestrator to confirm or
+correct, since it is the one place this card's guard shape is inference rather than an unambiguous
+spec sentence.
+
+**The seeded Super Admin role cannot be assigned through `POST /admins/{id}/assignments` at all** —
+rejected with `role_assignment.super_admin_not_assignable`. Spec 4.2.2 describes a sessionless,
+permanent Super Admin assignment as though it is a normal (if special-cased) row, but TASK-0003's
+human ruling (2026-09-05, recorded above `AdminAccount`'s remarks) already settled that
+`is_super_admin` is a flag bypass, not a role assignment, specifically because "spec 6.1.7 rule 4
+governs over 4.2.2's looser wording." Letting the seeded Super Admin role be granted through this new
+table would open a second, unaudited path to full privileges that bypasses rule 4's `SetSuperAdmin`
+gate and the last-active-Super-Admin invariant entirely — the opposite of what a card this
+security-sensitive should ship. `RoleAssignment.Create` still accepts an `isSuperAdminAssignment` flag
+so the schema (`session_id` nullable) already matches spec 6.1.5's literal field table without a later
+migration, but no code path in this card ever passes `true` for it.
+
+**Audit events for rules 1 and 3 stay LOG-ONLY, via the existing `ISystemAuditSink` seam** — the same
+mechanism §2.16 already disclosed for TASK-0027's rule-4 rejection, not the transactional,
+persisted `audit_event` table spec 6.1.12 describes (that table does not exist anywhere in this
+codebase yet; see STATE.md's live-drift entry naming the future card that must build it). The
+`ISystemAuditSink.RecordAsync` signature also has no `outcome` field — outcome is encoded in the
+action code (`role_assignment.self_assignment_forbidden`, `role_assignment.scope_exceeds_actor`)
+rather than a literal `success`/`rejected` value, following rule 2's and rule 4's own precedent exactly
+rather than inventing a third convention for the same gap. Tests assert against `RecordingSystemAuditSink.Records`
+(the established test double), which is what "assert the row exists" means today, absent a real table.
+
+**Spec 6.1.13's closed-session and archived-role create-time rejections are NOT implemented** — the
+task card's own out-of-scope list groups "closed session, archived role, arm deleted under an
+assignment, form teacher reassigned mid-term" together as "6.1.13's lifecycle cascades," deferred to
+TASK-0046. `CreateRoleAssignmentHandler` therefore accepts an assignment against a closed session or
+an archived role today; spec 6.1.5's OTHER field-table validations (arm-belongs-to-session, target not
+deactivated, role exists) are enforced, since those are basic field rules, not 6.1.13 edge cases.
+
+**`DELETE /roles/{id}`'s has-ever-been-assigned archive branch is added in this card**, per its own
+live-drift trigger (§2.20's sibling entry in STATE.md): a role with any assignment (active or revoked)
+now archives instead of hard-deleting, still returning 204.
+
 ---
 
 ## 3. Open — a human must decide or supply

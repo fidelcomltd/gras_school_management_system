@@ -26,7 +26,9 @@ internal static class SessionMapper
     }
 
     /// <summary>Projects a session (list item shape) to its wire shape.</summary>
-    public static SessionDto ToDto(AcademicSession session)
+    /// <param name="session">The session to project.</param>
+    /// <param name="armCount">TASK-0039: the number of arms (any status) that exist for this session (spec 6.3.8).</param>
+    public static SessionDto ToDto(AcademicSession session, int armCount)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -35,11 +37,15 @@ internal static class SessionMapper
             session.Name,
             session.StartDate,
             session.EndDate,
-            session.State);
+            session.State,
+            armCount);
     }
 
     /// <summary>Projects a session and its terms to the detail wire shape.</summary>
-    public static SessionDetailDto ToDetailDto(AcademicSession session, IReadOnlyList<Term> terms)
+    /// <param name="session">The session to project.</param>
+    /// <param name="terms">The session's terms.</param>
+    /// <param name="armCount">TASK-0039: the number of arms (any status) that exist for this session (spec 6.3.8).</param>
+    public static SessionDetailDto ToDetailDto(AcademicSession session, IReadOnlyList<Term> terms, int armCount)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(terms);
@@ -50,6 +56,7 @@ internal static class SessionMapper
             session.StartDate,
             session.EndDate,
             session.State,
-            terms.OrderBy(term => term.Ordinal).Select(ToTermDto).ToArray());
+            terms.OrderBy(term => term.Ordinal).Select(ToTermDto).ToArray(),
+            armCount);
     }
 }

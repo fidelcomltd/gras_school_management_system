@@ -13,6 +13,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Sessions;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Infrastructure.Persistence;
@@ -250,6 +251,50 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    // TASK-0039, drift resolution: SessionDto/SessionDetailDto carry a real arm count (spec 6.3.8).
+    [Fact]
+    public async Task Get_IncludesTheSessionsArmCount()
+    {
+        RequireDatabase();
+
+        Guid sessionId;
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            sessionId = await InsertSessionDirectlyAsync(context, "2026/2027", SessionState.Upcoming);
+            await InsertArmsAsync(context, sessionId, 2);
+        }
+
+        var jar = await SignInWithGrantsAsync(Privileges.Session.View);
+
+        var response = await GetAsync($"{SessionsUrl}/{sessionId}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<SessionDetailDto>(response)).ArmCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task List_IncludesEachSessionsArmCount()
+    {
+        RequireDatabase();
+
+        await using (var scope = _fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var withArms = await InsertSessionDirectlyAsync(context, "2026/2027", SessionState.Upcoming);
+            await InsertArmsAsync(context, withArms, 3);
+            await InsertSessionDirectlyAsync(context, "2025/2026", SessionState.Closed);
+        }
+
+        var jar = await SignInWithGrantsAsync(Privileges.Session.View);
+
+        var body = await ReadAsync<CursorPageDto>(await GetAsync(SessionsUrl, jar));
+
+        body.Items.Single(item => item.Name == "2026/2027").ArmCount.ShouldBe(3);
+        body.Items.Single(item => item.Name == "2025/2026").ArmCount.ShouldBe(0);
+    }
+
     [Fact]
     public async Task Create_WithNonConsecutiveYears_Returns422()
     {
@@ -424,6 +469,20 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
 
         return id;
+    }
+
+    /// <summary>Inserts <paramref name="count"/> arms for <paramref name="sessionId"/> under the first seeded level.</summary>
+    private static async Task InsertArmsAsync(ApplicationDbContext context, Guid sessionId, int count)
+    {
+        var levelId = (await context.ClassLevels.AsNoTracking().FirstAsync(TestContext.Current.CancellationToken)).Id;
+        var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        for (var index = 0; index < count; index++)
+        {
+            context.Add(Arm.Create(Guid.CreateVersion7(), levelId, sessionId, letters[index].ToString(), null, null).Value);
+        }
+
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<CookieJar> SignInWithGrantsAsync(params string[] privileges)

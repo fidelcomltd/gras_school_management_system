@@ -12,8 +12,9 @@ namespace SchoolManagement.Api.Endpoints;
 
 /// <summary>
 /// Class levels — year groups and the progression chain (TASK-0038; spec 6.4.1, 6.4.2, 6.4.7, 6.4.8,
-/// 6.4.9). Everything about arms (creation, capacity, the <c>open</c>-term precondition, session arm
-/// counts) is TASK-0039 — this module carries none of it, including no arm count on any DTO here.
+/// 6.4.9). Arms (creation, capacity, the <c>open</c>-term precondition, session arm counts) are
+/// <see cref="ArmEndpoints"/> — TASK-0039. No arm count is carried on any DTO here; a level's own
+/// arms are reachable via <c>GET /arms?levelId=</c>.
 /// </summary>
 public sealed class ClassLevelEndpoints : IEndpointModule
 {
@@ -179,9 +180,9 @@ public sealed class ClassLevelEndpoints : IEndpointModule
             .WithSummary("Delete a class level")
             .WithDescription(
                 "Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the " +
-                "one reference this codebase can see today (another level's nextLevelId); arm, " +
-                "enrolment, subject-mapping and result references are DEFERRED — those tables do not " +
-                "exist yet (TASK-0039 and later).")
+                "two references this codebase can see today (another level's nextLevelId, and any " +
+                "arm under this level); enrolment, subject-mapping and result references remain " +
+                "DEFERRED — those tables do not exist yet.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

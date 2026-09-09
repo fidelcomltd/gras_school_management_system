@@ -62,6 +62,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0028 dispatch 2. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Role> Roles => Set<Role>();
 
+    /// <summary>TASK-0030. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
     /// <summary>TASK-0035. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<AcademicSession> AcademicSessions => Set<AcademicSession>();
 
@@ -73,6 +76,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     /// <summary>TASK-0038. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<ClassLevel> ClassLevels => Set<ClassLevel>();
+
+    /// <summary>TASK-0039. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Arm> Arms => Set<Arm>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

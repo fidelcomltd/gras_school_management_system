@@ -13,8 +13,9 @@ public static class TermTransitionGuard
     /// <summary>
     /// Spec 6.3.6: "Opening a term is blocked unless: the previous term in the same session is
     /// closed, or this is the first term of the session and the previous session is closed or has no
-    /// active term... The block message names the reason, for example: First Term 2026/2027 cannot
-    /// be opened because Third Term 2025/2026 is still active. Close it first."
+    /// active term; the session has a start and end date; and at least one arm exists for the
+    /// session. The block message names the reason, for example: First Term 2026/2027 cannot be
+    /// opened because Third Term 2025/2026 is still active. Close it first."
     /// </summary>
     /// <param name="term">The term being opened. Must already be <see cref="TermState.Upcoming"/>.</param>
     /// <param name="session"><paramref name="term"/>'s own session — named in the message.</param>
@@ -29,11 +30,17 @@ public static class TermTransitionGuard
     /// has no active term" reduces to "no term anywhere is currently active," since a session cannot
     /// hold an active term while itself being anything other than <see cref="SessionState.Active"/>.
     /// </param>
+    /// <param name="hasArmsForSession">
+    /// TASK-0039: whether at least one arm (any status) exists for <paramref name="session"/> — spec
+    /// 6.3.6's third precondition. Was DEFERRED (always treated as satisfied) until <c>Arm</c> existed;
+    /// see <c>OpenTermHandler</c>'s remarks for the resolved seam.
+    /// </param>
     public static Result CanOpen(
         Term term,
         AcademicSession session,
         Term? previousTermInSession,
-        (string TermName, string SessionName)? activeTermElsewhere)
+        (string TermName, string SessionName)? activeTermElsewhere,
+        bool hasArmsForSession)
     {
         ArgumentNullException.ThrowIfNull(term);
         ArgumentNullException.ThrowIfNull(session);
@@ -54,11 +61,8 @@ public static class TermTransitionGuard
                     $"{term.Name} {session.Name} cannot be opened because {active.TermName} " +
                     $"{active.SessionName} is still active. Close it first."));
             }
-
-            return Result.Success();
         }
-
-        if (previousTermInSession is null || previousTermInSession.State != TermState.Closed)
+        else if (previousTermInSession is null || previousTermInSession.State != TermState.Closed)
         {
             var previousDescription = previousTermInSession is null
                 ? "the previous term"
@@ -74,6 +78,15 @@ public static class TermTransitionGuard
                 "term.previous_term_not_closed",
                 $"{term.Name} {session.Name} cannot be opened because {previousDescription} is " +
                 $"{stateDescription}. Close it first."));
+        }
+
+        // TASK-0039, spec 6.3.6's third precondition — checked LAST, after every other reason has
+        // already had a chance to fire its own, more specific message.
+        if (!hasArmsForSession)
+        {
+            return Result.Failure(Error.Conflict(
+                "term.no_arms_for_session",
+                $"No arms exist for {session.Name}. Create at least one arm before opening a term."));
         }
 
         return Result.Success();
