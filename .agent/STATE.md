@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-08 by frontend-dev (TASK-0044 append) · no size cap, see `## Reading this file`
+Last reconciled: 2026-09-09 by orchestrator (TASK-0052 closure) · no size cap, see `## Reading this file`
 
 ## Product
 
@@ -129,11 +129,18 @@ openapi.json sha256: **`53820aa5feb23ef8d34b4962b250a74ef202faa3cbc3f066873a6a2c
           line has an exact matching added line elsewhere: 0 unmatched) and by diffing
           `components.schemas` keys directly (6 added, 0 removed). Recomputed independently with
           `sha256sum`, matches `CONTRACT.lock`.
-          ⚠ **Frontend client NOT regenerated — §4.4 check 2 RED until TASK-0052 lands.
+          ✅ **Frontend client REGENERATED against this same hash by TASK-0052 (2026-09-09) —
+          §4.4 check 2 GREEN. `frontend/src/api/schema.d.ts` re-run through `npm run generate:api`
+          (+1394/-93), `check:api-drift` → "No drift.", verified three times by the orchestrator.
+          All nine new operations (three reg-number settings, six pupils) reachable through the
+          existing generic wrapper with ZERO new lines in `client.ts`/`client-types.ts` — eighth
+          consecutive confirmation of that finding. §4.4 check 1 verified PASS by contract-guardian
+          (backend regeneration matches the committed contract); checks 3 and 4 PASS.**
           ORCHESTRATOR'S CALL 2026-09-09: ONE card, not two — TASK-0052 was widened to consume
           both the 0005c and 0050 moves in a single regeneration. `generate:api` rewrites the whole
           of `schema.d.ts` from the committed document regardless, so two sequential cards would
-          regenerate the same file twice and the first would be dead work.**
+          regenerate the same file twice and the first would be dead work. Vindicated: the single
+          regeneration produced all nine operations at once.
 
 previous: **`e86e1b187bbacd9f83b8bd725cb8c9066bf41c5fd936b606da331646d2080e90`** — moved
           2026-09-09 by TASK-0005c. Additive: `/settings/reg-number`,
@@ -141,7 +148,8 @@ previous: **`e86e1b187bbacd9f83b8bd725cb8c9066bf41c5fd936b606da331646d2080e90`**
           new groups on `SettingsDto`. +623/-3; the 3 deletions are a `SettingsDto` doc-comment
           rewording and its `required` list gaining two entries — nothing removed or narrowed.
           Recomputed independently with `sha256sum`, matches `CONTRACT.lock`.
-          ⚠ **Frontend client NOT regenerated — §4.4 check 2 RED until TASK-0052 lands.**
+          ✅ **Superseded — the client was regenerated against the LATER `53820aa5…` hash by
+          TASK-0052, which consumed this move and TASK-0050's together. §4.4 check 2 GREEN.**
 
 previous:  **`c3cb88ff74b931ba58057a11b781fbad58d72d1778ff91584dbfe712f661a4c9`** — moved
           2026-09-08 by TASK-0030. Additive: three assignment endpoints. Recomputed independently,
@@ -234,9 +242,9 @@ portal:    pin validation only, no accounts (spec 6.8, 6.9).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0050, 0005a, 0005c
+Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 0048, 0050, 0052, 0005a, 0005c
 (0021, 0005a, 0027 and 0029 closed 2026-09-06; 0033, 0034, 0035 and 0037 closed 2026-09-07;
-0038-0044 closed 2026-09-08; 0047, 0048, 0005c and 0050 closed 2026-09-09) — closure notes and reopen history in
+0038-0044 closed 2026-09-08; 0047, 0048, 0005c, 0050 and 0052 closed 2026-09-09) — closure notes and reopen history in
 [decisions/2026-Q3.md](decisions/2026-Q3.md).
 
 | Task | Title | Owner | Status |
@@ -247,13 +255,159 @@ Open cards only. Closed: TASK-0001-0004, 0006-0029, 0031-0035, 0037-0044, 0047, 
 | TASK-0049 | Audit log read surface and CSV export | backend-dev | **queued 2026-09-09** — depends on TASK-0048's table. Contract additive |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **queued (stub)** — split from TASK-0030 on 2026-09-08 |
-| TASK-0052 | Regenerate the frontend client for reg-number settings AND pupils | frontend-dev | **queued 2026-09-09** — §4.4 check 2 RED. Consumes BOTH contract moves (0005c + 0050) in one pass; target hash `53820aa5…`, 45 paths |
-| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — TASK-0005c dependency CLEARED 2026-09-09; still needs TASK-0050 and an `enrolment` entity |
+| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — TASK-0005c and TASK-0050 dependencies both CLEARED 2026-09-09; still needs an `enrolment` entity |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
+
+- 2026-09-09 **TASK-0052 CLOSED by orchestrator.** Client regenerated against `53820aa5…`
+  consuming both contract moves (0005c reg-number settings + 0050 pupils) in one pass; §4.4 check 2
+  RED→GREEN. All nine operations reachable through the existing generic wrapper, **zero** new lines
+  in `client.ts`/`client-types.ts` (eighth consecutive confirmation). Gates independently re-run by
+  the orchestrator, not taken on the agent's report: 47 files / 340 tests / **Skipped 0**, build and
+  lint green, `check:api-drift` "No drift.", gitleaks clean, hash recomputed against
+  `CONTRACT.lock`. `test:e2e` deliberately not re-run (client-seam-only, no screen/route/auth code
+  touched) — same call as TASK-0040/0044/0047.
+
+  **`frontend-dev` correctly rejected four factual claims in its own task card**, each
+  re-verified by the orchestrator with `jq` against the committed contract before acceptance:
+  (1) `GetRegNumberPreview`'s `separator`/`serialWidth` are **required**, not optional as the card
+  asserted; (2) `FindPupilDuplicates` declares **three** query parameters
+  (`surname`/`firstName`/`dateOfBirth`), not four — no `contactPhone`, and not `dob`;
+  (3) **`YearSource` is not an enum at all** — `SettingsRegNumberGroupDto.yearSource` is a plain
+  `string` with no schema behind it, so the card's §8-tolerance bullet was unprovable and the agent
+  wrote no test rather than fabricating one; (4) the card guessed this move might supply no new
+  omitted-required-header instance, but `CreatePupil` (`POST /pupils`) **requires**
+  `Idempotency-Key`, so the proof came from this move's own surface. Minor, no AC affected: the card
+  writes `PupilStatus` members lowercase; the contract declares them PascalCase.
+
+  **Root cause of all four: per-parameter required/optional claims and enum membership were written
+  into acceptance criteria from the backend card's prose instead of from the promoted document.**
+  Standing rule for this recurring card and every future one: derive that class of fact from
+  `contracts/openapi.json` with `jq` at card-authoring time, or state the shape as an open question
+  and let the implementing agent establish it. Corrections are struck through in place in
+  TASK-0052.md under `## Card text corrections`, with the verifying `jq` query for each, plus a
+  banner at the top — this is a recurring card on its seventh run and the eighth would otherwise
+  have inherited all four. The card's own "**Do not fabricate a proof**" instruction is what
+  produced the right behaviour on (3) and is worth keeping verbatim in the eighth run.
+
+  Also on this dispatch: a `contract-guardian` incident that reverted uncommitted work, repaired in
+  full — see `## Known drift` for the account and the landed fix.
+
+- 2026-09-09 **TASK-0052 implemented by frontend-dev — client regenerated against `53820aa5…`
+  (both TASK-0005c's reg-number-settings move and TASK-0050's pupils move, consumed in one pass),
+  all nine new operations reachable through the existing generic wrapper with ZERO new lines in
+  `client.ts`/`client-types.ts`. Status table and closure left to the orchestrator per this
+  dispatch's instructions.**
+
+  Hash independently recomputed (`sha256sum contracts/openapi.json`) before starting — matched
+  `CONTRACT.lock` byte for byte (`53820aa5feb23ef8d34b4962b250a74ef202faa3cbc3f066873a6a2c38f0da9b`,
+  45 paths). `npm run generate:api` rewrote `frontend/src/api/schema.d.ts` (+1394/-93 per
+  `git diff --numstat`), purely additive: `UpdateRegNumber`, `GetRegNumberPreview`,
+  `UpdateAbbreviation`, `ListPupils`, `CreatePupil`, `GetPupil`, `UpdatePupilBiographical`,
+  `FindPupilDuplicates`, `ListAdmissionsQueue` and their schemas. `check:api-drift` → "No drift."
+  Eighth confirmation of the TASK-0033/0037/0040/0044/0047 finding: a new operation on an
+  already-supported HTTP method needs no hand-written code in `client.ts`/`client-types.ts`.
+
+  **Three new test files**, all under CONVENTIONS.md §3's 180-line cap: `client-reg-number.test.ts`
+  (99 lines — `UpdateRegNumber`, `GetRegNumberPreview`, `UpdateAbbreviation`),
+  `client-pupils.test.ts` (126 lines — `ListPupils`, `CreatePupil`, `FindPupilDuplicates`,
+  `ListAdmissionsQueue`) and `client-pupils-detail.test.ts` (101 lines — `GetPupil`,
+  `UpdatePupilBiographical`, the by-id pair). `src/api/README.md` updated (tests table and
+  zero-new-code precedent list now name all three and TASK-0052).
+
+  **Omitted-required-path-parameter direction**: proven on both `GetPupil` and
+  `UpdatePupilBiographical` — the pupils half is this move's own instance, since neither
+  reg-number operation has a path parameter at all. §8 enum tolerance proven for `PupilSex` and
+  `PupilStatus` together in one `server.use(...)` override on `GET /api/v1/pupils/:id` (route
+  written `:id`, never the contract's literal `{id}`, per the card's warning — same trap
+  TASK-0037 lost a run to), and separately for `RegNumberSerialReset` via an override on
+  `PATCH /api/v1/settings/reg-number` (no path parameter on any of the three reg-number routes, so
+  no `{id}`→`:id` conversion applies there — noted in that test's own comment for the next copier).
+
+  **`registrationNumber` (PupilDto) and `issuedCount` (SettingsAbbreviationGroupDto) both asserted
+  `null`, never coerced** — `client-pupils.test.ts`'s `ListPupils`/`CreatePupil` tests and
+  `client-pupils-detail.test.ts`'s `GetPupil` test assert `result.registrationNumber` /
+  `result.items[0]?.registrationNumber` is exactly `null` (no `?? ""` anywhere in the diff);
+  `client-reg-number.test.ts`'s `UpdateAbbreviation` test asserts `result.issuedCount` is exactly
+  `null` (no `?? 0` anywhere in the diff). Both examples already carry `null` in the committed
+  contract, so no override was needed to produce it.
+
+  **The named trap, hit exactly as predicted**: `FindPupilDuplicates`'s 200 body is an inline
+  `array` of `$ref PupilDto` with no top-level `example` — the same shape as TASK-0040's
+  `ReorderLevels` and TASK-0047's `ListRoleAssignments`. Fixed with an explicit `server.use(...)`
+  override in that one test; `openapi-handlers.ts` untouched, no assertion loosened.
+
+  **Three corrections to this card's own text, flagged not silently followed — all verified
+  directly against the committed contract and the regenerated `schema.d.ts` before writing a
+  single test:**
+  1. **`GetRegNumberPreview`'s `separator`/`serialWidth` are REQUIRED, not optional** — the card's
+     AC says they "typecheck as optional"; `contracts/openapi.json` marks both parameters
+     `"required": true`, and the generated type is `query: { separator: string; serialWidth:
+     number | string }` with no `?` on either. `client-reg-number.test.ts` tests the actual
+     (required) shape and documents the discrepancy inline.
+  2. **`FindPupilDuplicates` takes THREE query parameters, not four, and the date one is
+     `dateOfBirth`, not `dob`** — the card names `surname`/`firstName`/`dob`/`contactPhone`; the
+     committed contract declares only `surname`/`firstName`/`dateOfBirth`, all required.
+     `contactPhone` matching is explicitly the *next* card's, per the operation's own description
+     ("once `pupil_contact` exists"). `client-pupils.test.ts` includes a test that names this
+     directly: passing `contactPhone` fails typecheck because the contract has never declared it.
+  3. **`YearSource` is not an enum in this contract — it does not exist as a schema at all.**
+     The card's AC asks for "§8 enum tolerance proven for … `YearSource` (`AdmissionYear`)". The
+     committed contract renders `SettingsRegNumberGroupDto.yearSource` as a plain `"type": "string"`
+     (confirmed in `contracts/openapi.json` and in the generated `yearSource: string` — no union,
+     no `$ref`, no `YearSource` schema anywhere in `components.schemas`). There is nothing to prove
+     §8 tolerance *of* here — a plain `string` field already accepts any string, and asserting that
+     would not demonstrate anything about enum widening. **No test was written for this bullet
+     rather than fabricating one**; `RegNumberSerialReset` (a genuine enum) is tested instead,
+     immediately above it in the same file.
+
+  **A fourth item, not a card error but worth recording for the next copier**: `POST /pupils`
+  (`CreatePupil`) requires `Idempotency-Key`, unlike either of this move's reg-number `PATCH`es.
+  The card's negative-typing-direction bullet is written entirely in terms of the reg-number half
+  ("neither \[PATCH\] proves the omitted-required-header direction … reuse `CreateLevel`,
+  `POST /arms` … or state plainly no new instance") and does not mention that the *pupils* half
+  supplies one directly. `client-pupils.test.ts`'s `CreatePupil` test is used for that proof
+  instead of reaching for an older, unrelated operation — a strictly better proof since it comes
+  from this move's own new surface.
+
+  **All 10 `@ts-expect-error`s verified load-bearing by the removal-probe method**: all three new
+  files copied to `.bak`, all ten comment lines deleted at once, `npm run typecheck` re-run,
+  reproduced exactly ten errors at exactly the ten expected lines (`TS2554` ×4 for the omitted
+  required-argument/path-parameter cases, `TS2353` ×5 for the excess-property/unknown-query-key
+  and rejected-`idempotencyKey` cases, `TS2345` ×2 — one doubling on `client-pupils.test.ts`'s
+  omitted-`dateOfBirth` case naming both the missing property and the type mismatch — for the two
+  omitted-required-query-parameter cases), then restored from `.bak` and re-confirmed
+  `npm run typecheck` clean before deleting the backups.
+
+  **Gates, all run directly by this session, in order**: `npm run typecheck` (`tsc -b`) 0 errors;
+  `npm run lint` (`oxlint --max-warnings=0`) 0 warnings; `npm run test` (`vitest run`) **47 files,
+  340 passed, 0 failed, Skipped: 0** (was 44 files/317 tests after TASK-0047, so +3 files/+23 tests
+  matches the three new files exactly: 8 + 10 + 5); `npm run build` (`tsc -b && vite build`)
+  succeeded, 537 modules (unchanged — test-only files don't affect the build graph);
+  `npm run check:api-drift` "No drift" (re-confirmed after the gate run). `gitleaks detect
+  --source . --no-git --config backend/.gitleaks.toml --redact --no-banner` → "no leaks found"
+  (6.72 MB scanned) — every fixture is the same fixed UUID-shaped constant pattern already used
+  throughout `src/api/client-*.test.ts`, nothing resembling a real credential.
+
+  **`npm run test:e2e` deliberately SKIPPED** — no screen, route, or auth/session code touched;
+  client-seam-only per the card's own Out of scope, same call TASK-0040/TASK-0044/TASK-0047 made.
+  Last known green remains **8 passed / Skipped 0 (TASK-0043)**, unchanged by this dispatch since
+  nothing e2e-relevant moved.
+
+  **Files changed**: `frontend/src/api/schema.d.ts` (regenerated, +1394/-93),
+  `frontend/src/api/client-reg-number.test.ts` (new, 99 lines),
+  `frontend/src/api/client-pupils.test.ts` (new, 126 lines),
+  `frontend/src/api/client-pupils-detail.test.ts` (new, 101 lines), `frontend/src/api/README.md`
+  (+13/-8). Nothing under `contracts/**` or `backend/**` touched; hash unmoved at `53820aa5…`.
+  `client.ts`/`client-types.ts` confirmed byte-identical (`git diff` empty on both).
+
+  **Confirmed out of scope, not built, exactly as the card scoped**: no reg-number settings UI, no
+  abbreviation dialogue, no preview widget, no pupils screens, no admissions-queue screen, no
+  TanStack Query hooks, no `features/settings`/`features/pupils` folders, no changes to
+  `client.ts`/`client-types.ts` beyond the (zero) proven gap. Full text: TASK-0052's own `## Log`.
 
 - 2026-09-09 **TASK-0050 implemented by backend-dev — pupil entity, the pending-exclusion invariant,
   and the register read surface. Status table and closure left to the orchestrator per this
@@ -1941,6 +2095,34 @@ Full sequence and cards not yet written: [ROADMAP.md](ROADMAP.md).
 DB-credential split, TASK-0001 close).
 
 ## Known drift
+
+- 2026-09-09 **PROCESS INCIDENT, repaired: `contract-guardian` reverted a dev agent's uncommitted
+  work.** On TASK-0052 closure the guardian was dispatched for the §4.4 check and, while performing
+  check 2, ran an in-place generator (and/or a working-tree-restoring `git` command) that reverted
+  `frontend/src/api/schema.d.ts` to `HEAD`, discarding the regeneration `frontend-dev` had just
+  produced. It then reported **check 2 FAIL** — it was measuring the damage its own commands had
+  caused, and its diff listed the nine new operations as "missing". Caught because the orchestrator
+  had independently run `check:api-drift` twice BEFORE the dispatch and seen "No drift." — the
+  contradiction was the tell. **Fully repaired, nothing lost:** `schema.d.ts` is deterministic
+  generator output, so re-running `npm run generate:api` restored it byte-identically (`+1394/-93`,
+  matching frontend-dev's reported numstat exactly); the three hand-written test files are
+  untracked and were never at risk; `contracts/**`, `backend/**`, `CONTRACT.lock` and the stash
+  were all confirmed untouched. Full verify re-run green on the restored tree (47 files / 340
+  tests / Skipped 0).
+  **Root cause, now fixed in `.claude/agents/contract-guardian.md`:** §11 says that agent may write
+  *nothing*, but the enforcement was prose only — the definition carried no `tools:` allowlist, so
+  it inherited `Edit`/`Write`; and check 2 told it to "regenerate the frontend client to a temp
+  path" when this repo's `npm run generate:api` writes **in place**. The definition now (a) pins
+  `tools: Bash, Read, Grep, Glob`, (b) forbids `git checkout/restore/stash/reset/clean` and every
+  in-place generator by name, (c) routes check 2 through `npm run check:api-drift`, which
+  generates to a temp path safely, (d) requires comparison against the WORKING TREE rather than
+  `HEAD`, since uncommitted-but-correct is the expected state at closure time, and (e) adds a
+  BLOCKED verdict so a check it cannot run safely costs one re-dispatch instead of a lost session.
+  **Generalisable lesson beyond this agent:** a "read-only" agent that has `Bash` is not read-only.
+  Any future reports-only agent needs the forbidden commands enumerated, not just an adjective.
+  **No follow-up card needed** — the fix is landed and the damage is repaired. Kept here as the
+  standing rationale for the guardian's tool restriction, so a later editor does not "simplify" it
+  away.
 
 - 2026-09-09 **`NigerianGeography`'s 774 LGA names are UNVERIFIED, and this one can block a real
   admission.** Spec 6.5.4 requires a closed list ("free text is not accepted, because this field is
