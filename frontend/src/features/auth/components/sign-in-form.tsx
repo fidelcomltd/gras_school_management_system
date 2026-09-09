@@ -6,19 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/http';
+import { fieldMessage } from '@/shared/forms/field-message';
 import { useSignIn } from '../api';
 import { signInSchema, type SignInFormValues } from '../sign-in-schema';
-
-/**
- * Maps a 422's server-supplied field errors onto the form, tolerant of casing
- * (ASP.NET model-validation keys are PascalCase; the rest of the wire is
- * camelCase) — never assumed, always looked up.
- */
-function fieldMessage(fieldErrors: Record<string, string[]> | undefined, name: string): string | undefined {
-  if (!fieldErrors) return undefined;
-  const key = Object.keys(fieldErrors).find((candidate) => candidate.toLowerCase() === name);
-  return key ? fieldErrors[key]?.[0] : undefined;
-}
 
 export function SignInForm() {
   const navigate = useNavigate();

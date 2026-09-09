@@ -3,6 +3,7 @@ import {
   __resetAuthSession,
   getCsrfToken,
   getSession,
+  hasPrivilege,
   onSessionEnded,
   registerKeepaliveCaller,
   setCsrfToken,
@@ -126,5 +127,36 @@ describe('terminateSession — the one session-end path', () => {
     await vi.advanceTimersByTimeAsync(HOUR);
 
     expect(caller).not.toHaveBeenCalled();
+  });
+});
+
+describe('hasPrivilege', () => {
+  function withGrants(...privileges: string[]): AuthSession {
+    return {
+      ...sessionEndingIn(HOUR),
+      isSuperAdmin: false,
+      effectivePrivileges: privileges.map((privilege) => ({
+        privilege,
+        scope: 'SchoolWide',
+        armIds: [],
+      })),
+    };
+  }
+
+  it('is true when the privilege is in the effective set', () => {
+    expect(hasPrivilege(withGrants('settings.view'), 'settings.view')).toBe(true);
+  });
+
+  it('is false when the privilege is absent from the effective set', () => {
+    expect(hasPrivilege(withGrants('settings.view'), 'settings.identity.update')).toBe(false);
+  });
+
+  it('is false for a caller with no grants at all', () => {
+    expect(hasPrivilege(withGrants(), 'settings.view')).toBe(false);
+  });
+
+  it('is true for any privilege when the super-admin flag-bypass applies, even with no explicit grant', () => {
+    const superAdmin: AuthSession = { ...withGrants(), isSuperAdmin: true };
+    expect(hasPrivilege(superAdmin, 'settings.view')).toBe(true);
   });
 });

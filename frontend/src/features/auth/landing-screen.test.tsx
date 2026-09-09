@@ -64,7 +64,6 @@ describe('LandingScreen — four required states', () => {
     renderLanding();
 
     expect(await screen.findByRole('heading', { name: 'Welcome, Chisom Maxwell' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 
   it('mustChangePassword: shows the forced-change message instead of the dashboard', async () => {
@@ -78,8 +77,5 @@ describe('LandingScreen — four required states', () => {
     expect(
       await screen.findByText('You must change your password before continuing.'),
     ).toBeInTheDocument();
-    // Sign-out stays available — it's one of the three endpoints exempt from
-    // the must-change-password gate (delta §2a).
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 });

@@ -125,6 +125,17 @@ export function getSession(): AuthSession | null {
   return current;
 }
 
+/**
+ * Whether `session` carries `privilege`, either directly in its effective set
+ * or via the super-admin flag-bypass path (TASK-0003 §1, spec 9.2). The one
+ * place nav visibility and route guards ask this question, so the two can
+ * never disagree (TASK-0041: an item/route the caller cannot use is ABSENT,
+ * never disabled-and-visible).
+ */
+export function hasPrivilege(session: AuthSession, privilege: string): boolean {
+  return session.isSuperAdmin || session.effectivePrivileges.some((grant) => grant.privilege === privilege);
+}
+
 /** Records the latest session state and (re)arms the keepalive from it. */
 export function setSession(session: AuthSession): void {
   current = session;

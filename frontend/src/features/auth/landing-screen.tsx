@@ -1,15 +1,16 @@
-import { useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router';
+import { Navigate } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
-import { onSessionEnded } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useMe } from './api';
-import { SignOutButton } from './components/sign-out-button';
 
 /**
- * `/` — the minimum protected landing (TASK-0021 ruling 5): no nav, no
- * dashboard, no widgets, just proof that the session and logout paths work.
+ * `/` — the minimum protected landing (TASK-0021 ruling 5), now mounted
+ * inside `ProtectedLayout`'s `<Outlet/>` (TASK-0041): the persistent nav and
+ * its one Sign-out control live in `AuthenticatedShell`, not here, so there
+ * is exactly one Sign-out affordance on screen rather than a second,
+ * redundant one. `ProtectedLayout` also owns the "session ended → sign-in"
+ * subscription for every protected route now, not just this one.
  *
  * Four required states (CONVENTIONS.md §11) for the `GET /auth/me` fetch this
  * screen makes: loading, error, unauthorized, and success below. There is no
@@ -18,14 +19,7 @@ import { SignOutButton } from './components/sign-out-button';
  * state does not apply here.
  */
 export function LandingScreen() {
-  const navigate = useNavigate();
   const me = useMe();
-
-  // Covers a session that ends while this screen is already mounted and its
-  // cached `me` data is still considered fresh (e.g. the proactive keepalive
-  // hits the absolute cap, or a later request 401s) — `me`'s own query error
-  // branch below only fires when `me` itself is (re)fetched.
-  useEffect(() => onSessionEnded(() => void navigate(paths.signIn, { replace: true })), [navigate]);
 
   if (me.isPending) {
     return (
@@ -55,7 +49,6 @@ export function LandingScreen() {
         <p className="text-sm text-foreground">
           You must change your password before continuing.
         </p>
-        <SignOutButton />
       </div>
     );
   }
@@ -65,7 +58,6 @@ export function LandingScreen() {
       <h1 className="font-display text-2xl font-semibold text-foreground">
         Welcome, {session.staffName}
       </h1>
-      <SignOutButton />
     </div>
   );
 }
