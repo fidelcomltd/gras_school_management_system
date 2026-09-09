@@ -115,6 +115,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the admissions queue
+         * @description Spec 6.5.14: "A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else." This IS that queue — every pending pupil, unconditionally. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.
+         */
+        get: operations["ListAdmissionsQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms": {
         parameters: {
             query?: never;
@@ -463,6 +483,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pupils": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pupils
+         * @description Spec 6.5.15. Cursor-paginated per spec 9.5, page size 50 by default. Sorted by surname ascending then id (spec 6.5.15's own default additionally orders by class progression, which no pupil in this card can carry — see backend/docs/ASSUMPTIONS.md §2.27). EXCLUDES pending unless `status=Pending` is passed explicitly (the pending-exclusion invariant, spec 6.5.14) — `GET /admissions` is the queue that always shows it. `search` matches surname, first name, middle name or the registration number (in full, or its trailing serial — spec 6.5.15's own worked example, "41" finding "GRAS/2026/0041", is satisfied by ordinary substring matching); contact-phone and authorised-pickup-person search are the NEXT card's, once `pupil_contact` exists. `pupil.view` is arm-scoped for a Class Teacher: no pupil carries an arm reference until enrolment exists, so an arm-scoped caller sees an empty page today rather than a 403 — a real answer, not a placeholder.
+         */
+        get: operations["ListPupils"];
+        put?: never;
+        /**
+         * Register a new pupil
+         * @description Spec 6.5.4: always creates a PENDING record with no registration number — nothing reaches active until admission approval (a later card) issues one. `pupil.create` is not arm-scoped. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreatePupil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find pupil records that may be duplicates
+         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
+         */
+        get: operations["FindPupilDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil
+         * @description Renders only what exists after this card — no contacts, health, documents or enrolment-history blocks yet. Reachable for a PENDING record (finding it again to edit it is this card's own goal), unlike the list. `pupil.view` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.
+         */
+        get: operations["GetPupil"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a pupil's biographical fields
+         * @description Spec 6.5.10: `registrationNumber` in the payload is REJECTED with 409 — it is issued once at admission approval and never edited afterwards, "no ordinary edit path exists." Every other field is independently optional; an absent field is left unchanged, an empty string clears an optional one. `pupil.update` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.
+         */
+        patch: operations["UpdatePupilBiographical"];
+        trace?: never;
+    };
     "/api/v1/reference/ping": {
         parameters: {
             query?: never;
@@ -709,6 +797,66 @@ export interface paths {
          * @description School name, short name, address, phone, email, motto, head teacher name (spec 6.2.3). `timezone` and `abbreviation` are not editable here — timezone is fixed, and the abbreviation has its own endpoint and its own optimistic-concurrency pointer. `expectedVersion` must match the identity group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written, and BOTH the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).
          */
         patch: operations["UpdateSchoolIdentity"];
+        trace?: never;
+    };
+    "/api/v1/settings/reg-number": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the registration-number pattern
+         * @description Separator, serial width, reset rule (spec 6.2.4). `yearSource` is fixed and not editable here. Reducing `serialWidth` below what the counter partition currently active under the SAVED `serialReset` already needs is rejected `409`, naming the real serial and the minimum width that fits it (spec 6.2.10). `expectedVersion` must match the reg-number group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written.
+         */
+        patch: operations["UpdateRegNumber"];
+        trace?: never;
+    };
+    "/api/v1/settings/reg-number/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the next registration number under unsaved parameters
+         * @description `separator`/`serialWidth` are UNSAVED — supplied as query parameters, not read from settings. The abbreviation and the counter partition (which the currently SAVED `serialReset` selects, spec 6.2.4) both come from saved configuration. Uses the next serial that would actually be issued; with an empty register that is serial 1.
+         */
+        get: operations["GetRegNumberPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/abbreviation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the school's registration-number abbreviation
+         * @description Requires the literal confirmation token `CHANGE` and a reason (spec 6.2.4). Rewrites no issued number — the counter is keyed on admission year alone, never the abbreviation, so a mid-session change neither restarts the serial nor produces two pupils whose numbers differ only by prefix. A value already used historically is allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's current `versionNumber` or the save is rejected `409` before anything is written.
+         */
+        patch: operations["UpdateAbbreviation"];
         trace?: never;
     };
     "/api/v1/config-versions": {
@@ -1534,6 +1682,76 @@ export interface components {
             insertAfterLevelId: null | string;
         };
         /**
+         * @description `POST /api/v1/pupils` (spec 6.5.4). Always creates a PupilStatus.Pending
+         *             record with a `null` registration number — see the task card's own goal: "Nothing
+         *             can reach active yet."
+         * @example {
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": "Ngozi",
+         *       "sex": "Female",
+         *       "dateOfBirth": "2020-05-03",
+         *       "nationality": "Nigerian",
+         *       "stateOfOrigin": "Anambra",
+         *       "lga": "Awka South",
+         *       "homeAddress": "14 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "otherInformation": null
+         *     }
+         */
+        CreatePupilCommand: {
+            /**
+             * @description 1..60 characters, letters/spaces/hyphens/apostrophes.
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description Same rule as Surname.
+             * @example Chidera
+             */
+            firstName: string;
+            /**
+             * @description Optional. Same rule as Surname when supplied.
+             * @example Ngozi
+             */
+            middleName: null | string;
+            /** @description Male or female. */
+            sex: components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description In the past; must give an age between 2 and 20.
+             * @example 2020-05-03
+             */
+            dateOfBirth: string;
+            /**
+             * @description `null` defaults to `Nigerian`.
+             * @example Nigerian
+             */
+            nationality: null | string;
+            /**
+             * @description One of the 36 states or the Federal Capital Territory — free text is rejected.
+             * @example Anambra
+             */
+            stateOfOrigin: string;
+            /**
+             * @description Must belong to StateOfOrigin — free text is rejected.
+             * @example Awka South
+             */
+            lga: string;
+            /**
+             * @description The child's own address. Multi-line permitted.
+             * @example 14 Zik Avenue, Awka
+             */
+            homeAddress: string;
+            /** @description Optional. */
+            previousSchool: null | string;
+            /** @description Optional. */
+            previousClass: null | string;
+            /** @description Optional, section G free text. */
+            otherInformation: null | string;
+        };
+        /**
          * @description `POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a
          *             school-wide grant or `role.scope.assign` for an arm-scoped grant — data-dependent on
          *             ScopeType CreateRoleAssignmentCommand.ScopeType, so the handler resolves and enforces it rather than a route-declarative
@@ -1919,6 +2137,68 @@ export interface components {
              * @description `null` when this is the last page.
              * @example BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2
              */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *           "registrationNumber": null,
+         *           "surname": "Okafor",
+         *           "firstName": "Chidera",
+         *           "middleName": "Ngozi",
+         *           "sex": "Female",
+         *           "dateOfBirth": "2020-05-03",
+         *           "ageYears": 6,
+         *           "nationality": "Nigerian",
+         *           "stateOfOrigin": "Anambra",
+         *           "lga": "Awka South",
+         *           "homeAddress": "14 Zik Avenue, Awka",
+         *           "previousSchool": null,
+         *           "previousClass": null,
+         *           "status": "Pending",
+         *           "otherInformation": null,
+         *           "matchedField": null,
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfPupilDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+             *         "registrationNumber": null,
+             *         "surname": "Okafor",
+             *         "firstName": "Chidera",
+             *         "middleName": "Ngozi",
+             *         "sex": "Female",
+             *         "dateOfBirth": "2020-05-03",
+             *         "ageYears": 6,
+             *         "nationality": "Nigerian",
+             *         "stateOfOrigin": "Anambra",
+             *         "lga": "Awka South",
+             *         "homeAddress": "14 Zik Avenue, Awka",
+             *         "previousSchool": null,
+             *         "previousClass": null,
+             *         "status": "Pending",
+             *         "otherInformation": null,
+             *         "matchedField": null,
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PupilDto"][];
+            /** @description `null` when this is the last page. */
             nextCursor: null | string;
         };
         /**
@@ -2423,6 +2703,151 @@ export interface components {
             lockedUntil?: string;
         };
         /**
+         * @description The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates
+         *     all use this one DTO — 6.5.15's extra detail-view sections (contacts, health, enrolment history)
+         *     and list-view completeness column do not exist yet (see the task card's own out-of-scope list),
+         *     so there is nothing today that would make a Summary/Detail split carry different fields.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "registrationNumber": null,
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": "Ngozi",
+         *       "sex": "Female",
+         *       "dateOfBirth": "2020-05-03",
+         *       "ageYears": 6,
+         *       "nationality": "Nigerian",
+         *       "stateOfOrigin": "Anambra",
+         *       "lga": "Awka South",
+         *       "homeAddress": "14 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "status": "Pending",
+         *       "otherInformation": null,
+         *       "matchedField": null,
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+         *     }
+         */
+        PupilDto: {
+            /**
+             * @description Opaque to the client.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /** @description `null` while pending — always null within this card. */
+            registrationNumber: null | string;
+            /**
+             * @description As typed (spec 6.5.4: displayed uppercase only on the result sheet, out of scope here).
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description As typed.
+             * @example Chidera
+             */
+            firstName: string;
+            /**
+             * @description `null` when not supplied.
+             * @example Ngozi
+             */
+            middleName: null | string;
+            /** @description Male or female. */
+            sex: components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description ISO-8601 date.
+             * @example 2020-05-03
+             */
+            dateOfBirth: string;
+            /**
+             * Format: int32
+             * @description Derived, not stored — whole years as of today (spec 6.5.4's term-end computation is result-sheet-specific and out of scope; see `backend/docs/ASSUMPTIONS.md` §2.27).
+             * @example 6
+             */
+            ageYears: number | string;
+            /**
+             * @description Free text; defaults `Nigerian`.
+             * @example Nigerian
+             */
+            nationality: string;
+            /**
+             * @description One of the 36 states or the FCT.
+             * @example Anambra
+             */
+            stateOfOrigin: string;
+            /**
+             * @description One of string PupilDto.StateOfOrigin's Local Government Areas.
+             * @example Awka South
+             */
+            lga: string;
+            /**
+             * @description The child's own address.
+             * @example 14 Zik Avenue, Awka
+             */
+            homeAddress: string;
+            /** @description `null` when not supplied. */
+            previousSchool: null | string;
+            /** @description `null` when not supplied. */
+            previousClass: null | string;
+            /** @description Pending for every record this card creates; the other members exist for the column's shape only. */
+            status: components["schemas"]["PupilStatus"];
+            /** @description `null` when not supplied. */
+            otherInformation: null | string;
+            /**
+             * @description Which field a search term matched (`"Surname"`, `"FirstName"`, `"MiddleName"` or
+             *     `"RegistrationNumber"`), or `null` when no search term was given. Contact and
+             *     authorised-pickup-person search (spec 6.5.15) are the NEXT card's — never a value here.
+             */
+            matchedField: null | string;
+            /**
+             * Format: date-time
+             * @description System.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+            /**
+             * @description The admin account id that created the record, or `null`.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            createdBy: null | string;
+        };
+        /**
+         * @description A Pupil's sex (spec 6.5.4). Required, no default.
+         * @example Female
+         * @enum {unknown}
+         */
+        PupilSex: "Male" | "Female";
+        /**
+         * @description A Pupil's status (spec 6.5.4, 6.5.14). Defaults PupilStatus.Pending.
+         * @example Pending
+         * @enum {unknown}
+         */
+        PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
+        /**
+         * @description The response body of GetRegNumberPreviewQuery.
+         * @example {
+         *       "preview": "GRAS/2026/0040"
+         *     }
+         */
+        RegNumberPreviewDto: {
+            /**
+             * @description The full registration number that would be issued right now under the supplied unsaved
+             *     parameters, for example `GRAS/2026/0041`. Uses the next serial that would actually be
+             *     issued — with an empty register that is serial 1.
+             * @example GRAS/2026/0040
+             */
+            preview: string;
+        };
+        /**
+         * @description How the registration-number serial resets (spec 6.2.4, 6.5.10). Stored as a string
+         *     (`SchoolProfileConfiguration.HasConversion&lt;string&gt;()`), so a future member is a
+         *     code-only change.
+         * @example PerYear
+         * @enum {unknown}
+         */
+        RegNumberSerialReset: "PerYear" | "Continuous";
+        /**
          * @description `POST /api/v1/terms/{id}/reopen` (spec 6.3.6): Super Admin only, a reason of at least
          *             int Term.ReopenReasonMinLength characters, refused outright if the following term has
          *             already been opened.
@@ -2914,10 +3339,41 @@ export interface components {
          */
         SessionState: "Upcoming" | "Active" | "Closed";
         /**
-         * @description The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of
-         *     TASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups
-         *     (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather
-         *     than a new top-level field, and registration-number/abbreviation get their own group here).
+         * @description The abbreviation group, both inside SettingsDto and as
+         *     `PATCH /api/v1/settings/abbreviation`'s own success body (spec 6.2.4).
+         * @example {
+         *       "abbreviation": "GRAS",
+         *       "issuedCount": null,
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsAbbreviationGroupDto: {
+            /**
+             * @description 2 to 8 characters. Frozen into every registration number issued from now on.
+             * @example GRAS
+             */
+            abbreviation: string;
+            /**
+             * Format: int32
+             * @description How many issued registration numbers currently begin with string SettingsAbbreviationGroupDto.Abbreviation — the count
+             *     spec 6.2.4's confirmation dialogue names before an admin types `CHANGE`.
+             *     `null` means "no register exists yet to count" (TASK-0005c ships this field
+             *     permanently `null`; wiring the real count is TASK-0051's). NEVER `0` — that
+             *     would claim zero pupils hold the abbreviation as a fact this card cannot support.
+             */
+            issuedCount: null | number | string;
+            /**
+             * Format: int32
+             * @description The abbreviation group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next `PATCH`.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description The response body of `GET /api/v1/settings`. TASK-0005b extends this same envelope
+         *     additively (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving
+         *     endpoints rather than a new top-level field here).
          * @example {
          *       "identity": {
          *         "schoolName": "Golden Royal Ark School",
@@ -2929,12 +3385,28 @@ export interface components {
          *         "headTeacherName": "Chisom Maxwell",
          *         "timezone": "Africa/Lagos",
          *         "versionNumber": 3
+         *       },
+         *       "abbreviation": {
+         *         "abbreviation": "GRAS",
+         *         "issuedCount": null,
+         *         "versionNumber": 0
+         *       },
+         *       "regNumber": {
+         *         "separator": "/",
+         *         "serialWidth": 4,
+         *         "serialReset": "PerYear",
+         *         "yearSource": "AdmissionYear",
+         *         "versionNumber": 0
          *       }
          *     }
          */
         SettingsDto: {
             /** @description The school identity group. */
             identity: components["schemas"]["SettingsIdentityGroupDto"];
+            /** @description The registration-number abbreviation group. */
+            abbreviation: components["schemas"]["SettingsAbbreviationGroupDto"];
+            /** @description The registration-number pattern group. */
+            regNumber: components["schemas"]["SettingsRegNumberGroupDto"];
         };
         /**
          * @description The school identity group, both inside SettingsDto and as
@@ -2997,6 +3469,45 @@ export interface components {
              * @description The identity group's current optimistic-concurrency pointer. Echo this back as
              *     `expectedVersion` on the next `PATCH`.
              * @example 3
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description The registration-number pattern group, both inside SettingsDto and as
+         *     `PATCH /api/v1/settings/reg-number`'s own success body (spec 6.2.4).
+         * @example {
+         *       "separator": "/",
+         *       "serialWidth": 4,
+         *       "serialReset": "PerYear",
+         *       "yearSource": "AdmissionYear",
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsRegNumberGroupDto: {
+            /**
+             * @description One of `/`, `-`, `.`.
+             * @example /
+             */
+            separator: string;
+            /**
+             * Format: int32
+             * @description 3 to 6. Serials are zero-padded to this width.
+             * @example 4
+             */
+            serialWidth: number | string;
+            /** @description Whether the serial restarts each admission year or runs continuously. */
+            serialReset: components["schemas"]["RegNumberSerialReset"];
+            /**
+             * @description Always `AdmissionYear` — fixed, spec 6.2.4: "a number that changes meaning with the calendar
+             *     is not an identifier." No `PATCH` can change it.
+             * @example AdmissionYear
+             */
+            yearSource: string;
+            /**
+             * Format: int32
+             * @description The reg-number group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next `PATCH`.
+             * @example 0
              */
             versionNumber: number | string;
         };
@@ -3106,6 +3617,44 @@ export interface components {
          * @enum {unknown}
          */
         TermState: "Upcoming" | "Active" | "Closed";
+        /**
+         * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
+         *             string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: "the
+         *             save writes an audit event with a mandatory reason") — deliberately NO 10-character floor, unlike
+         *             6.2.9's grading/assessment/traits/trait-scale/result-rules family: 6.2.10 confirms the abbreviation
+         *             is never locked and never triggers that warning (approved delta, confirmed as proposed).
+         * @example {
+         *       "abbreviation": "GRA",
+         *       "confirmationToken": "CHANGE",
+         *       "reason": "The school shortened its registered trading name.",
+         *       "expectedVersion": 0
+         *     }
+         */
+        UpdateAbbreviationCommand: {
+            /**
+             * @description 2 to 8 characters. A value already used historically is allowed (spec 6.2.11).
+             * @example GRA
+             */
+            abbreviation: string;
+            /**
+             * @description Must equal the literal string `CHANGE`, typed by the administrator.
+             * @example CHANGE
+             */
+            confirmationToken: string;
+            /**
+             * @description Non-empty once trimmed. Capped but not floored — see `backend/docs/ASSUMPTIONS.md` for both
+             *     authored choices.
+             * @example The school shortened its registered trading name.
+             */
+            reason: string;
+            /**
+             * Format: int32
+             * @description The abbreviation group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.abbreviation.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+        };
         /**
          * @description `PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes
          *             reach this one command: an `admin.update` holder editing any account (name, email, phone,
@@ -3220,6 +3769,115 @@ export interface components {
              */
             progressionOrder: null | number | string;
             status: null | components["schemas"]["LevelStatus"];
+        };
+        /**
+         * @description `PATCH /api/v1/pupils/{id}` (spec 6.5.4, 6.5.10). Biographical fields only. Every field is
+         *             independently optional — `null` leaves it unchanged, the same convention
+         *             `UpdateArmCommand` established; an empty string clears an optional field
+         *             (MiddleName, PreviousSchool, PreviousClass,
+         *             OtherInformation).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": null,
+         *       "sex": null,
+         *       "dateOfBirth": null,
+         *       "nationality": null,
+         *       "stateOfOrigin": null,
+         *       "lga": null,
+         *       "homeAddress": "22 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "otherInformation": null,
+         *       "registrationNumber": null
+         *     }
+         */
+        UpdatePupilBiographicalCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /**
+             * @description 1..60 characters, letters/spaces/hyphens/apostrophes.
+             * @example Okafor
+             */
+            surname: null | string;
+            /**
+             * @description Same rule as Surname.
+             * @example Chidera
+             */
+            firstName: null | string;
+            /** @description An empty string clears it. */
+            middleName: null | string;
+            sex: null | components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description In the past; must give an age between 2 and 20.
+             */
+            dateOfBirth: null | string;
+            /** @description An empty string resets it to the default (`Nigerian`). */
+            nationality: null | string;
+            /** @description Must resolve to one of the 36 states or the Federal Capital Territory. */
+            stateOfOrigin: null | string;
+            /** @description Must resolve to one of StateOfOrigin's LGAs (the record's current state when StateOfOrigin is not also supplied). */
+            lga: null | string;
+            /**
+             * @description The child's own address.
+             * @example 22 Zik Avenue, Awka
+             */
+            homeAddress: null | string;
+            /** @description An empty string clears it. */
+            previousSchool: null | string;
+            /** @description An empty string clears it. */
+            previousClass: null | string;
+            /** @description An empty string clears it. */
+            otherInformation: null | string;
+            /**
+             * @description DECLARED ONLY SO ITS PRESENCE CAN BE DETECTED AND REJECTED — spec 6.5.10: "the number is
+             *     immutable and no ordinary edit path exists." Any non-null value here, including one identical to
+             *     the pupil's current number, is a 409. Never written.
+             */
+            registrationNumber: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/settings/reg-number` (spec 6.2.4). `yearSource` is deliberately absent
+         *             from this body — it is fixed (admission year) and never editable.
+         * @example {
+         *       "separator": "/",
+         *       "serialWidth": 4,
+         *       "serialReset": "PerYear",
+         *       "expectedVersion": 0
+         *     }
+         */
+        UpdateRegNumberCommand: {
+            /**
+             * @description One of `/`, `-`, `.`.
+             * @example /
+             */
+            separator: string;
+            /**
+             * Format: int32
+             * @description 3 to 6. Serials are zero-padded to this width.
+             * @example 4
+             */
+            serialWidth: number | string;
+            /**
+             * @description Whether the serial restarts each admission year (RegNumberSerialReset.PerYear) or
+             *     runs continuously (RegNumberSerialReset.Continuous) — approved delta amendment 1: the
+             *     counter itself carries a partition per mode, so this genuinely changes which numbers get issued
+             *     next, not merely a stored-but-inert flag.
+             */
+            serialReset: components["schemas"]["RegNumberSerialReset"];
+            /**
+             * Format: int32
+             * @description The reg-number group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.regnumber.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
         };
         /**
          * @description `PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):
@@ -3959,6 +4617,65 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAdmissionsQueue: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfPupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Too Many Requests */
@@ -5541,6 +6258,359 @@ export interface operations {
             };
         };
     };
+    ListPupils: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["PupilStatus"];
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfPupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreatePupil: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePupilCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FindPupilDuplicates: {
+        parameters: {
+            query: {
+                surname: string;
+                firstName: string;
+                dateOfBirth: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdatePupilBiographical: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePupilBiographicalCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Ping: {
         parameters: {
             query: {
@@ -6768,6 +7838,237 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsIdentityGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateRegNumber: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRegNumberCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsRegNumberGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRegNumberPreview: {
+        parameters: {
+            query: {
+                separator: string;
+                serialWidth: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegNumberPreviewDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAbbreviation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAbbreviationCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsAbbreviationGroupDto"];
                 };
             };
             /** @description Unauthorized */
