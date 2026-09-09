@@ -10,7 +10,7 @@ namespace SchoolManagement.Application.Audit;
 /// and is itself an audit event." A <see cref="ICommand{TResponse}"/>, not a query, precisely
 /// because it WRITES that event — every call appends one <c>audit_event</c> row (action
 /// <c>audit.export</c>, its <c>after_json</c> recording the filters actually used) before the
-/// filtered set is streamed back. Same five filters as <see cref="ListAuditEventsQuery"/>, no
+/// filtered set is streamed back. Same filters as <see cref="ListAuditEventsQuery"/>, no
 /// paging: the whole matching set is exported.
 /// </summary>
 public sealed record ExportAuditEventsCommand(
@@ -19,6 +19,7 @@ public sealed record ExportAuditEventsCommand(
     Guid? ActorAdminId,
     string? Action,
     string? EntityType,
+    string? EntityId,
     AuditOutcome? Outcome)
     : ICommand<Result<IAsyncEnumerable<AuditEventDto>>>;
 

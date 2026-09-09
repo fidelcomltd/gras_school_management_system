@@ -149,6 +149,49 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
     }
 
     [Fact]
+    public async Task List_Filters_ByEntityIdAlone()
+    {
+        RequireDatabase();
+
+        var marker = $"test.entity_id.{Guid.NewGuid():N}";
+        var targetEntityId = Guid.NewGuid().ToString();
+        var target = await SeedAuditEventAsync(BaseInstant, marker, "entity_a", entityId: targetEntityId);
+        await SeedAuditEventAsync(BaseInstant, marker, "entity_a", entityId: Guid.NewGuid().ToString());
+
+        var jar = await SignInWithGrantAsync([Privileges.Audit.View]);
+
+        var url = $"{AuditEventsUrl}?action={marker}&entityId={targetEntityId}";
+        var response = await GetAsync(url, jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await ReadAsync<CursorPage<AuditEventDto>>(response);
+        page.Items.Select(item => item.Id).ShouldBe([target]);
+    }
+
+    // Two rows share entityId but differ in entityType: combining both filters must return the
+    // intersection (the one row matching BOTH), never the union of either alone.
+    [Fact]
+    public async Task List_Filters_EntityIdAndEntityType_CombineAsAnIntersectionNotAnUnion()
+    {
+        RequireDatabase();
+
+        var marker = $"test.entity_id_intersection.{Guid.NewGuid():N}";
+        var sharedEntityId = Guid.NewGuid().ToString();
+
+        var target = await SeedAuditEventAsync(BaseInstant, marker, "target_entity", entityId: sharedEntityId);
+        await SeedAuditEventAsync(BaseInstant, marker, "other_entity", entityId: sharedEntityId);
+
+        var jar = await SignInWithGrantAsync([Privileges.Audit.View]);
+
+        var url = $"{AuditEventsUrl}?action={marker}&entityId={sharedEntityId}&entityType=target_entity";
+        var response = await GetAsync(url, jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await ReadAsync<CursorPage<AuditEventDto>>(response);
+        page.Items.Select(item => item.Id).ShouldBe([target]);
+    }
+
+    [Fact]
     public async Task Export_WithoutAuditExportGrant_Returns403()
     {
         RequireDatabase();
@@ -212,20 +255,54 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
         selfLogResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var selfLogPage = await ReadAsync<CursorPage<AuditEventDto>>(selfLogResponse);
 
-        var narrowLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedEntityTypeIs(item, narrowEntityType));
+        var narrowLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedFilterValueIs(item, "entityType", narrowEntityType));
         narrowLogEntry.ShouldNotBeNull();
 
-        var wholeLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedEntityTypeIs(item, expected: null));
+        var wholeLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedFilterValueIs(item, "entityType", expected: null));
+        wholeLogEntry.ShouldNotBeNull();
+
+        narrowLogEntry!.Id.ShouldNotBe(wholeLogEntry!.Id);
+    }
+
+    // The point of this card: BuildFilterMetadata must record entityId too, so an export narrowed to
+    // one entity and an unfiltered export stay distinguishable after the fact — read back through
+    // this same card's GET /audit-events, not a raw query.
+    [Fact]
+    public async Task Export_SelfLogRecordsTheEntityIdFilter_DistinguishableFromAnUnfilteredExport()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantAsync([Privileges.Audit.Export, Privileges.Audit.View]);
+        var narrowEntityId = Guid.NewGuid().ToString();
+
+        var narrowResponse = await GetAsync($"{ExportUrl}?entityId={narrowEntityId}", jar);
+        narrowResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await narrowResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        var wholeLogResponse = await GetAsync(ExportUrl, jar);
+        wholeLogResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await wholeLogResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        var selfLogResponse = await GetAsync(
+            $"{AuditEventsUrl}?action={Uri.EscapeDataString(Privileges.Audit.Export)}&pageSize=100", jar);
+        selfLogResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var selfLogPage = await ReadAsync<CursorPage<AuditEventDto>>(selfLogResponse);
+
+        var narrowLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedFilterValueIs(item, "entityId", narrowEntityId));
+        narrowLogEntry.ShouldNotBeNull();
+
+        var wholeLogEntry = selfLogPage.Items.FirstOrDefault(item => LoggedFilterValueIs(item, "entityId", expected: null));
         wholeLogEntry.ShouldNotBeNull();
 
         narrowLogEntry!.Id.ShouldNotBe(wholeLogEntry!.Id);
     }
 
     /// <summary>
-    /// Reads the self-log row's recorded <c>entityType</c> filter out of its <c>afterJson</c> —
-    /// raw JSON text (<see cref="AuditEventDto.AfterJson"/> is a plain string, not a parsed element).
+    /// Reads the self-log row's recorded filter value for <paramref name="key"/> out of its
+    /// <c>afterJson</c> — raw JSON text (<see cref="AuditEventDto.AfterJson"/> is a plain string,
+    /// not a parsed element).
     /// </summary>
-    private static bool LoggedEntityTypeIs(AuditEventDto item, string? expected)
+    private static bool LoggedFilterValueIs(AuditEventDto item, string key, string? expected)
     {
         if (item.AfterJson is not { } afterJson)
         {
@@ -234,7 +311,7 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
 
         using var document = System.Text.Json.JsonDocument.Parse(afterJson);
 
-        if (!document.RootElement.TryGetProperty("entityType", out var value))
+        if (!document.RootElement.TryGetProperty(key, out var value))
         {
             return false;
         }
@@ -249,7 +326,8 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
         string action,
         string entityType,
         Guid? actorAdminId = null,
-        AuditOutcome outcome = AuditOutcome.Success)
+        AuditOutcome outcome = AuditOutcome.Success,
+        string? entityId = null)
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -260,7 +338,7 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
             "System",
             action,
             entityType,
-            entityId: null,
+            entityId,
             outcome,
             beforeJson: null,
             afterJson: null,

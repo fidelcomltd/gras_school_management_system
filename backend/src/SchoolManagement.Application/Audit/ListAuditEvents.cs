@@ -18,6 +18,7 @@ namespace SchoolManagement.Application.Audit;
 /// <param name="ActorAdminId">Exact match on the acting administrator, or <see langword="null"/> for any actor.</param>
 /// <param name="Action">Exact match on the privilege/action string, or <see langword="null"/> for any action.</param>
 /// <param name="EntityType">Exact match on the affected entity's type, or <see langword="null"/> for any.</param>
+/// <param name="EntityId">Exact match on the affected entity's opaque id, or <see langword="null"/> for any.</param>
 /// <param name="Outcome">Exact match on <c>Success</c>/<c>Rejected</c>, or <see langword="null"/> for both.</param>
 public sealed record ListAuditEventsQuery(
     string? Cursor,
@@ -27,6 +28,7 @@ public sealed record ListAuditEventsQuery(
     Guid? ActorAdminId,
     string? Action,
     string? EntityType,
+    string? EntityId,
     AuditOutcome? Outcome)
     : IQuery<Result<CursorPage<AuditEventDto>>>;
 

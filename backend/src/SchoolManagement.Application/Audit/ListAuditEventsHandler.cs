@@ -36,6 +36,7 @@ internal sealed class ListAuditEventsQueryHandler(IAuditEventQueryRepository aud
                 request.ActorAdminId,
                 request.Action,
                 request.EntityType,
+                request.EntityId,
                 request.Outcome,
                 request.Cursor,
                 pageSize,

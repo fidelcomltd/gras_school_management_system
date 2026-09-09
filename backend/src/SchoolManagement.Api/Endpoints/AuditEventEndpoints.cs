@@ -51,10 +51,11 @@ public sealed class AuditEventEndpoints : IEndpointModule
                 [FromQuery] Guid? actorAdminId = null,
                 [FromQuery] string? action = null,
                 [FromQuery] string? entityType = null,
+                [FromQuery] string? entityId = null,
                 [FromQuery] AuditOutcome? outcome = null) =>
             {
                 var result = await sender.SendAsync(
-                    new ListAuditEventsQuery(cursor, pageSize, fromUtc, toUtc, actorAdminId, action, entityType, outcome),
+                    new ListAuditEventsQuery(cursor, pageSize, fromUtc, toUtc, actorAdminId, action, entityType, entityId, outcome),
                     cancellationToken);
 
                 return result.Match(TypedResults.Ok);
@@ -64,8 +65,8 @@ public sealed class AuditEventEndpoints : IEndpointModule
             .WithSummary("List audit events")
             .WithDescription(
                 "Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), " +
-                "`actorAdminId`, `action`, `entityType` and `outcome` — every filter optional and " +
-                "combinable. Sorted newest first by default (`occurred_at` descending, `id` " +
+                "`actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter " +
+                "optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` " +
                 "descending as the tie-break within the same instant). Cursor-paginated per spec " +
                 $"9.5 — never offset. `pageSize` defaults to {CursorPageRequest.DefaultPageSize} " +
                 $"and is capped at {CursorPageRequest.MaxPageSize}.")
@@ -84,10 +85,11 @@ public sealed class AuditEventEndpoints : IEndpointModule
                 [FromQuery] Guid? actorAdminId = null,
                 [FromQuery] string? action = null,
                 [FromQuery] string? entityType = null,
+                [FromQuery] string? entityId = null,
                 [FromQuery] AuditOutcome? outcome = null) =>
             {
                 var result = await sender.SendAsync(
-                    new ExportAuditEventsCommand(fromUtc, toUtc, actorAdminId, action, entityType, outcome),
+                    new ExportAuditEventsCommand(fromUtc, toUtc, actorAdminId, action, entityType, entityId, outcome),
                     cancellationToken);
 
                 return result.Match(events => TypedResults.Stream(
@@ -100,7 +102,7 @@ public sealed class AuditEventEndpoints : IEndpointModule
             .WithSummary("Export a filtered audit log to CSV")
             .WithDescription(
                 "Spec 6.1.12: \"Export to CSV requires audit.export and is itself an audit event.\" " +
-                "Same five filters as the list endpoint, no paging — the whole matching set is " +
+                "Same filters as the list endpoint, no paging — the whole matching set is " +
                 "streamed, never buffered in memory. Before any row is written to the response, this " +
                 "call writes its OWN `audit_event` row (action `audit.export`) recording the filters " +
                 "used, so a later read of the log can answer \"who exported what.\" Columns are " +

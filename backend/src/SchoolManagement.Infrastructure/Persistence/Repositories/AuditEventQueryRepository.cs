@@ -40,12 +40,13 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         Guid? actorAdminId,
         string? action,
         string? entityType,
+        string? entityId,
         AuditOutcome? outcome,
         string? cursor,
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var query = ApplyFilters(context.AuditEvents.AsNoTracking(), fromUtc, toUtc, actorAdminId, action, entityType, outcome);
+        var query = ApplyFilters(context.AuditEvents.AsNoTracking(), fromUtc, toUtc, actorAdminId, action, entityType, entityId, outcome);
 
         if (AuditEventListCursor.TryDecode(cursor, out var cursorOccurredAt, out var cursorId))
         {
@@ -84,10 +85,11 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         Guid? actorAdminId,
         string? action,
         string? entityType,
+        string? entityId,
         AuditOutcome? outcome,
         CancellationToken cancellationToken)
     {
-        var query = ApplyFilters(context.AuditEvents.AsNoTracking(), fromUtc, toUtc, actorAdminId, action, entityType, outcome)
+        var query = ApplyFilters(context.AuditEvents.AsNoTracking(), fromUtc, toUtc, actorAdminId, action, entityType, entityId, outcome)
             .OrderByDescending(auditEvent => auditEvent.OccurredAt)
             .ThenByDescending(auditEvent => auditEvent.Id)
             .Select(Projection);
@@ -119,6 +121,7 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         Guid? actorAdminId,
         string? action,
         string? entityType,
+        string? entityId,
         AuditOutcome? outcome)
     {
         if (fromUtc is { } from)
@@ -144,6 +147,11 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         if (entityType is not null)
         {
             query = query.Where(auditEvent => auditEvent.EntityType == entityType);
+        }
+
+        if (entityId is not null)
+        {
+            query = query.Where(auditEvent => auditEvent.EntityId == entityId);
         }
 
         if (outcome is { } resolvedOutcome)

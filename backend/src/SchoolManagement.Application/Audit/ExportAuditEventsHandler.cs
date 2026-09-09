@@ -47,6 +47,7 @@ internal sealed class ExportAuditEventsCommandHandler(
             request.ActorAdminId,
             request.Action,
             request.EntityType,
+            request.EntityId,
             request.Outcome,
             cancellationToken);
 
@@ -67,6 +68,7 @@ internal sealed class ExportAuditEventsCommandHandler(
             ["actorAdminId"] = request.ActorAdminId?.ToString("D", CultureInfo.InvariantCulture),
             ["action"] = request.Action,
             ["entityType"] = request.EntityType,
+            ["entityId"] = request.EntityId,
             ["outcome"] = request.Outcome?.ToString(),
         };
 }

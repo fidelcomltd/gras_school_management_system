@@ -20,6 +20,7 @@ public interface IAuditEventQueryRepository
         Guid? actorAdminId,
         string? action,
         string? entityType,
+        string? entityId,
         AuditOutcome? outcome,
         string? cursor,
         int pageSize,
@@ -35,6 +36,7 @@ public interface IAuditEventQueryRepository
         Guid? actorAdminId,
         string? action,
         string? entityType,
+        string? entityId,
         AuditOutcome? outcome,
         CancellationToken cancellationToken);
 }

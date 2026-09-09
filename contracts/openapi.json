@@ -2252,7 +2252,7 @@
           "Audit"
         ],
         "summary": "List audit events",
-        "description": "Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType` and `outcome` — every filter optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.",
+        "description": "Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.",
         "operationId": "ListAuditEvents",
         "parameters": [
           {
@@ -2309,6 +2309,13 @@
           },
           {
             "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -2382,7 +2389,7 @@
           "Audit"
         ],
         "summary": "Export a filtered audit log to CSV",
-        "description": "Spec 6.1.12: \"Export to CSV requires audit.export and is itself an audit event.\" Same five filters as the list endpoint, no paging — the whole matching set is streamed, never buffered in memory. Before any row is written to the response, this call writes its OWN `audit_event` row (action `audit.export`) recording the filters used, so a later read of the log can answer \"who exported what.\" Columns are exactly spec 6.1.12's thirteen; `sourceIp` stays truncated as stored.",
+        "description": "Spec 6.1.12: \"Export to CSV requires audit.export and is itself an audit event.\" Same filters as the list endpoint, no paging — the whole matching set is streamed, never buffered in memory. Before any row is written to the response, this call writes its OWN `audit_event` row (action `audit.export`) recording the filters used, so a later read of the log can answer \"who exported what.\" Columns are exactly spec 6.1.12's thirteen; `sourceIp` stays truncated as stored.",
         "operationId": "ExportAuditEvents",
         "parameters": [
           {
@@ -2420,6 +2427,13 @@
           },
           {
             "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
             "in": "query",
             "schema": {
               "type": "string"
