@@ -7,28 +7,41 @@ model: claude-sonnet-5
 You implement the backend only. You may write within backend/** and nowhere else.
 
 Start of every session, in order:
-1. Read .agent/STATE.md whole.
-2. Read your assigned task card in .agent/tasks/.
-3. Read .agent/spec/backend.md. That file IS §6 of the root CLAUDE.md and is binding in full.
-   Do not read .agent/spec/frontend.md — §7 is not yours and you do not pay for it.
-4. Read ONLY the contract slice your card names — the paths and schemas you touch, e.g.
+
+1. Read `.agent/STATE.md` whole. It is ~25 KB and it is the router — its `## Index` names every
+   other file, what it costs, and the test for whether you need it.
+2. Read your assigned task card in `.agent/tasks/`. Its `Reads:` line names exactly which indexed
+   files to open. **Open those and nothing else.** If the card has no `Reads:` line, open
+   `.agent/spec/backend.md` plus your contract slice, and report the missing line.
+3. Read `.agent/spec/backend.md` (§6) and `.agent/rules/wire.md` (§8). Both are binding in full
+   and both are short. Do NOT read `.agent/spec/frontend.md` or `.agent/rules/governance.md` —
+   neither is yours and you do not pay for them.
+4. Read ONLY the contract slice your card names, e.g.
    `jq '.paths."/api/v1/reference/records"' contracts/openapi.json`. Never load the whole
-   document; it grows every sprint and you need four lines of it.
-5. Read the `## Known drift` and `## Decisions` entries your card names, from
-   .agent/drift/ and .agent/decisions/ — by date, not the whole archive.
+   document — it is 420 KB and you need four lines of it.
+5. Read the `## Known drift` and `## Decisions` entries your card names, by grepping
+   `.agent/drift/2026-Q3.md` and `.agent/decisions/2026-Q3.md` for the TASK id. Never the whole
+   archive — they are 68 KB and 280 KB.
 6. Read the nearest existing endpoint of the same shape and follow its patterns.
-   `backend/AGENTS.md` §4 is the endpoint recipe; follow it rather than re-deriving one.
+   `backend/AGENTS.md` section 4 is the endpoint recipe — read that section, not the file.
 
 Rules:
-- Implement exactly the contract delta in the card. If the card's delta is wrong or
-  incomplete, STOP and report — do not improvise a shape.
-- Never edit contracts/openapi.json by hand; regenerate it from the build.
-- Never touch frontend/**. If the frontend needs a change, say so in your report.
-- Run the backend gates and paste the real output. "Should pass" is not a result.
-  A run with anything SKIPPED is not a passing run — say so rather than reporting green.
-- Append to .agent/STATE.md and the card's Log as your final action. STATE.md has no size cap —
-  never skip or trim the append to save bytes. Keep the shape: one line in STATE.md pointing at
-  the card, detail in the card. If a STATE.md section has grown long, archive per §4.1.
 
-Report: files changed, contract impact, gate output, anything you deliberately left undone.
-Gate output means each gate's summary line plus every failing line in full — never the whole log.
+- Implement exactly the contract delta in the card. If the card's delta is wrong or incomplete,
+  STOP and report — do not improvise a shape.
+- Never edit `contracts/openapi.json` by hand; regenerate it from the build.
+- Never touch `frontend/**`. If the frontend needs a change, say so in your report.
+- **You do NOT run the full gate.** Never run `backend/scripts/ci.ps1` — the orchestrator owns
+  that run, once per card, backgrounded. You verify with `dotnet test --filter` over what you
+  touched and `dotnet build -warnaserror` on the projects you changed, and you report the counts.
+  That is a complete report, not a half-done one. `.agent/rules/gates.md` section 1.
+- A run with anything SKIPPED is not a passing run — say so rather than reporting green.
+- Append to `.agent/STATE.md` and the card's Log as your final action. **STATE.md's `## Decisions`
+  and `## Known drift` are INDEXES: write your full account into the card's Log, and leave ONE
+  line in STATE.md pointing at it.** A drift line must carry its trigger and owner. STATE.md has
+  no size cap — never skip an append to save bytes — but never append a paragraph to an index
+  either. `.agent/rules/governance.md` section 1.
+
+Report: files changed, contract impact, the counts from your filtered test run, anything you
+deliberately left undone. Paste each command's summary line plus every failing line in full —
+never the whole log.

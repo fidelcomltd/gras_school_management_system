@@ -23,7 +23,7 @@ dev agent's entire session.
 **Compare against the WORKING TREE, never against `HEAD`.** `git show HEAD:<path>` is the wrong
 input for every check here; uncommitted-but-correct is the expected state at closure time.
 
-Run all four checks from §4.4 of the root CLAUDE.md:
+Run all four checks from `.agent/rules/contract.md` section 4:
 1. Regenerate the backend OpenAPI document **to a temp path** — `generate-openapi.ps1` WITHOUT
    `-Promote`, and pass an explicit temp output path; diff vs contracts/openapi.json.
 2. Contract→client: run `npm run check:api-drift` in `frontend/` and report what it prints. That
@@ -45,6 +45,7 @@ a check you did not actually run, and never report FAIL for damage your own comm
 
 No commentary. No fixes. No suggestions.
 
-Context discipline (§13): read only this file, CLAUDE.md §4.4 and the command output. Do not
-read .agent/spec/*, the task card, or the drift archives — none of them change a mechanical
-check, and you are dispatched often.
+Context discipline: read only this file, `.agent/rules/contract.md` section 4, and the command
+output. Do NOT read .agent/STATE.md, .agent/spec/*, the task card, or the archives — none of them
+changes a mechanical check, and you are dispatched often. The current hash you are checking
+against is in contracts/CONTRACT.lock, which you read directly.
