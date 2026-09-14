@@ -72,7 +72,10 @@ failures were in whether they actually executed.
 | TASK-0035 | Sessions and terms | BE | 05 §6.3 | **done** 2026-09-07. Term dates derive weekly-report weeks |
 | TASK-0038 | Sections, class levels, progression chain | BE | 06 §6.4.1-2, 6.4.7-9 | `section` drives result-sheet routing — load-bearing, not descriptive. Eight chain rules are the substance |
 | TASK-0039 | Arms: per-session rooms, capacity, display name | BE | 06 §6.4.3, 6.4.5-8 | Split from TASK-0038 on 2026-09-07: one card could not hold §6.4 under §1's ~400-line dispatch rule. Owns both TASK-0035 drifts; last blocker on TASK-0030 |
-| — | Back-office shell, navigation, settings screens | FE | 04, 06 | First real screens; delete `scaffold-status/` here |
+| TASK-0041 | Back-office shell, protected routing, School Settings | FE | 04 | **done** 2026-09-14 |
+| TASK-0042 | Academic structure screens: sessions/terms, levels/sections | FE | 05, 06 | **done** 2026-09-14 |
+| TASK-0043 | Admin accounts and roles screens | FE | 03 | **done** 2026-09-14. Spec 6.1.2 self-edit carve-out still unbuilt — see `STATE.md ## Known drift` |
+| TASK-0045 | Arms screens: rooms per session, bulk creation, capacity | FE | 06 §6.4.3/6.4.5-8 | **done** 2026-09-14 — was implemented while the ledger read `queued` |
 
 ## Phase 2 — the register
 

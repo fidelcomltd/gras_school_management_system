@@ -77,7 +77,9 @@ frontend:  ./frontend — Vite 8 / React 19 / TypeScript 6, package gra-school-p
            TanStack Query, Zustand, MSW, react-hook-form + zod, Playwright. Top-level:
            src/api/ app/ components/ config/ features/ lib/ stores/ test/.
            features/<feature>/ is the documented home for screens; features/auth/ is its
-           first tenant (TASK-0021). screens/ DELETED 2026-09-06; shared/ deliberately absent.
+           first tenant (TASK-0021). screens/ DELETED 2026-09-06. shared/ EXISTS since 2026-09-14
+           (`shared/forms/field-message.ts`, 13 cross-feature importers) — created by the commit
+           promoting the first genuinely shared helper, never in advance (CONVENTIONS.md:126-130).
 contract generator: Microsoft.Extensions.ApiDescription.Server/10.0.10 via
            backend/scripts/generate-openapi.ps1 -Promote — the ONLY sanctioned way
            contracts/openapi.json and CONTRACT.lock change.
@@ -116,7 +118,7 @@ query parameter on `ListAuditEvents` and `ExportAuditEvents`).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0040, 0044, 0047, 0048, 0049,
+Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
 0050, 0052, 0054, 0055, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
@@ -125,12 +127,14 @@ also read `Status: done`. Neither was true — `decisions/2026-Q3.md` holds an i
 entry for each and **no closure entry**, and TASK-0041's final Log line records nothing committed.
 Card headers and this list now both say `review`. TASK-0045 was missing from this table entirely.
 
+**Closed 2026-09-14 (same day):** all four — 0041, 0042, 0043 and 0045 — reviewed against
+their acceptance criteria and closed on one orchestrator gate run. **TASK-0045 turned out to be
+already implemented in full**, not queued: the reconciliation compared card headers against the
+archive and never against the working tree, so an under-claiming header was invisible to it.
+`decisions/2026-Q3.md`.
+
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
-| TASK-0042 | Academic structure screens: sessions and terms, levels and sections | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
-| TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
-| TASK-0045 | Arms screens: rooms per session, bulk creation, capacity | frontend-dev | **queued** — card is written in full and dispatchable. **Was absent from this table until 2026-09-14** and referenced by no other file; it had fallen out of the ledger entirely |
 | TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review. Encoding-only, contract must not move |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
@@ -146,6 +150,23 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
 
+- 2026-09-14 **TASK-0041, 0042, 0043 and 0045 CLOSED** on one orchestrator gate run — back-office
+  shell and guards, academic structure, admins and roles, arms. Contract unmoved. →
+  `decisions/2026-Q3.md`
+- 2026-09-14 **TASK-0045 was already fully implemented while the ledger called it `queued`.**
+  Today's own reconciliation reinstated it as "dispatchable"; dispatching it would have rebuilt
+  ~1,800 lines of tested code. **A card's `Status:` is a claim about the TREE — reconciliation
+  must grep the code for the card's id before believing it.** Headers drift in BOTH directions,
+  and comparing them only against the archive cannot see the under-claiming half. →
+  `decisions/2026-Q3.md`
+- 2026-09-14 **`src/shared/` appearing is the CONVENTION FIRING, not a violation** — created in
+  the commit that promoted the first genuinely cross-feature helper, exactly as
+  `CONVENTIONS.md:126-130` prescribes. `## Layout`'s "deliberately absent" line was stale and is
+  corrected. → `decisions/2026-Q3.md`
+- 2026-09-14 **A drift trigger arrived on TASK-0043 and no acceptance criterion carried it**
+  (spec 6.1.2 self-edit). The implementing agent flagged it rather than shipping around it, which
+  is `rules/governance.md` §3's second half doing the job its first half missed. →
+  `decisions/2026-Q3.md`
 - 2026-09-14 **Context-budget pass.** CLAUDE.md 16 KB to 5 KB (router only); STATE.md 250 KB to
   this; the rule sections split to `.agent/rules/` one-file-per-reader; decision and drift full
   text now archived at card close rather than at quarter end. Orchestrator model dropped from the
@@ -282,8 +303,12 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-09 **`GET /pupils` default sort omits 6.5.15's class-progression half** — it sorts
   surname then id. Same root cause as above. *Trigger: the enrolment card. Owner: `backend-dev`.*
 - 2026-09-08 **Spec 6.1.2's self-edit carve-out is not built** — an admin editing their OWN
-  `staffName` / `phone` without holding `admin.update`. *Trigger: the next `/admins` card.
-  Owner: `frontend-dev` plus `backend-dev`.*
+  `staffName` / `phone` without holding `admin.update`. **Its trigger ALREADY FIRED and was
+  missed: TASK-0043 was "the next `/admins` card" and carried no AC for it** (flagged anyway by
+  the implementing agent — `admins/api.ts:77`). Needs the ROUTE to accept the narrower
+  authorisation before any screen can offer it. *Trigger: the next card touching `PATCH
+  /admins/{id}` authorisation, or a human asking why self-service editing is absent.
+  Owner: `backend-dev` FIRST, then `frontend-dev`.*
 - 2026-09-08 **`DELETE /levels/{id}`'s reference check is PARTIAL and MORE PERMISSIVE than spec
   6.4.2's** "delete only where nothing has ever referenced the row". *Trigger: when history tables
   exist. Owner: `backend-dev`.*
@@ -306,8 +331,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-06 **`mustChangePassword` is detected but there is still no change-password screen** — a
   flagged account can only read a message. *Trigger: the card wiring `POST /auth/password` into a
   screen. Owner: `frontend-dev`.*
-- 2026-09-06 **The session-end redirect is subscribed per-screen, not once.** *Trigger: the next
-  routing card. Owner: `frontend-dev`.*
+- 2026-09-06 ~~**The session-end redirect is subscribed per-screen, not once.**~~ **STRUCK
+  2026-09-14 by TASK-0041** — `protected-layout.tsx:28` is now the sole production subscriber.
+  Full text: `drift/2026-Q3.md`.
 
 ### Live — standing obligations on every card
 

@@ -49,6 +49,32 @@ understood, the paragraph belongs in the archive and the index line points at it
 
 **Archive, never delete.** An entry that is superseded or struck is moved, not dropped.
 
+### Reconciling card status — grep the TREE, not just the archive
+
+Added 2026-09-14, the same day the rule it amends was written. The 2026-09-14 reconciliation
+resolved every disputed card header against `decisions/YYYY-QN.md`, on the principle that
+**closure is real only where a closure entry exists**. That principle is correct and stays. It is
+also only half a check, and the missing half cost a near-miss the same afternoon.
+
+It catches headers that **over**-claim — `Status: done` with no closure entry behind it. It cannot
+see a header that **under**-claims. TASK-0045 read `queued`, had no closure entry, and was
+therefore reinstated as "written in full and dispatchable" — while `features/arms/` sat complete
+on disk, ~1,800 tested lines, with the card's own id cited in eight places. The next dispatch
+would have rebuilt it on top of itself.
+
+**A card's `Status:` is a claim about the working tree, and only the tree can refute it.** Before
+trusting `queued` or `blocked` on any card, grep the code for the card's id and for the paths its
+scope names:
+
+```
+grep -rn "TASK-00NN" backend/ frontend/ contracts/   # cards get cited in the code they produce
+git log --oneline --all -- <the paths the card's scope names>
+```
+
+Both directions, every reconciliation. An orphaned card — one no other file references — is the
+signature to watch for: it means nothing has been maintaining its header, so the header is
+evidence of nothing at all, in either direction.
+
 ## 2. Task card format — `.agent/tasks/TASK-####.md` (§4.2)
 
 ```markdown
