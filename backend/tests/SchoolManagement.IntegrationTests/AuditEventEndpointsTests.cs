@@ -229,6 +229,33 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
         lines[1].ShouldContain("entity_a");
     }
 
+    // TASK-0053, end to end: a caller with no account (failed sign-ins are audited too) sets
+    // user_agent to a formula. RFC 4180 quoting alone does not stop it being executed on open — the
+    // cell must be neutralised with a leading apostrophe, which this asserts on the actual response
+    // body, not just on the writer in isolation.
+    [Fact]
+    public async Task Export_NeutralisesAFormulaInjectedViaUserAgent()
+    {
+        RequireDatabase();
+
+        var marker = $"test.formula_injection.{Guid.NewGuid():N}";
+        const string payload = "=HYPERLINK(\"http://evil\",\"x\")";
+        await SeedAuditEventAsync(BaseInstant, marker, "entity_a", userAgent: payload);
+
+        var jar = await SignInWithGrantAsync([Privileges.Audit.Export]);
+
+        var response = await GetAsync($"{ExportUrl}?action={marker}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var lines = body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        // The field is RFC-4180-quoted (it contains commas and quotes), so this checks the
+        // neutralised prefix survives that quoting rather than matching the whole field verbatim.
+        lines[1].ShouldContain("'=HYPERLINK(\"\"http://evil\"\"");
+        lines[1].ShouldNotContain(",=HYPERLINK(");
+    }
+
     // The card's other named criterion: the export writes its OWN audit_event row, action
     // audit.export, before returning — and the filters actually used are recorded, so exporting the
     // whole log and exporting a narrowed slice are distinguishable after the fact.
@@ -327,7 +354,8 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
         string entityType,
         Guid? actorAdminId = null,
         AuditOutcome outcome = AuditOutcome.Success,
-        string? entityId = null)
+        string? entityId = null,
+        string? userAgent = null)
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -344,7 +372,7 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
             afterJson: null,
             reason: null,
             sourceIp: null,
-            userAgent: null);
+            userAgent: userAgent);
 
         context.Add(auditEvent);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);

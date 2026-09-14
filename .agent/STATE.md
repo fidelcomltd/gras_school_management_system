@@ -354,7 +354,8 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 - 2026-09-09 **An unaudited 403 becomes a 500.** `RejectedAuditEventWriter.WriteAsync` is awaited
   with no `try` / `catch` in either `SystemAuditSink.RecordRejectionAsync` or its caller.
-  *Trigger: the next audit card. Owner: `backend-dev`.*
+  *Trigger: TASK-0058 (re-pointed 2026-09-14 — the old trigger "the next audit card" FIRED on
+  TASK-0053 and was deliberately not folded into an encoding-only card). Owner: `backend-dev`.*
 - 2026-09-09 **`PrivilegeDecision.cs:21` carries a `TODO(TASK-0002)` pointing at a CLOSED card** —
   session-bearing scope filtering, blocked on enrolment. *Trigger: re-card it.
   Owner: `backend-dev`.*

@@ -155,10 +155,36 @@ internal static class AuditEventCsvWriter
                 auditEvent.UserAgent ?? string.Empty,
             };
 
-            await writer.WriteLineAsync(string.Join(',', fields.Select(Escape))).ConfigureAwait(false);
+            await writer.WriteLineAsync(string.Join(',', fields.Select(field => Escape(Neutralize(field))))).ConfigureAwait(false);
         }
 
         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// TASK-0053: neutralise CSV formula injection. A field beginning with <c>=</c>, <c>+</c>,
+    /// <c>-</c>, <c>@</c>, TAB or CR is executed as a formula by Excel/LibreOffice/Sheets on open —
+    /// RFC 4180 quoting alone does not stop this, since a quoted <c>"=1+1"</c> is still a formula.
+    /// The conventional fix is a leading apostrophe, understood by all three as "treat as literal
+    /// text". <c>user_agent</c> is attacker-controlled (failed sign-ins are audited), so this is
+    /// applied uniformly to every field rather than enumerating "the dangerous" columns.
+    /// Must run BEFORE <see cref="Escape"/>: neutralising after quoting would insert the apostrophe
+    /// outside the quotes and corrupt the field.
+    /// Assumption: none of the thirteen columns currently emits a signed number, so blanket-
+    /// prefixing a leading '-' is safe today. Revisit if a future column carries one.
+    /// </summary>
+    private static string Neutralize(string field)
+    {
+        if (field.Length == 0)
+        {
+            return field;
+        }
+
+        return field[0] switch
+        {
+            '=' or '+' or '-' or '@' or '\t' or '\r' => "'" + field,
+            _ => field,
+        };
     }
 
     /// <summary>RFC 4180: a field containing a comma, quote or line break is quoted, with embedded quotes doubled.</summary>
