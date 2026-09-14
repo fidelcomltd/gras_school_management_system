@@ -79,14 +79,53 @@ Existing patterns to follow, files to read first, gotchas.
 - 2026-07-27 dispatched to backend-dev
 ```
 
-**Cards cap at ~120 lines, and the cap is real.** Several cards have run past 350. A card longer
-than that is two cards, or it is restating a spec section it should cite instead.
+**The card BODY caps at ~120 lines** — everything above `## Log`. Measured 2026-09-14, nearly every
+card already meets it; what overruns is the `## Log`, which is history and archives to
+`.agent/tasks/logs/TASK-####.log.md` at close. A *body* longer than 120 lines is two cards, or it
+is restating a spec section it should cite instead.
 
-**The `Reads:` line is the point.** It is how an agent knows which of the indexed files to open
-without opening them all to find out. A card with no `Reads:` line makes its agent guess, and an
-agent that guesses reads everything.
+## 3. Card sufficiency — the pre-dispatch check
 
-## 3. Definition of done (§10)
+**This is the counterweight to the context budget, and it outranks it.** Lazy loading only works
+if the card tells its agent what to load. An agent that has been given a thin card does not fail
+loudly — it guesses, or it reads everything, and the second one costs more than the whole budget
+saved. Added 2026-09-14 alongside the budget pass, because the budget pass created this risk.
+
+**Before dispatching, the card must answer all six. If one is unanswered, the card is not ready.**
+
+| # | The agent must be able to answer | Where it comes from |
+|---|---|---|
+| 1 | *What am I building, and how will a human use it?* | `## Goal` |
+| 2 | *What exactly crosses the wire?* | `## Contract delta`, or "None" stated explicitly — never blank |
+| 3 | *How does THIS repo already do this?* | `## Notes`: name the nearest existing file of the same shape, by path. Not "follow existing patterns" |
+| 4 | *What will bite me?* | `## Notes`: the drift entries and decisions that constrain this card, named so they can be grepped |
+| 5 | *When am I done, and how is each claim proven?* | `## Acceptance criteria`, each one testable |
+| 6 | *What must I NOT do?* | `## Out of scope` |
+
+**The mechanical check for row 4 — run it, do not rely on remembering.** Accidental discovery used
+to happen because every agent read a 250 KB ledger and tripped over the relevant entry. That no
+longer happens, so replace it with a grep:
+
+```
+grep -in "<the card's subject>" .agent/STATE.md      # drift + decision index lines
+grep -in "TASK-00NN" .agent/STATE.md                 # anything already pointing at this card
+```
+
+Every drift line whose *trigger* names this card, or this card's subject, goes into `## Notes` and
+its archive location into `Reads:`. A drift entry whose trigger has arrived and was not carried
+into the card is the failure this check exists to prevent — it is how a known landmine gets
+stepped on twice.
+
+**`Reads:` must be sufficient, not minimal.** It is a budget for the agent to spend, not a cap to
+squeeze. Under-naming costs far more than over-naming: an agent that cannot find what it needs
+reads the whole archive, or invents a shape. When unsure, name the file.
+
+**The agent may bounce the card.** An implementing agent that cannot answer one of the six from
+the card plus its `Reads:` is required to STOP and say which row is unanswered, rather than guess
+or go reading. A bounced card costs one re-dispatch. A guessed shape costs a contract delta, a
+regeneration on both sides, and a review that has to catch it.
+
+## 4. Definition of done (§10)
 
 A card closes only when **all** hold:
 
@@ -96,9 +135,9 @@ A card closes only when **all** hold:
 4. No new `TODO`/`FIXME` without a task card number attached.
 5. `STATE.md` updated: card moved to `done`, full account written to `decisions/`, one-line index
    entry left behind.
-6. Diff reviewed against the relevant spec and reported to the human per §4 below.
+6. Diff reviewed against the relevant spec and reported to the human per section 5 below.
 
-## 4. Report format after each dispatch (§12)
+## 5. Report format after each dispatch (§12)
 
 ```
 TASK-0042 — <title>            [done | blocked | needs human]

@@ -116,16 +116,24 @@ query parameter on `ListAuditEvents` and `ExportAuditEvents`).
 
 ## In flight
 
-Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0044, 0047, 0048, 0049, 0050,
-0052, 0054, 0055, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0040, 0044, 0047, 0048, 0049,
+0050, 0052, 0054, 0055, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+
+**Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
+and 0043 as closed while the table below correctly showed them in `review`. Their card headers
+also read `Status: done`. Neither was true — `decisions/2026-Q3.md` holds an implemented-to-review
+entry for each and **no closure entry**, and TASK-0041's final Log line records nothing committed.
+Card headers and this list now both say `review`. TASK-0045 was missing from this table entirely.
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0043 | Admin accounts and roles screens | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
 | TASK-0042 | Academic structure screens: sessions and terms, levels and sections | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
 | TASK-0041 | Back-office shell, protected routing, School Settings screen | frontend-dev | **review** — implemented 2026-09-08, frontend gates green incl. `test:e2e`; awaiting orchestrator diff review |
+| TASK-0045 | Arms screens: rooms per session, bulk creation, capacity | frontend-dev | **queued** — card is written in full and dispatchable. **Was absent from this table until 2026-09-14** and referenced by no other file; it had fallen out of the ledger entirely |
 | TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review. Encoding-only, contract must not move |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
+| TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — 0005c and 0050 dependencies CLEARED 2026-09-09; still needs an `enrolment` entity |
@@ -142,6 +150,28 @@ Implementation and closure of the same card are merged onto one line.
   this; the rule sections split to `.agent/rules/` one-file-per-reader; decision and drift full
   text now archived at card close rather than at quarter end. Orchestrator model dropped from the
   1M-context Opus variant. Subagents no longer run the full gate on either side.
+- 2026-09-14 **Card sufficiency made the explicit counterweight to the context budget**
+  (`rules/governance.md` section 3). Six questions a card must answer before dispatch; a mechanical
+  `grep` of this file's drift index replaces the accidental discovery that a 250 KB ledger used to
+  provide; `Reads:` is a budget to spend, not a cap to squeeze; and **an implementing agent is now
+  required to bounce an underspecified card rather than guess or read everything.** The budget pass
+  created this risk and this is what contains it.
+- 2026-09-14 **Closed cards' `## Log` sections archived to `.agent/tasks/logs/`** — 25 cards, 2,501
+  log lines out of the card bodies, each leaving a pointer plus its closure entry. The convention
+  already existed (applied to eight cards on 2026-09-04, then abandoned); this resumes it. Cards
+  over ~120 lines fell from 32 to 16, and the remainder is genuine body. **This is what makes
+  `rules/governance.md` section 3 row 3 affordable** — a card that says "follow TASK-0049" is now
+  pointing at a brief, not a 234-line transcript.
+- 2026-09-14 **Ledger reconciled against the card files — three real disagreements found, all
+  fixed.** (1) The closed list claimed `0037–0044`, silently including 0041/0042/0043, whose card
+  headers ALSO read `done`; the archive holds no closure entry for any of the three and TASK-0041's
+  last Log line records nothing committed. All now read `review`. (2) TASK-0022/0024/0025/0026 and
+  0031/0032 card headers read `queued`/`review` for work the archive records as closed. All now
+  read `done`. (3) **TASK-0045 — a complete, dispatchable frontend card — was referenced by no
+  other file in the repo** and would never have been picked up. Now in `## In flight`.
+  **Card `Status:` headers had drifted in BOTH directions, so neither side was reliably
+  authoritative.** What resolved each case was `decisions/2026-Q3.md` — closure is real only where
+  a closure entry exists.
 - 2026-09-10 **TASK-0054 closed.** Audit-log client seam typed end to end against `7a3c84e6…`.
   The contract's first non-JSON (`text/csv`) response body resolved `SuccessBody` to `never`;
   fixed with a `ResponseBodyOf` helper, proven by a throwaway type probe before any transport

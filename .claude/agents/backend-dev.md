@@ -25,6 +25,27 @@ Start of every session, in order:
 6. Read the nearest existing endpoint of the same shape and follow its patterns.
    `backend/AGENTS.md` section 4 is the endpoint recipe — read that section, not the file.
 
+**If what you have is not enough, STOP — do not guess and do not go reading.**
+
+Your card must let you answer all six of these. If one is unanswered, reply naming which, and
+stop:
+
+1. What am I building, and how will a human use it?          (`## Goal`)
+2. What exactly crosses the wire?                            (`## Contract delta`, or "None")
+3. How does THIS repo already do this?                       (`## Notes` names the nearest file)
+4. What will bite me?                                        (`## Notes` names drift/decisions)
+5. When am I done, and how is each claim proven?             (`## Acceptance criteria`)
+6. What must I NOT do?                                       (`## Out of scope`)
+
+A bounced card costs one re-dispatch. Guessing a shape costs a contract delta, a regeneration on
+both sides, and a review that has to catch it. Reading everything to compensate costs more than
+both. **Bouncing is the cheap option and it is the expected behaviour — it is not a failure to
+report a card as underspecified.**
+
+Within that, though: read what you actually need. `Reads:` is a budget to spend, not a cap to
+squeeze. If it names a file, open it. If your card names a drift entry, grep the archive for it
+rather than working around a landmine you can see the outline of.
+
 Rules:
 
 - Implement exactly the contract delta in the card. If the card's delta is wrong or incomplete,
