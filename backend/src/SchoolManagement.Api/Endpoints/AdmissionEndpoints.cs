@@ -30,6 +30,7 @@ public sealed class AdmissionEndpoints : IEndpointModule
             .WithTags(Tag);
 
         MapListQueue(group);
+        MapGetOne(group);
         MapUpdate(group);
         MapApprove(group);
         MapDecline(group);
@@ -62,6 +63,35 @@ public sealed class AdmissionEndpoints : IEndpointModule
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetOne(RouteGroupBuilder group) =>
+        group.MapGet("/{id:guid}", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetAdmissionRecordQuery(id), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.View, ScopeParameterKind.None)
+            .WithName("GetAdmissionRecord")
+            .WithSummary("Read one admission record")
+            .WithDescription(
+                "TASK-0066: `id` is the PUPIL id, the same one `PATCH /admissions/{id}` and the " +
+                "admissions queue already use. Returns the same `AdmissionRecordDto` shape `PATCH` " +
+                "returns — one mapper, one shape, no second definition. Carries the opaque " +
+                "`sessionId` and `classAdmittedInto` ids an arm selector needs, which the queue row's " +
+                "own `levelAppliedFor` display name cannot supply. 404 when `id` does not name a " +
+                "PENDING pupil (approved, declined or unknown pupils are not reachable through this " +
+                "route) — the same rule `PATCH /admissions/{id}` already enforces. `pupil.view`, " +
+                "SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped " +
+                "grant cannot reach a pending record — it has no arm yet). No write: no audit row, no " +
+                "mutation.")
+            .Produces<AdmissionRecordDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     private static void MapUpdate(RouteGroupBuilder group) =>

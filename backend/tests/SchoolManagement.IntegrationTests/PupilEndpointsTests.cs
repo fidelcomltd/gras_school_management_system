@@ -500,6 +500,170 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    // TASK-0066: GET /admissions/{id} — the read twin of PATCH. Same id, same DTO shape (asserted by
+    // id, not display name), same pending-only-404 rule, school-wide-only pupil.view, no write.
+    [Fact]
+    public async Task GetAdmission_HappyPath_ReturnsTheOpaqueSessionAndClassIds()
+    {
+        RequireDatabase();
+
+        var createJar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var command = await CreateCommandAsync("Getadmission", "Happypath");
+        var createResponse = await PostAsync(PupilsUrl, createJar, command, $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        var readJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+        var response = await GetAsync($"{AdmissionsUrl}/{created.Id}", readJar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<AdmissionRecordDto>(response);
+        body.SessionId.ShouldBe(command.Admission.SessionId);
+        body.ClassAdmittedInto.ShouldBe(command.Admission.ClassAdmittedInto);
+    }
+
+    [Fact]
+    public async Task GetAdmission_AnApprovedPupil_Returns404()
+    {
+        RequireDatabase();
+
+        var pupilId = await SeedPupilDirectlyAsync("Getadmission", "Approved");
+        await SetRegistrationNumberAndStatusAsync(pupilId, "GRAS/2026/0070", PupilStatus.Active);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+
+        var response = await GetAsync($"{AdmissionsUrl}/{pupilId}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAdmission_ADeclinedPupil_Returns404()
+    {
+        RequireDatabase();
+
+        var pupilId = await SeedPupilDirectlyAsync("Getadmission", "Declined");
+        await SetRegistrationNumberAndStatusAsync(pupilId, "GRAS/2026/0071", PupilStatus.Withdrawn);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+
+        var response = await GetAsync($"{AdmissionsUrl}/{pupilId}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAdmission_UnknownId_Returns404()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+
+        var response = await GetAsync($"{AdmissionsUrl}/{Guid.CreateVersion7()}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetAdmission_CallerWithoutPupilView_Returns403()
+    {
+        RequireDatabase();
+
+        var pupilId = await SeedPupilDirectlyAsync("Getadmission", "Forbidden");
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+
+        var response = await GetAsync($"{AdmissionsUrl}/{pupilId}", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    // A pending record has no arm, so an arm-scoped grant has no reach — matching
+    // ListAdmissionsQueue's own school-wide-only decision rather than an honest empty page: a single
+    // record read has no "empty," only a 404 that would lie about existence.
+    [Fact]
+    public async Task GetAdmission_ArmScopedPupilViewGrant_Returns403()
+    {
+        RequireDatabase();
+
+        var pupilId = await SeedPupilDirectlyAsync("Getadmission", "Armscoped");
+        var sessionId = await SeedSessionAsync();
+        var armId = await SeedArmAsync(sessionId, "1G");
+
+        var armScopedJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.ArmList, sessionId, [armId]);
+
+        var response = await GetAsync($"{AdmissionsUrl}/{pupilId}", armScopedJar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetAdmission_MatchesWhatPatchReturnsForTheSameRecord()
+    {
+        RequireDatabase();
+
+        var createJar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var createResponse = await PostAsync(
+            PupilsUrl, createJar, await CreateCommandAsync("Getadmission", "Matchespatch"), $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        var updateJar = await SignInWithGrantAsync([Privileges.Pupil.Update], ScopeType.SchoolWide);
+        var patchResponse = await PatchAsync(
+            $"{AdmissionsUrl}/{created.Id}", updateJar, new { declarationName = "Chinwe Okafor" });
+        patchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var patched = await ReadAsync<AdmissionRecordDto>(patchResponse);
+
+        var readJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+        var getResponse = await GetAsync($"{AdmissionsUrl}/{created.Id}", readJar);
+        getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var fetched = await ReadAsync<AdmissionRecordDto>(getResponse);
+
+        fetched.ShouldBe(patched);
+    }
+
+    [Fact]
+    public async Task GetAdmission_WritesNothing_NoAuditRowAndNoModifiedAtBump()
+    {
+        RequireDatabase();
+
+        var auditSink = new RecordingSystemAuditSink();
+        using var factory = Fixture.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<ISystemAuditSink>();
+            services.AddSingleton<ISystemAuditSink>(auditSink);
+        }));
+        using var client = factory.CreateClient();
+
+        var createJar = await SignInWithGrantAsync(client, [Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var createResponse = await PostAsync(
+            client, PupilsUrl, createJar, await CreateCommandAsync("Getadmission", "Nowrite"), $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        auditSink.Records.Clear();
+        var modifiedBefore = await GetAdmissionRecordModifiedAtAsync(Guid.Parse(created.Id));
+
+        var readJar = await SignInWithGrantAsync(client, [Privileges.Pupil.View], ScopeType.SchoolWide);
+        var response = await GetAsync(client, $"{AdmissionsUrl}/{created.Id}", readJar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        auditSink.Records.ShouldBeEmpty();
+
+        var modifiedAfter = await GetAdmissionRecordModifiedAtAsync(Guid.Parse(created.Id));
+        modifiedAfter.ShouldBe(modifiedBefore);
+    }
+
+    private async Task<DateTimeOffset?> GetAdmissionRecordModifiedAtAsync(Guid pupilId)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await context.AdmissionRecords.AsNoTracking()
+            .Where(record => record.PupilId == pupilId)
+            .Select(record => record.ModifiedAtUtc)
+            .FirstAsync(TestContext.Current.CancellationToken);
+    }
+
     // Spec 6.5.15's queue columns (TASK-0062): levelAppliedFor, dateApplicationReceived and missing.
     // missing here is restricted to what sections A and I's stored fields can check — see the
     // endpoint's own description for the recorded steps-3-to-8 gap.

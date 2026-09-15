@@ -10,4 +10,7 @@ public interface IAdmissionRecordRepository
 
     /// <summary>Loads a TRACKED record by pupil id, for a command that will mutate it (<c>PATCH /admissions/{id}</c>).</summary>
     Task<AdmissionRecord?> FindTrackedByPupilIdAsync(Guid pupilId, CancellationToken cancellationToken);
+
+    /// <summary>Loads a record by pupil id, <c>AsNoTracking</c>, for a query (<c>GET /admissions/{id}</c>).</summary>
+    Task<AdmissionRecord?> FindReadOnlyByPupilIdAsync(Guid pupilId, CancellationToken cancellationToken);
 }

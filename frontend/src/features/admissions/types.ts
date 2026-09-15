@@ -7,6 +7,7 @@ import type { components } from '@/api/schema';
  */
 export const AdmissionsKeys = {
   Queue: 'admissions.queue',
+  Record: 'admissions.record',
   Approve: 'admissions.approve',
   Decline: 'admissions.decline',
 } as const;
@@ -20,5 +21,12 @@ export const AdmissionsKeys = {
  * pupil-biographical fields every other read path also returns.
  */
 export type AdmissionQueueRow = components['schemas']['PupilDto'];
+/**
+ * `GET /api/v1/admissions/{id}` (TASK-0066) — the same shape `PATCH
+ * /admissions/{id}` returns. Carries the opaque `sessionId`/`classAdmittedInto`
+ * the queue row cannot: this is what unblocked the approve dialog's arm
+ * selector.
+ */
+export type AdmissionRecordDto = components['schemas']['AdmissionRecordDto'];
 export type ApproveAdmissionCommand = components['schemas']['ApproveAdmissionCommand'];
 export type DeclineAdmissionCommand = components['schemas']['DeclineAdmissionCommand'];

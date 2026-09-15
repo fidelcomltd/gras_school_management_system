@@ -1,32 +1,62 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, userEvent } from '@/test/render';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@/test/render';
+import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
+import { server } from '@/test/msw/server';
 import { ApproveAdmissionDialog } from './approve-admission-dialog';
-import { pupil } from './test-fixtures';
+import { admissionRecord, pupil } from './test-fixtures';
+
+function renderDialog() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ApproveAdmissionDialog pupil={pupil()} onClose={() => {}} />
+    </QueryClientProvider>,
+  );
+}
 
 /**
- * Approve is BLOCKED (TASK-0064, contract gap — see this component's own doc
- * comment): the admissions queue row has no `sessionId`/`classAdmittedInto`
- * to source `GET /arms`'s filter from, so there is no honest way to build
- * the arm selector `ApproveAdmissionCommand.armId` needs. This dialog only
- * proves the entry point says so and can be dismissed — it makes no request.
+ * TASK-0066 unblocked this dialog: it now fetches `GET /admissions/{id}`
+ * first (for `sessionId`/`classAdmittedInto`), so it carries its own four
+ * required states for THAT fetch, mirroring `ArmDetailScreen`'s shape. The
+ * form itself (arm selector, tick gating, idempotency, success, errors) is
+ * `approve-admission-form.test.tsx`, once the record has loaded.
  */
-describe('ApproveAdmissionDialog — blocked pending a contract addition', () => {
-  it('names the applicant and explains why approval cannot proceed here', () => {
-    render(<ApproveAdmissionDialog pupil={pupil()} onClose={() => {}} />);
+describe('ApproveAdmissionDialog — four required states (GetAdmissionRecord)', () => {
+  it('loading, then the form appears', async () => {
+    server.use(http.get(apiUrl('/api/v1/admissions/:id'), () => HttpResponse.json(admissionRecord())));
 
-    expect(screen.getByRole('heading', { name: 'Approve Okafor Chidera' })).toBeInTheDocument();
-    expect(
-      screen.getByText(/cannot yet determine which session and class level/),
-    ).toBeInTheDocument();
+    renderDialog();
+
+    expect(screen.getByText('Loading application…')).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Arm' })).toBeInTheDocument();
   });
 
-  it('Close calls onClose without ever making a network request', async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<ApproveAdmissionDialog pupil={pupil()} onClose={onClose} />);
+  it('unauthorized renders nothing', async () => {
+    server.use(http.get(apiUrl('/api/v1/admissions/:id'), () => problemResponse(401)));
 
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    const { container } = renderDialog();
 
-    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it('error shows a retry', async () => {
+    server.use(http.get(apiUrl('/api/v1/admissions/:id'), () => problemResponse(500)));
+
+    renderDialog();
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('404 (no longer pending) surfaces the server message', async () => {
+    server.use(
+      http.get(apiUrl('/api/v1/admissions/:id'), () =>
+        problemResponse(404, { detail: 'This admission is no longer pending.' }),
+      ),
+    );
+
+    renderDialog();
+
+    expect(await screen.findByText('This admission is no longer pending.')).toBeInTheDocument();
   });
 });

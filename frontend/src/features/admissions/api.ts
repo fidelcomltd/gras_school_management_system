@@ -1,10 +1,11 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/api/client';
 import { AdmissionsKeys, type ApproveAdmissionCommand, type DeclineAdmissionCommand } from './types';
 
 /** One hook per endpoint, per CONVENTIONS.md §4 / `src/features/README.md`. */
 
 const ADMISSIONS_PATH = '/api/v1/admissions';
+const ADMISSION_PATH = '/api/v1/admissions/{id}';
 const ADMISSION_APPROVE_PATH = '/api/v1/admissions/{id}/approve';
 const ADMISSION_DECLINE_PATH = '/api/v1/admissions/{id}/decline';
 
@@ -20,6 +21,19 @@ export function useAdmissionsQueue() {
       apiGet(ADMISSIONS_PATH, pageParam !== undefined ? { cursor: pageParam } : {}, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+}
+
+/**
+ * `GET /api/v1/admissions/{id}` (TASK-0066). Gated `pupil.view`, SCHOOL-WIDE.
+ * 404s unless `id` names a PENDING pupil. Carries `sessionId`/
+ * `classAdmittedInto` — the two ids the approve dialog's arm selector needs
+ * and the queue row itself cannot supply.
+ */
+export function useAdmissionRecord(id: string) {
+  return useQuery({
+    queryKey: [AdmissionsKeys.Record, id],
+    queryFn: ({ signal }) => apiGet(ADMISSION_PATH, undefined, { pathParams: { id }, signal }),
   });
 }
 

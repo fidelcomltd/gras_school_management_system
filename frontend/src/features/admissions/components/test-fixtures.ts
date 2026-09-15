@@ -1,4 +1,4 @@
-import type { AdmissionQueueRow } from '../types';
+import type { AdmissionQueueRow, AdmissionRecordDto } from '../types';
 
 /** Shared queue-row fixture for this feature's tests. Not a source file — no 180-line pressure. */
 export function pupil(overrides: Partial<AdmissionQueueRow> = {}): AdmissionQueueRow {
@@ -26,6 +26,30 @@ export function pupil(overrides: Partial<AdmissionQueueRow> = {}): AdmissionQueu
     levelAppliedFor: 'Primary 2',
     dateApplicationReceived: '2026-08-01',
     missing: ['Declaration (Section I)'],
+    ...overrides,
+  };
+}
+
+/** `GET /api/v1/admissions/{id}` (TASK-0066) fixture — carries the ids the queue row cannot. */
+export function admissionRecord(overrides: Partial<AdmissionRecordDto> = {}): AdmissionRecordDto {
+  return {
+    sessionId: 'session-1',
+    dateApplicationReceived: '2026-08-01',
+    dateAdmitted: '2026-09-08',
+    classAdmittedInto: 'level-1',
+    classAdmittedIntoName: 'Primary 2',
+    admissionType: 'New',
+    admissionTypeNote: null,
+    assessmentRequired: false,
+    assessmentResultRemarks: null,
+    assignedClassTeacher: null,
+    declarationName: 'Chinwe Okafor',
+    declarationSigned: true,
+    declarationDate: '2026-09-08',
+    approvedBy: null,
+    approvedAt: null,
+    headOfSchoolConfirmed: false,
+    headOfSchoolName: null,
     ...overrides,
   };
 }

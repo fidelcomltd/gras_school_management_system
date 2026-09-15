@@ -21,4 +21,8 @@ internal sealed class AdmissionRecordRepository(ApplicationDbContext context) : 
     /// <inheritdoc />
     public Task<AdmissionRecord?> FindTrackedByPupilIdAsync(Guid pupilId, CancellationToken cancellationToken) =>
         context.AdmissionRecords.FirstOrDefaultAsync(record => record.PupilId == pupilId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AdmissionRecord?> FindReadOnlyByPupilIdAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        context.AdmissionRecords.AsNoTracking().FirstOrDefaultAsync(record => record.PupilId == pupilId, cancellationToken);
 }

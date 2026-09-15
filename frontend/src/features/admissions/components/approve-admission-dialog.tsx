@@ -1,36 +1,19 @@
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ApiError } from '@/lib/http';
+import { useAdmissionRecord } from '../api';
 import type { AdmissionQueueRow } from '../types';
+import { ApproveAdmissionForm } from './approve-admission-form';
 
 /**
- * `POST /api/v1/admissions/{id}/approve` — BLOCKED (TASK-0064, reported to
- * the orchestrator rather than shimmed, per the card's own out-of-scope
- * rule and `rules/contract.md` §5).
- *
- * `ApproveAdmissionCommand.armId` must reference an arm for THIS record's
- * `class_admitted_into` level in the record's OWN `sessionId` — spec 6.5.11
- * step 9's "the selector lists the level's arms for the active session".
- * Both ids are opaque and neither is reachable from this screen: `GET
- * /admissions` (`ListAdmissionsQueue`) returns `PupilDto` rows whose
- * `admission` object is `null` on this read path (see `PupilDto.admission`'s
- * own contract description, and the `CursorPageOfPupilDto` example, which
- * shows `"admission": null` on a queue-shaped row) — the row carries only
- * `levelAppliedFor` (a display NAME) and no `sessionId` at all.
- *
- * Matching `levelAppliedFor` against `GET /levels` by name, or assuming "the
- * currently active session", were both considered and rejected: the first
- * guesses an identity relationship the contract doesn't state, the second
- * contradicts the spec's own distinction between a record's target session
- * and whatever session happens to be active right now. Both are exactly the
- * kind of guess-across-the-boundary `CLAUDE.md` §3 and this card's own
- * out-of-scope note rule out. `GET /pupils/{id}` doesn't help either — the
- * same property description lists "single-get" among the null-returning
- * paths.
- *
- * Needs a contract addition (e.g. `sessionId`/`classAdmittedInto` on the
- * queue row) before the arm selector — and therefore this whole dialog — can
- * be built. Decline has no such dependency and is fully implemented
- * (`DeclineAdmissionDialog`).
+ * `POST /api/v1/admissions/{id}/approve`. Fetches the admission record first
+ * (`GET /admissions/{id}`, TASK-0066) — the queue row (`AdmissionQueueRow`)
+ * only carries `levelAppliedFor` as a display NAME, never the `sessionId`/
+ * `classAdmittedInto` ids the arm selector needs; see `types.ts`'s own note
+ * and TASK-0064's card Log for the contract gap this closed. Four required
+ * states (CONVENTIONS.md §11) for that fetch, mirroring `ArmDetailScreen`'s
+ * shape; the form itself is `ApproveAdmissionForm`, split out to stay under
+ * CONVENTIONS.md §3's 180-line cap.
  */
 export function ApproveAdmissionDialog({
   pupil,
@@ -39,6 +22,12 @@ export function ApproveAdmissionDialog({
   pupil: AdmissionQueueRow;
   onClose: () => void;
 }) {
+  const record = useAdmissionRecord(pupil.id);
+
+  if (record.isError && record.error instanceof ApiError && record.error.kind === 'unauthorized') {
+    return null;
+  }
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -48,18 +37,18 @@ export function ApproveAdmissionDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <DialogDescription>
-          Approval needs to offer an arm for this applicant's class, but this screen cannot yet
-          determine which session and class level the application was submitted for — that
-          information isn't returned by the admissions queue today. This has been reported as a
-          contract gap (TASK-0064); approval will be enabled once it's resolved.
-        </DialogDescription>
-
-        <div className="mt-6 flex justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
+        {record.isPending ? (
+          <output className="text-sm text-muted-foreground">Loading application…</output>
+        ) : record.isError ? (
+          <div role="alert" className="flex flex-col items-start gap-3">
+            <p className="text-sm text-destructive">{record.error.message}</p>
+            <Button variant="outline" size="sm" onClick={() => void record.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <ApproveAdmissionForm pupil={pupil} record={record.data} onClose={onClose} />
+        )}
       </DialogContent>
     </Dialog>
   );

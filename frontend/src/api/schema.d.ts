@@ -142,7 +142,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read one admission record
+         * @description TASK-0066: `id` is the PUPIL id, the same one `PATCH /admissions/{id}` and the admissions queue already use. Returns the same `AdmissionRecordDto` shape `PATCH` returns — one mapper, one shape, no second definition. Carries the opaque `sessionId` and `classAdmittedInto` ids an arm selector needs, which the queue row's own `levelAppliedFor` display name cannot supply. 404 when `id` does not name a PENDING pupil (approved, declined or unknown pupils are not reachable through this route) — the same rule `PATCH /admissions/{id}` already enforces. `pupil.view`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped grant cannot reach a pending record — it has no arm yet). No write: no audit row, no mutation.
+         */
+        get: operations["GetAdmissionRecord"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5268,6 +5272,64 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionRecordDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Too Many Requests */

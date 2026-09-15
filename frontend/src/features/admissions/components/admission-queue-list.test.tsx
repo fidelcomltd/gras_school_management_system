@@ -107,7 +107,7 @@ describe('AdmissionQueueList — privilege gating', () => {
 });
 
 describe('AdmissionQueueList — opening a decision dialog', () => {
-  it('Decline opens the reason dialog; Approve opens the blocked notice', async () => {
+  it('Decline opens the reason dialog; Approve opens the approval form', async () => {
     mockMe('pupil.view', 'pupil.admission.approve');
     server.use(
       http.get(apiUrl('/api/v1/admissions'), () => HttpResponse.json({ items: [pupil()], nextCursor: null })),

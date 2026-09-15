@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-15 by orchestrator (TASK-0051 closure) · no size cap, see
+Last reconciled: 2026-09-15 by orchestrator (TASK-0064 + TASK-0066 closure) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -104,19 +104,19 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `4b31521d833b48f37edeb801815c91f70fc9ff1c42c4ab5fbce04b040512ed29`** · **50 paths** ·
-**92 schemas** · api version `v1` · moved 2026-09-15 by TASK-0051 (additive: `POST
-/admissions/{id}/approve` and `POST /admissions/{id}/decline`, plus a description-only edit to
-`SettingsAbbreviationGroupDto.issuedCount`).
+**Current: `37f8b4c2d19db1af9c5adc0be1f002840cb667416e9072dc4aa74fc6818a2b53`** · **50 paths** ·
+**92 schemas** · api version `v1` · moved 2026-09-15 by TASK-0066 (additive: `GET /admissions/{id}` — one method added to an
+already-existing path, so the path and schema counts are unchanged). TASK-0051 moved it earlier the
+same day, adding the two approve/decline paths.
 
 **Corrected 2026-09-15:** this block still named TASK-0055's `7a3c84e6…` / 47 paths / 86 schemas
 even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing TASK-0062 updated
 the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-15.
-- Frontend client is **STALE** against this hash — the two new admission operations are not in
-  `src/api/schema.d.ts`. Drift check 2 will be RED until a frontend card regenerates it, the same
-  way TASK-0052 and TASK-0054 consumed earlier backend moves.
+- Frontend client is **CURRENT** against this hash — TASK-0064 regenerated it and
+  `npm run check:api-drift` is GREEN. All four admission operations (queue, read, approve,
+  decline) are in `src/api/schema.d.ts` and consumed by the `/admissions` screen.
 - The additive classification was verified MECHANICALLY (every existing schema's `required` array
   and every property type diffed against HEAD), not read off the card — see `decisions/2026-Q3.md`.
 - `/health/*` is excluded from the document (`ASSUMPTIONS.md` section 2.9); `/reference/*` is
@@ -127,7 +127,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0062, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0062, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -151,14 +151,17 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0063 | Registration-number correction and the history alias | backend-dev | **queued 2026-09-15 — UNBLOCKED by TASK-0051** (closed same day). Written in full. Split out of 0051 at its write-up |
-| TASK-0064 | Admissions queue screen: approve and decline | frontend-dev | **review 2026-09-15** — client regenerated (drift check 2 GREEN), queue list and Decline fully implemented and tested; Approve shipped as an honest blocked stub, one contract gap found. See card Log |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
-| TASK-0066 | `GET /admissions/{id}`: make a pending record readable | backend-dev | **DISPATCHED 2026-09-15.** Additive, approved at creation. TASK-0064 is blocked on it: no read path carries `sessionId` or the level id, so the approve dialog cannot build its arm selector |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-15 TASK-0064 and TASK-0066 closed on a 10/10 gate. The admissions queue,
+  approve and decline screens shipped; `frontend-dev` refused to guess two missing opaque ids and
+  that refusal produced `GET /admissions/{id}` rather than a silent wrong-class defect.
+  → `decisions/2026-Q3.md`
 
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
@@ -356,13 +359,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-15 **`admission` is null on `GET /pupils/{id}`** — only the create response populates it, yet
   6.5.15's detail view names the admission block. *Trigger: the pupil detail-view card. Owner:
   `backend-dev`.*
-- 2026-09-15 **The same null-`admission` gap also blocks `GET /admissions`'s own queue rows**,
-  which carry `levelAppliedFor` (a name) but no `sessionId`/`classAdmittedInto` (ids) — discovered
-  by TASK-0064, which needed both to scope the Approve dialog's arm selector and shipped that
-  dialog as a blocked stub instead of shimming a name-match or an "active session" guess. *Trigger:
-  a contract card adding session/level ids to the queue row (or a `GET /admissions/{id}`). Owner:
-  `backend-dev` for the contract, `frontend-dev` for the follow-up dialog. Full account: TASK-0064
-  card Log.*
+- 2026-09-15 ~~**The same null-`admission` gap also blocks `GET /admissions`'s own queue rows.**~~
+  **STRUCK 2026-09-15 by TASK-0066** — `GET /admissions/{id}` (`GetAdmissionRecord`) now returns
+  `AdmissionRecordDto` with `sessionId`/`classAdmittedInto`, gated `pupil.view`. TASK-0064's Approve
+  dialog consumes it and is fully implemented. Full account: TASK-0064 card Log.
 - 2026-09-09 **`GET /audit-events/export` writes a row on a GET and carries no CSRF token.**
   Spec-mandated by TASK-0049's card, harmless today. **It stops being harmless if the screen
   triggers the download by top-level navigation** — it must use fetch plus blob. *Trigger: the
