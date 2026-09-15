@@ -151,7 +151,8 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0063 | Registration-number correction and the history alias | backend-dev | **queued 2026-09-15 — UNBLOCKED by TASK-0051** (closed same day). Written in full. Split out of 0051 at its write-up |
-| TASK-0064 | Regenerate the API client against `4b31521d…` | frontend-dev | **queued 2026-09-15 — NOT YET CARDED.** Drift check 2 is RED until this lands: the two admission operations are absent from `src/api/schema.d.ts` |
+| TASK-0064 | Admissions queue screen: approve and decline | frontend-dev | **DISPATCHED 2026-09-15.** Written in full and widened: regeneration alone yields no product, and `rules/contract.md` section 3 pairs regeneration with consumption in ONE frontend step. Clears the RED drift check 2 as its first criterion |
+| TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
