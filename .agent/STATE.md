@@ -119,7 +119,7 @@ query parameter on `ListAuditEvents` and `ExportAuditEvents`).
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0052, 0053, 0054, 0055, 0059, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0052, 0053, 0054, 0055, 0059, 0062, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -142,8 +142,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
-| TASK-0062 | `admission_record` — sections A, I and J | backend-dev | **queued 2026-09-15** — written in full. NEW: the dependency nothing had noticed was unbuilt. This is now the next critical-path card |
-| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked on TASK-0062** 2026-09-15 — written in full and NARROWED to approve/decline/issue. Dispatch the moment 0062 closes |
+| TASK-0051 | Registration number issue and admission approval | backend-dev | **queued 2026-09-15 — UNBLOCKED by TASK-0062** (closed same day). Written in full, narrowed to approve/decline/issue. This is the next critical-path card |
 | TASK-0063 | Registration-number correction and the history alias | backend-dev | **blocked on TASK-0051** 2026-09-15 — written in full. Split out of 0051 at its write-up |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -154,6 +153,10 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
 
+- 2026-09-15 **TASK-0062 closed, full green gate** (10/10, 953 tests, Skipped 0). `admission_record`
+  sections A/I/J. **The orchestrator classified a BREAKING delta as additive** — a NEW required
+  request field on `POST /pupils`; caught by contract-guardian at close, human signed off after the
+  fact. → `decisions/2026-Q3.md`
 - 2026-09-15 **TASK-0051 could not be written as one card: `admission_record` was never built and
   appeared in no dependency list, including its own.** Split three ways — TASK-0062 (the record),
   0051 (approve/decline/issue), 0063 (correction). → `decisions/2026-Q3.md`
@@ -321,6 +324,15 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-15 **The admissions queue's `missing` column cannot see steps 3 to 8** — contacts, health,
+  barred/pickup persons and documents have no entity, so an empty `missing` does NOT mean "ready to
+  approve". *Trigger: each step 3-to-8 entity card, and TASK-0051. Owner: `backend-dev`.*
+- 2026-09-15 **`headOfSchoolName` has no settings-derived default**, though 6.5.9 says "Defaults from
+  settings" — a genuine spec deviation, not an unbuilt dependency. *Trigger: TASK-0051, which writes
+  section J. Owner: `backend-dev`.*
+- 2026-09-15 **`admission` is null on `GET /pupils/{id}`** — only the create response populates it, yet
+  6.5.15's detail view names the admission block. *Trigger: the pupil detail-view card. Owner:
+  `backend-dev`.*
 - 2026-09-09 **`GET /audit-events/export` writes a row on a GET and carries no CSRF token.**
   Spec-mandated by TASK-0049's card, harmless today. **It stops being harmless if the screen
   triggers the download by top-level navigation** — it must use fetch plus blob. *Trigger: the

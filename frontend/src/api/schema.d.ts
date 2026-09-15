@@ -124,7 +124,7 @@ export interface paths {
         };
         /**
          * List the admissions queue
-         * @description Spec 6.5.14: "A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else." This IS that queue — every pending pupil, unconditionally. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.
+         * @description Spec 6.5.14: "A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else." This IS that queue — every pending pupil, unconditionally. Each row additionally carries `levelAppliedFor`, `dateApplicationReceived` and `missing` (TASK-0062; spec 6.5.15) — `missing` covers only what sections A and I's stored fields can check today (the assessment result and the declaration): steps 2 to 8 have no entity yet, so a gap there never appears. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.
          */
         get: operations["ListAdmissionsQueue"];
         put?: never;
@@ -133,6 +133,26 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit an admission record's sections A, I and J
+         * @description Spec 6.5.9, 6.5.11: `id` is the PUPIL id, the same one `POST /pupils` returned and the admissions queue lists rows by. Steps 2 to 8's own screens are a later card — this endpoint only ever touches sections A, I and J. A HALF-FINISHED STEP STILL SAVES: every field is independently optional, absent fields are left unchanged, and an empty string clears an optional string field. `assessmentResultRemarks` is NOT required to save even when `assessmentRequired` is true — only admission APPROVAL (a later card) enforces that. 404 when `id` does not name a PENDING pupil (approved, declined or unknown pupils are not reachable through this route). Issues no registration number and approves nothing — `pupil.update`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped grant cannot reach a pending record).
+         */
+        patch: operations["UpdateAdmissionRecord"];
         trace?: never;
     };
     "/api/v1/arms": {
@@ -1157,6 +1177,108 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description Sections A, I and J of the admission form (spec 6.5.9) — nested inside `PupilDto.Admission`
+         *     on `POST /pupils`'s response, and returned directly by `PATCH /admissions/{id}`.
+         * @example {
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "dateAdmitted": "2026-09-08",
+         *       "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *       "classAdmittedIntoName": "Primary 2",
+         *       "admissionType": "New",
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": false,
+         *       "assessmentResultRemarks": null,
+         *       "assignedClassTeacher": null,
+         *       "declarationName": "Chinwe Okafor",
+         *       "declarationSigned": true,
+         *       "declarationDate": "2026-09-08",
+         *       "approvedBy": null,
+         *       "approvedAt": null,
+         *       "headOfSchoolConfirmed": false,
+         *       "headOfSchoolName": null
+         *     }
+         */
+        AdmissionRecordDto: {
+            /**
+             * @description Opaque to the client. The session admitted into.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * Format: date
+             * @description `null` when not supplied.
+             * @example 2026-08-01
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description Not in the future. The registration number's year comes from this (spec 6.5.10).
+             * @example 2026-09-08
+             */
+            dateAdmitted: string;
+            /**
+             * @description Opaque to the client. A class level id.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30
+             */
+            classAdmittedInto: string;
+            /**
+             * @description The level's display name, for a client that has no other lookup handy.
+             * @example Primary 2
+             */
+            classAdmittedIntoName: null | string;
+            /** @description New or returning. */
+            admissionType: components["schemas"]["AdmissionType"];
+            /** @description `null` when not supplied. */
+            admissionTypeNote: null | string;
+            /**
+             * @description Whether an entrance assessment is required.
+             * @example false
+             */
+            assessmentRequired: boolean;
+            /** @description `null` when not yet recorded — NOT required to save (spec 6.5.9). */
+            assessmentResultRemarks: null | string;
+            /** @description Opaque admin-account id, or `null`. Informational only at this stage. */
+            assignedClassTeacher: null | string;
+            /**
+             * @description `null` when not yet supplied.
+             * @example Chinwe Okafor
+             */
+            declarationName: null | string;
+            /**
+             * @description Section I: whether the signed paper form exists.
+             * @example true
+             */
+            declarationSigned: boolean;
+            /**
+             * Format: date
+             * @description `null` unless DeclarationSigned is `true`.
+             * @example 2026-09-08
+             */
+            declarationDate: null | string;
+            /** @description Opaque admin-account id. Written only by admission approval (TASK-0051) — always `null` today. */
+            approvedBy: null | string;
+            /**
+             * Format: date-time
+             * @description Written only by admission approval (TASK-0051) — always `null` today.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            approvedAt: null | string;
+            /**
+             * @description Section J's second signature block. Defaults `false`.
+             * @example false
+             */
+            headOfSchoolConfirmed: boolean;
+            /** @description `null` when not supplied. */
+            headOfSchoolName: null | string;
+        };
+        /**
+         * @description An AdmissionRecord's section A "New / Returning" tick (spec 6.5.9).
+         * @example New
+         * @enum {unknown}
+         */
+        AdmissionType: "New" | "Returning";
+        /**
          * @description The wire shape of an Arm (spec 6.4.3, 6.4.9). One shape for the list item and the
          *     detail read — roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are
          *     out of scope until pupils, enrolments, subject mappings and results exist.
@@ -1732,6 +1854,41 @@ export interface components {
             temporaryPassword: null | string;
         };
         /**
+         * @description Section A of the admission form, as captured at pupil creation (spec 6.5.9). Sections I and J are
+         *     filled in later, through `PATCH /admissions/{id}` (TASK-0062).
+         * @example {
+         *       "sessionId": null,
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "dateAdmitted": null,
+         *       "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *       "admissionType": "New",
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": false
+         *     }
+         */
+        CreateAdmissionInput: {
+            /** @description Opaque id. `null` defaults to the active session. */
+            sessionId: null | string;
+            /**
+             * Format: date
+             * @description Optional; not in the future.
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description `null` defaults to today; not in the future.
+             */
+            dateAdmitted: null | string;
+            /** @description Opaque id. Must reference an existing, active class level. */
+            classAdmittedInto: string;
+            /** @description New or returning. */
+            admissionType: components["schemas"]["AdmissionType"];
+            /** @description Optional. */
+            admissionTypeNote: null | string;
+            /** @description Explicit yes or no. */
+            assessmentRequired: boolean;
+        };
+        /**
          * @description `POST /api/v1/arms` (spec 6.4.3, 6.4.9). Single-arm creation — the flow spec 6.4.4 exists for:
          *             opening a new room mid-term under an active level, permitted with no privilege beyond
          *             `arm.create`.
@@ -1810,9 +1967,11 @@ export interface components {
             insertAfterLevelId: null | string;
         };
         /**
-         * @description `POST /api/v1/pupils` (spec 6.5.4). Always creates a PupilStatus.Pending
+         * @description `POST /api/v1/pupils` (spec 6.5.4, 6.5.9). Always creates a PupilStatus.Pending
          *             record with a `null` registration number — see the task card's own goal: "Nothing
-         *             can reach active yet."
+         *             can reach active yet." Admission is section A of the paper form, saved as the
+         *             pupil's `admission_record` row in the SAME transaction (TASK-0062) — a pupil with no
+         *             admission record is a state this handler cannot produce.
          * @example {
          *       "surname": "Okafor",
          *       "firstName": "Chidera",
@@ -1825,7 +1984,16 @@ export interface components {
          *       "homeAddress": "14 Zik Avenue, Awka",
          *       "previousSchool": null,
          *       "previousClass": null,
-         *       "otherInformation": null
+         *       "otherInformation": null,
+         *       "admission": {
+         *         "sessionId": null,
+         *         "dateApplicationReceived": "2026-08-01",
+         *         "dateAdmitted": null,
+         *         "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *         "admissionType": "New",
+         *         "admissionTypeNote": null,
+         *         "assessmentRequired": false
+         *       }
          *     }
          */
         CreatePupilCommand: {
@@ -1878,6 +2046,8 @@ export interface components {
             previousClass: null | string;
             /** @description Optional, section G free text. */
             otherInformation: null | string;
+            /** @description Section A. Required — every pupil gets an admission record at creation. */
+            admission: components["schemas"]["CreateAdmissionInput"];
         };
         /**
          * @description `POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a
@@ -2342,7 +2512,13 @@ export interface components {
          *           "otherInformation": null,
          *           "matchedField": null,
          *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
-         *           "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+         *           "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "admission": null,
+         *           "levelAppliedFor": "Primary 2",
+         *           "dateApplicationReceived": "2026-08-01",
+         *           "missing": [
+         *             "Declaration (Section I)"
+         *           ]
          *         }
          *       ],
          *       "nextCursor": null
@@ -2371,7 +2547,13 @@ export interface components {
              *         "otherInformation": null,
              *         "matchedField": null,
              *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
-             *         "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+             *         "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "admission": null,
+             *         "levelAppliedFor": "Primary 2",
+             *         "dateApplicationReceived": "2026-08-01",
+             *         "missing": [
+             *           "Declaration (Section I)"
+             *         ]
              *       }
              *     ]
              */
@@ -2904,7 +3086,31 @@ export interface components {
          *       "otherInformation": null,
          *       "matchedField": null,
          *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
-         *       "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+         *       "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "admission": {
+         *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *         "dateApplicationReceived": "2026-08-01",
+         *         "dateAdmitted": "2026-09-08",
+         *         "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *         "classAdmittedIntoName": "Primary 2",
+         *         "admissionType": "New",
+         *         "admissionTypeNote": null,
+         *         "assessmentRequired": false,
+         *         "assessmentResultRemarks": null,
+         *         "assignedClassTeacher": null,
+         *         "declarationName": "Chinwe Okafor",
+         *         "declarationSigned": true,
+         *         "declarationDate": "2026-09-08",
+         *         "approvedBy": null,
+         *         "approvedAt": null,
+         *         "headOfSchoolConfirmed": false,
+         *         "headOfSchoolName": null
+         *       },
+         *       "levelAppliedFor": "Primary 2",
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "missing": [
+         *         "Declaration (Section I)"
+         *       ]
          *     }
          */
         PupilDto: {
@@ -2989,6 +3195,31 @@ export interface components {
              * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
              */
             createdBy: null | string;
+            admission?: null | components["schemas"]["AdmissionRecordDto"];
+            /**
+             * @description The admission record's `class_admitted_into` display name. Populated ONLY by the admissions
+             *     queue (TASK-0062; spec 6.5.15's queue column) — `null` everywhere else.
+             * @example Primary 2
+             */
+            levelAppliedFor?: null | string;
+            /**
+             * Format: date
+             * @description The admission record's own field, lifted onto the row for the admissions queue (TASK-0062; spec
+             *     6.5.15). Populated ONLY by the admissions queue — `null` everywhere else.
+             * @example 2026-08-01
+             */
+            dateApplicationReceived?: null | string;
+            /**
+             * @description The admissions queue's own "what is missing" column (TASK-0062; spec 6.5.11 step 9, 6.5.15).
+             *     Restricted to what sections A and I's stored fields can check today: steps 2 to 8 (contacts,
+             *     health, barred persons, pickup persons, documents) have no entity yet, so a gap there can never
+             *     appear here — a known, recorded limitation, not a claim of completeness. Populated ONLY by the
+             *     admissions queue — `null` everywhere else.
+             * @example [
+             *       "Declaration (Section I)"
+             *     ]
+             */
+            missing?: null | string[];
         };
         /**
          * @description A Pupil's sex (spec 6.5.4). Required, no default.
@@ -3876,6 +4107,80 @@ export interface components {
              *             event even though the request as a whole still fails.
              */
             isSuperAdmin: null | boolean;
+        };
+        /**
+         * @description `PATCH /api/v1/admissions/{id}` (spec 6.5.9, 6.5.11 steps 1 and 8-9's section A/I fields, and
+         *             section J). Id is the PUPIL id — the same identity `POST /pupils` (spec
+         *             6.5.17's step 1, built as `POST /pupils` under TASK-0050) returned, and the one the admissions
+         *             queue already lists rows by.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "sessionId": null,
+         *       "dateApplicationReceived": null,
+         *       "dateAdmitted": null,
+         *       "classAdmittedInto": null,
+         *       "admissionType": null,
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": null,
+         *       "assessmentResultRemarks": null,
+         *       "assignedClassTeacher": null,
+         *       "declarationName": "Chinwe Okafor",
+         *       "declarationSigned": true,
+         *       "declarationDate": "2026-09-08",
+         *       "headOfSchoolConfirmed": null,
+         *       "headOfSchoolName": null
+         *     }
+         */
+        UpdateAdmissionRecordCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil whose admission record is being edited. Supplied from the route, not the body.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /** @description Opaque id. Must reference an existing session. */
+            sessionId: null | string;
+            /**
+             * Format: date
+             * @description Not in the future.
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description Not in the future.
+             */
+            dateAdmitted: null | string;
+            /** @description Opaque id. Must reference an existing, active class level. */
+            classAdmittedInto: null | string;
+            admissionType: null | components["schemas"]["AdmissionType"];
+            /** @description An empty string clears it. */
+            admissionTypeNote: null | string;
+            /** @description Whether an entrance assessment is required. */
+            assessmentRequired: null | boolean;
+            /** @description An empty string clears it. NOT required to save, even when AssessmentRequired is true (spec 6.5.9) — see Result AdmissionRecord.EnsureAssessmentResultRecordedIfRequired(). */
+            assessmentResultRemarks: null | string;
+            /** @description Opaque admin-account id as text; an empty string clears it. */
+            assignedClassTeacher: null | string;
+            /**
+             * @description An empty string clears it.
+             * @example Chinwe Okafor
+             */
+            declarationName: null | string;
+            /**
+             * @description Section I's tick. Setting this `false` also clears the record's declaration date.
+             * @example true
+             */
+            declarationSigned: null | boolean;
+            /**
+             * Format: date
+             * @description Required for the record to end up with bool? UpdateAdmissionRecordCommand.DeclarationSigned true; rejected while it is false.
+             * @example 2026-09-08
+             */
+            declarationDate: null | string;
+            /** @description Section J's second signature block. */
+            headOfSchoolConfirmed: null | boolean;
+            /** @description An empty string clears it. */
+            headOfSchoolName: null | string;
         };
         /**
          * @description `PATCH /api/v1/arms/{id}` (spec 6.4.3, 6.4.9): "Label, capacity, form teacher, status." Every
@@ -4859,6 +5164,94 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAdmissionRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdmissionRecordCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionRecordDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {

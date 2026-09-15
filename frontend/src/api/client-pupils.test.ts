@@ -52,6 +52,16 @@ describe('apiPost — POST /api/v1/pupils (CreatePupil)', () => {
     previousSchool: null,
     previousClass: null,
     otherInformation: null,
+    // TASK-0062: `admission` (section A) is now required on `CreatePupilCommand`.
+    admission: {
+      sessionId: null,
+      dateApplicationReceived: '2026-08-01',
+      dateAdmitted: null,
+      classAdmittedInto: '0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30',
+      admissionType: 'New' as const,
+      admissionTypeNote: null,
+      assessmentRequired: false,
+    },
   };
 
   it('requires Idempotency-Key and threads it through — this move\'s own instance of the omitted-required-header proof', async () => {

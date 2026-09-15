@@ -39,7 +39,9 @@ jq '.paths | keys | length' contracts/openapi.json
 5. `contract-guardian` verifies the lockfile, the diff, and that no generated file was touched.
 
 **Breaking** (requires human sign-off): removing or renaming a field or endpoint, narrowing a
-type, making an optional field required, changing a status code's meaning, or changing enum member
+type, making an optional field required, **adding a NEW required request field** (added 2026-09-15
+after TASK-0062 shipped one under an `additive` header — a request that worked yesterday is
+rejected today, which is the same thing from the caller's side), changing a status code's meaning, or changing enum member
 values. **Additive** (no sign-off): new optional field, new endpoint, new enum member *if the
 client handles unknown members*.
 
