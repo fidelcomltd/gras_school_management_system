@@ -17,6 +17,7 @@ export const paths = {
   roles: '/roles',
   arms: '/arms',
   armDetail: (id: string) => `/arms/${id}`,
+  admissions: '/admissions',
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

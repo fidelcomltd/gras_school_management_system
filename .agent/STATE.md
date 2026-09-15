@@ -151,8 +151,9 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0063 | Registration-number correction and the history alias | backend-dev | **queued 2026-09-15 — UNBLOCKED by TASK-0051** (closed same day). Written in full. Split out of 0051 at its write-up |
-| TASK-0064 | Admissions queue screen: approve and decline | frontend-dev | **DISPATCHED 2026-09-15.** Written in full and widened: regeneration alone yields no product, and `rules/contract.md` section 3 pairs regeneration with consumption in ONE frontend step. Clears the RED drift check 2 as its first criterion |
+| TASK-0064 | Admissions queue screen: approve and decline | frontend-dev | **review 2026-09-15** — client regenerated (drift check 2 GREEN), queue list and Decline fully implemented and tested; Approve shipped as an honest blocked stub, one contract gap found. See card Log |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
+| TASK-0066 | `GET /admissions/{id}`: make a pending record readable | backend-dev | **DISPATCHED 2026-09-15.** Additive, approved at creation. TASK-0064 is blocked on it: no read path carries `sessionId` or the level id, so the approve dialog cannot build its arm selector |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
@@ -355,6 +356,13 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-15 **`admission` is null on `GET /pupils/{id}`** — only the create response populates it, yet
   6.5.15's detail view names the admission block. *Trigger: the pupil detail-view card. Owner:
   `backend-dev`.*
+- 2026-09-15 **The same null-`admission` gap also blocks `GET /admissions`'s own queue rows**,
+  which carry `levelAppliedFor` (a name) but no `sessionId`/`classAdmittedInto` (ids) — discovered
+  by TASK-0064, which needed both to scope the Approve dialog's arm selector and shipped that
+  dialog as a blocked stub instead of shimming a name-match or an "active session" guess. *Trigger:
+  a contract card adding session/level ids to the queue row (or a `GET /admissions/{id}`). Owner:
+  `backend-dev` for the contract, `frontend-dev` for the follow-up dialog. Full account: TASK-0064
+  card Log.*
 - 2026-09-09 **`GET /audit-events/export` writes a row on a GET and carries no CSRF token.**
   Spec-mandated by TASK-0049's card, harmless today. **It stops being harmless if the screen
   triggers the download by top-level navigation** — it must use fetch plus blob. *Trigger: the

@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { ErrorBoundary } from '@/components/feedback/error-boundary';
 import { AppShell } from '@/components/layout/app-shell';
 import { NotFoundScreen } from '@/components/feedback/not-found-screen';
+import { admissionsRoutes } from '@/features/admissions/admissions-routes';
 import { adminsRoutes } from '@/features/admins/admins-routes';
 import { armsRoutes } from '@/features/arms/arms-routes';
 import { authRoutes, publicAuthRoutes } from '@/features/auth/auth-routes';
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
       ...sessionsRoutes,
       ...classesRoutes,
       ...armsRoutes,
+      ...admissionsRoutes,
       ...adminsRoutes,
       ...rolesRoutes,
     ],
