@@ -8,6 +8,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
@@ -97,6 +98,11 @@ public sealed class PipelineTests
         // TASK-0062: CreatePupilHandler and UpdateAdmissionRecordHandler depend on this port,
         // implemented by Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IAdmissionRecordRepository>());
+
+        // TASK-0051: ApproveAdmissionCommandHandler depends on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository/port stubbed above.
+        services.AddSingleton(Substitute.For<IEnrolmentRepository>());
+        services.AddSingleton(Substitute.For<IPersistenceErrorTranslator>());
 
         // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.

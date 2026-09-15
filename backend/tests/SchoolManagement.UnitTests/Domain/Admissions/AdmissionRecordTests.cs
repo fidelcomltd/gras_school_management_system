@@ -189,4 +189,43 @@ public sealed class AdmissionRecordTests
 
         record.AdmissionTypeNote.ShouldBeNull();
     }
+
+    // TASK-0051: section J's approval fields.
+
+    [Fact]
+    public void RecordApproval_WritesApprovedByAndApprovedAt()
+    {
+        var record = CreateValid();
+        var approverId = Guid.CreateVersion7();
+        var approvedAt = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero);
+
+        record.RecordApproval(approverId, approvedAt);
+
+        record.ApprovedBy.ShouldBe(approverId);
+        record.ApprovedAt.ShouldBe(approvedAt);
+    }
+
+    [Fact]
+    public void EnsureAssessmentResultRecordedIfRequired_AfterUpdateSuppliesRemarks_Succeeds()
+    {
+        // The approval handler's own sequence: Update(...) writes the outcome BEFORE this check runs.
+        var record = CreateValid(assessmentRequired: true);
+
+        record.Update(
+            null, null, null, null, null, null, null, "Passed the entrance assessment.", null,
+            null, null, null, null, null, Today).IsSuccess.ShouldBeTrue();
+
+        record.EnsureAssessmentResultRecordedIfRequired().IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void EnsureAssessmentResultRecordedIfRequired_RequiredButNeverSupplied_Fails()
+    {
+        var record = CreateValid(assessmentRequired: true);
+
+        var result = record.EnsureAssessmentResultRecordedIfRequired();
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("admission_record.assessment_result_remarks_required_for_approval");
+    }
 }

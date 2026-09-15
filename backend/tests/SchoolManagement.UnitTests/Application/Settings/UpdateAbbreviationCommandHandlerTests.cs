@@ -2,6 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Settings;
 
@@ -19,6 +20,7 @@ public sealed class UpdateAbbreviationCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
+    private readonly IPupilRepository _pupils = Substitute.For<IPupilRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -26,6 +28,7 @@ public sealed class UpdateAbbreviationCommandHandlerTests
     private UpdateAbbreviationCommandHandler CreateHandler() => new(
         _schoolProfileRepository,
         _configVersionRepository,
+        _pupils,
         _currentUser,
         _auditSink,
         _timeProvider);
@@ -45,6 +48,8 @@ public sealed class UpdateAbbreviationCommandHandlerTests
             abbreviationVersionNumber: 2);
         _schoolProfileRepository.GetTrackedSingletonAsync(Arg.Any<CancellationToken>()).Returns(profile);
         _currentUser.UserId.Returns("admin-1");
+        // TASK-0051: a live count against the NEW abbreviation, never null.
+        _pupils.CountByRegistrationNumberPrefixAsync("GRA", Arg.Any<CancellationToken>()).Returns(0);
 
         var result = await CreateHandler().HandleAsync(
             ValidCommand(expectedVersion: 2, abbreviation: "GRA"),
@@ -52,7 +57,7 @@ public sealed class UpdateAbbreviationCommandHandlerTests
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Abbreviation.ShouldBe("GRA");
-        result.Value.IssuedCount.ShouldBeNull(); // Amendment 2 — never 0.
+        result.Value.IssuedCount.ShouldBe(0);
         result.Value.VersionNumber.ShouldBe(3);
 
         await _configVersionRepository.Received(1).AddAsync(

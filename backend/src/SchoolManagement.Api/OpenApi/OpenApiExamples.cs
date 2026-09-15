@@ -950,6 +950,23 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(ApproveAdmissionCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
+              "assessmentResultRemarks": "Passed the entrance assessment.",
+              "headOfSchoolConfirmed": true,
+              "headOfSchoolName": null
+            }
+            """,
+
+        [typeof(DeclineAdmissionCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "reason": "Family relocated before the intake began."
+            }
+            """,
+
         [typeof(PupilDto)] = """
             {
               "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",

@@ -404,7 +404,10 @@ public sealed class SettingsEndpointsTests(ApiTestFixture fixture) : Integration
         var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
 
         settings.Abbreviation.Abbreviation.ShouldBe("GRAS");
-        settings.Abbreviation.IssuedCount.ShouldBeNull(); // Amendment 2 — never 0.
+        // TASK-0051: a real, live count as of this card — amendment 2's "never 0" reasoning applied
+        // only while no pupil register existed. A freshly reset database has zero approved pupils, so
+        // 0 is now the CORRECT, meaningful answer, not the old "uncounted" null. Do not revert this.
+        settings.Abbreviation.IssuedCount.ShouldBe(0);
         settings.Abbreviation.VersionNumber.ShouldBe(0);
         settings.RegNumber.Separator.ShouldBe("/");
         settings.RegNumber.SerialWidth.ShouldBe(4);
@@ -636,7 +639,9 @@ public sealed class SettingsEndpointsTests(ApiTestFixture fixture) : Integration
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var abbreviation = await ReadAsync<SettingsAbbreviationGroupDto>(response);
         abbreviation.Abbreviation.ShouldBe("GRA");
-        abbreviation.IssuedCount.ShouldBeNull();
+        // TASK-0051: a real, live count against the NEW abbreviation — zero pupils hold "GRA" the
+        // instant it is saved, so 0 is correct here, not the old permanently-null placeholder.
+        abbreviation.IssuedCount.ShouldBe(0);
         abbreviation.VersionNumber.ShouldBe(1);
 
         var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));

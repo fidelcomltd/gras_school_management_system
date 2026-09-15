@@ -238,6 +238,20 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         return rows.ConvertAll(pupil => PupilMapper.ToDto(pupil, asOfDate));
     }
 
+    /// <inheritdoc />
+    public Task<int> CountByRegistrationNumberPrefixAsync(string abbreviationPrefix, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(abbreviationPrefix);
+
+        // IgnoreQueryFilters: status-agnostic by design (the port's own remarks) — harmless here
+        // regardless, since a Pending row's RegistrationNumber is always null and can never match.
+        return context.Pupils
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(pupil => pupil.RegistrationNumber != null && pupil.RegistrationNumber.StartsWith(abbreviationPrefix))
+            .CountAsync(cancellationToken);
+    }
+
     private static CursorPage<PupilDto> ToPage(List<Pupil> rows, int pageSize, string? searchTerm, DateOnly asOfDate)
     {
         var hasNextPage = rows.Count > pageSize;

@@ -1138,6 +1138,341 @@
         }
       }
     },
+    "/api/v1/admissions/{id}/approve": {
+      "post": {
+        "tags": [
+          "Admissions"
+        ],
+        "summary": "Approve a pending admission",
+        "description": "Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved).",
+        "operationId": "ApproveAdmission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAdmissionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admissions/{id}/decline": {
+      "post": {
+        "tags": [
+          "Admissions"
+        ],
+        "summary": "Decline a pending admission",
+        "description": "Spec 6.5.14: pending -> withdrawn. Requires a reason. Issues no registration number and leaves the counter's last_serial untouched — no serial is ever consumed by a decline. 404 when `id` does not name a pending pupil.",
+        "operationId": "DeclineAdmission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineAdmissionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/arms": {
       "get": {
         "tags": [
@@ -7970,6 +8305,58 @@
         "description": "An AdmissionRecord's section A \"New / Returning\" tick (spec 6.5.9).",
         "example": "New"
       },
+      "ApproveAdmissionCommand": {
+        "required": [
+          "id",
+          "armId",
+          "assessmentResultRemarks",
+          "headOfSchoolConfirmed",
+          "headOfSchoolName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The pupil whose pending admission is being approved. Supplied from the route, not the body.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "armId": {
+            "type": "string",
+            "description": "Opaque id. Must reference an arm for the record's `class_admitted_into` level, in the\ncurrently active session (spec 6.5.11 step 9: \"The selector lists the level's arms for the active\nsession\"). Over capacity is a WARNING (spec 6.4.6), not a rejection, for a caller holding\n`arm.capacity.override`.",
+            "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70"
+          },
+          "assessmentResultRemarks": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The assessment outcome (spec 6.5.11 step 9). Required — and checked against the record's OWN\n`assessment_required` flag, not this command's shape — where an assessment was required;\n`null` otherwise leaves whatever the record already stored unchanged.",
+            "example": "Passed the entrance assessment."
+          },
+          "headOfSchoolConfirmed": {
+            "type": "boolean",
+            "description": "Section J's second signature block (appendix B question 26: \"one approving account plus a\nconfirmation tick for the head of school, both required at approval\"). Must be `true` — `false` blocks approval outright.",
+            "example": true
+          },
+          "headOfSchoolName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Section J. Omitted defaults to `settings.head_teacher_name` (spec 6.5.9: \"Defaults from\nsettings\" — the orchestrator's ruling on the source field, drift 2026-09-15). A supplied value\nalways wins over the default."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/admissions/{id}/approve` (spec 6.5.10, 6.5.11 step 9, 6.5.14). Id is the PUPIL id, the same identity `PATCH /admissions/{id}` already uses. The\n        only route into `PupilStatus.Active` for a new record: in ONE transaction, issues the\n        registration number (spec 6.5.10), writes section J, and opens the first enrolment in string ApproveAdmissionCommand.ArmId. `Idempotency-Key` is REQUIRED on this route (spec 6.5.17) — see\n        `AdmissionEndpoints.MapApprove`.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
+          "assessmentResultRemarks": "Passed the entrance assessment.",
+          "headOfSchoolConfirmed": true,
+          "headOfSchoolName": null
+        }
+      },
       "ArmDto": {
         "required": [
           "id",
@@ -9752,6 +10139,32 @@
           "nextCursor": "MjAyNi8yMDI3"
         }
       },
+      "DeclineAdmissionCommand": {
+        "required": [
+          "id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The pupil whose pending admission is being declined. Supplied from the route, not the body.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required (spec 6.5.14: \"Requires a reason\").",
+            "example": "Family relocated before the intake began."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/admissions/{id}/decline` (spec 6.5.14: pending -&gt; withdrawn). Id is the PUPIL id. Issues no registration number and leaves the counter's\n        `last_serial` untouched — this command never calls the counter at all.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "reason": "Family relocated before the intake began."
+        }
+      },
       "EffectivePrivilegeDto": {
         "required": [
           "privilege",
@@ -11227,7 +11640,7 @@
               "integer",
               "string"
             ],
-            "description": "How many issued registration numbers currently begin with string SettingsAbbreviationGroupDto.Abbreviation — the count\nspec 6.2.4's confirmation dialogue names before an admin types `CHANGE`.\n`null` means \"no register exists yet to count\" (TASK-0005c ships this field\npermanently `null`; wiring the real count is TASK-0051's). NEVER `0` — that\nwould claim zero pupils hold the abbreviation as a fact this card cannot support.",
+            "description": "How many issued registration numbers currently begin with string SettingsAbbreviationGroupDto.Abbreviation — the count\nspec 6.2.4's confirmation dialogue names before an admin types `CHANGE`. A real, live count\nas of TASK-0051 (wired from `IPupilRepository.CountByRegistrationNumberPrefixAsync`); genuinely\n`0` now means zero pupils hold it, not \"uncounted\". Kept nullable for wire compatibility with\nTASK-0005c's shape, though no code path produces `null` any more.",
             "format": "int32"
           },
           "versionNumber": {

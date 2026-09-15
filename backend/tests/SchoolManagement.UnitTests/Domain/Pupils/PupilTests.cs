@@ -205,4 +205,88 @@ public sealed class PupilTests
         result.IsFailure.ShouldBeTrue();
         pupil.DateOfBirth.ShouldBe(originalDateOfBirth);
     }
+
+    // TASK-0051: admission approval and decline.
+
+    [Fact]
+    public void Approve_OnAPendingPupil_TransitionsToActive()
+    {
+        var pupil = CreateValid().Value;
+
+        var result = pupil.Approve();
+
+        result.IsSuccess.ShouldBeTrue();
+        pupil.Status.ShouldBe(PupilStatus.Active);
+    }
+
+    [Fact]
+    public void Approve_DoesNotItselfSetARegistrationNumber()
+    {
+        var pupil = CreateValid().Value;
+
+        pupil.Approve();
+
+        pupil.RegistrationNumber.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Approve_OnAnAlreadyApprovedPupil_FailsWithConflict()
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+
+        var result = pupil.Approve();
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("pupil.already_approved");
+    }
+
+    [Fact]
+    public void IssueRegistrationNumber_WritesTheSuppliedValue()
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+
+        pupil.IssueRegistrationNumber("GRAS/2026/0001");
+
+        pupil.RegistrationNumber.ShouldBe("GRAS/2026/0001");
+    }
+
+    [Fact]
+    public void IssueRegistrationNumber_CalledTwice_TheSecondCallOverwritesTheFirst()
+    {
+        // The retry-on-conflict loop's own precondition: a failed attempt's number must be
+        // replaceable by a fresh one against the SAME tracked entity, with no guard blocking it.
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+        pupil.IssueRegistrationNumber("GRAS/2026/0001");
+
+        pupil.IssueRegistrationNumber("GRAS/2026/0002");
+
+        pupil.RegistrationNumber.ShouldBe("GRAS/2026/0002");
+    }
+
+    [Fact]
+    public void DeclineAdmission_OnAPendingPupil_TransitionsToWithdrawnAndIssuesNoNumber()
+    {
+        var pupil = CreateValid().Value;
+
+        var result = pupil.DeclineAdmission();
+
+        result.IsSuccess.ShouldBeTrue();
+        pupil.Status.ShouldBe(PupilStatus.Withdrawn);
+        pupil.RegistrationNumber.ShouldBeNull();
+    }
+
+    [Fact]
+    public void DeclineAdmission_OnAnAlreadyApprovedPupil_Fails()
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+
+        var result = pupil.DeclineAdmission();
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("pupil.not_pending");
+    }
 }

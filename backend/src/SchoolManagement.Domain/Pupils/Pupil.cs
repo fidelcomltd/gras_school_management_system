@@ -440,6 +440,59 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
+    /// Transitions <see cref="PupilStatus.Pending"/> to <see cref="PupilStatus.Active"/> (spec 6.5.14:
+    /// "the only route into active for a new record"). Guarded: fails if the pupil is not currently
+    /// pending — TASK-0051's admission approval checks this itself before calling, so this is defence
+    /// in depth, not the primary check. Deliberately does NOT set <see cref="RegistrationNumber"/> —
+    /// see <see cref="IssueRegistrationNumber"/>, called separately so the counter's retry-on-conflict
+    /// loop (spec 6.5.10 rule 4) can re-attempt just the number, against the SAME already-approved
+    /// entity, without re-running this guard a second time.
+    /// </summary>
+    public Result Approve()
+    {
+        if (Status != PupilStatus.Pending)
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.already_approved", "This pupil is not pending — it has already been approved, declined, or otherwise resolved."));
+        }
+
+        Status = PupilStatus.Active;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Writes (or, on a retry, OVERWRITES) the registration number issued by admission approval (spec
+    /// 6.5.10). Deliberately UNGUARDED and callable more than once: the counter's retry-on-conflict
+    /// loop (rule 4) needs to try a fresh serial against this SAME tracked entity without re-running
+    /// <see cref="Approve"/>'s pending check, which would incorrectly fail once <see cref="Approve"/>
+    /// has already flipped <see cref="Status"/>. Nothing outside admission approval ever calls this —
+    /// that absence of a second caller, not a check here, is what keeps "immutable once issued" true
+    /// once the enclosing transaction actually commits.
+    /// </summary>
+    public void IssueRegistrationNumber(string registrationNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(registrationNumber);
+        RegistrationNumber = registrationNumber;
+    }
+
+    /// <summary>
+    /// Declines a pending admission (spec 6.5.14: pending -> withdrawn). Guarded: fails if the pupil
+    /// is not currently pending. Issues no registration number and leaves the counter untouched —
+    /// this method never touches <see cref="RegistrationNumber"/> at all.
+    /// </summary>
+    public Result DeclineAdmission()
+    {
+        if (Status != PupilStatus.Pending)
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.not_pending", "Only a pending admission can be declined."));
+        }
+
+        Status = PupilStatus.Withdrawn;
+        return Result.Success();
+    }
+
+    /// <summary>
     /// Whole years between <paramref name="dateOfBirth"/> and <paramref name="asOfDate"/> — the same
     /// computation <see cref="Create"/>/<see cref="UpdateBiographical"/> use to enforce the age range,
     /// exposed so the read side (<c>PupilMapper</c>) never re-derives it a second way.

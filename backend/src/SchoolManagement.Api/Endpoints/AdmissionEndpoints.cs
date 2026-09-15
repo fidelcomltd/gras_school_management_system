@@ -31,6 +31,8 @@ public sealed class AdmissionEndpoints : IEndpointModule
 
         MapListQueue(group);
         MapUpdate(group);
+        MapApprove(group);
+        MapDecline(group);
     }
 
     private static void MapListQueue(RouteGroupBuilder group) =>
@@ -90,6 +92,73 @@ public sealed class AdmissionEndpoints : IEndpointModule
                 "and approves nothing — `pupil.update`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s " +
                 "own description for why an arm-scoped grant cannot reach a pending record).")
             .Produces<AdmissionRecordDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapApprove(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/approve", async (
+                Guid id,
+                ApproveAdmissionCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.AdmissionApprove, ScopeParameterKind.None)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("ApproveAdmission")
+            .WithSummary("Approve a pending admission")
+            .WithDescription(
+                "Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new " +
+                "record. In ONE transaction: issues the registration number (the year comes from THIS " +
+                "record's own DateAdmitted, never today's date; the abbreviation, separator and serial " +
+                "width are read from SAVED settings at the moment of issue and frozen into the stored " +
+                "string), writes section J, and opens the first enrolment in `armId` effective from " +
+                "the later of the admission date and the session start date. `Idempotency-Key` is " +
+                "REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the " +
+                "pupil's class level in the active session (422); no term is currently active (409, " +
+                "verbatim spec message); a required assessment has no recorded outcome (422); the " +
+                "declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, " +
+                "validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over " +
+                "capacity is a WARNING that proceeds — audited — for a caller holding " +
+                "`arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to " +
+                "`settings.head_teacher_name`; a supplied value always wins. 409 when the admission is " +
+                "no longer pending (already approved, declined, or otherwise resolved).")
+            .Produces<PupilDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapDecline(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/decline", async (
+                Guid id,
+                DeclineAdmissionCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.AdmissionApprove, ScopeParameterKind.None)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("DeclineAdmission")
+            .WithSummary("Decline a pending admission")
+            .WithDescription(
+                "Spec 6.5.14: pending -> withdrawn. Requires a reason. Issues no registration number " +
+                "and leaves the counter's last_serial untouched — no serial is ever consumed by a " +
+                "decline. 404 when `id` does not name a pending pupil.")
+            .Produces<PupilDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

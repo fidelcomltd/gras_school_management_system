@@ -1,10 +1,13 @@
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Application.Settings;
 
 /// <summary>Handles <see cref="GetSettingsQuery"/>.</summary>
-internal sealed class GetSettingsQueryHandler(ISchoolProfileRepository schoolProfileRepository)
+internal sealed class GetSettingsQueryHandler(
+    ISchoolProfileRepository schoolProfileRepository,
+    IPupilRepository pupils)
     : IRequestHandler<GetSettingsQuery, Result<SettingsDto>>
 {
     /// <inheritdoc />
@@ -16,10 +19,15 @@ internal sealed class GetSettingsQueryHandler(ISchoolProfileRepository schoolPro
             .GetReadOnlySingletonAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        // TASK-0051: the register is real now — a live count, never null (amendment 2's "no register
+        // exists yet" reason no longer holds).
+        var issuedCount = await pupils
+            .CountByRegistrationNumberPrefixAsync(profile.Abbreviation, cancellationToken)
+            .ConfigureAwait(false);
+
         return Result.Success(new SettingsDto(
             SettingsMapper.ToIdentityDto(profile),
-            // Amendment 2: no pupil register exists yet, so this can only ever be null — never 0.
-            SettingsMapper.ToAbbreviationDto(profile, issuedCount: null),
+            SettingsMapper.ToAbbreviationDto(profile, issuedCount),
             SettingsMapper.ToRegNumberDto(profile)));
     }
 }

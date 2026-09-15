@@ -49,10 +49,10 @@ public sealed record SettingsIdentityGroupDto(
 /// <param name="Abbreviation">2 to 8 characters. Frozen into every registration number issued from now on.</param>
 /// <param name="IssuedCount">
 /// How many issued registration numbers currently begin with <see cref="Abbreviation"/> — the count
-/// spec 6.2.4's confirmation dialogue names before an admin types <c>CHANGE</c>.
-/// <see langword="null"/> means "no register exists yet to count" (TASK-0005c ships this field
-/// permanently <see langword="null"/>; wiring the real count is TASK-0051's). NEVER <c>0</c> — that
-/// would claim zero pupils hold the abbreviation as a fact this card cannot support.
+/// spec 6.2.4's confirmation dialogue names before an admin types <c>CHANGE</c>. A real, live count
+/// as of TASK-0051 (wired from <c>IPupilRepository.CountByRegistrationNumberPrefixAsync</c>); genuinely
+/// <c>0</c> now means zero pupils hold it, not "uncounted". Kept nullable for wire compatibility with
+/// TASK-0005c's shape, though no code path produces <see langword="null"/> any more.
 /// </param>
 /// <param name="VersionNumber">
 /// The abbreviation group's current optimistic-concurrency pointer. Echo this back as

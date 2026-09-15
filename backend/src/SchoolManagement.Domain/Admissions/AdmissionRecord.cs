@@ -377,6 +377,19 @@ public sealed class AdmissionRecord : Entity<Guid>, IAuditableEntity
         return Result.Success();
     }
 
+    /// <summary>
+    /// Writes section J's approval fields (spec 6.5.9): who approved this record, and when. Called
+    /// exactly once, by admission approval (TASK-0051), immediately after that same call has verified
+    /// <see cref="EnsureAssessmentResultRecordedIfRequired"/> and <see cref="DeclarationSigned"/> —
+    /// this method itself enforces neither, trusting the caller the way <see cref="Update"/> trusts
+    /// its own inputs.
+    /// </summary>
+    public void RecordApproval(Guid? approvedBy, DateTimeOffset approvedAt)
+    {
+        ApprovedBy = approvedBy;
+        ApprovedAt = approvedAt;
+    }
+
     private static Error DateInFutureError(string code, string fieldLabel, DateOnly value) =>
         Error.Validation(code, $"{fieldLabel} of {value:dd/MM/yyyy} cannot be in the future.");
 

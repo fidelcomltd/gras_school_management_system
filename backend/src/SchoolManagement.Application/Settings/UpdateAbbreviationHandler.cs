@@ -2,6 +2,7 @@ using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -31,6 +32,7 @@ namespace SchoolManagement.Application.Settings;
 internal sealed class UpdateAbbreviationCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IConfigVersionRepository configVersionRepository,
+    IPupilRepository pupils,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -100,6 +102,11 @@ internal sealed class UpdateAbbreviationCommandHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(SettingsMapper.ToAbbreviationDto(profile, issuedCount: null));
+        // TASK-0051: a live count against the NEW abbreviation, never null — see GetSettingsQueryHandler.
+        var issuedCount = await pupils
+            .CountByRegistrationNumberPrefixAsync(profile.Abbreviation, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Result.Success(SettingsMapper.ToAbbreviationDto(profile, issuedCount));
     }
 }

@@ -84,4 +84,18 @@ public interface IPupilRepository
         int maxResults,
         DateOnly asOfDate,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many pupils, in ANY status, currently hold a non-null <c>registration_number</c> beginning
+    /// with <paramref name="abbreviationPrefix"/> — spec 6.2.4's confirmation-dialogue count
+    /// (<c>abbreviation.issuedCount</c>, TASK-0051). Reads the pupil table, never the counter: a
+    /// declined admission never had a number to count, and a corrected number (TASK-0063, out of this
+    /// card's scope) is still the pupil's CURRENT number, so neither can inflate this beyond what is
+    /// genuinely issued and outstanding. Status-agnostic on purpose — a transferred, withdrawn or
+    /// graduated pupil keeps their number, so <see cref="PupilStatus.Pending"/> aside (which can never
+    /// match: <see cref="Pupil.RegistrationNumber"/> is null until approval), every status counts.
+    /// </summary>
+    /// <param name="abbreviationPrefix">The abbreviation to match at the start of the string, verbatim (case-sensitive).</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<int> CountByRegistrationNumberPrefixAsync(string abbreviationPrefix, CancellationToken cancellationToken);
 }
