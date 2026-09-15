@@ -119,7 +119,7 @@ query parameter on `ListAuditEvents` and `ExportAuditEvents`).
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0052, 0054, 0055, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0052, 0053, 0054, 0055, 0059, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -135,12 +135,14 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0053 | Neutralise CSV formula injection in the audit export | backend-dev | **queued 2026-09-09** — found by orchestrator in TASK-0049 review. Encoding-only, contract must not move |
+| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **blocked — needs a human ruling** 2026-09-15: where does a pupil with NO open enrolment sort? Split from TASK-0059 at its pre-authorised cut line |
+| TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
+| TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
-| TASK-0036 | End-of-session promotion | backend-dev | **blocked** — needs arms, pupils, enrolments, annual results |
+| TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
-| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked (stub)** — 0005c and 0050 dependencies CLEARED 2026-09-09; still needs an `enrolment` entity |
+| TASK-0051 | Registration number issue and admission approval | backend-dev | **UNBLOCKED 2026-09-15 by TASK-0059** — every dependency now cleared (0005c, 0050, enrolment). Still a STUB card: must be written in full before dispatch. This is the next critical-path card |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
@@ -150,6 +152,27 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
 
+- 2026-09-15 **TASK-0059 closed, full green gate.** `enrolment` — the pupil-to-arm spine; the
+  one-open-row invariant is a partial unique index proven in BOTH directions. 933/933, Skipped 0,
+  contract unmoved. One AC split to TASK-0061. → `decisions/2026-Q3.md`
+- 2026-09-15 **A card returned one AC short WITH the open question written down beats one returned
+  complete and guessed.** 6.5.15 is silent on where an unenrolled pupil sorts. →
+  `decisions/2026-Q3.md`
+- 2026-09-15 **Judge a running gate by TWO samples, never one.** The test DB is a Neon POOLER
+  endpoint, so an idle `pg_stat_activity` session is a pooled connection, not the worker; and
+  `ci.ps1` logs nothing until its summary. The orchestrator misread silence as a hang twice, once
+  killing a healthy run and corrupting the database. → `decisions/2026-Q3.md`
+- 2026-09-14 **TASK-0053 closed, full green gate.** CSV formula injection neutralised in the audit
+  export; neutralise-then-quote ordering is the substance. 917/917, Skipped 0, contract unmoved. →
+  `decisions/2026-Q3.md`
+- 2026-09-14 **Silence from `ci.ps1`'s integration stage is NOT evidence of a hang.** It logs nothing
+  until the final summary, and `ResetDatabaseAsync` runs per test against hosted Neon at ~8s/test, so
+  256 tests are 35+ minutes of silence. The orchestrator killed a healthy run, corrupting the shared
+  database mid-reseed and costing ~2 hours. **Get evidence a run is stuck before killing it.** →
+  `decisions/2026-Q3.md`
+- 2026-09-14 **Human priority ruling: critical product features before further audit work.** TASK-0058
+  deferred (not dropped; its drift trigger still names it); TASK-0059 (enrolment) opened as the first
+  critical card — the stated blocker on TASK-0051, TASK-0036 and two live drift entries.
 - 2026-09-14 **TASK-0041, 0042, 0043 and 0045 CLOSED** on one orchestrator gate run — back-office
   shell and guards, academic structure, admins and roles, arms. Contract unmoved. →
   `decisions/2026-Q3.md`
@@ -297,11 +320,15 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-09 **`NigerianGeography`'s 774 LGA names are UNVERIFIED** against an authoritative
   source, and a wrong name can block a real admission (6.5.4 requires a closed list).
   *Trigger: before the first real admission. Owner: `backend-dev` plus human.*
-- 2026-09-09 **Arm-scoped `pupil.view` / `pupil.update` is a tested mechanism but a NO-OP against
-  today's data** — 6.5.4's entity carries no arm field; arm comes only from `enrolment`, which does
-  not exist yet. *Trigger: TASK-0051 or the enrolment card. Owner: `backend-dev`.*
+- 2026-09-09 ~~**Arm-scoped `pupil.view` / `pupil.update` is a tested mechanism but a NO-OP against
+  today's data.**~~ **STRUCK 2026-09-14 by TASK-0059** — `PupilArmOfRecordLookup` resolves a pupil's
+  real arm from their open enrolment; `GetPupilHandler`/`UpdatePupilBiographicalHandler`/
+  `ListPupilsHandler` all use it. Full text: `drift/2026-Q3.md`.
 - 2026-09-09 **`GET /pupils` default sort omits 6.5.15's class-progression half** — it sorts
-  surname then id. Same root cause as above. *Trigger: the enrolment card. Owner: `backend-dev`.*
+  surname then id. **TASK-0059 looked at this and deliberately did NOT build it** — needs a widened
+  keyset cursor plus a product decision on where a pupil with no open enrolment sorts, neither of
+  which fit that card safely. *Trigger: TASK-0061, written 2026-09-15 and BLOCKED on the human
+  ruling it carries. Owner: `backend-dev`.*
 - 2026-09-08 **Spec 6.1.2's self-edit carve-out is not built** — an admin editing their OWN
   `staffName` / `phone` without holding `admin.update`. **Its trigger ALREADY FIRED and was
   missed: TASK-0043 was "the next `/admins` card" and carried no AC for it** (flagged anyway by
@@ -356,9 +383,14 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   with no `try` / `catch` in either `SystemAuditSink.RecordRejectionAsync` or its caller.
   *Trigger: TASK-0058 (re-pointed 2026-09-14 — the old trigger "the next audit card" FIRED on
   TASK-0053 and was deliberately not folded into an encoding-only card). Owner: `backend-dev`.*
-- 2026-09-09 **`PrivilegeDecision.cs:21` carries a `TODO(TASK-0002)` pointing at a CLOSED card** —
-  session-bearing scope filtering, blocked on enrolment. *Trigger: re-card it.
-  Owner: `backend-dev`.*
+- 2026-09-09 **`PrivilegeDecision.cs:21`'s session-bearing-scope-filtering gap, RE-EXAMINED
+  2026-09-14 by TASK-0059, still unresolved and no longer a `TODO(TASK-nnnn)` tag.** Enrolment
+  existing does not resolve it: pupil routes still bypass `ScopeResolver`/`PrivilegeDecision`
+  entirely via the handler-level `PupilAccessGuard` pattern, so `PrivilegeGrant.SessionId` is still
+  never exercised by a real caller. The remark was rewritten to stop pointing at TASK-0002 (closed)
+  and, since 2026-09-15, reads `TODO(TASK-0060)` — the orchestrator opened that card at TASK-0059's
+  closure. **The gap in plain terms: a grant scoped to one academic session authorises the same
+  action against a target in another.** *Trigger: TASK-0060. Owner: `backend-dev`.*
 - 2026-09-05 **`vite build` succeeds with NO `.env` and emits a bundle that throws on boot**
   (it inlines `VITE_*` as `undefined`). CI copies `.env.example`, which masks it; nothing checks
   env at build time. *Trigger: any card touching build or deployment. Owner: UNOWNED.*

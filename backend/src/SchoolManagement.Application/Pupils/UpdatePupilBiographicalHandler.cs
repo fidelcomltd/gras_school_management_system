@@ -13,6 +13,7 @@ namespace SchoolManagement.Application.Pupils;
 internal sealed class UpdatePupilBiographicalHandler(
     IPupilRepository pupils,
     IEffectivePrivilegeProvider grantsProvider,
+    IPupilArmOfRecordLookup armOfRecordLookup,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -62,8 +63,15 @@ internal sealed class UpdatePupilBiographicalHandler(
 
         if (scope == PupilAccessScope.ArmRestricted)
         {
-            return Result.Failure<PupilDto>(Error.Forbidden(
-                "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
+            // TASK-0059: same real arm-of-record resolution as GetPupilQueryHandler — see its remarks.
+            var armId = await armOfRecordLookup.GetArmIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
+            var allowedArmIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.Update);
+
+            if (armId is not { } resolvedArmId || !allowedArmIds.Contains(resolvedArmId))
+            {
+                return Result.Failure<PupilDto>(Error.Forbidden(
+                    "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
+            }
         }
 
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Secrets;
@@ -118,7 +119,10 @@ public static class InfrastructureDependencyInjection
         // DELETED, not left registered behind a flag. See the class remarks.
         services.AddScoped<IEffectivePrivilegeProvider, RoleAssignmentEffectivePrivilegeProvider>();
         services.AddScoped<IAuthorizationAuditSink, AuthorizationAuditSink>();
-        services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
+        // TASK-0059: the real implementation, resolving a pupil's arm from their open enrolment —
+        // replaces NotYetImplementedPupilArmOfRecordLookup (DELETED, not left registered behind a
+        // flag, same convention TASK-0030 used for SuperAdminFlagEffectivePrivilegeProvider).
+        services.AddScoped<IPupilArmOfRecordLookup, PupilArmOfRecordLookup>();
         services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
 
         // TASK-0003: authentication and session management (spec 6.1.11, spec 9.1). Bound the same
@@ -185,6 +189,9 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IArmRepository, ArmRepository>();
 
         services.AddScoped<IPupilRepository, PupilRepository>();
+
+        // TASK-0059: enrolment — dated membership of a pupil in an arm (spec 02 §5.2).
+        services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

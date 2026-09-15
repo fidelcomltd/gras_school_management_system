@@ -10,6 +10,7 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
@@ -155,9 +156,11 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
     }
 
     // The other named criterion: arm-scoped pupil.view proven BOTH directions against the REAL
-    // RoleAssignmentEffectivePrivilegeProvider — a class-teacher-shaped arm-scoped grant sees nothing
-    // (no pupil carries an arm reference yet, see PupilAccessGuard's remarks), a school-wide grant
-    // sees the record.
+    // RoleAssignmentEffectivePrivilegeProvider. This seeds a PENDING pupil, which by construction
+    // (spec 07 §6.5.11) never has an open enrolment, so an arm-scoped grant still matches no row —
+    // TASK-0059's positive case (an arm-scoped caller reaching a pupil actually enrolled in their
+    // arm) is List_ArmScopedCaller_SeesAPupilEnrolledInTheirArm_ExcludesOneInAnotherArm below. A
+    // school-wide grant sees the record regardless, since it never consults an arm at all.
     [Fact]
     public async Task List_ArmScopedCaller_SeesAnEmptyPage_SchoolWideCallerSeesTheRecord()
     {
@@ -183,6 +186,8 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         schoolWidePage.Items.ShouldContain(item => item.Surname == surname);
     }
 
+    // Same PENDING-pupil-has-no-open-enrolment shape as the list test above — the positive case is
+    // Get_ArmScopedCaller_ReachesAPupilEnrolledInTheirArm_AndCannotReachOneInAnotherArm below.
     [Fact]
     public async Task Get_ArmScopedCaller_Returns403_SchoolWideCallerReturns200()
     {
@@ -201,6 +206,65 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
 
         var schoolWideResponse = await GetAsync($"{PupilsUrl}/{pupilId}", schoolWideJar);
         schoolWideResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    // TASK-0059: closes the drift the two tests above disclosed — arm-scoped pupil.view/update now
+    // resolves a REAL arm from the pupil's open enrolment (spec 02 §5.2), so an arm-scoped caller
+    // can reach a pupil actually enrolled in one of their granted arms, and still cannot reach one
+    // enrolled in a DIFFERENT arm.
+    [Fact]
+    public async Task Get_ArmScopedCaller_ReachesAPupilEnrolledInTheirArm_AndCannotReachOneInAnotherArm()
+    {
+        RequireDatabase();
+
+        var sessionId = await SeedSessionAsync();
+        var grantedArmId = await SeedArmAsync(sessionId, "5A");
+        var otherArmId = await SeedArmAsync(sessionId, "5B");
+
+        var enrolledPupilId = await SeedPupilDirectlyAsync("Enrolled", "InGrantedArm");
+        await SetRegistrationNumberAndStatusAsync(enrolledPupilId, "GRAS/2026/0050", PupilStatus.Active);
+        await SeedEnrolmentAsync(enrolledPupilId, grantedArmId, new DateOnly(2026, 9, 1));
+
+        var elsewherePupilId = await SeedPupilDirectlyAsync("Enrolled", "InOtherArm");
+        await SetRegistrationNumberAndStatusAsync(elsewherePupilId, "GRAS/2026/0051", PupilStatus.Active);
+        await SeedEnrolmentAsync(elsewherePupilId, otherArmId, new DateOnly(2026, 9, 1));
+
+        var armScopedJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.ArmList, sessionId, [grantedArmId]);
+
+        var reachableResponse = await GetAsync($"{PupilsUrl}/{enrolledPupilId}", armScopedJar);
+        reachableResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var unreachableResponse = await GetAsync($"{PupilsUrl}/{elsewherePupilId}", armScopedJar);
+        unreachableResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task List_ArmScopedCaller_SeesAPupilEnrolledInTheirArm_ExcludesOneInAnotherArm()
+    {
+        RequireDatabase();
+
+        var sessionId = await SeedSessionAsync();
+        var grantedArmId = await SeedArmAsync(sessionId, "6A");
+        var otherArmId = await SeedArmAsync(sessionId, "6B");
+
+        var inArmSurname = "Instudentgrantedarm";
+        var inArmPupilId = await SeedPupilDirectlyAsync(inArmSurname, "One");
+        await SetRegistrationNumberAndStatusAsync(inArmPupilId, "GRAS/2026/0052", PupilStatus.Active);
+        await SeedEnrolmentAsync(inArmPupilId, grantedArmId, new DateOnly(2026, 9, 1));
+
+        var elsewhereSurname = "Instudentotherarm";
+        var elsewherePupilId = await SeedPupilDirectlyAsync(elsewhereSurname, "Two");
+        await SetRegistrationNumberAndStatusAsync(elsewherePupilId, "GRAS/2026/0053", PupilStatus.Active);
+        await SeedEnrolmentAsync(elsewherePupilId, otherArmId, new DateOnly(2026, 9, 1));
+
+        var armScopedJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.ArmList, sessionId, [grantedArmId]);
+
+        var response = await GetAsync(PupilsUrl, armScopedJar);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await ReadAsync<CursorPage<PupilDto>>(response);
+
+        page.Items.ShouldContain(item => item.Id == inArmPupilId.ToString("D", CultureInfo.InvariantCulture));
+        page.Items.ShouldNotContain(item => item.Id == elsewherePupilId.ToString("D", CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -437,6 +501,24 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return arm.Id;
+    }
+
+    /// <summary>
+    /// Seeds an OPEN enrolment directly through the DbContext — TASK-0051's admission-approval flow
+    /// does not exist yet to do this through a route, the same accepted technique this file already
+    /// uses for status and registration-number setup.
+    /// </summary>
+    private async Task<Guid> SeedEnrolmentAsync(Guid pupilId, Guid armId, DateOnly effectiveFrom)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var enrolment = Enrolment.Open(Guid.CreateVersion7(), pupilId, armId, effectiveFrom).Value;
+
+        context.Add(enrolment);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return enrolment.Id;
     }
 
     /// <summary>

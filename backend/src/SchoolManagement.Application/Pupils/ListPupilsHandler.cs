@@ -50,20 +50,29 @@ internal sealed class ListPupilsQueryHandler(
                 "pupil.view_forbidden", "You do not hold the privilege required to list pupils."));
         }
 
+        // TASK-0059: an arm-scoped caller sees exactly the pupils whose open enrolment names one of
+        // their granted arms (see PupilAccessGuard's remarks). An empty allowed-arm set (should not
+        // occur in practice — ArmRestricted implies at least one ArmList grant matched — but honest
+        // regardless) is an honest empty page, not a 403: the caller DOES hold the privilege.
+        IReadOnlyCollection<Guid>? allowedArmIds = null;
+
         if (scope == PupilAccessScope.ArmRestricted)
         {
-            // No pupil carries an arm reference until enrolment exists (TASK-0050's own boundary —
-            // see PupilAccessGuard's remarks), so an arm-scoped grant matches no row today. Honest
-            // empty page, not a 403: the caller DOES hold the privilege, just over arms that (today)
-            // contain nothing.
-            return Result.Success(new CursorPage<PupilDto>([], null));
+            var armIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View);
+
+            if (armIds.Count == 0)
+            {
+                return Result.Success(new CursorPage<PupilDto>([], null));
+            }
+
+            allowedArmIds = armIds;
         }
 
         var pageSize = Math.Clamp(request.PageSize ?? CursorPageRequest.DefaultPageSize, 1, CursorPageRequest.MaxPageSize);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         var page = await pupils
-            .ListAsync(request.Status, request.Search, request.Cursor, pageSize, today, cancellationToken)
+            .ListAsync(request.Status, request.Search, request.Cursor, pageSize, today, allowedArmIds, cancellationToken)
             .ConfigureAwait(false);
 
         return Result.Success(page);

@@ -4,6 +4,7 @@ using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Idempotency;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Reference;
@@ -98,6 +99,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <c>Configurations.PupilConfiguration</c>.
     /// </summary>
     internal DbSet<Pupil> Pupils => Set<Pupil>();
+
+    /// <summary>
+    /// TASK-0059. Internal, not public: only this assembly's repositories may query it. Spec 02
+    /// §5.2's arm-of-record relationship — no <c>Pupil</c> or <c>Arm</c> column ever substitutes
+    /// for a query against this set for the open row.
+    /// </summary>
+    internal DbSet<Enrolment> Enrolments => Set<Enrolment>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

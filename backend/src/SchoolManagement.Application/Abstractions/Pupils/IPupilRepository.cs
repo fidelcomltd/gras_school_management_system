@@ -37,6 +37,12 @@ public interface IPupilRepository
     /// <param name="cursor">The opaque <c>nextCursor</c> from a previous page, or <see langword="null"/> for the first page.</param>
     /// <param name="pageSize">Already clamped by the caller.</param>
     /// <param name="asOfDate">"Today", for each row's derived age.</param>
+    /// <param name="allowedArmIds">
+    /// <see langword="null"/> for no restriction (a school-wide caller). Non-null and non-empty
+    /// restricts the result to pupils whose OPEN enrolment (spec 02 §5.2) names one of these arms —
+    /// TASK-0059's real arm-scoped <c>pupil.view</c> (<c>PupilAccessGuard</c>'s remarks). The caller
+    /// never passes an empty, non-null collection — it returns an empty page itself in that case.
+    /// </param>
     /// <param name="cancellationToken">Propagated to the underlying query.</param>
     Task<CursorPage<PupilDto>> ListAsync(
         PupilStatus? status,
@@ -44,6 +50,7 @@ public interface IPupilRepository
         string? cursor,
         int pageSize,
         DateOnly asOfDate,
+        IReadOnlyCollection<Guid>? allowedArmIds,
         CancellationToken cancellationToken);
 
     /// <summary>

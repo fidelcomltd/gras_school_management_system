@@ -11,6 +11,7 @@ namespace SchoolManagement.Application.Pupils;
 internal sealed class GetPupilQueryHandler(
     IPupilRepository pupils,
     IEffectivePrivilegeProvider grantsProvider,
+    IPupilArmOfRecordLookup armOfRecordLookup,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<GetPupilQuery, Result<PupilDto>>
@@ -43,11 +44,18 @@ internal sealed class GetPupilQueryHandler(
 
         if (scope == PupilAccessScope.ArmRestricted)
         {
-            // The pupil has no arm reference at all today (see PupilAccessGuard's remarks), so it is
-            // never within an arm-scoped grant's reach — 403, matching how a resolved-but-out-of-scope
-            // target behaves everywhere else in this codebase (PrivilegeDecision.IsAuthorized).
-            return Result.Failure<PupilDto>(Error.Forbidden(
-                "pupil.view_forbidden", "You do not hold the privilege required to view this pupil."));
+            // TASK-0059: resolve the pupil's REAL arm from their open enrolment (spec 02 §5.2) — a
+            // pupil with none (still Pending, or between enrolments) is unresolvable and an
+            // arm-restricted caller is refused it, the same fail-closed direction
+            // PrivilegeDecision.IsAuthorized takes for ScopeResolution.Unresolvable generally.
+            var armId = await armOfRecordLookup.GetArmIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
+            var allowedArmIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View);
+
+            if (armId is not { } resolvedArmId || !allowedArmIds.Contains(resolvedArmId))
+            {
+                return Result.Failure<PupilDto>(Error.Forbidden(
+                    "pupil.view_forbidden", "You do not hold the privilege required to view this pupil."));
+            }
         }
 
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

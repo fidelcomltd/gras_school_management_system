@@ -48,6 +48,7 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         string? cursor,
         int pageSize,
         DateOnly asOfDate,
+        IReadOnlyCollection<Guid>? allowedArmIds,
         CancellationToken cancellationToken)
     {
         var hasCursor = PupilListCursor.TryDecode(cursor, out var cursorSurnameKey, out var cursorId);
@@ -83,6 +84,16 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
             query = query.Where(pupil =>
                 string.Compare(pupil.Surname.ToLower(), cursorSurnameKey, StringComparison.Ordinal) > 0 ||
                 (EF.Functions.ILike(pupil.Surname, cursorSurnameKey) && pupil.Id.CompareTo(cursorId) > 0));
+        }
+
+        // TASK-0059: arm-scoped pupil.view restricts to pupils whose OPEN enrolment names one of the
+        // caller's granted arms (spec 02 §5.2 — never a pupil.arm_id shortcut). allowedArmIds is
+        // null for an unrestricted (school-wide) caller; ListPupilsQueryHandler never passes an
+        // empty, non-null collection, so no additional guard is needed here.
+        if (allowedArmIds is { Count: > 0 } arms)
+        {
+            query = query.Where(pupil => context.Enrolments.Any(enrolment =>
+                enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null && arms.Contains(enrolment.ArmId)));
         }
 
         // Take one extra row to learn whether a further page exists, without a second COUNT query.
