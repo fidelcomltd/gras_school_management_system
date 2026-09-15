@@ -115,6 +115,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// </summary>
     internal DbSet<AdmissionRecord> AdmissionRecords => Set<AdmissionRecord>();
 
+    /// <summary>
+    /// TASK-0063. Internal, not public: only this assembly's repositories may query it. Every
+    /// superseded registration number, appended by a correction and never updated or deleted (spec
+    /// 6.5.10) — see <c>Configurations.PupilRegNumberHistoryConfiguration</c>.
+    /// </summary>
+    internal DbSet<PupilRegNumberHistory> PupilRegNumberHistory => Set<PupilRegNumberHistory>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -35,6 +35,7 @@ public sealed class PupilEndpoints : IEndpointModule
         MapFindDuplicates(group);
         MapGet(group);
         MapUpdate(group);
+        MapCorrectRegistrationNumber(group);
     }
 
     private static void MapCreate(RouteGroupBuilder group) =>
@@ -170,6 +171,44 @@ public sealed class PupilEndpoints : IEndpointModule
                 "unchanged, an empty string clears an optional one. `pupil.update` is arm-scoped for " +
                 "a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot " +
                 "reach any pupil yet.")
+            .Produces<PupilDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapCorrectRegistrationNumber(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/registration-number", async (
+                Guid id,
+                CorrectRegistrationNumberCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.RegNumberCorrect)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("CorrectPupilRegistrationNumber")
+            .WithSummary("Correct a wrongly issued registration number")
+            .WithDescription(
+                "Spec 6.5.10, \"Immutability and correction\". Super Admin only " +
+                "(`pupil.regnumber.correct` is excluded from every other seeded role). The " +
+                "administrator TYPES the replacement number in full — nothing here composes one " +
+                "from settings, unlike admission approval's issuance. The new number must be " +
+                "unique against both the live `registrationNumber` column and every historical " +
+                "alias ever recorded (409 on either collision). The counter is NOT touched — a " +
+                "correction consumes no serial. The old number is written to a permanent history " +
+                "row with the reason, the actor and the timestamp, and is never deleted: a parent " +
+                "holding a pin slip printed with the old number still reaches this pupil (the " +
+                "portal lookup that reads it is a later card). Already-published result snapshots " +
+                "are not rewritten. `Idempotency-Key` is REQUIRED — a retry must not append a " +
+                "second, redundant history row. 404 when `id` names no pupil. 409 when this pupil " +
+                "has no registration number yet (still pending — approve the admission first).")
             .Produces<PupilDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

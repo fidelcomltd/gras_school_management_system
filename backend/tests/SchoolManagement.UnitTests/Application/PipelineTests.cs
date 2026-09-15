@@ -104,6 +104,10 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IEnrolmentRepository>());
         services.AddSingleton(Substitute.For<IPersistenceErrorTranslator>());
 
+        // TASK-0063: CorrectRegistrationNumberHandler depends on this port, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IPupilRegNumberHistoryRepository>());
+
         // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IAuditEventQueryRepository>());

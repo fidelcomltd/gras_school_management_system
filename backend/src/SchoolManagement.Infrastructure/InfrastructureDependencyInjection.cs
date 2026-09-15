@@ -197,6 +197,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0062: admission_record — sections A, I and J of the admission form (spec 6.5.9).
         services.AddScoped<IAdmissionRecordRepository, AdmissionRecordRepository>();
 
+        // TASK-0063: the permanent registration-number history alias (spec 6.5.10).
+        services.AddScoped<IPupilRegNumberHistoryRepository, PupilRegNumberHistoryRepository>();
+
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
         // routing traffic here instead of restarting a container that is working fine.

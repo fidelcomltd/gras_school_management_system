@@ -50,4 +50,23 @@ public sealed class RegNumberFormatTests
     {
         RegNumberFormat.DigitCount(serial).ShouldBe(expected);
     }
+
+    // TASK-0063: the correction path's shape check on a TYPED number (spec 6.5.10) — never the
+    // composer above, which needs saved settings this validator does not.
+    [Theory]
+    [InlineData("GRAS/2026/0041", true)]
+    [InlineData("GRAS-2026-0041", true)]
+    [InlineData("GRAS.2026.0041", true)]
+    [InlineData("ABC/2026/1", true)]
+    [InlineData("", false)]
+    [InlineData(" ", false)]
+    [InlineData("GRAS20260041", false)]
+    [InlineData("GRAS/26/0041", false)]
+    [InlineData("GRAS/2026/", false)]
+    [InlineData("/2026/0041", false)]
+    [InlineData("GRAS/2026/0041a", false)]
+    public void IsWellFormed_MatchesTheGeneralAbbreviationSeparatorYearSeparatorSerialShape(string candidate, bool expected)
+    {
+        RegNumberFormat.IsWellFormed(candidate).ShouldBe(expected);
+    }
 }

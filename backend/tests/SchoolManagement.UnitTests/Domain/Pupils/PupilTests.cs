@@ -267,6 +267,31 @@ public sealed class PupilTests
     }
 
     [Fact]
+    public void CorrectRegistrationNumber_OnAPupilHoldingANumber_OverwritesIt()
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+        pupil.IssueRegistrationNumber("GRAS/2025/0041");
+
+        var result = pupil.CorrectRegistrationNumber("GRAS/2026/0041");
+
+        result.IsSuccess.ShouldBeTrue();
+        pupil.RegistrationNumber.ShouldBe("GRAS/2026/0041");
+    }
+
+    [Fact]
+    public void CorrectRegistrationNumber_OnAPendingPupilWithNoNumberYet_Fails()
+    {
+        var pupil = CreateValid().Value;
+
+        var result = pupil.CorrectRegistrationNumber("GRAS/2026/0041");
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("pupil.registration_number_not_issued");
+        pupil.RegistrationNumber.ShouldBeNull();
+    }
+
+    [Fact]
     public void DeclineAdmission_OnAPendingPupil_TransitionsToWithdrawnAndIssuesNoNumber()
     {
         var pupil = CreateValid().Value;

@@ -252,6 +252,23 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
             .CountAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public Task<bool> ExistsByRegistrationNumberAsync(
+        string registrationNumber, Guid excludingPupilId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(registrationNumber);
+
+        // IgnoreQueryFilters: status-agnostic, matching CountByRegistrationNumberPrefixAsync's own
+        // reasoning — a transferred, withdrawn or graduated pupil still holds their number and must
+        // still block a collision.
+        return context.Pupils
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .AnyAsync(
+                pupil => pupil.Id != excludingPupilId && pupil.RegistrationNumber == registrationNumber,
+                cancellationToken);
+    }
+
     private static CursorPage<PupilDto> ToPage(List<Pupil> rows, int pageSize, string? searchTerm, DateOnly asOfDate)
     {
         var hasNextPage = rows.Count > pageSize;

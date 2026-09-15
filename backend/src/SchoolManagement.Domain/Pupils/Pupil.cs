@@ -476,6 +476,31 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
+    /// Overwrites an already-issued number (spec 6.5.10, "Immutability and correction") — TASK-0063,
+    /// the ONE other caller of a setter on <see cref="RegistrationNumber"/> besides <see
+    /// cref="IssueRegistrationNumber"/>. Guarded, unlike that method: a pending pupil has never had a
+    /// number issued, so there is nothing here for a correction to replace. The caller
+    /// (<c>CorrectRegistrationNumberHandler</c>) reads <see cref="RegistrationNumber"/> BEFORE calling
+    /// this, to capture the old value for the permanent history row — this method does not return it,
+    /// since a <see cref="Result"/> carries only a domain entity's own outcome, never a DTO-shaped
+    /// payload (see this type's own remarks on <see cref="Result{TValue}"/>'s intended use elsewhere).
+    /// </summary>
+    public Result CorrectRegistrationNumber(string newRegistrationNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newRegistrationNumber);
+
+        if (RegistrationNumber is null)
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.registration_number_not_issued",
+                "This pupil has no registration number to correct yet — approve the admission first."));
+        }
+
+        RegistrationNumber = newRegistrationNumber;
+        return Result.Success();
+    }
+
+    /// <summary>
     /// Declines a pending admission (spec 6.5.14: pending -> withdrawn). Guarded: fails if the pupil
     /// is not currently pending. Issues no registration number and leaves the counter untouched —
     /// this method never touches <see cref="RegistrationNumber"/> at all.

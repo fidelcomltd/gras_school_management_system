@@ -4815,6 +4815,183 @@
         }
       }
     },
+    "/api/v1/pupils/{id}/registration-number": {
+      "post": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Correct a wrongly issued registration number",
+        "description": "Spec 6.5.10, \"Immutability and correction\". Super Admin only (`pupil.regnumber.correct` is excluded from every other seeded role). The administrator TYPES the replacement number in full — nothing here composes one from settings, unlike admission approval's issuance. The new number must be unique against both the live `registrationNumber` column and every historical alias ever recorded (409 on either collision). The counter is NOT touched — a correction consumes no serial. The old number is written to a permanent history row with the reason, the actor and the timestamp, and is never deleted: a parent holding a pin slip printed with the old number still reaches this pupil (the portal lookup that reads it is a later card). Already-published result snapshots are not rewritten. `Idempotency-Key` is REQUIRED — a retry must not append a second, redundant history row. 404 when `id` names no pupil. 409 when this pupil has no registration number yet (still pending — approve the admission first).",
+        "operationId": "CorrectPupilRegistrationNumber",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectRegistrationNumberCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reference/ping": {
       "get": {
         "tags": [
@@ -9061,6 +9238,39 @@
           "changedGroup": "Identity",
           "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "CorrectRegistrationNumberCommand": {
+        "required": [
+          "id",
+          "registrationNumber",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The pupil whose number is being corrected. Supplied from the route, not the body.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "The new number, typed in full. Must be well-formed and unique against both the live table and the history table.",
+            "example": "GRAS/2026/0041"
+          },
+          "reason": {
+            "type": "string",
+            "description": "At least ten characters (spec 6.5.10). Written to the history row and to the audit event.",
+            "example": "Wrong admission year was entered at approval; corrected to 2026."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/pupils/{id}/registration-number` (spec 6.5.10, \"Immutability and\n        correction\"). `pupil.regnumber.correct`, Super Admin only — the privilege is excluded from\n        every seeded non-Super-Admin role (`SeededRoles.cs`). Unlike admission approval's issuance,\n        NOTHING here is generated: the administrator types the whole replacement number, because a\n        correction is usually fixing a wrong admission year and the corrected serial should be chosen\n        deliberately, never composed from settings.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "registrationNumber": "GRAS/2026/0041",
+          "reason": "Wrong admission year was entered at approval; corrected to 2026."
         }
       },
       "CreateAdminAccountCommand": {

@@ -1069,6 +1069,14 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(CorrectRegistrationNumberCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "registrationNumber": "GRAS/2026/0041",
+              "reason": "Wrong admission year was entered at approval; corrected to 2026."
+            }
+            """,
+
         [typeof(AuditEventDto)] = $$"""
             {
               "id": "48213",

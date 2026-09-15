@@ -98,4 +98,18 @@ public interface IPupilRepository
     /// <param name="abbreviationPrefix">The abbreviation to match at the start of the string, verbatim (case-sensitive).</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<int> CountByRegistrationNumberPrefixAsync(string abbreviationPrefix, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether ANY pupil other than <paramref name="excludingPupilId"/> currently holds
+    /// <paramref name="registrationNumber"/> as their live <c>registration_number</c> — half of
+    /// TASK-0063's two-table uniqueness check (spec 6.5.10 correction: "must be unique against both
+    /// <c>pupil.registration_number</c> and <c>pupil_reg_number_history</c>"). <paramref
+    /// name="excludingPupilId"/> is the pupil being corrected: resubmitting that pupil's OWN current
+    /// number would otherwise spuriously collide with itself, the same "exclude self" shape
+    /// <c>IArmRepository.LabelExistsAsync</c> already uses for its own update-time uniqueness check.
+    /// Status-agnostic, like <see cref="CountByRegistrationNumberPrefixAsync"/> — a transferred,
+    /// withdrawn or graduated pupil still holds their number and still blocks a collision.
+    /// </summary>
+    Task<bool> ExistsByRegistrationNumberAsync(
+        string registrationNumber, Guid excludingPupilId, CancellationToken cancellationToken);
 }
