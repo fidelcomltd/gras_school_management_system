@@ -104,19 +104,22 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `37f8b4c2d19db1af9c5adc0be1f002840cb667416e9072dc4aa74fc6818a2b53`** · **50 paths** ·
-**92 schemas** · api version `v1` · moved 2026-09-15 by TASK-0066 (additive: `GET /admissions/{id}` — one method added to an
-already-existing path, so the path and schema counts are unchanged). TASK-0051 moved it earlier the
-same day, adding the two approve/decline paths.
+**Current: `b293db2bc2b4fd86044cf2ec727051ab911920b71c4361e8d9dc6d0d379d8202`** · **51 paths** ·
+**93 schemas** · api version `v1` · moved 2026-09-15 by TASK-0063 (additive: `POST /pupils/{id}/registration-number`
+is new — one path, and one schema for its request command only, since the 200 reuses the existing
+`PupilDto`). TASK-0066 moved it earlier the same day to `37f8b4c2d19d…`, and TASK-0051 before that.
 
 **Corrected 2026-09-15:** this block still named TASK-0055's `7a3c84e6…` / 47 paths / 86 schemas
 even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing TASK-0062 updated
 the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-15.
-- Frontend client is **CURRENT** against this hash — TASK-0064 regenerated it and
-  `npm run check:api-drift` is GREEN. All four admission operations (queue, read, approve,
-  decline) are in `src/api/schema.d.ts` and consumed by the `/admissions` screen.
+- Frontend client is **STALE** against this hash as of 2026-09-15 — TASK-0063 shipped the new
+  correction path backend-only, so `src/api/schema.d.ts` predates it and `npm run check:api-drift`
+  is RED until a regeneration card lands. This is the established backend-first pattern (TASK-0062
+  shipped the same way, TASK-0064 caught it up), not an accident. **The next `frontend-dev`
+  dispatch of any kind regenerates the client before doing anything else.** The client IS current
+  for all four admission operations, which TASK-0064 wired to the `/admissions` screen.
 - The additive classification was verified MECHANICALLY (every existing schema's `required` array
   and every property type diffed against HEAD), not read off the card — see `decisions/2026-Q3.md`.
 - `/health/*` is excluded from the document (`ASSUMPTIONS.md` section 2.9); `/reference/*` is
@@ -127,7 +130,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0062, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0062, 0063, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -143,20 +146,24 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **queued 2026-09-15** — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
+| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **queued 2026-09-15, NEXT after TASK-0063** (same owner and surface; 0063 moves the contract, so no parallel dispatch) — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
-| TASK-0063 | Registration-number correction and the history alias | backend-dev | **queued 2026-09-15 — UNBLOCKED by TASK-0051** (closed same day). Written in full. Split out of 0051 at its write-up |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-15 **TASK-0063 closed.** Reg-number correction + the permanent history alias; 1035 tests,
+  Skipped 0, one Neon TLS drop re-run green in 13s against 12m51s. **A filtered `dotnet test` SKIPPED
+  silently and still exited 0 — only `ci.ps1` enforces `Skipped > 0`. Read counts, never exit codes.**
+  Contract `37f8b4c2d19d…` → `b293db2bc2b4…`. → `decisions/2026-Q3.md`
 
 - 2026-09-15 TASK-0064 and TASK-0066 closed on a 10/10 gate. The admissions queue,
   approve and decline screens shipped; `frontend-dev` refused to guess two missing opaque ids and
@@ -346,6 +353,21 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-15 **A correction whose new number equals the pupil's CURRENT number is not rejected**, and
+  poisons that pupil's next correction into a `23505` instead of a clean 409. *Trigger: the next card
+  touching `POST /pupils/{id}/registration-number`, or the portal card. Owner: `backend-dev`, after a
+  human ruling on reject-vs-no-op.*
+- 2026-09-15 **TASK-0051's ISSUANCE path does not check `pupil_reg_number_history`** — the two-table
+  uniqueness rule is enforced on correction only, so a freshly issued number could duplicate a retired
+  alias and make the portal lookup ambiguous. *Trigger: the portal redemption card, or any card changing
+  reg-number composition or counter-reset settings. Owner: `backend-dev`.*
+- 2026-09-15 **`src/api/schema.d.ts` is STALE against `b293db2bc2b4…` and `check:api-drift` is RED** —
+  TASK-0063 shipped backend-only and no frontend card exists for the correction screen. *Trigger: the
+  next `frontend-dev` dispatch of any kind, before anything else. Owner: `frontend-dev`.*
+- 2026-09-15 **Published result snapshots do not exist, so TASK-0063's AC 6 is VACUOUS, not proven** —
+  no results module, only the `IResultSetArmLookup` seam. Verified by the orchestrator, nothing invented.
+  *Trigger: the results-module card that first persists a published snapshot, which must carry the test.
+  Owner: `backend-dev`.*
 - 2026-09-15 **The admissions queue's `missing` column cannot see steps 3 to 8** — contacts, health,
   barred/pickup persons and documents have no entity, so an empty `missing` does NOT mean "ready to
   approve". *Trigger: each step 3-to-8 entity card, and TASK-0051. Owner: `backend-dev`.*
