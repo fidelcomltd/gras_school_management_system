@@ -1,3 +1,4 @@
+using SchoolManagement.Application.Admissions;
 using SchoolManagement.Domain.Pupils;
 
 namespace SchoolManagement.Application.Pupils;
@@ -31,6 +32,26 @@ namespace SchoolManagement.Application.Pupils;
 /// </param>
 /// <param name="CreatedAtUtc">System.</param>
 /// <param name="CreatedBy">The admin account id that created the record, or <see langword="null"/>.</param>
+/// <param name="Admission">
+/// Sections A, I and J of the admission form (spec 6.5.9, TASK-0062). Populated only by
+/// <c>CreatePupilHandler</c>'s own response today — <see langword="null"/> on every other read path
+/// in this card (list, single-get, duplicates), which do not load the admission record.
+/// </param>
+/// <param name="LevelAppliedFor">
+/// The admission record's <c>class_admitted_into</c> display name. Populated ONLY by the admissions
+/// queue (TASK-0062; spec 6.5.15's queue column) — <see langword="null"/> everywhere else.
+/// </param>
+/// <param name="DateApplicationReceived">
+/// The admission record's own field, lifted onto the row for the admissions queue (TASK-0062; spec
+/// 6.5.15). Populated ONLY by the admissions queue — <see langword="null"/> everywhere else.
+/// </param>
+/// <param name="Missing">
+/// The admissions queue's own "what is missing" column (TASK-0062; spec 6.5.11 step 9, 6.5.15).
+/// Restricted to what sections A and I's stored fields can check today: steps 2 to 8 (contacts,
+/// health, barred persons, pickup persons, documents) have no entity yet, so a gap there can never
+/// appear here — a known, recorded limitation, not a claim of completeness. Populated ONLY by the
+/// admissions queue — <see langword="null"/> everywhere else.
+/// </param>
 public sealed record PupilDto(
     string Id,
     string? RegistrationNumber,
@@ -50,4 +71,8 @@ public sealed record PupilDto(
     string? OtherInformation,
     string? MatchedField,
     DateTimeOffset CreatedAtUtc,
-    string? CreatedBy);
+    string? CreatedBy,
+    AdmissionRecordDto? Admission = null,
+    string? LevelAppliedFor = null,
+    DateOnly? DateApplicationReceived = null,
+    IReadOnlyList<string>? Missing = null);

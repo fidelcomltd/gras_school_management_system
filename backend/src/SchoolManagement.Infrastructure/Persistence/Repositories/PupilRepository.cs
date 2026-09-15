@@ -135,7 +135,80 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return ToPage(rows, pageSize, searchTerm: null, asOfDate);
+        var hasNextPage = rows.Count > pageSize;
+        var page = hasNextPage ? rows.GetRange(0, pageSize) : rows;
+        var pupilIds = page.ConvertAll(pupil => pupil.Id);
+
+        // TASK-0062: the queue's own columns (spec 6.5.15) — levelAppliedFor, dateApplicationReceived
+        // and missing — read the admission record, one small extra query rather than a join, since
+        // this page is at most pageSize + 1 rows.
+        var admissionsByPupilId = await context.AdmissionRecords
+            .AsNoTracking()
+            .Where(record => pupilIds.Contains(record.PupilId))
+            .Select(record => new
+            {
+                record.PupilId,
+                record.ClassAdmittedInto,
+                record.DateApplicationReceived,
+                record.AssessmentRequired,
+                record.AssessmentResultRemarks,
+                record.DeclarationSigned,
+            })
+            .ToDictionaryAsync(record => record.PupilId, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Spec 6.4.2: "The session list is short and always will be" holds for levels too (nine seeded
+        // rows, a school adds a handful more) — the whole set is cheaper to load once than to look up
+        // per row, the same choice IClassLevelRepository's own remarks make for its callers.
+        var levelNamesById = await context.ClassLevels
+            .AsNoTracking()
+            .Select(level => new { level.Id, level.Name })
+            .ToDictionaryAsync(level => level.Id, level => level.Name, cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = page.ConvertAll(pupil =>
+        {
+            string? levelAppliedFor = null;
+            DateOnly? dateApplicationReceived = null;
+            List<string>? missing = null;
+
+            if (admissionsByPupilId.TryGetValue(pupil.Id, out var admission))
+            {
+                levelNamesById.TryGetValue(admission.ClassAdmittedInto, out levelAppliedFor);
+                dateApplicationReceived = admission.DateApplicationReceived;
+
+                missing = [];
+
+                // Restricted to what sections A and I's stored fields can check (TASK-0062's own
+                // recorded gap) — steps 2 to 8 have no entity yet, so nothing below can ever name them.
+                if (admission.AssessmentRequired && string.IsNullOrWhiteSpace(admission.AssessmentResultRemarks))
+                {
+                    missing.Add("Assessment result (Section A)");
+                }
+
+                if (!admission.DeclarationSigned)
+                {
+                    missing.Add("Declaration (Section I)");
+                }
+            }
+
+            return PupilMapper.ToDto(
+                pupil,
+                asOfDate,
+                levelAppliedFor: levelAppliedFor,
+                dateApplicationReceived: dateApplicationReceived,
+                missing: missing);
+        });
+
+        string? nextCursor = null;
+
+        if (hasNextPage)
+        {
+            var last = page[^1];
+            nextCursor = PupilListCursor.Encode(last.Surname.ToLowerInvariant(), last.Id);
+        }
+
+        return new CursorPage<PupilDto>(items, nextCursor);
     }
 
     /// <inheritdoc />

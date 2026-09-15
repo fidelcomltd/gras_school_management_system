@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Classes;
@@ -106,6 +107,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// for a query against this set for the open row.
     /// </summary>
     internal DbSet<Enrolment> Enrolments => Set<Enrolment>();
+
+    /// <summary>
+    /// TASK-0062. Internal, not public: only this assembly's repositories may query it. Sections A, I
+    /// and J of the admission form (spec 6.5.9) — one row per <see cref="Pupil"/>, created in the same
+    /// transaction as the pupil.
+    /// </summary>
+    internal DbSet<AdmissionRecord> AdmissionRecords => Set<AdmissionRecord>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

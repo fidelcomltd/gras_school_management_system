@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
+using SchoolManagement.Application.Admissions;
 using SchoolManagement.Application.Audit;
 using SchoolManagement.Application.Auth;
 using SchoolManagement.Application.Auth.AdminAccounts;
@@ -894,7 +895,58 @@ internal static class OpenApiExamples
               "homeAddress": "14 Zik Avenue, Awka",
               "previousSchool": null,
               "previousClass": null,
-              "otherInformation": null
+              "otherInformation": null,
+              "admission": {
+                "sessionId": null,
+                "dateApplicationReceived": "2026-08-01",
+                "dateAdmitted": null,
+                "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+                "admissionType": "New",
+                "admissionTypeNote": null,
+                "assessmentRequired": false
+              }
+            }
+            """,
+
+        [typeof(AdmissionRecordDto)] = """
+            {
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "dateApplicationReceived": "2026-08-01",
+              "dateAdmitted": "2026-09-08",
+              "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+              "classAdmittedIntoName": "Primary 2",
+              "admissionType": "New",
+              "admissionTypeNote": null,
+              "assessmentRequired": false,
+              "assessmentResultRemarks": null,
+              "assignedClassTeacher": null,
+              "declarationName": "Chinwe Okafor",
+              "declarationSigned": true,
+              "declarationDate": "2026-09-08",
+              "approvedBy": null,
+              "approvedAt": null,
+              "headOfSchoolConfirmed": false,
+              "headOfSchoolName": null
+            }
+            """,
+
+        [typeof(UpdateAdmissionRecordCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "sessionId": null,
+              "dateApplicationReceived": null,
+              "dateAdmitted": null,
+              "classAdmittedInto": null,
+              "admissionType": null,
+              "admissionTypeNote": null,
+              "assessmentRequired": null,
+              "assessmentResultRemarks": null,
+              "assignedClassTeacher": null,
+              "declarationName": "Chinwe Okafor",
+              "declarationSigned": true,
+              "declarationDate": "2026-09-08",
+              "headOfSchoolConfirmed": null,
+              "headOfSchoolName": null
             }
             """,
 
@@ -918,7 +970,31 @@ internal static class OpenApiExamples
               "otherInformation": null,
               "matchedField": null,
               "createdAtUtc": "2026-08-03T09:30:00+00:00",
-              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "admission": {
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "dateApplicationReceived": "2026-08-01",
+                "dateAdmitted": "2026-09-08",
+                "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+                "classAdmittedIntoName": "Primary 2",
+                "admissionType": "New",
+                "admissionTypeNote": null,
+                "assessmentRequired": false,
+                "assessmentResultRemarks": null,
+                "assignedClassTeacher": null,
+                "declarationName": "Chinwe Okafor",
+                "declarationSigned": true,
+                "declarationDate": "2026-09-08",
+                "approvedBy": null,
+                "approvedAt": null,
+                "headOfSchoolConfirmed": false,
+                "headOfSchoolName": null
+              },
+              "levelAppliedFor": "Primary 2",
+              "dateApplicationReceived": "2026-08-01",
+              "missing": [
+                "Declaration (Section I)"
+              ]
             }
             """,
 
@@ -944,7 +1020,13 @@ internal static class OpenApiExamples
                   "otherInformation": null,
                   "matchedField": null,
                   "createdAtUtc": "2026-08-03T09:30:00+00:00",
-                  "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+                  "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                  "admission": null,
+                  "levelAppliedFor": "Primary 2",
+                  "dateApplicationReceived": "2026-08-01",
+                  "missing": [
+                    "Declaration (Section I)"
+                  ]
                 }
               ],
               "nextCursor": null

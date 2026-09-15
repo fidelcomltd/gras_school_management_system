@@ -903,7 +903,7 @@
           "Admissions"
         ],
         "summary": "List the admissions queue",
-        "description": "Spec 6.5.14: \"A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else.\" This IS that queue — every pending pupil, unconditionally. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.",
+        "description": "Spec 6.5.14: \"A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else.\" This IS that queue — every pending pupil, unconditionally. Each row additionally carries `levelAppliedFor`, `dateApplicationReceived` and `missing` (TASK-0062; spec 6.5.15) — `missing` covers only what sections A and I's stored fields can check today (the assessment result and the declaration): steps 2 to 8 have no entity yet, so a gap there never appears. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.",
         "operationId": "ListAdmissionsQueue",
         "parameters": [
           {
@@ -969,6 +969,164 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admissions/{id}": {
+      "patch": {
+        "tags": [
+          "Admissions"
+        ],
+        "summary": "Edit an admission record's sections A, I and J",
+        "description": "Spec 6.5.9, 6.5.11: `id` is the PUPIL id, the same one `POST /pupils` returned and the admissions queue lists rows by. Steps 2 to 8's own screens are a later card — this endpoint only ever touches sections A, I and J. A HALF-FINISHED STEP STILL SAVES: every field is independently optional, absent fields are left unchanged, and an empty string clears an optional string field. `assessmentResultRemarks` is NOT required to save even when `assessmentRequired` is true — only admission APPROVAL (a later card) enforces that. 404 when `id` does not name a PENDING pupil (approved, declined or unknown pupils are not reachable through this route). Issues no registration number and approves nothing — `pupil.update`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped grant cannot reach a pending record).",
+        "operationId": "UpdateAdmissionRecord",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdmissionRecordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionRecordDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7646,6 +7804,172 @@
           "createdAtUtc": "2026-08-03T09:30:00+00:00"
         }
       },
+      "AdmissionRecordDto": {
+        "required": [
+          "sessionId",
+          "dateApplicationReceived",
+          "dateAdmitted",
+          "classAdmittedInto",
+          "classAdmittedIntoName",
+          "admissionType",
+          "admissionTypeNote",
+          "assessmentRequired",
+          "assessmentResultRemarks",
+          "assignedClassTeacher",
+          "declarationName",
+          "declarationSigned",
+          "declarationDate",
+          "approvedBy",
+          "approvedAt",
+          "headOfSchoolConfirmed",
+          "headOfSchoolName"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Opaque to the client. The session admitted into.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41"
+          },
+          "dateApplicationReceived": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied.",
+            "format": "date",
+            "example": "2026-08-01"
+          },
+          "dateAdmitted": {
+            "type": "string",
+            "description": "Not in the future. The registration number's year comes from this (spec 6.5.10).",
+            "format": "date",
+            "example": "2026-09-08"
+          },
+          "classAdmittedInto": {
+            "type": "string",
+            "description": "Opaque to the client. A class level id.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30"
+          },
+          "classAdmittedIntoName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The level's display name, for a client that has no other lookup handy.",
+            "example": "Primary 2"
+          },
+          "admissionType": {
+            "description": "New or returning.",
+            "$ref": "#/components/schemas/AdmissionType"
+          },
+          "admissionTypeNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied."
+          },
+          "assessmentRequired": {
+            "type": "boolean",
+            "description": "Whether an entrance assessment is required.",
+            "example": false
+          },
+          "assessmentResultRemarks": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not yet recorded — NOT required to save (spec 6.5.9)."
+          },
+          "assignedClassTeacher": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque admin-account id, or `null`. Informational only at this stage."
+          },
+          "declarationName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not yet supplied.",
+            "example": "Chinwe Okafor"
+          },
+          "declarationSigned": {
+            "type": "boolean",
+            "description": "Section I: whether the signed paper form exists.",
+            "example": true
+          },
+          "declarationDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` unless DeclarationSigned is `true`.",
+            "format": "date",
+            "example": "2026-09-08"
+          },
+          "approvedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque admin-account id. Written only by admission approval (TASK-0051) — always `null` today."
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Written only by admission approval (TASK-0051) — always `null` today.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "headOfSchoolConfirmed": {
+            "type": "boolean",
+            "description": "Section J's second signature block. Defaults `false`.",
+            "example": false
+          },
+          "headOfSchoolName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Sections A, I and J of the admission form (spec 6.5.9) — nested inside `PupilDto.Admission`\non `POST /pupils`'s response, and returned directly by `PATCH /admissions/{id}`.",
+        "example": {
+          "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+          "dateApplicationReceived": "2026-08-01",
+          "dateAdmitted": "2026-09-08",
+          "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+          "classAdmittedIntoName": "Primary 2",
+          "admissionType": "New",
+          "admissionTypeNote": null,
+          "assessmentRequired": false,
+          "assessmentResultRemarks": null,
+          "assignedClassTeacher": null,
+          "declarationName": "Chinwe Okafor",
+          "declarationSigned": true,
+          "declarationDate": "2026-09-08",
+          "approvedBy": null,
+          "approvedAt": null,
+          "headOfSchoolConfirmed": false,
+          "headOfSchoolName": null
+        }
+      },
+      "AdmissionType": {
+        "enum": [
+          "New",
+          "Returning"
+        ],
+        "description": "An AdmissionRecord's section A \"New / Returning\" tick (spec 6.5.9).",
+        "example": "New"
+      },
       "ArmDto": {
         "required": [
           "id",
@@ -8383,6 +8707,73 @@
           "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
+      "CreateAdmissionInput": {
+        "required": [
+          "sessionId",
+          "dateApplicationReceived",
+          "dateAdmitted",
+          "classAdmittedInto",
+          "admissionType",
+          "admissionTypeNote",
+          "assessmentRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque id. `null` defaults to the active session."
+          },
+          "dateApplicationReceived": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional; not in the future.",
+            "format": "date"
+          },
+          "dateAdmitted": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` defaults to today; not in the future.",
+            "format": "date"
+          },
+          "classAdmittedInto": {
+            "type": "string",
+            "description": "Opaque id. Must reference an existing, active class level."
+          },
+          "admissionType": {
+            "description": "New or returning.",
+            "$ref": "#/components/schemas/AdmissionType"
+          },
+          "admissionTypeNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional."
+          },
+          "assessmentRequired": {
+            "type": "boolean",
+            "description": "Explicit yes or no."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Section A of the admission form, as captured at pupil creation (spec 6.5.9). Sections I and J are\nfilled in later, through `PATCH /admissions/{id}` (TASK-0062).",
+        "example": {
+          "sessionId": null,
+          "dateApplicationReceived": "2026-08-01",
+          "dateAdmitted": null,
+          "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+          "admissionType": "New",
+          "admissionTypeNote": null,
+          "assessmentRequired": false
+        }
+      },
       "CreateArmCommand": {
         "required": [
           "classLevelId",
@@ -8507,7 +8898,8 @@
           "homeAddress",
           "previousSchool",
           "previousClass",
-          "otherInformation"
+          "otherInformation",
+          "admission"
         ],
         "type": "object",
         "properties": {
@@ -8582,10 +8974,14 @@
               "string"
             ],
             "description": "Optional, section G free text."
+          },
+          "admission": {
+            "description": "Section A. Required — every pupil gets an admission record at creation.",
+            "$ref": "#/components/schemas/CreateAdmissionInput"
           }
         },
         "additionalProperties": false,
-        "description": "`POST /api/v1/pupils` (spec 6.5.4). Always creates a PupilStatus.Pending\n        record with a `null` registration number — see the task card's own goal: \"Nothing\n        can reach active yet.\"",
+        "description": "`POST /api/v1/pupils` (spec 6.5.4, 6.5.9). Always creates a PupilStatus.Pending\n        record with a `null` registration number — see the task card's own goal: \"Nothing\n        can reach active yet.\" Admission is section A of the paper form, saved as the\n        pupil's `admission_record` row in the SAME transaction (TASK-0062) — a pupil with no\n        admission record is a state this handler cannot produce.",
         "example": {
           "surname": "Okafor",
           "firstName": "Chidera",
@@ -8598,7 +8994,16 @@
           "homeAddress": "14 Zik Avenue, Awka",
           "previousSchool": null,
           "previousClass": null,
-          "otherInformation": null
+          "otherInformation": null,
+          "admission": {
+            "sessionId": null,
+            "dateApplicationReceived": "2026-08-01",
+            "dateAdmitted": null,
+            "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+            "admissionType": "New",
+            "admissionTypeNote": null,
+            "assessmentRequired": false
+          }
         }
       },
       "CreateRoleAssignmentCommand": {
@@ -9190,7 +9595,13 @@
                 "otherInformation": null,
                 "matchedField": null,
                 "createdAtUtc": "2026-08-03T09:30:00+00:00",
-                "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+                "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                "admission": null,
+                "levelAppliedFor": "Primary 2",
+                "dateApplicationReceived": "2026-08-01",
+                "missing": [
+                  "Declaration (Section I)"
+                ]
               }
             ]
           },
@@ -9225,7 +9636,13 @@
               "otherInformation": null,
               "matchedField": null,
               "createdAtUtc": "2026-08-03T09:30:00+00:00",
-              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "admission": null,
+              "levelAppliedFor": "Primary 2",
+              "dateApplicationReceived": "2026-08-01",
+              "missing": [
+                "Declaration (Section I)"
+              ]
             }
           ],
           "nextCursor": null
@@ -10048,6 +10465,47 @@
             ],
             "description": "The admin account id that created the record, or `null`.",
             "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          },
+          "admission": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Sections A, I and J of the admission form (spec 6.5.9, TASK-0062). Populated only by\n`CreatePupilHandler`'s own response today — `null` on every other read path\nin this card (list, single-get, duplicates), which do not load the admission record.",
+                "$ref": "#/components/schemas/AdmissionRecordDto"
+              }
+            ]
+          },
+          "levelAppliedFor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The admission record's `class_admitted_into` display name. Populated ONLY by the admissions\nqueue (TASK-0062; spec 6.5.15's queue column) — `null` everywhere else.",
+            "example": "Primary 2"
+          },
+          "dateApplicationReceived": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The admission record's own field, lifted onto the row for the admissions queue (TASK-0062; spec\n6.5.15). Populated ONLY by the admissions queue — `null` everywhere else.",
+            "format": "date",
+            "example": "2026-08-01"
+          },
+          "missing": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The admissions queue's own \"what is missing\" column (TASK-0062; spec 6.5.11 step 9, 6.5.15).\nRestricted to what sections A and I's stored fields can check today: steps 2 to 8 (contacts,\nhealth, barred persons, pickup persons, documents) have no entity yet, so a gap there can never\nappear here — a known, recorded limitation, not a claim of completeness. Populated ONLY by the\nadmissions queue — `null` everywhere else.",
+            "example": [
+              "Declaration (Section I)"
+            ]
           }
         },
         "additionalProperties": false,
@@ -10071,7 +10529,31 @@
           "otherInformation": null,
           "matchedField": null,
           "createdAtUtc": "2026-08-03T09:30:00+00:00",
-          "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+          "admission": {
+            "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+            "dateApplicationReceived": "2026-08-01",
+            "dateAdmitted": "2026-09-08",
+            "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+            "classAdmittedIntoName": "Primary 2",
+            "admissionType": "New",
+            "admissionTypeNote": null,
+            "assessmentRequired": false,
+            "assessmentResultRemarks": null,
+            "assignedClassTeacher": null,
+            "declarationName": "Chinwe Okafor",
+            "declarationSigned": true,
+            "declarationDate": "2026-09-08",
+            "approvedBy": null,
+            "approvedAt": null,
+            "headOfSchoolConfirmed": false,
+            "headOfSchoolName": null
+          },
+          "levelAppliedFor": "Primary 2",
+          "dateApplicationReceived": "2026-08-01",
+          "missing": [
+            "Declaration (Section I)"
+          ]
         }
       },
       "PupilSex": {
@@ -11187,6 +11669,161 @@
           "email": "ngozi.adeyemi@example.com",
           "phone": "08012345678",
           "isSuperAdmin": null
+        }
+      },
+      "UpdateAdmissionRecordCommand": {
+        "required": [
+          "id",
+          "sessionId",
+          "dateApplicationReceived",
+          "dateAdmitted",
+          "classAdmittedInto",
+          "admissionType",
+          "admissionTypeNote",
+          "assessmentRequired",
+          "assessmentResultRemarks",
+          "assignedClassTeacher",
+          "declarationName",
+          "declarationSigned",
+          "declarationDate",
+          "headOfSchoolConfirmed",
+          "headOfSchoolName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The pupil whose admission record is being edited. Supplied from the route, not the body.",
+            "format": "uuid",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50"
+          },
+          "sessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque id. Must reference an existing session."
+          },
+          "dateApplicationReceived": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Not in the future.",
+            "format": "date"
+          },
+          "dateAdmitted": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Not in the future.",
+            "format": "date"
+          },
+          "classAdmittedInto": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque id. Must reference an existing, active class level."
+          },
+          "admissionType": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "New or returning.",
+                "$ref": "#/components/schemas/AdmissionType"
+              }
+            ]
+          },
+          "admissionTypeNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          },
+          "assessmentRequired": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether an entrance assessment is required."
+          },
+          "assessmentResultRemarks": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it. NOT required to save, even when AssessmentRequired is true (spec 6.5.9) — see Result AdmissionRecord.EnsureAssessmentResultRecordedIfRequired()."
+          },
+          "assignedClassTeacher": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque admin-account id as text; an empty string clears it."
+          },
+          "declarationName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it.",
+            "example": "Chinwe Okafor"
+          },
+          "declarationSigned": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Section I's tick. Setting this `false` also clears the record's declaration date.",
+            "example": true
+          },
+          "declarationDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required for the record to end up with bool? UpdateAdmissionRecordCommand.DeclarationSigned true; rejected while it is false.",
+            "format": "date",
+            "example": "2026-09-08"
+          },
+          "headOfSchoolConfirmed": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Section J's second signature block."
+          },
+          "headOfSchoolName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An empty string clears it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/admissions/{id}` (spec 6.5.9, 6.5.11 steps 1 and 8-9's section A/I fields, and\n        section J). Id is the PUPIL id — the same identity `POST /pupils` (spec\n        6.5.17's step 1, built as `POST /pupils` under TASK-0050) returned, and the one the admissions\n        queue already lists rows by.",
+        "example": {
+          "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+          "sessionId": null,
+          "dateApplicationReceived": null,
+          "dateAdmitted": null,
+          "classAdmittedInto": null,
+          "admissionType": null,
+          "admissionTypeNote": null,
+          "assessmentRequired": null,
+          "assessmentResultRemarks": null,
+          "assignedClassTeacher": null,
+          "declarationName": "Chinwe Okafor",
+          "declarationSigned": true,
+          "declarationDate": "2026-09-08",
+          "headOfSchoolConfirmed": null,
+          "headOfSchoolName": null
         }
       },
       "UpdateArmCommand": {

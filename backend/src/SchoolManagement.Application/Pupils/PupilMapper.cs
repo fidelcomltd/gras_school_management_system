@@ -1,4 +1,5 @@
 using System.Globalization;
+using SchoolManagement.Application.Admissions;
 using SchoolManagement.Domain.Pupils;
 
 namespace SchoolManagement.Application.Pupils;
@@ -13,7 +14,18 @@ public static class PupilMapper
     /// The field a search term matched against <paramref name="pupil"/>, or <see langword="null"/>
     /// when no search term was in play — see <see cref="PupilSearchMatcher"/>.
     /// </param>
-    public static PupilDto ToDto(Pupil pupil, DateOnly asOfDate, string? matchedField = null)
+    /// <param name="admission">See <see cref="PupilDto.Admission"/>'s own remarks — only <c>CreatePupilHandler</c> supplies this today.</param>
+    /// <param name="levelAppliedFor">See <see cref="PupilDto.LevelAppliedFor"/>'s own remarks — only the admissions queue supplies this today.</param>
+    /// <param name="dateApplicationReceived">See <see cref="PupilDto.DateApplicationReceived"/>'s own remarks — only the admissions queue supplies this today.</param>
+    /// <param name="missing">See <see cref="PupilDto.Missing"/>'s own remarks — only the admissions queue supplies this today.</param>
+    public static PupilDto ToDto(
+        Pupil pupil,
+        DateOnly asOfDate,
+        string? matchedField = null,
+        AdmissionRecordDto? admission = null,
+        string? levelAppliedFor = null,
+        DateOnly? dateApplicationReceived = null,
+        IReadOnlyList<string>? missing = null)
     {
         ArgumentNullException.ThrowIfNull(pupil);
 
@@ -36,6 +48,10 @@ public static class PupilMapper
             pupil.OtherInformation,
             matchedField,
             pupil.CreatedAtUtc,
-            pupil.CreatedBy);
+            pupil.CreatedBy,
+            admission,
+            levelAppliedFor,
+            dateApplicationReceived,
+            missing);
     }
 }

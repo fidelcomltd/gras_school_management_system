@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SchoolManagement.Application;
+using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
@@ -92,6 +93,10 @@ public sealed class PipelineTests
         // TASK-0050: the Pupils/* handlers depend on this port, implemented by Infrastructure — same
         // treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IPupilRepository>());
+
+        // TASK-0062: CreatePupilHandler and UpdateAdmissionRecordHandler depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAdmissionRecordRepository>());
 
         // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.

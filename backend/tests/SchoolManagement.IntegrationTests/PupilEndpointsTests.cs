@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SchoolManagement.Application.Abstractions.Audit;
+using SchoolManagement.Application.Admissions;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pupils;
+using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Pupils;
@@ -44,13 +46,20 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
 
         var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
 
-        var response = await PostAsync(PupilsUrl, jar, CreateCommand("Okafor", "Chidera"), $"key-{Guid.NewGuid():N}");
+        var response = await PostAsync(PupilsUrl, jar, await CreateCommandAsync("Okafor", "Chidera"), $"key-{Guid.NewGuid():N}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         var body = await ReadAsync<PupilDto>(response);
         body.Status.ShouldBe(PupilStatus.Pending);
         body.RegistrationNumber.ShouldBeNull();
         body.Surname.ShouldBe("Okafor");
+
+        // Contract delta: "Response gains the same object" — section A's own fields round-trip.
+        body.Admission.ShouldNotBeNull();
+        body.Admission.AdmissionType.ShouldBe(AdmissionType.New);
+        body.Admission.AssessmentRequired.ShouldBeFalse();
+        body.Admission.DeclarationSigned.ShouldBeFalse();
+        body.Admission.ApprovedBy.ShouldBeNull();
     }
 
     [Fact]
@@ -59,7 +68,7 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         RequireDatabase();
 
         var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
-        var command = CreateCommand("Okafor", "Chidera") with { DateOfBirth = new DateOnly(2025, 1, 1) };
+        var command = (await CreateCommandAsync("Okafor", "Chidera")) with { DateOfBirth = new DateOnly(2025, 1, 1) };
 
         var response = await PostAsync(PupilsUrl, jar, command, $"key-{Guid.NewGuid():N}");
 
@@ -78,7 +87,7 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         RequireDatabase();
 
         var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
-        var command = CreateCommand("Okafor", "Chidera") with { StateOfOrigin = "Not A Real State" };
+        var command = (await CreateCommandAsync("Okafor", "Chidera")) with { StateOfOrigin = "Not A Real State" };
 
         var response = await PostAsync(PupilsUrl, jar, command, $"key-{Guid.NewGuid():N}");
 
@@ -95,7 +104,7 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         var jar = new CookieJar();
         await GetAsync(CsrfUrl, jar);
 
-        var response = await PostAsync(PupilsUrl, jar, CreateCommand("Okafor", "Chidera"), $"key-{Guid.NewGuid():N}");
+        var response = await PostAsync(PupilsUrl, jar, await CreateCommandAsync("Okafor", "Chidera"), $"key-{Guid.NewGuid():N}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -395,19 +404,204 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         candidates.ShouldContain(item => item.Id == pupilId.ToString("D", CultureInfo.InvariantCulture));
     }
 
-    private static CreatePupilCommand CreateCommand(string surname, string firstName) => new(
-        surname,
-        firstName,
-        MiddleName: null,
-        PupilSex.Female,
-        DefaultDateOfBirth,
-        Nationality: null,
-        StateOfOrigin: "Anambra",
-        Lga: "Awka South",
-        HomeAddress: "14 Zik Avenue, Awka",
-        PreviousSchool: null,
-        PreviousClass: null,
-        OtherInformation: null);
+    // TASK-0062's own acceptance criterion: "a level with no arm in the session is ACCEPTED here and
+    // blocks only at approval" — CreateCommandAsync's freshly-seeded session never has an arm.
+    [Fact]
+    public async Task Create_WithAClassLevelThatHasNoArmInTheSession_StillSaves()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+
+        var response = await PostAsync(PupilsUrl, jar, await CreateCommandAsync("Noarm", "Inthesession"), $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Create_WithAnUnknownClassLevel_Returns422()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var baseCommand = await CreateCommandAsync("Unknown", "Level");
+        var command = baseCommand with
+        {
+            Admission = baseCommand.Admission with
+            {
+                ClassAdmittedInto = Guid.CreateVersion7().ToString("D", CultureInfo.InvariantCulture),
+            },
+        };
+
+        var response = await PostAsync(PupilsUrl, jar, command, $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("admission_record.class_admitted_into_invalid");
+    }
+
+    // The card's own acceptance criterion, proven end-to-end through the HTTP surface (the entity-level
+    // proof lives in AdmissionRecordTests.Update_TwoDisjointPartialPayloads_BothSurvive).
+    [Fact]
+    public async Task PatchAdmission_TwoDisjointPartialPayloads_BothSurvive()
+    {
+        RequireDatabase();
+
+        var createJar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var createResponse = await PostAsync(
+            PupilsUrl, createJar, await CreateCommandAsync("Partial", "Payload"), $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        var updateJar = await SignInWithGrantAsync([Privileges.Pupil.Update], ScopeType.SchoolWide);
+
+        var firstResponse = await PatchAsync(
+            $"{AdmissionsUrl}/{created.Id}", updateJar, new { admissionTypeNote = "Sibling of an existing pupil" });
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var secondResponse = await PatchAsync(
+            $"{AdmissionsUrl}/{created.Id}",
+            updateJar,
+            new { declarationName = "Chinwe Okafor", declarationSigned = true, declarationDate = "2026-09-08" });
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var updated = await ReadAsync<AdmissionRecordDto>(secondResponse);
+
+        updated.AdmissionTypeNote.ShouldBe("Sibling of an existing pupil");
+        updated.DeclarationName.ShouldBe("Chinwe Okafor");
+        updated.DeclarationSigned.ShouldBeTrue();
+        updated.DeclarationDate.ShouldBe(new DateOnly(2026, 9, 8));
+    }
+
+    [Fact]
+    public async Task PatchAdmission_ANonPendingPupil_Returns404()
+    {
+        RequireDatabase();
+
+        var pupilId = await SeedPupilDirectlyAsync("Active", "AlreadyApproved");
+        await SetRegistrationNumberAndStatusAsync(pupilId, "GRAS/2026/0060", PupilStatus.Active);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.Update], ScopeType.SchoolWide);
+
+        var response = await PatchAsync(
+            $"{AdmissionsUrl}/{pupilId}", jar, new { declarationSigned = true, declarationDate = "2026-09-08" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task PatchAdmission_UnknownId_Returns404()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.Update], ScopeType.SchoolWide);
+
+        var response = await PatchAsync($"{AdmissionsUrl}/{Guid.CreateVersion7()}", jar, new { headOfSchoolConfirmed = true });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    // Spec 6.5.15's queue columns (TASK-0062): levelAppliedFor, dateApplicationReceived and missing.
+    // missing here is restricted to what sections A and I's stored fields can check — see the
+    // endpoint's own description for the recorded steps-3-to-8 gap.
+    [Fact]
+    public async Task AdmissionsQueue_RowsCarryLevelAppliedForDateApplicationReceivedAndMissing()
+    {
+        RequireDatabase();
+
+        var createJar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var baseCommand = await CreateCommandAsync("Queuecolumn", "Surname");
+        var command = baseCommand with
+        {
+            Admission = baseCommand.Admission with
+            {
+                AssessmentRequired = true,
+                DateApplicationReceived = new DateOnly(2026, 8, 1),
+            },
+        };
+
+        var createResponse = await PostAsync(PupilsUrl, createJar, command, $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        var readJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+        var queueResponse = await GetAsync(AdmissionsUrl, readJar);
+        queueResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var queue = await ReadAsync<CursorPage<PupilDto>>(queueResponse);
+        var row = queue.Items.Single(item => item.Id == created.Id);
+
+        row.LevelAppliedFor.ShouldNotBeNullOrWhiteSpace();
+        row.DateApplicationReceived.ShouldBe(new DateOnly(2026, 8, 1));
+        row.Missing.ShouldNotBeNull();
+        row.Missing.ShouldContain("Assessment result (Section A)");
+        row.Missing.ShouldContain("Declaration (Section I)");
+    }
+
+    [Fact]
+    public async Task AdmissionsQueue_MissingIsEmptyOnceAssessmentAndDeclarationAreRecorded()
+    {
+        RequireDatabase();
+
+        var createJar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
+        var createResponse = await PostAsync(
+            PupilsUrl, createJar, await CreateCommandAsync("Completesection", "Ai"), $"key-{Guid.NewGuid():N}");
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var created = await ReadAsync<PupilDto>(createResponse);
+
+        var updateJar = await SignInWithGrantAsync([Privileges.Pupil.Update], ScopeType.SchoolWide);
+        var patchResponse = await PatchAsync(
+            $"{AdmissionsUrl}/{created.Id}",
+            updateJar,
+            new { declarationName = "Chinwe Okafor", declarationSigned = true, declarationDate = "2026-09-08" });
+        patchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var readJar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+        var queueResponse = await GetAsync(AdmissionsUrl, readJar);
+        var queue = await ReadAsync<CursorPage<PupilDto>>(queueResponse);
+        var row = queue.Items.Single(item => item.Id == created.Id);
+
+        row.Missing.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// Seeds a session and reuses the first seeded class level, so <c>Admission</c> — REQUIRED since
+    /// TASK-0062 — always references real rows. The session is passed EXPLICITLY (rather than left
+    /// for the handler to default), so these tests never depend on an active session existing.
+    /// </summary>
+    private async Task<CreatePupilCommand> CreateCommandAsync(string surname, string firstName)
+    {
+        var sessionId = await SeedSessionAsync();
+        var classLevelId = await GetFirstClassLevelIdAsync();
+
+        return new CreatePupilCommand(
+            surname,
+            firstName,
+            MiddleName: null,
+            PupilSex.Female,
+            DefaultDateOfBirth,
+            Nationality: null,
+            StateOfOrigin: "Anambra",
+            Lga: "Awka South",
+            HomeAddress: "14 Zik Avenue, Awka",
+            PreviousSchool: null,
+            PreviousClass: null,
+            OtherInformation: null,
+            Admission: new CreateAdmissionInput(
+                SessionId: sessionId.ToString("D", CultureInfo.InvariantCulture),
+                DateApplicationReceived: null,
+                DateAdmitted: null,
+                ClassAdmittedInto: classLevelId.ToString("D", CultureInfo.InvariantCulture),
+                AdmissionType: AdmissionType.New,
+                AdmissionTypeNote: null,
+                AssessmentRequired: false));
+    }
+
+    private async Task<Guid> GetFirstClassLevelIdAsync()
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return (await context.ClassLevels.AsNoTracking().FirstAsync(TestContext.Current.CancellationToken)).Id;
+    }
 
     private async Task<Guid> SeedPupilDirectlyAsync(
         string surname, string firstName, DateOnly? dateOfBirth = null)

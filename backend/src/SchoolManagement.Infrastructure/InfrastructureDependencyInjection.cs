@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
@@ -192,6 +193,9 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0059: enrolment — dated membership of a pupil in an arm (spec 02 §5.2).
         services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
+
+        // TASK-0062: admission_record — sections A, I and J of the admission form (spec 6.5.9).
+        services.AddScoped<IAdmissionRecordRepository, AdmissionRecordRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
