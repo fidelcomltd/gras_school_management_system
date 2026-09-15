@@ -135,7 +135,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **blocked — needs a human ruling** 2026-09-15: where does a pupil with NO open enrolment sort? Split from TASK-0059 at its pre-authorised cut line |
+| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **queued 2026-09-15** — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -152,6 +152,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
 
+- 2026-09-15 **Human ruling on TASK-0061: a pupil with NO open enrolment sorts LAST**, one flat
+  trailing block, surname then id; non-null sentinel keys so the widened cursor never carries a
+  NULL. Rejected: first, excluded (breaks search), and by-last-closed-enrolment. → `decisions/2026-Q3.md`
 - 2026-09-15 **TASK-0059 closed, full green gate.** `enrolment` — the pupil-to-arm spine; the
   one-open-row invariant is a partial unique index proven in BOTH directions. 933/933, Skipped 0,
   contract unmoved. One AC split to TASK-0061. → `decisions/2026-Q3.md`
@@ -327,8 +330,8 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-09 **`GET /pupils` default sort omits 6.5.15's class-progression half** — it sorts
   surname then id. **TASK-0059 looked at this and deliberately did NOT build it** — needs a widened
   keyset cursor plus a product decision on where a pupil with no open enrolment sorts, neither of
-  which fit that card safely. *Trigger: TASK-0061, written 2026-09-15 and BLOCKED on the human
-  ruling it carries. Owner: `backend-dev`.*
+  which fit that card safely. *Trigger: TASK-0061, unblocked 2026-09-15 by the human ruling it carried (unenrolled pupils sort
+  LAST); now queued for dispatch. Owner: `backend-dev`.*
 - 2026-09-08 **Spec 6.1.2's self-edit carve-out is not built** — an admin editing their OWN
   `staffName` / `phone` without holding `admin.update`. **Its trigger ALREADY FIRED and was
   missed: TASK-0043 was "the next `/admins` card" and carried no AC for it** (flagged anyway by
