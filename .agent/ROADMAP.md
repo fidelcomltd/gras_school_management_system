@@ -82,7 +82,9 @@ failures were in whether they actually executed.
 | Task | Title | Owner | Spec | Notes |
 |---|---|---|---|---|
 | TASK-0050 | Pupil entity, `pending`-exclusion invariant, register read surface | BE | 07 §6.5.4, 6.5.15 | **queued** 2026-09-09. Every pupil query except the admissions queue filters `pending` out — built as a structural default, not a per-query filter |
-| TASK-0051 | Registration number issue + admission approval | BE | 07 §6.5.10, 6.5.14 | **blocked (stub)** — split from 0050 on 2026-09-09: 6.5.10's number is composed from TASK-0005c's settings, which is itself an unwritten stub. Also needs `enrolment`. Counter is a row lock, never `MAX+1` |
+| TASK-0062 | `admission_record` — sections A, I, J | BE | 07 §6.5.9, 6.5.11 | **queued** 2026-09-15. Written in full. The dependency 0051 could not run without, missed by every list until 0051 was written out |
+| TASK-0051 | Registration number issue + admission approval | BE | 07 §6.5.10, 6.5.14 | **blocked on 0062** 2026-09-15. Written in full, narrowed to approve/decline/issue. Counter is a row lock, never `MAX+1` |
+| TASK-0063 | Reg-number correction + history alias | BE | 07 §6.5.10 | **blocked on 0051** 2026-09-15. Written in full |
 | — | Contacts, health, pickup/barred persons, document checklist | BE | 07 §6.5.5–6.5.9 | Health and barred data behind `pupil.safeguarding.view`, audited on read |
 | — | Nine-step resumable admission flow | BE+FE | 07 §6.5.11, 6.5.12 | Largest single flow in the product; split if the card exceeds ~400 lines |
 | — | Bulk import | BE | 07 §6.5.13 | Background job with progress; 5000 rows max |

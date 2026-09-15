@@ -142,7 +142,9 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
-| TASK-0051 | Registration number issue and admission approval | backend-dev | **UNBLOCKED 2026-09-15 by TASK-0059** — every dependency now cleared (0005c, 0050, enrolment). Still a STUB card: must be written in full before dispatch. This is the next critical-path card |
+| TASK-0062 | `admission_record` — sections A, I and J | backend-dev | **queued 2026-09-15** — written in full. NEW: the dependency nothing had noticed was unbuilt. This is now the next critical-path card |
+| TASK-0051 | Registration number issue and admission approval | backend-dev | **blocked on TASK-0062** 2026-09-15 — written in full and NARROWED to approve/decline/issue. Dispatch the moment 0062 closes |
+| TASK-0063 | Registration-number correction and the history alias | backend-dev | **blocked on TASK-0051** 2026-09-15 — written in full. Split out of 0051 at its write-up |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
@@ -152,6 +154,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 **Index only — one line per entry.** Full text: `decisions/2026-Q3.md` (grep the TASK id).
 Implementation and closure of the same card are merged onto one line.
 
+- 2026-09-15 **TASK-0051 could not be written as one card: `admission_record` was never built and
+  appeared in no dependency list, including its own.** Split three ways — TASK-0062 (the record),
+  0051 (approve/decline/issue), 0063 (correction). → `decisions/2026-Q3.md`
 - 2026-09-15 **Human ruling on TASK-0061: a pupil with NO open enrolment sorts LAST**, one flat
   trailing block, surname then id; non-null sentinel keys so the widened cursor never carries a
   NULL. Rejected: first, excluded (breaks search), and by-last-closed-enrolment. → `decisions/2026-Q3.md`
@@ -351,7 +356,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   holding `role.update` and not `settings.grading.update`. *Trigger: TASK-0046.
   Owner: `backend-dev`.*
 - 2026-09-06 **`abbreviation.issuedCount` will ship as `null` and stay null.** 6.2.4's change
-  dialogue names a real count. *Trigger: the reg-number issue card. Owner: `backend-dev`.*
+  dialogue names a real count. *Trigger: TASK-0051, written in full 2026-09-15 and carrying this as an acceptance criterion. Owner: `backend-dev`.*
 - 2026-09-06 **The logo-removal affordance is unrouted** — 6.2.11 requires rejecting "logo deleted
   with no replacement" and 6.2.12 enumerates no `DELETE` route to reject on. *Trigger: TASK-0005b.
   Owner: `backend-dev`.*
