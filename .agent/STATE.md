@@ -172,6 +172,8 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
+| TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **queued 2026-09-16** — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
+| TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DISPATCHED 2026-09-16** — `frontend-ci` red on every push today for this one reason. Discharges the standing "next frontend-dev dispatch regenerates first" drift instruction |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
