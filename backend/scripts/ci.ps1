@@ -46,6 +46,34 @@
     run — only whether a skip fails the SCRIPT changes. Without this switch, a skipped suite is a
     non-zero exit (CLAUDE.md §13: a skipped suite is not a passing suite).
 
+    This is UNCHANGED by -SkipIntegration / -IntegrationFilter below, and answers a different
+    question: -AllowSkipped is about a test that ran and reported itself skipped (e.g. it could not
+    reach Postgres); -SkipIntegration/-IntegrationFilter are about the ORCHESTRATOR choosing not to
+    run (all of, or part of) the integration stage at all. The two must never read alike in the
+    SUMMARY — see TASK-0067.
+
+.PARAMETER SkipIntegration
+    (TASK-0067) Skip the integration-tests gate entirely — gates 1-5 and 8-10 still run in full.
+    The SUMMARY reports it as `SKIP: Integration tests (SKIPPED BY REQUEST ...)`, never as a pass.
+    Because the run is then necessarily partial, the coverage-threshold gate reports its floor as
+    NOT APPLICABLE rather than PASS or FAIL — a partial run's coverage number is meaningless, but
+    that is not the same as the gate failing. Mutually exclusive with -IntegrationFilter. This is
+    the scoped local gate from `.agent/rules/gates.md` §0 — CI (`backend-ci.yml`) always runs the
+    full integration stage and passes neither this nor -IntegrationFilter.
+
+.PARAMETER IntegrationFilter
+    (TASK-0067) Run only the integration tests matching this `dotnet test --filter` expression,
+    leaving every other gate untouched and full. Goes through THIS script's own
+    POSTGRES_TEST_CONNECTION resolution (see above) exactly like the unfiltered run does — a raw,
+    hand-rolled `dotnet test --filter` outside this script does NOT resolve that variable, which is
+    precisely how TASK-0063 got `Passed: 0, Skipped: 1` and exit 0 on a test that never really ran.
+
+    A filter that matches ZERO tests is treated as a FAILURE of this gate, not a clean pass: a
+    typo'd expression reporting green is the same false-green class -SkipIntegration's honest
+    labelling exists to kill. Like -SkipIntegration, this makes the run partial, so the
+    coverage-threshold gate reports NOT APPLICABLE rather than enforcing the floor. Mutually
+    exclusive with -SkipIntegration.
+
 .PARAMETER NoFailFast
     Run every gate even after one fails, then exit non-zero with a summary, instead of stopping at
     the first failure. This is the CI workflow's mode.
@@ -55,6 +83,12 @@
 
 .EXAMPLE
     ./scripts/ci.ps1 -NoFailFast -AllowSkipped
+
+.EXAMPLE
+    ./scripts/ci.ps1 -SkipIntegration
+
+.EXAMPLE
+    ./scripts/ci.ps1 -IntegrationFilter 'FullyQualifiedName~AdmissionApproval'
 #>
 [CmdletBinding()]
 param(
@@ -68,8 +102,21 @@ param(
 
     [switch]$AllowSkipped,
 
-    [switch]$NoFailFast
+    [switch]$NoFailFast,
+
+    # TASK-0067: the scoped local gate. Neither flag changes which gates exist, their order, or
+    # their thresholds -- they change whether/how much of gate 6 runs, and gate 7 (coverage) reacts
+    # by reporting N/A instead of enforcing a floor against a partial run. See the PARAMETER blocks
+    # above for the full rationale.
+    [switch]$SkipIntegration,
+
+    [string]$IntegrationFilter
 )
+
+if ($SkipIntegration -and $IntegrationFilter) {
+    Write-Host 'ERROR: -SkipIntegration and -IntegrationFilter are mutually exclusive -- pick one.' -ForegroundColor Red
+    exit 1
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
@@ -93,6 +140,14 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $gateVerdicts = [System.Collections.Generic.List[string]]::new()
 $script:testCountsLine = $null
 $script:coverageLine = $null
+
+# TASK-0067: true the moment ANY part of the integration stage is scoped by request -- whether the
+# whole stage was skipped (-SkipIntegration) or narrowed to a filter (-IntegrationFilter). This is
+# what tells the Coverage threshold gate its floor is not comparable to a partial run and must be
+# reported N/A rather than PASS or FAIL. It is deliberately independent of -AllowSkipped, which
+# answers a different question (see that parameter's doc comment above).
+$script:integrationScoped = [bool]$SkipIntegration -or [bool]$IntegrationFilter
+$script:coverageGateNotApplicable = $false
 
 function Write-FinalSummary {
     # A FIXED block: one line per gate that ran, plus the test and coverage numbers when they were
@@ -205,22 +260,84 @@ try {
         $global:LASTEXITCODE = $exitCode
     }
 
-    Invoke-Gate 'Integration tests' {
-        # These SKIP when no PostgreSQL is reachable — they never silently pass. POSTGRES_TEST_
-        # CONNECTION was already resolved at the top of this script (an explicit env var, or
-        # $HOME/.gras/pg-test.txt); if neither existed, it is still unset here and this suite skips,
-        # unless a container runtime is available instead. CI must supply one of those, or the suite
-        # it is guarding is much smaller than it looks. A skip now fails the script (see the
-        # Coverage threshold gate below) unless -AllowSkipped is passed.
-        if (-not $env:POSTGRES_TEST_CONNECTION) {
-            Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
-            Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
-        }
+    if ($SkipIntegration) {
+        # TASK-0067: bypass Invoke-Gate entirely, same shape as -SkipContractDrift below -- this is
+        # a stage skipped BY REQUEST, which must never be printed or counted as a pass. It must also
+        # never be conflated with a test reporting itself skipped (e.g. Postgres unreachable), which
+        # is a different thing entirely and still fails the run below regardless of this flag.
+        Write-Host ''
+        Write-Host 'SKIPPED: Integration tests (SKIPPED BY REQUEST via -SkipIntegration)' -ForegroundColor Yellow
+        $gateVerdicts.Add('SKIP: Integration tests (SKIPPED BY REQUEST via -SkipIntegration)')
+    }
+    else {
+        Invoke-Gate 'Integration tests' {
+            # These SKIP when no PostgreSQL is reachable — they never silently pass. POSTGRES_TEST_
+            # CONNECTION was already resolved at the top of this script (an explicit env var, or
+            # $HOME/.gras/pg-test.txt); if neither existed, it is still unset here and this suite skips,
+            # unless a container runtime is available instead. CI must supply one of those, or the suite
+            # it is guarding is much smaller than it looks. A skip now fails the script (see the
+            # Coverage threshold gate below) unless -AllowSkipped is passed.
+            if (-not $env:POSTGRES_TEST_CONNECTION) {
+                Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
+                Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
+            }
 
-        dotnet test 'tests/SchoolManagement.IntegrationTests/SchoolManagement.IntegrationTests.csproj' --no-build --configuration $Configuration --nologo `
-            --settings coverlet.runsettings `
-            --results-directory './artifacts/coverage' `
-            --logger 'trx'
+            $filterArgs = @()
+            if ($IntegrationFilter) {
+                # TASK-0067: this dotnet test call is the SAME one the unfiltered run uses, inside
+                # THIS script, after Initialize-PostgresTestConnection already ran at the top -- so
+                # POSTGRES_TEST_CONNECTION resolves exactly as it does for a full run. A raw
+                # `dotnet test --filter` run outside ci.ps1 does not resolve it at all; that gap is
+                # what let TASK-0063 report `Passed: 0, Skipped: 1` and exit 0 on a test that never
+                # really ran.
+                Write-Host "Filtering integration tests: $IntegrationFilter" -ForegroundColor DarkGray
+                $filterArgs = @('--filter', $IntegrationFilter)
+            }
+
+            # Snapshotted BEFORE the run, by full path, not by "newest timestamp": the Unit &
+            # architecture tests gate above always wipes and repopulates './artifacts/coverage', so
+            # by the time this gate runs the directory already contains that suite's own .trx. A
+            # "pick whichever .trx has the latest LastWriteTime" check would silently select THAT
+            # file whenever this run's filter produces none of its own, read its total (the whole
+            # unit suite, never zero), and let a filter that matched nothing read as a pass -- a
+            # review caught exactly this hole. Comparing file identity (which paths are NEW after
+            # this run) rather than timestamps sidesteps clock/resolution questions entirely.
+            $existingTrxPaths = @(
+                Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty FullName
+            )
+
+            dotnet test 'tests/SchoolManagement.IntegrationTests/SchoolManagement.IntegrationTests.csproj' --no-build --configuration $Configuration --nologo `
+                --settings coverlet.runsettings `
+                --results-directory './artifacts/coverage' `
+                --logger 'trx' `
+                @filterArgs
+            $testExitCode = $LASTEXITCODE
+
+            if ($IntegrationFilter) {
+                # TASK-0067: a filter matching ZERO tests is a FAILURE, not a clean pass -- the same
+                # false-green class as the silent skip this card exists to kill. `dotnet test` exits
+                # 0 when a filter selects nothing, so the exit code alone cannot catch this; the trx
+                # this run just wrote (a path that was NOT in the snapshot above) is read directly,
+                # not via the merged coverage-gate summary, which only checks the aggregate and would
+                # not single out an empty suite from the unit suite's already-present total.
+                $newTrx = @(Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue) |
+                    Where-Object { $existingTrxPaths -notcontains $_.FullName } |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+                if (-not $newTrx) {
+                    throw "Integration test filter '$IntegrationFilter' produced no .trx result file for this run -- it matched zero tests."
+                }
+
+                [xml]$filterResults = Get-Content -LiteralPath $newTrx.FullName -Raw
+                $filterTotal = [int]$filterResults.TestRun.ResultSummary.Counters.total
+                if ($filterTotal -eq 0) {
+                    throw "Integration test filter '$IntegrationFilter' matched ZERO tests. Check the expression -- a typo'd filter reporting green is a false pass."
+                }
+            }
+
+            $global:LASTEXITCODE = $testExitCode
+        }
     }
 
     Invoke-Gate "Coverage threshold ($CoverageThreshold%)" {
@@ -291,8 +408,29 @@ try {
             Write-Host $message -ForegroundColor Yellow
         }
 
+        # TASK-0067: a real failure, or a test reporting itself skipped (e.g. Postgres unreachable),
+        # still fails the run in EVERY mode -- -SkipIntegration/-IntegrationFilter only excuses the
+        # FLOOR below from being enforced against a partial number, never this check. This is the
+        # exact distinction the card exists to keep safe: a stage skipped by request is not the same
+        # as a test that ran and skipped itself.
         if (-not $verdict.Passed) {
             throw 'Test run was not clean (failed and/or skipped tests) - see the messages above.'
+        }
+
+        if ($script:integrationScoped) {
+            # TASK-0067: the integration stage was skipped or filtered by request, so this run is
+            # necessarily partial and the coverage number is not comparable to the floor -- it is not
+            # a pass (nothing was proven against the floor) and not a failure (nothing said it had to
+            # be). $script:coverageGateNotApplicable is read right after this Invoke-Gate call below
+            # to correct the single "PASS: Coverage threshold" line Invoke-Gate is about to record,
+            # to N/A, in the SUMMARY block.
+            Write-Host ''
+            Write-Host 'NOT APPLICABLE: integration tests were scoped by request (-SkipIntegration or' -ForegroundColor Yellow
+            Write-Host '-IntegrationFilter), so this run is partial and the coverage floor is not enforced' -ForegroundColor Yellow
+            Write-Host 'against it. This is reported as N/A, not PASS or FAIL, in the final summary.' -ForegroundColor Yellow
+            $script:coverageGateNotApplicable = $true
+            $global:LASTEXITCODE = 0
+            return
         }
 
         # THE THRESHOLD IS A FLOOR, NOT A GOAL. It exists to catch a collapse — someone deleting a test
@@ -316,6 +454,15 @@ try {
             throw ("Line coverage {0:N2}% is below the {1}% floor." -f $lineRate, $CoverageThreshold)
         }
         $global:LASTEXITCODE = 0
+    }
+
+    if ($script:coverageGateNotApplicable) {
+        # TASK-0067: Invoke-Gate above just recorded "PASS: Coverage threshold (...)" (exit code 0,
+        # no exception) and printed it to the console -- correct only the SUMMARY-block entry to N/A
+        # so the pasted evidence cannot be misread as a genuine pass on a partial run's coverage
+        # number. $failures is untouched: this is not a failure, so the run's exit code is unaffected.
+        $lastIndex = $gateVerdicts.Count - 1
+        $gateVerdicts[$lastIndex] = "N/A: Coverage threshold ($CoverageThreshold%) -- integration scoped by request (-SkipIntegration or -IntegrationFilter); floor not enforced against a partial run"
     }
 
     Invoke-Gate 'Vulnerable dependencies' {

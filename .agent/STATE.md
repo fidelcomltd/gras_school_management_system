@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-16 by orchestrator (TASK-0063 closure; TASK-0061 dispatched) · no size cap, see
+Last reconciled: 2026-09-16 by orchestrator (TASK-0067 closure) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -130,7 +130,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0067, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -153,13 +153,18 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0067 | Give `ci.ps1` a scoped mode (`-SkipIntegration`, `-IntegrationFilter`) | backend-dev | **queued 2026-09-16 — human directive, highest leverage in the queue.** Makes the ~1h/card gate cost avoidable; TASK-0065 makes it small. Pairs with CI now triggering on `staging` |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-16 **TASK-0067 closed — the scoped gate exists.** `-SkipIntegration` / `-IntegrationFilter`;
+  a stage skipped BY REQUEST can never read as a pass, and `Skipped > 0` still fails in every mode.
+  **Review caught a false-green: the zero-match check read the UNIT suite's `.trx`** when a filtered run
+  wrote none. Diagnosing its own 6 network failures took 5m30s scoped vs 50m19s full. →
+  `decisions/2026-Q3.md`
 
 - 2026-09-16 **TASK-0061 closed on the FIRST scoped gate** (§ new policy): unit 700/700, arch 33/33,
   pupils integration 34/34, Skipped 0, contract unmoved — minutes, not the hour. The dispatch-time
@@ -465,6 +470,15 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   `Program.cs`.** *Trigger: a THIRD exemption must argue for itself or the type gets a port.*
 
 ### Live — defects and test gaps
+
+- 2026-09-16 **`ci.ps1`'s "produced no `.trx` for this run" branch is UNTESTED** — the zero-match
+  guard's other half (a new-path snapshot diff) is proven, but no case was constructed that makes
+  VSTest write no `.trx` at all, because forcing that on demand is not reliably reproducible.
+  *Trigger: the next card touching the integration stage of `ci.ps1`, or TASK-0065. Owner: `backend-dev`.*
+- 2026-09-16 **`ci.ps1` prints `PASS: Coverage threshold` live while the SUMMARY records `N/A:`** —
+  `Invoke-Gate` writes its own verdict before the correction is applied. The card's requirement is about
+  the SUMMARY block, so this is accepted, not a defect. *Trigger: any card making the console output
+  load-bearing (e.g. TASK-0056's machine-readable gate summary). Owner: `backend-dev`.*
 
 - 2026-09-09 **An unaudited 403 becomes a 500.** `RejectedAuditEventWriter.WriteAsync` is awaited
   with no `try` / `catch` in either `SystemAuditSink.RecordRejectionAsync` or its caller.
