@@ -13,6 +13,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Behaviors;
@@ -70,6 +71,15 @@ public sealed class PipelineTests
         // TASK-0005c: the reg-number handlers depend on this port too, implemented by Infrastructure —
         // same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRegistrationCounterRepository>());
+
+        // TASK-0069: the grading/assessment handlers (plus every other Settings/* handler, since the
+        // snapshot now carries both groups regardless of which one changed) depend on these four
+        // ports, implemented by Infrastructure — same treatment as every other repository stubbed
+        // above.
+        services.AddSingleton(Substitute.For<IGradingBandRepository>());
+        services.AddSingleton(Substitute.For<IAssessmentComponentRepository>());
+        services.AddSingleton(Substitute.For<ISubjectScoreSessionLockLookup>());
+        services.AddSingleton(Substitute.For<IPublishedResultsGate>());
 
         // TASK-0028 dispatch 2: the Roles/* handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.

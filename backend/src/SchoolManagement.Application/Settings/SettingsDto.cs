@@ -10,10 +10,14 @@ namespace SchoolManagement.Application.Settings;
 /// <param name="Identity">The school identity group.</param>
 /// <param name="Abbreviation">The registration-number abbreviation group.</param>
 /// <param name="RegNumber">The registration-number pattern group.</param>
+/// <param name="Grading">The grading-scale group (TASK-0069).</param>
+/// <param name="Assessment">The assessment-structure group (TASK-0069).</param>
 public sealed record SettingsDto(
     SettingsIdentityGroupDto Identity,
     SettingsAbbreviationGroupDto Abbreviation,
-    SettingsRegNumberGroupDto RegNumber);
+    SettingsRegNumberGroupDto RegNumber,
+    SettingsGradingGroupDto Grading,
+    SettingsAssessmentGroupDto Assessment);
 
 /// <summary>
 /// The school identity group, both inside <see cref="SettingsDto"/> and as

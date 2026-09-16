@@ -7,7 +7,9 @@ namespace SchoolManagement.Application.Settings;
 /// <summary>Handles <see cref="GetSettingsQuery"/>.</summary>
 internal sealed class GetSettingsQueryHandler(
     ISchoolProfileRepository schoolProfileRepository,
-    IPupilRepository pupils)
+    IPupilRepository pupils,
+    IGradingBandRepository gradingBandRepository,
+    IAssessmentComponentRepository assessmentComponentRepository)
     : IRequestHandler<GetSettingsQuery, Result<SettingsDto>>
 {
     /// <inheritdoc />
@@ -25,9 +27,14 @@ internal sealed class GetSettingsQueryHandler(
             .CountByRegistrationNumberPrefixAsync(profile.Abbreviation, cancellationToken)
             .ConfigureAwait(false);
 
+        var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+
         return Result.Success(new SettingsDto(
             SettingsMapper.ToIdentityDto(profile),
             SettingsMapper.ToAbbreviationDto(profile, issuedCount),
-            SettingsMapper.ToRegNumberDto(profile)));
+            SettingsMapper.ToRegNumberDto(profile),
+            SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber),
+            SettingsMapper.ToAssessmentDto(components, profile.AssessmentVersionNumber)));
     }
 }

@@ -19,16 +19,31 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
+    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
+
+    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
+        Substitute.For<IAssessmentComponentRepository>();
+
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
-    private UpdateSchoolIdentityCommandHandler CreateHandler() => new(
-        _schoolProfileRepository,
-        _configVersionRepository,
-        _currentUser,
-        _auditSink,
-        _timeProvider);
+    // TASK-0069: the snapshot now reads the current grading/assessment state even from a save that
+    // does not touch either group — stub both empty so SettingsSnapshotBuilder.Build never sees null.
+    private UpdateSchoolIdentityCommandHandler CreateHandler()
+    {
+        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
+        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+
+        return new(
+            _schoolProfileRepository,
+            _configVersionRepository,
+            _gradingBandRepository,
+            _assessmentComponentRepository,
+            _currentUser,
+            _auditSink,
+            _timeProvider);
+    }
 
     private static UpdateSchoolIdentityCommand ValidCommand(int expectedVersion) => new(
         "Golden Royal Ark School",

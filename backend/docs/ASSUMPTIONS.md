@@ -1150,6 +1150,54 @@ double the guideline. Flagged prominently in this card's own report rather than 
 the orchestrator's call whether a later card of this shape should split the entity-plus-invariant work
 from the CRUD-handler work, the same lesson TASK-0038's own retrospective drew for `Domain/Classes/`.
 
+### 2.28 TASK-0069 — grading scale and assessment structure: the seam pattern for a dependency that doesn't exist yet, and five smaller authored calls
+
+**The central tension:** two of this card's acceptance criteria — the 6.2.6 session lock and the
+6.2.9 published-results reason gate — are keyed on `subject_score` and `result_set` rows, and NEITHER
+table exists anywhere in this codebase. TASK-0071 (computation engine, blocked on this card) READS
+`grading_band`/`assessment_component`; it does not write scores. No results/publish module is carded
+at all. `IResultSetArmLookup`'s 2026-08-26 drift entry and TASK-0063's 2026-09-15 "vacuously
+satisfied" entry are the precedent this card follows, but with one difference worth stating
+explicitly: those two ports are genuinely UNREACHED (no route uses them), so throwing is honest.
+`ISubjectScoreSessionLockLookup`/`IPublishedResultsGate` ARE reached, on every
+`PUT /settings/grading`, `POST /settings/grading/reset` and `PUT /settings/assessment` call — a
+throwing stand-in would break those endpoints in production today. The chosen shape is a real,
+non-throwing Infrastructure implementation that returns `false`/`0` unconditionally, documented as
+honestly correct (not a placeholder) because no code path anywhere can populate either table yet, and
+unit-tested against a fake that DOES report `true`/nonzero, so the locked/published branches are
+proven even though production can't exercise them. Whichever future card first persists a
+`subject_score` or `result_set.Published` row must replace the two Infrastructure classes with real
+queries — filed as drift in `.agent/STATE.md`, full account in `.agent/tasks/TASK-0069.md`'s Log.
+
+Five smaller authored calls, each a genuine judgement call rather than a literal reading of the spec:
+
+1. **Grade-letter character set widened.** 6.2.5's field table says "Letters and digits"; 6.2.13
+   requires seeding `A+` and `B-`, which contain neither. Widened the regex to
+   `^[A-Za-z0-9+-]+$` — the minimum change that makes the required seed data legal against its own
+   field's stated rule.
+2. **`IsExamination` is session-locked alongside `MaxMark`.** 6.2.6's own sentence names only "a
+   maximum" as locked once marks exist. Flipping which existing component id is flagged as the
+   examination, without changing max marks, would silently move already-entered marks between the CA
+   total and the exam total for a component whose id and stored marks did not change — the identical
+   "arithmetic nonsense" 6.2.6 invokes to justify locking maximums at all. Extended the lock to cover
+   it rather than leave a narrow, spec-literal gap.
+3. **Rule 4's ceiling (100) is authored.** 6.2.6's numbered rule states only the floor ("at least 1
+   mark"); the ceiling mirrors the field's own stated `1 to 100` bound from the same section's field
+   table, so a maximum above 100 is rejected with a rule-4-shaped message rather than surfacing later
+   as an arithmetic surprise.
+4. **The 3-component seed's `short_label` values are authored.** 6.2.13's seed table for the
+   replacement structure has four columns (Component/Maximum/Is examination/Display order) — no
+   short-label column. `CA1`/`CA2`/`EXAM` follow 6.2.6's own worked example ("First CA Test 15... for
+   example CA1, EXAM").
+5. **Entity/table name is `grading_band`, not `grade_band`.** `02-data-model.md` lines 16-17 name the
+   entity `grading_band`; 6.2.13's own prose calls the same entity `grade_band` in one place. Followed
+   the data-model document as the naming source of truth, since it is the document every other
+   versioned entity's table name in this codebase is drawn from.
+
+Also, per the card's own contract-impact line, `GET /settings/impact` (6.2.12) was **not** built —
+it depends on the same not-yet-existent `result_set` the seam above stands in for, and the card named
+only `/settings/grading` and `/settings/assessment` as its contract delta.
+
 ## 3. Open — a human must decide or supply
 
 Ordered by how much they block.

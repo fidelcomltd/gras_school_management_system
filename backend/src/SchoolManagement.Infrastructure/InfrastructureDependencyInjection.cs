@@ -10,6 +10,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -23,6 +24,7 @@ using SchoolManagement.Infrastructure.Idempotency;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
+using SchoolManagement.Infrastructure.Results;
 using SchoolManagement.Infrastructure.Secrets;
 
 namespace SchoolManagement.Infrastructure;
@@ -171,6 +173,16 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0005c: registration-number counter, read paths only — see the port's own remarks.
         services.AddScoped<IRegistrationCounterRepository, RegistrationCounterRepository>();
+
+        // TASK-0069: grading scale and assessment structure.
+        services.AddScoped<IGradingBandRepository, GradingBandRepository>();
+        services.AddScoped<IAssessmentComponentRepository, AssessmentComponentRepository>();
+
+        // TASK-0069: documented seams, honestly empty — no scoring/results module exists yet. See
+        // each interface's own remarks for why this is NOT the same pattern as
+        // NotYetImplementedResultSetArmLookup (which throws).
+        services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();
+        services.AddScoped<IPublishedResultsGate, PublishedResultsGate>();
 
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();

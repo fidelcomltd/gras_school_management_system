@@ -11,6 +11,7 @@ using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.Infrastructure.Persistence.Configurations;
 using Testcontainers.PostgreSql;
 
 namespace SchoolManagement.IntegrationTests.Infrastructure;
@@ -212,6 +213,12 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // TASK-0038: same reasoning, for spec 6.4.2's two seeded sections and nine seeded levels —
         // ClassLevelEndpointsTests' seeded-chain assertions need the REAL migration-seeded rows.
         await ReseedClassLevelsAsync(context, cancellationToken);
+
+        // TASK-0069: same reasoning, for spec 6.2.13's nine seeded grading bands and the
+        // gras_default assessment structure — SettingsGradingAssessmentEndpointsTests' fresh-database
+        // assertions need the REAL migration-seeded rows, not an empty table.
+        await ReseedGradingBandsAsync(context, cancellationToken);
+        await ReseedAssessmentComponentsAsync(context, cancellationToken);
     }
 
     /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
@@ -290,6 +297,55 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                     ({level.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL, {level.Name},
                      {level.Name.ToLowerInvariant()}, {level.SectionId}, {level.ProgressionOrder},
                      {level.NextLevelId}, 'Active', {level.Version})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13's nine seeded grading bands, using the SAME fixed ids
+    /// <see cref="GradingBandConfiguration.SeededIds"/> the migration itself seeds with — reusing the
+    /// migration's own row ids, not freshly generated ones and not some other re-derivation, is what
+    /// makes this prove the MIGRATION's rows rather than merely proving a seed constant equals itself.
+    /// </summary>
+    private static async Task ReseedGradingBandsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var ids = GradingBandConfiguration.SeededIds;
+
+        for (var index = 0; index < GradingScaleSeed.SeededBands.Count; index++)
+        {
+            var band = GradingScaleSeed.SeededBands[index];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO grading_band (id, lower_bound, upper_bound, grade_letter, remark, display_order)
+                VALUES
+                    ({ids[index]}, {band.LowerBound}, {band.UpperBound}, {band.GradeLetter},
+                     {band.Remark}, {index + 1})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13's three seeded assessment components (the <c>gras_default</c> profile),
+    /// using the SAME fixed ids <see cref="AssessmentComponentConfiguration.SeededIds"/> the migration
+    /// itself seeds with — see <see cref="ReseedGradingBandsAsync"/>'s remarks for why.
+    /// </summary>
+    private static async Task ReseedAssessmentComponentsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var ids = AssessmentComponentConfiguration.SeededIds;
+
+        for (var index = 0; index < AssessmentStructureSeed.GrasDefaultComponents.Count; index++)
+        {
+            var component = AssessmentStructureSeed.GrasDefaultComponents[index];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO assessment_component (id, name, short_label, max_mark, is_examination, display_order)
+                VALUES
+                    ({ids[index]}, {component.Name}, {component.ShortLabel}, {component.MaxMark},
+                     {component.IsExamination}, {index + 1})
                 """,
                 cancellationToken);
         }

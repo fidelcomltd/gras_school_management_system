@@ -105,8 +105,9 @@ Largest module. `index.md` says split it; expect five or more cards.
 | — | Nursery + primary result sheet renderers | BE+FE | 21, 22, 18 §C |
 
 `13-result-computation-rules.md` is not a build task — it is the spec the engine satisfies, and
-its worked example is a regression fixture. Its numbers assume the superseded assessment
-structure and grading scale and must be restated before use.
+its worked example is a regression fixture. **Restated 2026-09-16** against the resolved 20/20/60
+structure and nine-band scale; the corrected tables are reproduced in TASK-0071 so that card is
+self-contained.
 
 ## Phase 4 — weekly reports (parallel with Phase 3)
 

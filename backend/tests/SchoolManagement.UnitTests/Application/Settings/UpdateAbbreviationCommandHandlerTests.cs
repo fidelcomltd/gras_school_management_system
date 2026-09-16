@@ -20,18 +20,33 @@ public sealed class UpdateAbbreviationCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
+    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
+
+    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
+        Substitute.For<IAssessmentComponentRepository>();
+
     private readonly IPupilRepository _pupils = Substitute.For<IPupilRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
-    private UpdateAbbreviationCommandHandler CreateHandler() => new(
-        _schoolProfileRepository,
-        _configVersionRepository,
-        _pupils,
-        _currentUser,
-        _auditSink,
-        _timeProvider);
+    // TASK-0069: the snapshot now reads the current grading/assessment state even from a save that
+    // does not touch either group — stub both empty so SettingsSnapshotBuilder.Build never sees null.
+    private UpdateAbbreviationCommandHandler CreateHandler()
+    {
+        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
+        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+
+        return new(
+            _schoolProfileRepository,
+            _configVersionRepository,
+            _gradingBandRepository,
+            _assessmentComponentRepository,
+            _pupils,
+            _currentUser,
+            _auditSink,
+            _timeProvider);
+    }
 
     private static UpdateAbbreviationCommand ValidCommand(int expectedVersion, string abbreviation = "GRA") => new(
         abbreviation,

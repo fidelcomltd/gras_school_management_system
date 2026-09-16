@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-16 by orchestrator (TASK-0067 closure) · no size cap, see
+Last reconciled: 2026-09-16 by orchestrator (TASK-0069 closed; conflicts 1/2/4 resolved) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -130,7 +130,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0067, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0067, 0069, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -154,11 +154,31 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
+| TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
+| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
+| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-16 **TASK-0069 closed — grading scale and assessment structure exist.** Nine bands,
+  20/20/60, ten grading rules and six assessment rules server-side, session lock, both seed
+  profiles. Contract additive: 54 paths, 102 schemas, hash `152dc1c2`. Final gate 745/33/10,
+  Skipped 0 everywhere. **Five review findings, none self-reported** — two "already solved"
+  architecture failures that were real, a delta called additive that added required properties,
+  a validator rule-order deviation, a missing `ApiTestFixture` reseed that made the fresh-database
+  criterion fail, and a write outside the agent's scope. → `decisions/2026-Q3.md`
+- 2026-09-16 **Conflicts 1, 2 and 4 are settled; results are unblocked.** The orchestrator had
+  reported 1 and 2 as awaiting a human ruling. They were **already resolved by the school** and the
+  spec was written to them — the real blocker was that `13-result-computation-rules.md` §8.4, which
+  the spec itself designates as the regression fixture, still computed against the superseded
+  15/15/10/60 structure and six-band scale. Restated against 20/20/60 and nine bands, holding every
+  `subject_total` constant so §8.4.4-§8.4.7 carry over unchanged; every figure re-derived by an
+  independent arithmetic check. Conflict 4 ruled by the human: Parent's Comment is **optional**,
+  written by a teacher or administrator under the existing `weekly.enter`, portal stays read-only.
+  No item in `25-open-conflicts-to-resolve.md` now blocks build. → `decisions/2026-Q3.md`
 
 - 2026-09-16 **TASK-0067 closed — the scoped gate exists.** `-SkipIntegration` / `-IntegrationFilter`;
   a stage skipped BY REQUEST can never read as a pass, and `Skipped > 0` still fails in every mode.
@@ -371,6 +391,16 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-16 **`04-module-school-settings.md` §6.2.5, §6.2.6 and §6.2.7 still print seed data that
+  §6.2.13 replaces, and the superseded text was never deleted.** §6.2.5 shows six bands and a
+  `String 2` grade letter (now nine bands, String 3); §6.2.6 shows 15/15/10/60 (now 20/20/60);
+  §6.2.7 specifies one school-wide trait scale (now per rating block). A dev who reads the section
+  its card cites, and stops, builds the wrong thing — so TASK-0069 and TASK-0072 each carry an
+  explicit was/now table as a workaround. **Trigger:** any card citing §6.2.5-§6.2.7. **Fix:**
+  delete the superseded tables and leave a pointer to §6.2.13. **Owner:** human — the specification
+  is the school's document; the 2026-09-16 authorisation covered §8.4 specifically, not the spec at
+  large. Ask before the next settings card.
+
 - 2026-09-15 **A correction whose new number equals the pupil's CURRENT number is not rejected**, and
   poisons that pupil's next correction into a `23505` instead of a clean 409. *Trigger: the next card
   touching `POST /pupils/{id}/registration-number`, or the portal card. Owner: `backend-dev`, after a
@@ -470,6 +500,28 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   `Program.cs`.** *Trigger: a THIRD exemption must argue for itself or the type gets a port.*
 
 ### Live — defects and test gaps
+
+- 2026-09-16 **The production seed path for `grading_band` / `assessment_component` is exercised by
+  nothing.** TASK-0069's fresh-database tests pass through `ApiTestFixture`'s truncate-and-reinsert
+  path, which proves the rows can be inserted and read — not that the migration's `HasData` lands on
+  a genuinely empty database. Same gap applies to `school_profile`, the seeded roles and the class
+  levels, which have had the same harness shape since TASK-0005a. **Trigger:** first deployment to a
+  fresh environment, or any card that changes a `HasData` seed. **Owner:** whoever builds the
+  deployment path (open question 5).
+- 2026-09-16 **`ISubjectScoreSessionLockLookup` and `IPublishedResultsGate` return `false`/`0`
+  unconditionally.** Correct today — no `subject_score` or `result_set` table exists — and both
+  branches are unit-tested against fakes that report otherwise. But the 6.2.6 session lock and the
+  6.2.9 published-results reason gate are therefore **inert in production**. **Trigger:** the first
+  card that persists a `subject_score` or a published `result_set` (TASK-0071 reads these settings;
+  it does not write scores). **Owner:** that card. Must replace both Infrastructure classes with
+  real queries, not extend them.
+- 2026-09-16 **`GradingScaleRules.ValidateWholeScale` reports rule 7 before rules 5 and 6.** Spec
+  6.2.5 says "the first failure in the order listed here", so a scale that both starts above 0 and
+  overlaps names the wrong rule. Cosmetic — both are real errors and the editor surfaces one at a
+  time either way. **Fix:** move the rule-7 and rule-8 checks after the adjacent-pair loop.
+  **Owner:** whoever next touches that method.
+- 2026-09-16 **`GET /settings/impact` (6.2.12) is not built.** Depends on the same absent
+  `result_set`. **Trigger:** the results module. **Owner:** that card.
 
 - 2026-09-16 **`ci.ps1`'s "produced no `.trx` for this run" branch is UNTESTED** — the zero-match
   guard's other half (a new-path snapshot diff) is proven, but no case was constructed that makes

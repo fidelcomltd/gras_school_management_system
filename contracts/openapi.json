@@ -7391,6 +7391,453 @@
         }
       }
     },
+    "/api/v1/settings/grading": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Replace the grading scale",
+        "description": "Whole scale as one array, atomic (spec 6.2.5, 6.2.12) — a band omitted from the array is deleted. All ten save-time rules run over the whole submitted scale as one unit; on the first failure nothing is written and the response's `bandIndex` extension names the offending band's position in the submitted array. `expectedVersion` must match the grading group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.",
+        "operationId": "UpdateGrading",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGradingCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsGradingGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/grading/reset": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Restore the grading scale to its seeded defaults",
+        "description": "Restores the nine seeded bands (spec 6.2.13). Treated as an ordinary edit under spec 6.2.9/6.2.11 — the same `expectedVersion`/`reason` contract as `PUT /settings/grading` applies.",
+        "operationId": "ResetGrading",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetGradingCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsGradingGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/assessment": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Replace the assessment structure",
+        "description": "Whole structure as one array, atomic (spec 6.2.6, 6.2.12). A component's `id`, when supplied, must match an existing component — that is how a rename/reorder is told apart from an add or a remove, which matters once the session lock engages. Once a mark has been entered anywhere in the active session, adding, removing, or changing an existing component's `maxMark`/`isExamination` is rejected `409`; renaming and reordering stay allowed (spec 6.2.6). `expectedVersion` must match the assessment group's current `versionNumber` or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.",
+        "operationId": "UpdateAssessment",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssessmentCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsAssessmentGroupDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config-versions": {
       "get": {
         "tags": [
@@ -8694,6 +9141,123 @@
         ],
         "description": "An Arm's status (spec 6.4.3). Defaults ArmStatus.Active.",
         "example": "Active"
+      },
+      "AssessmentComponentDto": {
+        "required": [
+          "id",
+          "name",
+          "shortLabel",
+          "maxMark",
+          "isExamination",
+          "displayOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id — the key marks are stored against (spec 6.2.6).",
+            "example": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101"
+          },
+          "name": {
+            "type": "string",
+            "description": "For example \"1st CA\", \"2nd CA\", \"Exam\".",
+            "example": "1st CA"
+          },
+          "shortLabel": {
+            "type": "string",
+            "description": "Used as the column header where space is tight.",
+            "example": "CA1"
+          },
+          "maxMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1 to 100.",
+            "format": "int32",
+            "example": 20
+          },
+          "isExamination": {
+            "type": "boolean",
+            "description": "Exactly one component in the structure has this `true`.",
+            "example": false
+          },
+          "displayOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Column order. The examination component is always last.",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "One component, both inside SettingsAssessmentGroupDto and inside\nSettingsDto's envelope. An element of an ORDERED ARRAY (6.2.13's durability\nrequirement) — never a named field like `firstCa`/`secondCa`; a client that reads by\nname breaks the moment a school adds a component.",
+        "example": {
+          "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+          "name": "1st CA",
+          "shortLabel": "CA1",
+          "maxMark": 20,
+          "isExamination": false,
+          "displayOrder": 1
+        }
+      },
+      "AssessmentComponentSaveRequest": {
+        "required": [
+          "id",
+          "name",
+          "shortLabel",
+          "maxMark",
+          "isExamination"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An existing component's opaque id, or `null` for a new one.",
+            "example": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101"
+          },
+          "name": {
+            "type": "string",
+            "description": "Up to 40 characters. Unique, case-insensitive.",
+            "example": "1st CA"
+          },
+          "shortLabel": {
+            "type": "string",
+            "description": "Up to 12 characters. Unique, case-insensitive.",
+            "example": "CA1"
+          },
+          "maxMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1 to 100.",
+            "format": "int32",
+            "example": 20
+          },
+          "isExamination": {
+            "type": "boolean",
+            "description": "Exactly one submitted component must set this `true`.",
+            "example": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "One submitted component on the wire (spec 6.2.6/6.2.13). string? AssessmentComponentSaveRequest.Id is opaque (CLAUDE.md\n§8) — `null` for a new component; when it matches an existing component's id it is\nan edit to that same row, never a delete-and-recreate (see `AssessmentComponent`'s remarks).\n`displayOrder` is deliberately absent — it is system-maintained from array position (spec\n6.2.6: \"System-maintained from the drag order\"), with the examination forced last regardless of\nwhere it sits in this array.",
+        "example": {
+          "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+          "name": "1st CA",
+          "shortLabel": "CA1",
+          "maxMark": 20,
+          "isExamination": false
+        }
       },
       "AuditEventDto": {
         "required": [
@@ -10481,6 +11045,123 @@
           "armIds": [ ]
         }
       },
+      "GradingBandDto": {
+        "required": [
+          "id",
+          "lowerBound",
+          "upperBound",
+          "gradeLetter",
+          "remark",
+          "displayOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id.",
+            "example": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001"
+          },
+          "lowerBound": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100 inclusive.",
+            "format": "int32",
+            "example": 90
+          },
+          "upperBound": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100 inclusive, greater than or equal to LowerBound.",
+            "format": "int32",
+            "example": 100
+          },
+          "gradeLetter": {
+            "type": "string",
+            "description": "Up to 3 characters — widened by 6.2.13 to hold `A+` and `B-`.",
+            "example": "A+"
+          },
+          "remark": {
+            "type": "string",
+            "description": "Printed in the Remark column of the result sheet.",
+            "example": "Very excellent"
+          },
+          "displayOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Printing order of the grading key.",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "One band, both inside SettingsGradingGroupDto and inside SettingsDto's\nenvelope. An element of an ORDERED ARRAY (6.2.13's durability requirement) — never a named field —\nsorted by `displayOrder` for printing; grade RESOLUTION sorts by `lowerBound` internally\n(6.2.11), a concern the wire shape does not need to express.",
+        "example": {
+          "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+          "lowerBound": 90,
+          "upperBound": 100,
+          "gradeLetter": "A+",
+          "remark": "Very excellent",
+          "displayOrder": 1
+        }
+      },
+      "GradingBandInput": {
+        "required": [
+          "lowerBound",
+          "upperBound",
+          "gradeLetter",
+          "remark"
+        ],
+        "type": "object",
+        "properties": {
+          "lowerBound": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100 inclusive.",
+            "format": "int32",
+            "example": 90
+          },
+          "upperBound": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100 inclusive, greater than or equal to LowerBound.",
+            "format": "int32",
+            "example": 100
+          },
+          "gradeLetter": {
+            "type": "string",
+            "description": "Up to int GradingBand.GradeLetterMaxLength characters. Unique, case-insensitive.",
+            "example": "A+"
+          },
+          "remark": {
+            "type": "string",
+            "description": "At least int GradingBand.RemarkMinLength characters.",
+            "example": "Very excellent"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One submitted band, before persistence (no id — `PUT /settings/grading` replaces the whole set; see GradingBand's remarks).",
+        "example": {
+          "lowerBound": 90,
+          "upperBound": 100,
+          "gradeLetter": "A+",
+          "remark": "Very excellent"
+        }
+      },
       "HttpValidationProblemDetails": {
         "required": [
           "traceId"
@@ -11376,6 +12057,38 @@
           "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
         }
       },
+      "ResetGradingCommand": {
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The grading group's current `versionNumber`, as last read from `GET /settings`. A stale\nvalue is rejected `409 settings.grading.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 3
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required, at least ten characters, ONLY when a result set is Published in the active session\n(spec 6.2.9 — 6.2.11: \"Reset to defaults while results are published: Allowed, treated as an\nordinary edit under 6.2.9\"); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/settings/grading/reset` (spec 6.2.5: \"a Reset to defaults action requiring\n        `settings.reset.defaults`... restores the six [now nine, 6.2.13] seeded bands. The reset confirms\n        first, naming what will be lost, and writes an audit event.\"). The confirmation dialogue itself is\n        frontend scope; this endpoint is what it calls once the administrator confirms.",
+        "example": {
+          "expectedVersion": 3,
+          "reason": null
+        }
+      },
       "RoleAssignmentDto": {
         "required": [
           "id",
@@ -11943,11 +12656,96 @@
           "versionNumber": 0
         }
       },
+      "SettingsAssessmentGroupDto": {
+        "required": [
+          "components",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentComponentDto"
+            },
+            "description": "Every component, ordered by `displayOrder` (examination last).",
+            "example": [
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+                "name": "1st CA",
+                "shortLabel": "CA1",
+                "maxMark": 20,
+                "isExamination": false,
+                "displayOrder": 1
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+                "name": "2nd CA",
+                "shortLabel": "CA2",
+                "maxMark": 20,
+                "isExamination": false,
+                "displayOrder": 2
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+                "name": "Exam",
+                "shortLabel": "EXAM",
+                "maxMark": 60,
+                "isExamination": true,
+                "displayOrder": 3
+              }
+            ]
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The assessment group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next save.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The assessment-structure group, both inside SettingsDto and as\n`PUT /api/v1/settings/assessment`'s own success body (spec 6.2.6).",
+        "example": {
+          "components": [
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false,
+              "displayOrder": 1
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+              "name": "2nd CA",
+              "shortLabel": "CA2",
+              "maxMark": 20,
+              "isExamination": false,
+              "displayOrder": 2
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+              "name": "Exam",
+              "shortLabel": "EXAM",
+              "maxMark": 60,
+              "isExamination": true,
+              "displayOrder": 3
+            }
+          ],
+          "versionNumber": 0
+        }
+      },
       "SettingsDto": {
         "required": [
           "identity",
           "abbreviation",
-          "regNumber"
+          "regNumber",
+          "grading",
+          "assessment"
         ],
         "type": "object",
         "properties": {
@@ -11962,6 +12760,14 @@
           "regNumber": {
             "description": "The registration-number pattern group.",
             "$ref": "#/components/schemas/SettingsRegNumberGroupDto"
+          },
+          "grading": {
+            "description": "The grading-scale group (TASK-0069).",
+            "$ref": "#/components/schemas/SettingsGradingGroupDto"
+          },
+          "assessment": {
+            "description": "The assessment-structure group (TASK-0069).",
+            "$ref": "#/components/schemas/SettingsAssessmentGroupDto"
           }
         },
         "additionalProperties": false,
@@ -11989,7 +12795,292 @@
             "serialReset": "PerYear",
             "yearSource": "AdmissionYear",
             "versionNumber": 0
+          },
+          "grading": {
+            "bands": [
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+                "lowerBound": 90,
+                "upperBound": 100,
+                "gradeLetter": "A+",
+                "remark": "Very excellent",
+                "displayOrder": 1
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+                "lowerBound": 85,
+                "upperBound": 89,
+                "gradeLetter": "A",
+                "remark": "Excellent",
+                "displayOrder": 2
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+                "lowerBound": 75,
+                "upperBound": 84,
+                "gradeLetter": "B",
+                "remark": "Very good",
+                "displayOrder": 3
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+                "lowerBound": 70,
+                "upperBound": 74,
+                "gradeLetter": "B-",
+                "remark": "Good",
+                "displayOrder": 4
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+                "lowerBound": 60,
+                "upperBound": 69,
+                "gradeLetter": "C+",
+                "remark": "Average",
+                "displayOrder": 5
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+                "lowerBound": 50,
+                "upperBound": 59,
+                "gradeLetter": "C",
+                "remark": "Fair",
+                "displayOrder": 6
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+                "lowerBound": 40,
+                "upperBound": 49,
+                "gradeLetter": "D",
+                "remark": "More effort",
+                "displayOrder": 7
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+                "lowerBound": 20,
+                "upperBound": 39,
+                "gradeLetter": "E",
+                "remark": "Not Now",
+                "displayOrder": 8
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+                "lowerBound": 0,
+                "upperBound": 19,
+                "gradeLetter": "F",
+                "remark": "Fail",
+                "displayOrder": 9
+              }
+            ],
+            "versionNumber": 0
+          },
+          "assessment": {
+            "components": [
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+                "name": "1st CA",
+                "shortLabel": "CA1",
+                "maxMark": 20,
+                "isExamination": false,
+                "displayOrder": 1
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+                "name": "2nd CA",
+                "shortLabel": "CA2",
+                "maxMark": 20,
+                "isExamination": false,
+                "displayOrder": 2
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+                "name": "Exam",
+                "shortLabel": "EXAM",
+                "maxMark": 60,
+                "isExamination": true,
+                "displayOrder": 3
+              }
+            ],
+            "versionNumber": 0
           }
+        }
+      },
+      "SettingsGradingGroupDto": {
+        "required": [
+          "bands",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradingBandDto"
+            },
+            "description": "Every band, ordered by `displayOrder`.",
+            "example": [
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+                "lowerBound": 90,
+                "upperBound": 100,
+                "gradeLetter": "A+",
+                "remark": "Very excellent",
+                "displayOrder": 1
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+                "lowerBound": 85,
+                "upperBound": 89,
+                "gradeLetter": "A",
+                "remark": "Excellent",
+                "displayOrder": 2
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+                "lowerBound": 75,
+                "upperBound": 84,
+                "gradeLetter": "B",
+                "remark": "Very good",
+                "displayOrder": 3
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+                "lowerBound": 70,
+                "upperBound": 74,
+                "gradeLetter": "B-",
+                "remark": "Good",
+                "displayOrder": 4
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+                "lowerBound": 60,
+                "upperBound": 69,
+                "gradeLetter": "C+",
+                "remark": "Average",
+                "displayOrder": 5
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+                "lowerBound": 50,
+                "upperBound": 59,
+                "gradeLetter": "C",
+                "remark": "Fair",
+                "displayOrder": 6
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+                "lowerBound": 40,
+                "upperBound": 49,
+                "gradeLetter": "D",
+                "remark": "More effort",
+                "displayOrder": 7
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+                "lowerBound": 20,
+                "upperBound": 39,
+                "gradeLetter": "E",
+                "remark": "Not Now",
+                "displayOrder": 8
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+                "lowerBound": 0,
+                "upperBound": 19,
+                "gradeLetter": "F",
+                "remark": "Fail",
+                "displayOrder": 9
+              }
+            ]
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The grading group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next save.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The grading-scale group, both inside SettingsDto and as\n`PUT /api/v1/settings/grading`'s / `POST /api/v1/settings/grading/reset`'s own success\nbody (spec 6.2.5).",
+        "example": {
+          "bands": [
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent",
+              "displayOrder": 1
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+              "lowerBound": 85,
+              "upperBound": 89,
+              "gradeLetter": "A",
+              "remark": "Excellent",
+              "displayOrder": 2
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+              "lowerBound": 75,
+              "upperBound": 84,
+              "gradeLetter": "B",
+              "remark": "Very good",
+              "displayOrder": 3
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+              "lowerBound": 70,
+              "upperBound": 74,
+              "gradeLetter": "B-",
+              "remark": "Good",
+              "displayOrder": 4
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+              "lowerBound": 60,
+              "upperBound": 69,
+              "gradeLetter": "C+",
+              "remark": "Average",
+              "displayOrder": 5
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+              "lowerBound": 50,
+              "upperBound": 59,
+              "gradeLetter": "C",
+              "remark": "Fair",
+              "displayOrder": 6
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+              "lowerBound": 40,
+              "upperBound": 49,
+              "gradeLetter": "D",
+              "remark": "More effort",
+              "displayOrder": 7
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+              "lowerBound": 20,
+              "upperBound": 39,
+              "gradeLetter": "E",
+              "remark": "Not Now",
+              "displayOrder": 8
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+              "lowerBound": 0,
+              "upperBound": 19,
+              "gradeLetter": "F",
+              "remark": "Fail",
+              "displayOrder": 9
+            }
+          ],
+          "versionNumber": 0
         }
       },
       "SettingsIdentityGroupDto": {
@@ -12581,6 +13672,244 @@
           "capacity": 25,
           "formTeacherAdminId": null,
           "status": null
+        }
+      },
+      "UpdateAssessmentCommand": {
+        "required": [
+          "components",
+          "expectedVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentComponentSaveRequest"
+            },
+            "description": "The whole structure, in the order it should print (examination forced last regardless of position — spec 6.2.6).",
+            "example": [
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+                "name": "1st CA",
+                "shortLabel": "CA1",
+                "maxMark": 20,
+                "isExamination": false
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+                "name": "2nd CA",
+                "shortLabel": "CA2",
+                "maxMark": 20,
+                "isExamination": false
+              },
+              {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+                "name": "Exam",
+                "shortLabel": "EXAM",
+                "maxMark": 60,
+                "isExamination": true
+              }
+            ]
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The assessment group's current `versionNumber`, as last read from `GET /settings`. A\nstale value is rejected `409 settings.assessment.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 0
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required, at least ten characters, ONLY when a result set is Published in the active session\n(spec 6.2.9); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/settings/assessment` (spec 6.2.6, 6.2.12: \"Whole structure as one array. Atomic.\n        Returns 409 when locked for the session.\"). A REPLACE with per-row IDENTITY preserved by\n        string? AssessmentComponentSaveRequest.Id — see that type's remarks for why this differs\n        from UpdateGradingCommand's blind replace.",
+        "example": {
+          "components": [
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+              "name": "2nd CA",
+              "shortLabel": "CA2",
+              "maxMark": 20,
+              "isExamination": false
+            },
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+              "name": "Exam",
+              "shortLabel": "EXAM",
+              "maxMark": 60,
+              "isExamination": true
+            }
+          ],
+          "expectedVersion": 0,
+          "reason": null
+        }
+      },
+      "UpdateGradingCommand": {
+        "required": [
+          "bands",
+          "expectedVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradingBandInput"
+            },
+            "description": "The whole scale, in the order it should print. See GradingScaleRules for the ten save-time rules.",
+            "example": [
+              {
+                "lowerBound": 90,
+                "upperBound": 100,
+                "gradeLetter": "A+",
+                "remark": "Very excellent"
+              },
+              {
+                "lowerBound": 85,
+                "upperBound": 89,
+                "gradeLetter": "A",
+                "remark": "Excellent"
+              },
+              {
+                "lowerBound": 75,
+                "upperBound": 84,
+                "gradeLetter": "B",
+                "remark": "Very good"
+              },
+              {
+                "lowerBound": 70,
+                "upperBound": 74,
+                "gradeLetter": "B-",
+                "remark": "Good"
+              },
+              {
+                "lowerBound": 60,
+                "upperBound": 69,
+                "gradeLetter": "C+",
+                "remark": "Average"
+              },
+              {
+                "lowerBound": 50,
+                "upperBound": 59,
+                "gradeLetter": "C",
+                "remark": "Fair"
+              },
+              {
+                "lowerBound": 40,
+                "upperBound": 49,
+                "gradeLetter": "D",
+                "remark": "More effort"
+              },
+              {
+                "lowerBound": 20,
+                "upperBound": 39,
+                "gradeLetter": "E",
+                "remark": "Not Now"
+              },
+              {
+                "lowerBound": 0,
+                "upperBound": 19,
+                "gradeLetter": "F",
+                "remark": "Fail"
+              }
+            ]
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The grading group's current `versionNumber`, as last read from `GET /settings`. A stale\nvalue is rejected `409 settings.grading.stale_version` before anything is written.",
+            "format": "int32",
+            "example": 0
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required, at least ten characters, ONLY when a result set is Published in the active session\n(spec 6.2.9); ignored otherwise. See UpdateGradingCommandHandler's remarks — the\ncheck that decides which applies is honestly always \"no publications\" today, no results module\nexisting yet."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/settings/grading` (spec 6.2.5, 6.2.12: \"Whole scale as one array. Atomic.\").\n        Every band in the new scale — this is a REPLACE, not a patch; omitting a currently-seeded band\n        deletes it.",
+        "example": {
+          "bands": [
+            {
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent"
+            },
+            {
+              "lowerBound": 85,
+              "upperBound": 89,
+              "gradeLetter": "A",
+              "remark": "Excellent"
+            },
+            {
+              "lowerBound": 75,
+              "upperBound": 84,
+              "gradeLetter": "B",
+              "remark": "Very good"
+            },
+            {
+              "lowerBound": 70,
+              "upperBound": 74,
+              "gradeLetter": "B-",
+              "remark": "Good"
+            },
+            {
+              "lowerBound": 60,
+              "upperBound": 69,
+              "gradeLetter": "C+",
+              "remark": "Average"
+            },
+            {
+              "lowerBound": 50,
+              "upperBound": 59,
+              "gradeLetter": "C",
+              "remark": "Fair"
+            },
+            {
+              "lowerBound": 40,
+              "upperBound": 49,
+              "gradeLetter": "D",
+              "remark": "More effort"
+            },
+            {
+              "lowerBound": 20,
+              "upperBound": 39,
+              "gradeLetter": "E",
+              "remark": "Not Now"
+            },
+            {
+              "lowerBound": 0,
+              "upperBound": 19,
+              "gradeLetter": "F",
+              "remark": "Fail"
+            }
+          ],
+          "expectedVersion": 0,
+          "reason": null
         }
       },
       "UpdateLevelCommand": {

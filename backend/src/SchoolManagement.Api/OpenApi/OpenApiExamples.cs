@@ -16,6 +16,7 @@ using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
 using SchoolManagement.Application.Sessions;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
 
@@ -163,7 +164,135 @@ internal static class OpenApiExamples
                 "serialReset": "PerYear",
                 "yearSource": "AdmissionYear",
                 "versionNumber": 0
+              },
+              "grading": {
+                "bands": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001", "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent", "displayOrder": 1 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002", "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent", "displayOrder": 2 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003", "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good", "displayOrder": 3 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004", "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good", "displayOrder": 4 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005", "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average", "displayOrder": 5 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006", "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair", "displayOrder": 6 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007", "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort", "displayOrder": 7 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008", "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now", "displayOrder": 8 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009", "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail", "displayOrder": 9 }
+                ],
+                "versionNumber": 0
+              },
+              "assessment": {
+                "components": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false, "displayOrder": 1 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false, "displayOrder": 2 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true, "displayOrder": 3 }
+                ],
+                "versionNumber": 0
               }
+            }
+            """,
+
+        [typeof(GradingBandDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent",
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SettingsGradingGroupDto)] = """
+            {
+              "bands": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001", "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent", "displayOrder": 1 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002", "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent", "displayOrder": 2 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003", "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good", "displayOrder": 3 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004", "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good", "displayOrder": 4 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005", "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average", "displayOrder": 5 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006", "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair", "displayOrder": 6 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007", "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort", "displayOrder": 7 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008", "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now", "displayOrder": 8 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009", "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail", "displayOrder": 9 }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(GradingBandInput)] = """
+            {
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent"
+            }
+            """,
+
+        [typeof(UpdateGradingCommand)] = """
+            {
+              "bands": [
+                { "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent" },
+                { "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent" },
+                { "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good" },
+                { "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good" },
+                { "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average" },
+                { "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair" },
+                { "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort" },
+                { "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now" },
+                { "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail" }
+              ],
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(ResetGradingCommand)] = """
+            {
+              "expectedVersion": 3,
+              "reason": null
+            }
+            """,
+
+        [typeof(AssessmentComponentDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false,
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SettingsAssessmentGroupDto)] = """
+            {
+              "components": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false, "displayOrder": 1 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false, "displayOrder": 2 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true, "displayOrder": 3 }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(AssessmentComponentSaveRequest)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false
+            }
+            """,
+
+        [typeof(UpdateAssessmentCommand)] = """
+            {
+              "components": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true }
+              ],
+              "expectedVersion": 0,
+              "reason": null
             }
             """,
 

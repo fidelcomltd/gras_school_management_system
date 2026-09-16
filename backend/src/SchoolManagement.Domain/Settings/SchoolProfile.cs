@@ -111,7 +111,9 @@ public sealed class SchoolProfile : Entity<Guid>
         string separator,
         int serialWidth,
         RegNumberSerialReset serialReset,
-        int regNumberVersionNumber)
+        int regNumberVersionNumber,
+        int gradingVersionNumber,
+        int assessmentVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -129,6 +131,8 @@ public sealed class SchoolProfile : Entity<Guid>
         SerialWidth = serialWidth;
         SerialReset = serialReset;
         RegNumberVersionNumber = regNumberVersionNumber;
+        GradingVersionNumber = gradingVersionNumber;
+        AssessmentVersionNumber = assessmentVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -189,6 +193,21 @@ public sealed class SchoolProfile : Entity<Guid>
     /// <see cref="UpdateRegNumber"/>.
     /// </summary>
     public int RegNumberVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The grading-scale group's own, independent optimistic-concurrency pointer (TASK-0069). The
+    /// scale itself lives in the separate <see cref="GradingBand"/> table — this counter has no
+    /// grading fields of its own to guard, only the group's "what did the client last see" pointer,
+    /// matching <see cref="AbbreviationVersionNumber"/>'s reason for existing on this singleton rather
+    /// than a row that is itself replaced wholesale on every save.
+    /// </summary>
+    public int GradingVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The assessment-structure group's own, independent optimistic-concurrency pointer (TASK-0069).
+    /// See <see cref="GradingVersionNumber"/>'s remarks — same reasoning, for <see cref="AssessmentComponent"/>.
+    /// </summary>
+    public int AssessmentVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -257,6 +276,20 @@ public sealed class SchoolProfile : Entity<Guid>
     }
 
     /// <summary>
+    /// Bumps <see cref="GradingVersionNumber"/> for a successful <c>PUT /settings/grading</c> or
+    /// <c>POST /settings/grading/reset</c> save (TASK-0069). The bands themselves are written through
+    /// <c>IGradingBandRepository.ReplaceAllAsync</c>, not through this entity — this method only
+    /// advances the group's optimistic-concurrency pointer, in the same transaction.
+    /// </summary>
+    public void IncrementGradingVersion() => GradingVersionNumber++;
+
+    /// <summary>
+    /// Bumps <see cref="AssessmentVersionNumber"/> for a successful <c>PUT /settings/assessment</c>
+    /// save (TASK-0069). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementAssessmentVersion() => AssessmentVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -279,7 +312,9 @@ public sealed class SchoolProfile : Entity<Guid>
         string separator = DefaultSeparator,
         int serialWidth = DefaultSerialWidth,
         RegNumberSerialReset serialReset = DefaultSerialReset,
-        int regNumberVersionNumber = 0) =>
+        int regNumberVersionNumber = 0,
+        int gradingVersionNumber = 0,
+        int assessmentVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -296,5 +331,7 @@ public sealed class SchoolProfile : Entity<Guid>
             separator,
             serialWidth,
             serialReset,
-            regNumberVersionNumber);
+            regNumberVersionNumber,
+            gradingVersionNumber,
+            assessmentVersionNumber);
 }

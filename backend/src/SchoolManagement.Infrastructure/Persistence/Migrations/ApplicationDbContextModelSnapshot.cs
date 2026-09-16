@@ -1448,6 +1448,71 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("terms", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.AssessmentComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsExamination")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_examination");
+
+                    b.Property<int>("MaxMark")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_mark");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ShortLabel")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("short_label");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assessment_component");
+
+                    b.ToTable("assessment_component", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000501"),
+                            DisplayOrder = 1,
+                            IsExamination = false,
+                            MaxMark = 20,
+                            Name = "1st CA",
+                            ShortLabel = "CA1"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000502"),
+                            DisplayOrder = 2,
+                            IsExamination = false,
+                            MaxMark = 20,
+                            Name = "2nd CA",
+                            ShortLabel = "CA2"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000503"),
+                            DisplayOrder = 3,
+                            IsExamination = true,
+                            MaxMark = 60,
+                            Name = "Exam",
+                            ShortLabel = "EXAM"
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.ConfigVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1497,6 +1562,125 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("config_versions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.GradingBand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("GradeLetter")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("grade_letter");
+
+                    b.Property<int>("LowerBound")
+                        .HasColumnType("integer")
+                        .HasColumnName("lower_bound");
+
+                    b.Property<string>("Remark")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("remark");
+
+                    b.Property<int>("UpperBound")
+                        .HasColumnType("integer")
+                        .HasColumnName("upper_bound");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grading_band");
+
+                    b.ToTable("grading_band", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000401"),
+                            DisplayOrder = 1,
+                            GradeLetter = "A+",
+                            LowerBound = 90,
+                            Remark = "Very excellent",
+                            UpperBound = 100
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000402"),
+                            DisplayOrder = 2,
+                            GradeLetter = "A",
+                            LowerBound = 85,
+                            Remark = "Excellent",
+                            UpperBound = 89
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000403"),
+                            DisplayOrder = 3,
+                            GradeLetter = "B",
+                            LowerBound = 75,
+                            Remark = "Very good",
+                            UpperBound = 84
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000404"),
+                            DisplayOrder = 4,
+                            GradeLetter = "B-",
+                            LowerBound = 70,
+                            Remark = "Good",
+                            UpperBound = 74
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000405"),
+                            DisplayOrder = 5,
+                            GradeLetter = "C+",
+                            LowerBound = 60,
+                            Remark = "Average",
+                            UpperBound = 69
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000406"),
+                            DisplayOrder = 6,
+                            GradeLetter = "C",
+                            LowerBound = 50,
+                            Remark = "Fair",
+                            UpperBound = 59
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000407"),
+                            DisplayOrder = 7,
+                            GradeLetter = "D",
+                            LowerBound = 40,
+                            Remark = "More effort",
+                            UpperBound = 49
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000408"),
+                            DisplayOrder = 8,
+                            GradeLetter = "E",
+                            LowerBound = 20,
+                            Remark = "Not Now",
+                            UpperBound = 39
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000409"),
+                            DisplayOrder = 9,
+                            GradeLetter = "F",
+                            LowerBound = 0,
+                            Remark = "Fail",
+                            UpperBound = 19
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.RegistrationCounter", b =>
                 {
                     b.Property<string>("Id")
@@ -1536,11 +1720,19 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("address");
 
+                    b.Property<int>("AssessmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("assessment_version_number");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
                         .HasColumnName("email");
+
+                    b.Property<int>("GradingVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("grading_version_number");
 
                     b.Property<string>("HeadTeacherName")
                         .IsRequired()
@@ -1613,7 +1805,9 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             Abbreviation = "GRAS",
                             AbbreviationVersionNumber = 0,
                             Address = "",
+                            AssessmentVersionNumber = 0,
                             Email = "",
+                            GradingVersionNumber = 0,
                             HeadTeacherName = "",
                             IdentityVersionNumber = 0,
                             Phone = "",

@@ -20,4 +20,10 @@ public enum ConfigVersionGroup
 
     /// <summary>A save through <c>PATCH /settings/reg-number</c> (TASK-0005c).</summary>
     RegistrationNumber = 2,
+
+    /// <summary>A save through <c>PUT /settings/grading</c> or <c>POST /settings/grading/reset</c> (TASK-0069).</summary>
+    Grading = 3,
+
+    /// <summary>A save through <c>PUT /settings/assessment</c> (TASK-0069).</summary>
+    Assessment = 4,
 }

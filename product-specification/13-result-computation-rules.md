@@ -49,7 +49,7 @@ Steps 5 and 6 are separate passes over the same data with different populations.
 
 ### 8.4.1 Setup
 
-Session 2026/2027, First Term. Class level Primary 3, running two arms: Primary 3A with 28 active pupils and Primary 3B with 26, giving 54 pupils at the level. Assessment structure is the seeded one: First CA Test 15, Second CA Test 15, Assignment 10, Examination 60. Grading scale is the seeded six bands. Result rules are the defaults: arm-scoped primary position, level position shown, shared-position tie-breaking, pass mark 40.
+Session 2026/2027, First Term. Class level Primary 3, running two arms: Primary 3A with 28 active pupils and Primary 3B with 26, giving 54 pupils at the level. Assessment structure is the seeded one per 6.2.13: 1st CA 20, 2nd CA 20, Examination 60, with no assignment component. Grading scale is the seeded nine bands per 6.2.13. Result rules are the defaults: arm-scoped primary position, level position shown, shared-position tie-breaking, pass mark 40.
 
 Pupil under examination: Adaeze Okafor, `GRAS/2024/0087`, female, born 04/03/2018, so 8 years old as at the term end date of 18/12/2026, enrolled in Primary 3A.
 
@@ -57,25 +57,27 @@ Primary 3 actually takes nine subjects. Four are shown here so the arithmetic ca
 
 ### 8.4.2 Adaeze's marks and subject totals
 
-| Subject | CA1 /15 | CA2 /15 | ASG /10 | CA total /40 | Exam /60 | Total /100 | Grade |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| English Studies | 13 | 12 | 9 | 34 | 52 | 86 | A |
-| Mathematics | 11 | 14 | 8 | 33 | 45 | 78 | B |
-| Basic Science and Technology | 10 | 9 | 7 | 26 | 38 | 64 | C |
-| Cultural and Creative Arts | 14 | 13 | 10 | 37 | 55 | 92 | A |
+| Subject | CA1 /20 | CA2 /20 | CA total | Exam /60 | Total /100 | Grade |
+| --- | --- | --- | --- | --- | --- | --- |
+| English Studies | 18 | 16 | 34 | 52 | 86 | A |
+| Mathematics | 17 | 16 | 33 | 45 | 78 | B |
+| Basic Science and Technology | 14 | 12 | 26 | 38 | 64 | C+ |
+| Cultural and Creative Arts | 19 | 18 | 37 | 55 | 92 | A+ |
 
-*Grades resolved against the seeded scale: 86 falls in A (80 to 100), 78 in B (70 to 79), 64 in C (60 to 69), 92 in A.*
+*The CA total column deliberately carries no maximum in its heading. It is the sum of every component where `is_examination` is false, which is 40 under this structure and a different number under another. Per 6.2.13 the value 40 must not appear in a column heading, a validation message, a fixture or anywhere in code.*
 
-Remarks follow the band: Excellent, Very Good, Good, Excellent.
+*Grades resolved against the seeded nine bands: 86 falls in A (85 to 89), 78 in B (75 to 84), 64 in C+ (60 to 69), 92 in A+ (90 to 100).*
 
-total_obtained is 86 plus 78 plus 64 plus 92, which is **320**. total_obtainable is 4 multiplied by 100, which is **400**. average is 320 divided by 4, which is **80.00**, and 80.00 falls in band A, so the overall grade is **A, Excellent**.
+Remarks follow the band: Excellent, Very good, Average, Very excellent.
+
+total_obtained is 86 plus 78 plus 64 plus 92, which is **320**. total_obtainable is 4 multiplied by 100, which is **400**. average is 320 divided by 4, which is **80.00**, and 80.00 falls in band B (75 to 84), so the overall grade is **B, Very good**.
 
 ### 8.4.3 A pupil absent for one examination
 
-Musa Ibrahim, `GRAS/2026/0104`, also in Primary 3A, was absent for the Mathematics examination. His Mathematics row is CA1 9, CA2 8, Assignment 7, giving a continuous assessment total of 24, with exam_absent true.
+Musa Ibrahim, `GRAS/2026/0104`, also in Primary 3A, was absent for the Mathematics examination. His Mathematics row is CA1 13, CA2 11, giving a continuous assessment total of 24, with exam_absent true.
 
 - His subject_total for Mathematics is 24, the continuous assessment total alone.
-- 24 falls in band F, so his grade is F and his remark is Fail.
+- 24 falls in band E (20 to 39), so his grade is E and his remark is Not Now.
 - The result sheet prints ABS in his examination column and 24 with an asterisk in his total column, keyed to the footnote ABS: absent for the examination.
 - He is ranked in Mathematics. With 24 he is last, 28th of 28.
 - He is excluded from Mathematics' class average, highest and lowest. The counted population for Mathematics is therefore 27, not 28, while the ranked population is 28.
@@ -136,7 +138,7 @@ This table is the fairness argument in one place. Emeka is first in his arm and 
 | Total marks obtainable | 400 |
 | Total marks obtained | 320 |
 | Average | 80.00 |
-| Overall grade and remark | A, Excellent |
+| Overall grade and remark | B, Very good |
 | Position in Class (Primary 3A, 28 pupils) | 3rd |
 | Position in Primary 3 (all 2 arms, 54 pupils) | 5th |
 | Times school opened | 58 |
@@ -147,14 +149,16 @@ This table is the fairness argument in one place. Emeka is first in his arm and 
 
 Adaeze's three term averages for 2026/2027 are First Term 80.00, Second Term 78.25 and Third Term 82.50.
 
-- Under the default simple average: 80.00 plus 78.25 plus 82.50 is 240.75. Divided by 3 that is 80.25. Cumulative grade **A, Excellent**.
+- Under the default simple average: 80.00 plus 78.25 plus 82.50 is 240.75. Divided by 3 that is 80.25. Cumulative grade **B, Very good**.
 - Under the weighted alternative with weights 20, 30 and 50: 80.00 times 0.20 is 16.000, plus 78.25 times 0.30 is 23.475, plus 82.50 times 0.50 is 41.250, giving 80.725, which rounds to **80.73**. Same grade, different number, and the difference is why the method is a setting and why changing it after Third Term is published is locked.
 - Annual position: ranked on cumulative average within Primary 3A.
 - Promotion: cumulative average 80.25 is at or above the promotion threshold of 40. `require_core_pass` is true and the core subjects are English Studies and Mathematics. Her annual subject means are 85.33 in English Studies, from 86, 82 and 88, and 76.33 in Mathematics, from 78, 71 and 80. Both are at or above the pass mark of 40. Proposed outcome: **Promoted to Primary 4**.
 
 ## 8.5 Using this as a fixture
 
-Load Primary 3A and Primary 3B with the pupils and marks above, run computation, and assert: Adaeze's four subject totals, four grades and four subject positions; the Mathematics tie displaying as 6th (tied) with the next position 8th; the Mathematics counted population of 27 against a ranked population of 28; Mathematics lowest of 31 rather than 24; the four class averages to one decimal place; total obtained 320, average 80.00, arm position 3rd of 28, level position 5th of 54; Musa's Mathematics total of 24 with ABS printed and grade F; and the annual cumulative of 80.25 under simple average and 80.73 under 20, 30, 50 weighting. Any change to the rounding rule, the tie-break default or the absentee treatment will break at least one of those assertions, which is the point.
+Load Primary 3A and Primary 3B with the pupils and marks above, run computation, and assert: Adaeze's four subject totals, four grades (A, B, C+, A+) and four subject positions; the Mathematics tie displaying as 6th (tied) with the next position 8th; the Mathematics counted population of 27 against a ranked population of 28; Mathematics lowest of 31 rather than 24; the four class averages to one decimal place; total obtained 320, average 80.00, overall grade B, arm position 3rd of 28, level position 5th of 54; Musa's Mathematics total of 24 with ABS printed and grade E; and the annual cumulative of 80.25 under simple average and 80.73 under 20, 30, 50 weighting. Any change to the rounding rule, the tie-break default or the absentee treatment will break at least one of those assertions, which is the point.
+
+Two coverage gaps this fixture does not close, and which need their own unit tests rather than a second end-to-end fixture: no total in it lands in **D (40 to 49)** or in **F (0 to 19)**, so band resolution at the bottom of the scale is unexercised here. F matters particularly because it is the band this specification added rather than the school, and it is the one a contiguity regression would expose first.
 
 
 ---

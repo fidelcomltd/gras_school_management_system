@@ -28,6 +28,8 @@ namespace SchoolManagement.Application.Settings;
 internal sealed class UpdateSchoolIdentityCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IConfigVersionRepository configVersionRepository,
+    IGradingBandRepository gradingBandRepository,
+    IAssessmentComponentRepository assessmentComponentRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -84,9 +86,14 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
             request.Motto,
             request.HeadTeacherName);
 
+        // TASK-0069: the snapshot carries every group, not only the one this save changed (spec
+        // 6.2.9) — read the grading/assessment groups' CURRENT state purely to hand them through.
+        var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile),
+            SettingsSnapshotBuilder.Build(profile, bands, components),
             ConfigVersionGroup.Identity,
             currentUser.UserId,
             reason: null,

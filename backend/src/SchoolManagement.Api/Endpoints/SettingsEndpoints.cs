@@ -41,6 +41,9 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapUpdateRegNumber(settingsGroup);
         MapGetRegNumberPreview(settingsGroup);
         MapUpdateAbbreviation(settingsGroup);
+        MapUpdateGrading(settingsGroup);
+        MapResetGrading(settingsGroup);
+        MapUpdateAssessment(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -173,6 +176,92 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's " +
                 "current `versionNumber` or the save is rejected `409` before anything is written.")
             .Produces<SettingsAbbreviationGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateGrading(RouteGroupBuilder group) =>
+        group.MapPut("/grading", async (
+                UpdateGradingCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.GradingUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateGrading")
+            .WithSummary("Replace the grading scale")
+            .WithDescription(
+                "Whole scale as one array, atomic (spec 6.2.5, 6.2.12) — a band omitted from the " +
+                "array is deleted. All ten save-time rules run over the whole submitted scale as one " +
+                "unit; on the first failure nothing is written and the response's `bandIndex` " +
+                "extension names the offending band's position in the submitted array. " +
+                "`expectedVersion` must match the grading group's current `versionNumber` (from " +
+                "`GET /settings`) or the save is rejected `409` before anything is written. `reason` " +
+                "is required, at least ten characters, only when a result set is Published in the " +
+                "active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsGradingGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapResetGrading(RouteGroupBuilder group) =>
+        group.MapPost("/grading/reset", async (
+                ResetGradingCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.ResetDefaults)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("ResetGrading")
+            .WithSummary("Restore the grading scale to its seeded defaults")
+            .WithDescription(
+                "Restores the nine seeded bands (spec 6.2.13). Treated as an ordinary edit under " +
+                "spec 6.2.9/6.2.11 — the same `expectedVersion`/`reason` contract as " +
+                "`PUT /settings/grading` applies.")
+            .Produces<SettingsGradingGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateAssessment(RouteGroupBuilder group) =>
+        group.MapPut("/assessment", async (
+                UpdateAssessmentCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.AssessmentUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateAssessment")
+            .WithSummary("Replace the assessment structure")
+            .WithDescription(
+                "Whole structure as one array, atomic (spec 6.2.6, 6.2.12). A component's `id`, when " +
+                "supplied, must match an existing component — that is how a rename/reorder is told " +
+                "apart from an add or a remove, which matters once the session lock engages. Once a " +
+                "mark has been entered anywhere in the active session, adding, removing, or changing " +
+                "an existing component's `maxMark`/`isExamination` is rejected `409`; renaming and " +
+                "reordering stay allowed (spec 6.2.6). `expectedVersion` must match the assessment " +
+                "group's current `versionNumber` or the save is rejected `409` before anything is " +
+                "written. `reason` is required, at least ten characters, only when a result set is " +
+                "Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsAssessmentGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

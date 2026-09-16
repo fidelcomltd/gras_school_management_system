@@ -35,6 +35,8 @@ internal sealed class UpdateRegNumberCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IRegistrationCounterRepository registrationCounterRepository,
     IConfigVersionRepository configVersionRepository,
+    IGradingBandRepository gradingBandRepository,
+    IAssessmentComponentRepository assessmentComponentRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -103,9 +105,13 @@ internal sealed class UpdateRegNumberCommandHandler(
 
         profile.UpdateRegNumber(request.Separator, request.SerialWidth, request.SerialReset);
 
+        // TASK-0069: the snapshot carries every group, not only the one this save changed (spec 6.2.9).
+        var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile),
+            SettingsSnapshotBuilder.Build(profile, bands, components),
             ConfigVersionGroup.RegistrationNumber,
             currentUser.UserId,
             reason: null,

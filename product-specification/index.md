@@ -69,7 +69,7 @@ The school supplied eight images: its own nursery result sheet, its own primary 
 | 12 | `11-module-parent-portal.md` | Module 6.9 | Public portal. **New 6.9.10** adds weekly reports and section-based sheet routing. |
 | 13 | `20-module-weekly-reports.md` | Module 6.10 | **New.** Weekly pastoral reports: entities, entry grid, publication, parent view, endpoints. |
 | 14 | `12-end-to-end-flows.md` | End-to-end flows | Five multi-module walkthroughs. Predates revision 3; the pin flow is current, the registration flow is superseded by 6.5.11. |
-| 15 | `13-result-computation-rules.md` | Computation rules | Algorithm and worked example. Numbers need restating after conflicts item 2. |
+| 15 | `13-result-computation-rules.md` | Computation rules | Algorithm and worked example. Restated 2026-09-16 against the resolved 20/20/60 structure and the nine-band scale. |
 | 16 | `14-non-functional-requirements.md` | Non-functional requirements | Auth, authorisation, audit, deletion rules, uploads, performance, backup, NDPA 2023, printing. |
 | 17 | `15-reporting-requirements.md` | Reporting | Thirteen reports, plus **eight more in 10.2** including the class safeguarding sheet. |
 | 18 | `16-appendix-a-decisions.md` | Appendix A: decisions | Numbered decisions with rationale. Entries 46 and 48 are partly superseded; see conflicts items 3 and 6. |
