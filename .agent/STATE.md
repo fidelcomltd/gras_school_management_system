@@ -145,7 +145,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0074, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -173,13 +173,19 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
 | TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **DISPATCHED 2026-09-16** (parallel with 0075 under `contract.md` §3 — disjoint files, zero endpoints, no contract change) — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0075 | Gate the ledger's contract block against the lock | backend-dev | **DISPATCHED 2026-09-16** — human directive, after `## Contract` went stale a THIRD time. Three assertions: lock-vs-document (**verified by nothing today**), ledger-vs-lock, ledger counts-vs-live. Must be proven able to fail on all three |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-16 **TASK-0075 closed — the ledger's contract block is gated, and `CONTRACT.lock` is
+  verified for the first time.** Three independent assertions in `ci.ps1` gate 11. **The existing
+  contract-drift gate never read the lock at all** — trusted by every agent, verified by nothing.
+  Each assertion proven to fail independently; the agent also falsified its own SELF-TEST, unasked.
+  Orchestrator re-ran with a DIFFERENT mutation on a copy. **Gate runs LAST on purpose** — first
+  would block a contract-moving dev agent on bookkeeping it is forbidden to fix. →
+  `decisions/2026-Q3.md`
 - 2026-09-16 **TASK-0065 closed — the integration suite no longer needs the network.** 322 tests in
   **3m40s offline** against 45+ min hosted; a missing database now FAILS instead of skipping. **The
   card was only possible because `docker ABSENT` in this file meant the WINDOWS HOST — Docker was

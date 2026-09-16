@@ -1,0 +1,15 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "Fixture", "version": "v1" },
+  "paths": {
+    "/api/v1/widgets": {},
+    "/api/v1/widgets/{id}": {}
+  },
+  "components": {
+    "schemas": {
+      "WidgetDto": {},
+      "WidgetCreateRequest": {},
+      "ProblemDetails": {}
+    }
+  }
+}

@@ -15,6 +15,7 @@
       8.  dependency vulnerability scan
       9.  secret scan (skipped with a warning if gitleaks is not installed)
       10. OpenAPI contract drift
+      11. Contract ledger drift (CONTRACT.lock vs. the committed contract vs. .agent/STATE.md)
 
     By default the script stops at the FIRST failing gate: a contributor fixes one thing, pushes,
     and finds out about the next thing rather than waiting through a database round trip to learn a
@@ -135,6 +136,10 @@ Push-Location $backendRoot
 # commands for why that matters.
 . (Join-Path $PSScriptRoot 'lib/postgres-test-connection.ps1')
 Initialize-PostgresTestConnection -HomeDirectory $HOME
+
+# Same pattern again: one implementation of "does the ledger match", shared with
+# backend/scripts/tests/contract-ledger.tests.ps1 (TASK-0075).
+. (Join-Path $PSScriptRoot 'lib/contract-ledger.ps1')
 
 $failures = [System.Collections.Generic.List[string]]::new()
 $gateVerdicts = [System.Collections.Generic.List[string]]::new()
@@ -565,6 +570,61 @@ try {
             Write-Host 'The committed contract matches the code.'
             $global:LASTEXITCODE = 0
         }
+    }
+
+    # TASK-0075: the drift gate above proves the CODE and the committed contract agree. It never
+    # reads contracts/CONTRACT.lock or .agent/STATE.md at all, so both were trusted by every agent
+    # and verified by nothing — and STATE.md's `## Contract` block (hash, path count, schema
+    # count, stated in prose) drifted from the real contract three separate times, silently, each
+    # time a closing card updated the archive and not the block. This gate makes that impossible to
+    # miss: file reads only, no database, no build output, so it belongs in the cheap tier.
+    Invoke-Gate 'Contract ledger drift' {
+        $repoRoot = Split-Path -Parent $backendRoot
+        $lockPath = Join-Path $repoRoot 'contracts/CONTRACT.lock'
+        $contractPath = Join-Path $repoRoot 'contracts/openapi.json'
+        $statePath = Join-Path $repoRoot '.agent/STATE.md'
+
+        $result = Test-ContractLedger -LockPath $lockPath -ContractPath $contractPath -StatePath $statePath
+
+        # Checked in this order, and each throws its own distinct message, because "the lock is
+        # wrong" and "the ledger is wrong" are different problems with different owners: a wrong
+        # lock is fixed by regenerating the contract; a wrong ledger can ONLY be fixed by the
+        # orchestrator, since .agent/** is off limits to a dev agent (CLAUDE.md §1).
+        if (-not $result.LockMatches) {
+            Write-Host 'contracts/CONTRACT.lock does not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  CONTRACT.lock records: $($result.LockHash)" -ForegroundColor Red
+            Write-Host "  actual document hash:  $($result.ActualHash)" -ForegroundColor Red
+            Write-Host 'The LOCK is wrong, not the ledger. Fix by regenerating it:' -ForegroundColor Yellow
+            Write-Host '    ./scripts/generate-openapi.ps1 -Promote' -ForegroundColor Yellow
+            throw 'CONTRACT.lock does not match the committed contract.'
+        }
+
+        if (-not $result.StateHashMatches) {
+            Write-Host '.agent/STATE.md ## Contract "Current:" hash does not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  STATE.md states:      $($result.StateHash)" -ForegroundColor Red
+            Write-Host "  actual document hash: $($result.ActualHash)" -ForegroundColor Red
+            Write-Host 'The LEDGER is stale, not the lock. Fix by updating .agent/STATE.md ## Contract' -ForegroundColor Yellow
+            Write-Host "to the actual hash above ($($result.ActualHash))." -ForegroundColor Yellow
+            Write-Host 'The ORCHESTRATOR owns .agent/STATE.md — a dev agent cannot write it. If you are' -ForegroundColor Yellow
+            Write-Host 'a dev agent reading this, STOP and bounce the card; do not guess and do not' -ForegroundColor Yellow
+            Write-Host 'edit .agent/** yourself.' -ForegroundColor Yellow
+            throw '.agent/STATE.md ## Contract "Current:" hash is stale.'
+        }
+
+        if (-not $result.StateCountsMatch) {
+            Write-Host '.agent/STATE.md ## Contract path/schema counts do not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  STATE.md states: $($result.StatePathCount) paths / $($result.StateSchemaCount) schemas" -ForegroundColor Red
+            Write-Host "  actual document: $($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas" -ForegroundColor Red
+            Write-Host 'The LEDGER is stale, not the lock. Fix by updating .agent/STATE.md ## Contract' -ForegroundColor Yellow
+            Write-Host "to the actual counts above ($($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas)." -ForegroundColor Yellow
+            Write-Host 'The ORCHESTRATOR owns .agent/STATE.md — a dev agent cannot write it. If you are' -ForegroundColor Yellow
+            Write-Host 'a dev agent reading this, STOP and bounce the card; do not guess and do not' -ForegroundColor Yellow
+            Write-Host 'edit .agent/** yourself.' -ForegroundColor Yellow
+            throw '.agent/STATE.md ## Contract path/schema counts are stale.'
+        }
+
+        Write-Host "Lock, ledger hash and ledger counts all agree: $($result.ActualHash) / $($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas." -ForegroundColor Green
+        $global:LASTEXITCODE = 0
     }
 
     Write-FinalSummary
