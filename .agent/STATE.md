@@ -145,7 +145,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0067, 0069, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0074, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -168,11 +168,10 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0065 | Make the integration suite runnable without the network | backend-dev | **IMPLEMENTED 2026-09-16, all 9 AC met, AWAITING HUMAN CLOSURE.** Testcontainers against the WSL2 daemon; 322 tests in **3m40s offline vs 45+ min hosted**. **AC-4 proven on a genuinely disconnected machine — the WSL bridge survives the adapter going down.** Suite is 321/322: the residual failure is the separately-carded `AuthLogRedactionTests` defect, pre-existing and owned elsewhere. Not committed |
 | TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
-| TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **queued 2026-09-16** — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
+| TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **DISPATCHED 2026-09-16** (parallel with 0075 under `contract.md` §3 — disjoint files, zero endpoints, no contract change) — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0075 | Gate the ledger's contract block against the lock | backend-dev | **DISPATCHED 2026-09-16** — human directive, after `## Contract` went stale a THIRD time. Three assertions: lock-vs-document (**verified by nothing today**), ledger-vs-lock, ledger counts-vs-live. Must be proven able to fail on all three |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
@@ -181,6 +180,14 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-16 **TASK-0065 closed — the integration suite no longer needs the network.** 322 tests in
+  **3m40s offline** against 45+ min hosted; a missing database now FAILS instead of skipping. **The
+  card was only possible because `docker ABSENT` in this file meant the WINDOWS HOST — Docker was
+  live in WSL2 the whole time, and two probe methods gave true-but-misleading negatives that cost a
+  withdrawn architectural ruling.** AC-4 proven offline by the human; the orchestrator cannot prove
+  it, since it reaches this machine over the network. Closed at 321/322 by human ruling — the
+  residual failure is TASK-0073. Four mechanisms for it proposed and refuted, three orchestrator's.
+  → `decisions/2026-Q3.md`
 - 2026-09-16 **TASK-0069 closed — grading scale and assessment structure exist.** Nine bands,
   20/20/60, ten grading rules and six assessment rules server-side, session lock, both seed
   profiles. Contract additive: 54 paths, 102 schemas, hash `152dc1c2`. Final gate 745/33/10,
