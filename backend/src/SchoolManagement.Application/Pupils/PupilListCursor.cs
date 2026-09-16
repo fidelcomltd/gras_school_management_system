@@ -4,16 +4,25 @@ using System.Text;
 namespace SchoolManagement.Application.Pupils;
 
 /// <summary>
-/// Encodes and decodes the opaque cursor for <c>GET /api/v1/pupils</c> and
-/// <c>GET /api/v1/admissions</c>: surname ascending, then id (spec 9.5's keyset convention, same
-/// codec shape as <c>AdminAccountListCursor</c>).
+/// Encodes and decodes the opaque cursor for <c>GET /api/v1/admissions</c> (the queue of
+/// <c>pending</c> pupils, unconditionally): surname ascending, then id (spec 9.5's keyset convention,
+/// same codec shape as <c>AdminAccountListCursor</c>).
 /// </summary>
 /// <remarks>
-/// Spec 6.5.15's stated default is "class in progression order then surname ascending" — this card
-/// has no arm/enrolment reference on <c>Pupil</c> at all (see the entity's own remarks), so there is
-/// no class to order by yet. Sort is surname ascending, then id, and this is disclosed rather than
-/// silently substituted — see <c>backend/docs/ASSUMPTIONS.md</c> §2.27. A later card that gives a
-/// pupil a resolvable class widens this cursor's key rather than replacing it.
+/// <para>
+/// NOT used by <c>GET /api/v1/pupils</c> as of TASK-0061 — that endpoint's default sort widened to
+/// spec 6.5.15's full "class in progression order, then arm, then surname ascending" and moved to
+/// <see cref="PupilRegisterCursor"/>, a SEPARATE type rather than this one widened in place: this
+/// type is shared with <c>PupilRepository.ListAdmissionsQueueAsync</c>, whose <c>pending</c>-only
+/// queue never carries a class (spec 6.5.14: a pending pupil holds no enrolment) and whose cursor
+/// format TASK-0064's <c>/admissions</c> screen already depends on unchanged.
+/// </para>
+/// <para>
+/// Before TASK-0061, this type ALSO backed <c>GET /api/v1/pupils</c>, disclosed as a temporary
+/// shortfall against spec 6.5.15 rather than silently substituted — see
+/// <c>backend/docs/ASSUMPTIONS.md</c> §2.27, now closed for the register (the queue's own sort was
+/// never part of that gap: spec 6.5.15 never asks the admissions queue to sort by class).
+/// </para>
 /// </remarks>
 public static class PupilListCursor
 {

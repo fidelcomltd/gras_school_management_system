@@ -1098,6 +1098,15 @@ is no class to order by yet — disclosed here and in `PupilListCursor`'s own re
 substituted. **Trigger: the card that gives a pupil a resolvable class (enrolment) widens the cursor's
 key rather than replacing it.** Owner `backend-dev`.
 
+**RESOLVED by TASK-0061 (2026-09-16), for `GET /pupils` only.** Default sort widened to level in
+progression order, then arm, then surname, then id, on `PupilRegisterCursor` (a new type, not
+`PupilListCursor` widened in place — the admissions queue shares that type and stays untouched, spec
+6.5.14 never asking it to sort by class). A pupil with no open enrolment sorts LAST as one flat
+trailing block, ruled by the human 2026-09-15 (`decisions/2026-Q3.md`). See
+`PupilRepository.ListAsync`'s own remarks for a genuine Npgsql/EF Core translation limitation this hit
+along the way (ordinal `string.Compare` cannot coexist with any join/subquery/`Contains` in the same
+compiled query) and the client-side-tie-break workaround it forced.
+
 **Search's "registration number... or its serial alone" requirement (spec 6.5.15, "typing 41 finds
 GRAS/2026/0041") is satisfied by ORDINARY substring matching on the full registration number, with no
 separate serial-extraction step.** `"41"` is literally a substring of `"...0041"`, so

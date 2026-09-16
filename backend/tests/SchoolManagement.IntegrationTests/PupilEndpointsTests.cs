@@ -276,6 +276,72 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         page.Items.ShouldNotContain(item => item.Id == elsewherePupilId.ToString("D", CultureInfo.InvariantCulture));
     }
 
+    // TASK-0061 (spec 6.5.15): default sort is level in progression order, then arm, then surname,
+    // then id. Every seeded row's arm/surname is chosen so a WRONG tie-break (surname before arm, or
+    // alphabetical level name instead of ProgressionOrder) would reorder the list — see
+    // SeedRegisterOrderingFixtureAsync's own remarks for the six rows and why each is placed as it
+    // is. Also proves the ruling's two other binding parts: unenrolled pupils (both shapes — a closed
+    // enrolment and the pending→withdrawn lapsed application of 6.5.14) sort LAST as one flat block,
+    // and are never sub-grouped by status inside it.
+    [Fact]
+    public async Task List_DefaultSort_OrdersByLevelThenArmThenSurname_AndSortsUnenrolledPupilsLastAsOneFlatBlock()
+    {
+        RequireDatabase();
+
+        // No search marker needed for isolation: IntegrationTestBase.InitializeAsync truncates the
+        // whole database before every test (ApiTestFixture.ResetDatabaseAsync), so this test's own
+        // seeded rows are the only pupils in the table.
+        const string Marker = "Regsort";
+        var expectedOrder = await SeedRegisterOrderingFixtureAsync(Marker);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+
+        var response = await GetAsync($"{PupilsUrl}?pageSize=50", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await ReadAsync<CursorPage<PupilDto>>(response);
+
+        page.Items.Select(item => item.Id).ShouldBe(
+            expectedOrder.Select(id => id.ToString("D", CultureInfo.InvariantCulture)).ToArray());
+        page.NextCursor.ShouldBeNull();
+    }
+
+    // The card's own named risk: widening the cursor is where an off-by-one page seam comes from. A
+    // single-page test (above) cannot see a row repeated or skipped at a boundary, so this pages the
+    // SAME six-row fixture two rows at a time, crossing the seam this card is most likely to get
+    // wrong — including the one between the last enrolled row and the unenrolled sentinel block.
+    [Fact]
+    public async Task List_DefaultSort_PagesAcrossEverySeamWithoutRepeatingOrSkippingARow()
+    {
+        RequireDatabase();
+
+        const string Marker = "Regseam";
+        var expectedOrder = await SeedRegisterOrderingFixtureAsync(Marker);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+
+        var collected = new List<string>();
+        string? cursor = null;
+
+        do
+        {
+            var url = cursor is null
+                ? $"{PupilsUrl}?pageSize=2"
+                : $"{PupilsUrl}?pageSize=2&cursor={Uri.EscapeDataString(cursor)}";
+
+            var response = await GetAsync(url, jar);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var page = await ReadAsync<CursorPage<PupilDto>>(response);
+
+            page.Items.Count.ShouldBeLessThanOrEqualTo(2);
+            collected.AddRange(page.Items.Select(item => item.Id));
+            cursor = page.NextCursor;
+        }
+        while (cursor is not null);
+
+        collected.ShouldBe(expectedOrder.Select(id => id.ToString("D", CultureInfo.InvariantCulture)).ToArray());
+    }
+
     [Fact]
     public async Task List_WithNoPupilViewGrantAtAll_Returns403()
     {
@@ -847,18 +913,32 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
 
     private async Task<Guid> SeedArmAsync(Guid sessionId, string label)
     {
+        var levelId = await GetFirstClassLevelIdAsync();
+        return await SeedArmAsync(sessionId, label, levelId);
+    }
+
+    /// <summary>Same as <see cref="SeedArmAsync(Guid, string)"/>, at a caller-chosen level — TASK-0061's ordering tests need arms spread across more than one level.</summary>
+    private async Task<Guid> SeedArmAsync(Guid sessionId, string label, Guid classLevelId)
+    {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var levelId = (await context.ClassLevels.AsNoTracking()
-            .FirstAsync(TestContext.Current.CancellationToken)).Id;
-
-        var arm = Arm.Create(Guid.CreateVersion7(), levelId, sessionId, label, null, null).Value;
+        var arm = Arm.Create(Guid.CreateVersion7(), classLevelId, sessionId, label, null, null).Value;
 
         context.Add(arm);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return arm.Id;
+    }
+
+    /// <summary>The seeded level (spec 6.4.2, <c>SeededClassLevels</c>) with this exact name — e.g. <c>"Primary 1"</c>.</summary>
+    private async Task<Guid> GetClassLevelIdByNameAsync(string name)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return (await context.ClassLevels.AsNoTracking()
+            .FirstAsync(level => level.Name == name, TestContext.Current.CancellationToken)).Id;
     }
 
     /// <summary>
@@ -877,6 +957,96 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return enrolment.Id;
+    }
+
+    /// <summary>Closes a previously-seeded OPEN enrolment — spec 6.5.14's transfer/withdrawal/graduation effect, for a pupil TASK-0061's ordering tests need to land in the unenrolled trailing block.</summary>
+    private async Task CloseEnrolmentAsync(Guid enrolmentId, DateOnly effectiveTo)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var enrolment = await context.Enrolments.FirstAsync(
+            e => e.Id == enrolmentId, TestContext.Current.CancellationToken);
+
+        var closeResult = enrolment.Close(effectiveTo);
+        closeResult.IsSuccess.ShouldBeTrue(closeResult.IsFailure ? closeResult.Error.Description : string.Empty);
+
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    /// Sets ONLY status, registration number left null — the pending→withdrawn lapsed application of
+    /// spec 6.5.14, which never held an enrolment and to which no registration number is ever issued.
+    /// Same accepted direct-DbContext technique as <see cref="SetRegistrationNumberAndStatusAsync"/>.
+    /// </summary>
+    private async Task SetStatusAsync(Guid pupilId, PupilStatus status)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE pupils SET status = {status.ToString()} WHERE id = {pupilId}",
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    /// Seeds the six-pupil fixture TASK-0061's ordering tests are proven against, in the exact order
+    /// spec 6.5.15's widened default sort must produce:
+    /// <list type="number">
+    /// <item>Primary 1, arm A, surname Z — arm A must place it first in this level despite its surname.</item>
+    /// <item>Primary 1, arm B, surname A — proves arm still outranks surname (a surname-first sort
+    /// would put this row first instead).</item>
+    /// <item>Primary 1, arm Z, surname B — same level, third and last arm.</item>
+    /// <item>Primary 2, arm A, surname Y — a HIGHER level ordinal must place it after every Primary 1
+    /// row above regardless of its own arm or surname.</item>
+    /// <item>The pending→withdrawn lapsed application of 6.5.14 (never held an enrolment).</item>
+    /// <item>Transferred (HAD an open enrolment, now closed).</item>
+    /// </list>
+    /// Rows 5 and 6 are both unenrolled and must sort LAST as one flat block ordered surname then id
+    /// — never sub-grouped by status — per the human ruling (<c>decisions/2026-Q3.md</c> 2026-09-15,
+    /// TASK-0061). Every surname carries <paramref name="marker"/> purely for readability in a
+    /// failing assertion; isolation comes from <see cref="ApiTestFixture.ResetDatabaseAsync"/>
+    /// truncating the table before every test, not from the marker.
+    /// </summary>
+    private async Task<IReadOnlyList<Guid>> SeedRegisterOrderingFixtureAsync(string marker)
+    {
+        var sessionId = await SeedSessionAsync();
+        var primary1Id = await GetClassLevelIdByNameAsync("Primary 1");
+        var primary2Id = await GetClassLevelIdByNameAsync("Primary 2");
+
+        var primary1ArmA = await SeedArmAsync(sessionId, "A", primary1Id);
+        var primary1ArmB = await SeedArmAsync(sessionId, "B", primary1Id);
+        var primary1ArmZ = await SeedArmAsync(sessionId, "Z", primary1Id);
+        var primary2ArmA = await SeedArmAsync(sessionId, "A", primary2Id);
+
+        // Surnames are letters-only (Pupil's NamePattern) — no digit suffixes. Each is chosen so that
+        // sorting by surname ALONE would give a different, wrong order from the expected one below,
+        // except for the two unenrolled rows (5, 6) where surname is the actual tie-break.
+        var p1 = await SeedPupilDirectlyAsync($"{marker}Zclass", "One");
+        await SetRegistrationNumberAndStatusAsync(p1, $"GRAS/2026/{marker}A", PupilStatus.Active);
+        await SeedEnrolmentAsync(p1, primary1ArmA, new DateOnly(2026, 9, 1));
+
+        var p2 = await SeedPupilDirectlyAsync($"{marker}Aclass", "Two");
+        await SetRegistrationNumberAndStatusAsync(p2, $"GRAS/2026/{marker}B", PupilStatus.Active);
+        await SeedEnrolmentAsync(p2, primary1ArmB, new DateOnly(2026, 9, 1));
+
+        var p3 = await SeedPupilDirectlyAsync($"{marker}Bclass", "Three");
+        await SetRegistrationNumberAndStatusAsync(p3, $"GRAS/2026/{marker}C", PupilStatus.Active);
+        await SeedEnrolmentAsync(p3, primary1ArmZ, new DateOnly(2026, 9, 1));
+
+        var p4 = await SeedPupilDirectlyAsync($"{marker}Yclass", "Four");
+        await SetRegistrationNumberAndStatusAsync(p4, $"GRAS/2026/{marker}D", PupilStatus.Active);
+        await SeedEnrolmentAsync(p4, primary2ArmA, new DateOnly(2026, 9, 1));
+
+        var p5 = await SeedPupilDirectlyAsync($"{marker}Uone", "Five");
+        await SetStatusAsync(p5, PupilStatus.Withdrawn);
+
+        var p6 = await SeedPupilDirectlyAsync($"{marker}Utwo", "Six");
+        var p6EnrolmentId = await SeedEnrolmentAsync(p6, primary1ArmA, new DateOnly(2026, 9, 1));
+        await CloseEnrolmentAsync(p6EnrolmentId, new DateOnly(2026, 9, 10));
+        await SetRegistrationNumberAndStatusAsync(p6, $"GRAS/2026/{marker}E", PupilStatus.Transferred);
+
+        return [p1, p2, p3, p4, p5, p6];
     }
 
     /// <summary>

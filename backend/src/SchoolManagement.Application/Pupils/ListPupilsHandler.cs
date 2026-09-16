@@ -35,7 +35,7 @@ internal sealed class ListPupilsQueryHandler(
                 Error.Unauthenticated("authentication.required", "Sign in to perform this action."));
         }
 
-        if (request.Cursor is not null && !PupilListCursor.TryDecode(request.Cursor, out _, out _))
+        if (request.Cursor is not null && !PupilRegisterCursor.TryDecode(request.Cursor, out _, out _, out _, out _))
         {
             return Result.Failure<CursorPage<PupilDto>>(Error.Validation(
                 "pupils.invalid_cursor", "The cursor is invalid or has expired. Start again from the first page."));

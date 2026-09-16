@@ -130,7 +130,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0062, 0063, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0066, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -146,13 +146,13 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **DISPATCHED 2026-09-16** (TASK-0063 closed, surface free) — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
+| TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0067 | Give `ci.ps1` a scoped mode (`-SkipIntegration`, `-IntegrationFilter`) | backend-dev | **queued 2026-09-16 — human directive, highest leverage in the queue.** Makes the ~1h/card gate cost avoidable; TASK-0065 makes it small. Pairs with CI now triggering on `staging` |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
@@ -160,6 +160,12 @@ archive and never against the working tree, so an under-claiming header was invi
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-16 **TASK-0061 closed on the FIRST scoped gate** (§ new policy): unit 700/700, arch 33/33,
+  pupils integration 34/34, Skipped 0, contract unmoved — minutes, not the hour. The dispatch-time
+  grep that found the shared `PupilListCursor` is what stopped the admissions queue breaking.
+  **Hand-assembling the scoped gate went wrong 3x in 2 cards, none a code defect — see TASK-0067.**
+  Two review findings carded as TASK-0068. → `decisions/2026-Q3.md`
 
 - 2026-09-16 **HUMAN DIRECTIVE: the full gate is no longer run per card.** Cheap gates in full +
   scoped integration locally (minutes); the full suite is CI's job. **Root cause: `backend-ci.yml`

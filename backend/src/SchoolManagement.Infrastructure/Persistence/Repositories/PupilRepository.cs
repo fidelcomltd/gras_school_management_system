@@ -51,7 +51,8 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         IReadOnlyCollection<Guid>? allowedArmIds,
         CancellationToken cancellationToken)
     {
-        var hasCursor = PupilListCursor.TryDecode(cursor, out var cursorSurnameKey, out var cursorId);
+        var hasCursor = PupilRegisterCursor.TryDecode(
+            cursor, out var cursorLevelOrdinal, out var cursorArmKey, out var cursorSurnameKey, out var cursorId);
 
         // status == Pending is the one caller-driven opt-out GET /pupils itself accepts (the
         // contract delta's own "unless status=pending is passed"); anything else — including no
@@ -79,13 +80,6 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
                 (pupil.RegistrationNumber != null && EF.Functions.ILike(pupil.RegistrationNumber, $"%{term}%")));
         }
 
-        if (hasCursor)
-        {
-            query = query.Where(pupil =>
-                string.Compare(pupil.Surname.ToLower(), cursorSurnameKey, StringComparison.Ordinal) > 0 ||
-                (EF.Functions.ILike(pupil.Surname, cursorSurnameKey) && pupil.Id.CompareTo(cursorId) > 0));
-        }
-
         // TASK-0059: arm-scoped pupil.view restricts to pupils whose OPEN enrolment names one of the
         // caller's granted arms (spec 02 §5.2 — never a pupil.arm_id shortcut). allowedArmIds is
         // null for an unrestricted (school-wide) caller; ListPupilsQueryHandler never passes an
@@ -96,15 +90,176 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
                 enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null && arms.Contains(enrolment.ArmId)));
         }
 
-        // Take one extra row to learn whether a further page exists, without a second COUNT query.
-        var rows = await query
-            .OrderBy(pupil => pupil.Surname.ToLower())
+        // TASK-0061 (spec 6.5.15): class-progression order, then arm, then surname, then id. A pupil's
+        // OWN row carries no arm/level reference (Enrolment's remarks — never a denormalised shortcut);
+        // the level ordinal and arm key are resolved through the pupil's OPEN enrolment, a correlated
+        // subquery per field, with the ruling's NON-NULL sentinel
+        // (PupilRegisterCursor.UnenrolledLevelOrdinal/UnenrolledArmKey) standing in for a pupil with
+        // none — transferred/withdrawn/graduated, or the pending→withdrawn lapsed application of
+        // 6.5.14 — so the ordering never carries a NULL. Ruling part 2, decisions/2026-Q3.md
+        // 2026-09-15 (TASK-0061).
+        //
+        // THE TRANSLATION TRAP (found empirically — every shape below was tried and ruled out the same
+        // way): Npgsql's EF Core provider refuses to translate `string.Compare`/`string.CompareOrdinal`
+        // — needed for the Surname/ArmKey tie-break — the moment ANY other condition (a join, a
+        // correlated subquery, even a plain `HashSet<Guid>.Contains(pupil.Id)` or a second, separately
+        // chained `.Where()`) sits in the SAME compiled query, reporting
+        // "Translation of method 'string.Compare' failed" regardless of nesting depth or which specific
+        // extra condition it was. It ONLY succeeds in the exact minimal shape
+        // `ListAdmissionsQueueAsync` already uses below (a plain status equality, then a lone
+        // string.Compare-or-ILike `.Where()`, nothing else). So the ordinal comparison here runs
+        // client-side in .NET, never in SQL — see `ListRegisterAsync` below — while every OTHER piece
+        // of the cursor logic (bucket membership, ORDER BY, LIMIT) stays server-side.
+        return await ListRegisterAsync(
+                query, hasCursor, cursorLevelOrdinal, cursorArmKey, cursorSurnameKey, cursorId, pageSize, term, asOfDate, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<CursorPage<PupilDto>> ListRegisterAsync(
+        IQueryable<Pupil> query,
+        bool hasCursor,
+        int cursorLevelOrdinal,
+        string cursorArmKey,
+        string cursorSurnameKey,
+        Guid cursorId,
+        int pageSize,
+        string? term,
+        DateOnly asOfDate,
+        CancellationToken cancellationToken)
+    {
+        // Arms+levels: a handful of rows (spec 6.4.2's own "the session list is short and always will
+        // be" reasoning — the same one ListAdmissionsQueueAsync already relies on for ClassLevels).
+        var armLevelByArmId = await context.Arms
+            .AsNoTracking()
+            .Select(arm => new { arm.Id, arm.LabelKey, arm.ClassLevelId })
+            .Join(
+                context.ClassLevels.AsNoTracking().Select(level => new { level.Id, level.ProgressionOrder }),
+                arm => arm.ClassLevelId,
+                level => level.Id,
+                (arm, level) => new { arm.Id, arm.LabelKey, level.ProgressionOrder })
+            .ToDictionaryAsync(row => row.Id, row => (row.ProgressionOrder, row.LabelKey), cancellationToken)
+            .ConfigureAwait(false);
+
+        static (Pupil Pupil, int LevelOrdinal, string ArmKey) ToRow(Pupil pupil, int levelOrdinal, string armKey) =>
+            (pupil, levelOrdinal, armKey);
+
+        if (!hasCursor)
+        {
+            var firstPageRows = await SelectOrderedByClassKeyAsync(query, pageSize, cancellationToken).ConfigureAwait(false);
+
+            return ToRegisterPage(firstPageRows, pageSize, term, asOfDate);
+        }
+
+        // The bucket (level, arm) the cursor's own row sat in, as small in-memory arm-id lists — every
+        // pupil enrolled in a STRICTLY LATER bucket qualifies outright, no surname comparison needed; a
+        // pupil in the SAME bucket needs the surname/id tie-break (done client-side, see above).
+        var armIdsAfterCursorBucket = new List<Guid>();
+        var armIdsAtCursorBucket = new List<Guid>();
+
+        foreach (var (armId, classKey) in armLevelByArmId)
+        {
+            var comparison = classKey.ProgressionOrder != cursorLevelOrdinal
+                ? classKey.ProgressionOrder.CompareTo(cursorLevelOrdinal)
+                : string.CompareOrdinal(classKey.LabelKey, cursorArmKey);
+
+            if (comparison > 0)
+            {
+                armIdsAfterCursorBucket.Add(armId);
+            }
+            else if (comparison == 0)
+            {
+                armIdsAtCursorBucket.Add(armId);
+            }
+        }
+
+        // The unenrolled sentinel is the LAST bucket (ruling part 2): every enrolled pupil is "after
+        // cursor" only when the cursor itself was not already IN that trailing block, and every
+        // unenrolled pupil is in the cursor's own bucket exactly when the cursor was too.
+        var cursorIsAtSentinel = cursorLevelOrdinal == PupilRegisterCursor.UnenrolledLevelOrdinal;
+
+        // Group 1: every row in a bucket strictly after the cursor's — qualifies outright, ordered and
+        // limited entirely server-side (no string.Compare in this query at all, so LIMIT is real).
+        var afterBucketQuery = query.Where(pupil =>
+            context.Enrolments.Any(enrolment =>
+                enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null &&
+                armIdsAfterCursorBucket.Contains(enrolment.ArmId)) ||
+            (!cursorIsAtSentinel &&
+                !context.Enrolments.Any(enrolment => enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null)));
+
+        var afterBucketRows = await SelectOrderedByClassKeyAsync(afterBucketQuery, pageSize, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Group 2: rows in the SAME bucket as the cursor — bounded by one arm's roster (spec 9.5: "an
+        // arm is at most a hundred pupils"), or the trailing sentinel block when the cursor itself was
+        // already in it. Fetched whole (no string.Compare in THIS query either), then the surname/id
+        // tie-break and ordering run in plain .NET — see the trap note above for why.
+        var sameBucketQuery = query.Where(pupil =>
+            context.Enrolments.Any(enrolment =>
+                enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null &&
+                armIdsAtCursorBucket.Contains(enrolment.ArmId)) ||
+            (cursorIsAtSentinel &&
+                !context.Enrolments.Any(enrolment => enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null)));
+
+        var sameBucketCandidates = await sameBucketQuery.ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        var sameBucketRows = sameBucketCandidates
+            .Where(pupil =>
+                string.CompareOrdinal(pupil.Surname.ToLowerInvariant(), cursorSurnameKey) > 0 ||
+                (pupil.Surname.Equals(cursorSurnameKey, StringComparison.OrdinalIgnoreCase) &&
+                    pupil.Id.CompareTo(cursorId) > 0))
+            .OrderBy(pupil => pupil.Surname, StringComparer.OrdinalIgnoreCase)
             .ThenBy(pupil => pupil.Id)
+            .Select(pupil => ToRow(pupil, cursorLevelOrdinal, cursorArmKey))
+            .ToList();
+
+        // Same-bucket rows sort BEFORE the strictly-after-bucket rows (they share the cursor's own
+        // bucket, which is earlier than any "after" bucket) — concatenate in that order, then take one
+        // extra row to learn whether a further page exists, exactly like every other page fetch here.
+        var rows = sameBucketRows
+            .Concat(afterBucketRows)
+            .Take(pageSize + 1)
+            .ToList();
+
+        return ToRegisterPage(rows, pageSize, term, asOfDate);
+    }
+
+    /// <summary>
+    /// Projects <paramref name="pupils"/> with each row's (LevelOrdinal, ArmKey) resolved through a
+    /// correlated subquery over its OPEN enrolment (TASK-0061), ordered class-progression-then-arm-
+    /// then-surname-then-id, and limited to <paramref name="pageSize"/> + 1. Shared by the first page
+    /// (no cursor) and the "strictly after the cursor's bucket" group — both need the SAME projection,
+    /// and NEITHER carries a `string.Compare` call, so both stay entirely server-side.
+    /// </summary>
+    private async Task<List<(Pupil Pupil, int LevelOrdinal, string ArmKey)>> SelectOrderedByClassKeyAsync(
+        IQueryable<Pupil> pupils, int pageSize, CancellationToken cancellationToken)
+    {
+        var rows = await pupils
+            .Select(pupil => new
+            {
+                Pupil = pupil,
+                LevelOrdinal = (
+                    from enrolment in context.Enrolments
+                    where enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null
+                    join arm in context.Arms on enrolment.ArmId equals arm.Id
+                    join level in context.ClassLevels on arm.ClassLevelId equals level.Id
+                    select (int?)level.ProgressionOrder)
+                    .FirstOrDefault() ?? PupilRegisterCursor.UnenrolledLevelOrdinal,
+                ArmKey = (
+                    from enrolment in context.Enrolments
+                    where enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null
+                    join arm in context.Arms on enrolment.ArmId equals arm.Id
+                    select arm.LabelKey)
+                    .FirstOrDefault() ?? PupilRegisterCursor.UnenrolledArmKey,
+            })
+            .OrderBy(row => row.LevelOrdinal)
+            .ThenBy(row => row.ArmKey)
+            .ThenBy(row => row.Pupil.Surname.ToLower())
+            .ThenBy(row => row.Pupil.Id)
             .Take(pageSize + 1)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return ToPage(rows, pageSize, term, asOfDate);
+        return rows.ConvertAll(row => (row.Pupil, row.LevelOrdinal, row.ArmKey));
     }
 
     /// <inheritdoc />
@@ -269,18 +424,24 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
                 cancellationToken);
     }
 
-    private static CursorPage<PupilDto> ToPage(List<Pupil> rows, int pageSize, string? searchTerm, DateOnly asOfDate)
+    /// <summary>
+    /// Builds the register's page and its <see cref="PupilRegisterCursor"/>-encoded <c>nextCursor</c>
+    /// (TASK-0061) — the widened counterpart of the admissions queue's own inline paging in
+    /// <see cref="ListAdmissionsQueueAsync"/>, which stays on <see cref="PupilListCursor"/> untouched.
+    /// </summary>
+    private static CursorPage<PupilDto> ToRegisterPage(
+        List<(Pupil Pupil, int LevelOrdinal, string ArmKey)> rows, int pageSize, string? searchTerm, DateOnly asOfDate)
     {
         var hasNextPage = rows.Count > pageSize;
         var page = hasNextPage ? rows.GetRange(0, pageSize) : rows;
 
         var items = page
-            .ConvertAll(pupil =>
+            .ConvertAll(row =>
             {
                 var matchedField = PupilSearchMatcher.Resolve(
-                    pupil.Surname, pupil.FirstName, pupil.MiddleName, pupil.RegistrationNumber, searchTerm);
+                    row.Pupil.Surname, row.Pupil.FirstName, row.Pupil.MiddleName, row.Pupil.RegistrationNumber, searchTerm);
 
-                return PupilMapper.ToDto(pupil, asOfDate, matchedField);
+                return PupilMapper.ToDto(row.Pupil, asOfDate, matchedField);
             });
 
         string? nextCursor = null;
@@ -288,7 +449,7 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         if (hasNextPage)
         {
             var last = page[^1];
-            nextCursor = PupilListCursor.Encode(last.Surname.ToLowerInvariant(), last.Id);
+            nextCursor = PupilRegisterCursor.Encode(last.LevelOrdinal, last.ArmKey, last.Pupil.Surname.ToLowerInvariant(), last.Pupil.Id);
         }
 
         return new CursorPage<PupilDto>(items, nextCursor);
