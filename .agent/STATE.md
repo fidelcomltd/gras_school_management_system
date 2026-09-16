@@ -174,6 +174,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
 | TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **queued 2026-09-16** — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
+| TASK-0075 | Gate the ledger's contract block against the lock | backend-dev | **DISPATCHED 2026-09-16** — human directive, after `## Contract` went stale a THIRD time. Three assertions: lock-vs-document (**verified by nothing today**), ledger-vs-lock, ledger counts-vs-live. Must be proven able to fail on all three |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
