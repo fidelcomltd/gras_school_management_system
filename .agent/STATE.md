@@ -128,13 +128,12 @@ trustworthy source and this block is not. A closing card MUST update this block.
 even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing TASK-0062 updated
 the archive and not this block. Verified against the working tree, not prose.
 
-- `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-15.
-- Frontend client is **STALE** against this hash as of 2026-09-15 — TASK-0063 shipped the new
-  correction path backend-only, so `src/api/schema.d.ts` predates it and `npm run check:api-drift`
-  is RED until a regeneration card lands. This is the established backend-first pattern (TASK-0062
-  shipped the same way, TASK-0064 caught it up), not an accident. **The next `frontend-dev`
-  dispatch of any kind regenerates the client before doing anything else.** The client IS current
-  for all four admission operations, which TASK-0064 wired to the `/admissions` screen.
+- `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-16.
+- Frontend client is **CURRENT** against this hash as of 2026-09-16 (TASK-0074). `check:api-drift`
+  re-run by the ORCHESTRATOR, not accepted on report: `No drift`, exit 0 — which also proves
+  `schema.d.ts` carries no hand-edit, since regeneration reproduces it byte-for-byte. Typecheck and
+  lint both exit 0. **But see the `apiPut` drift entry: four new operations are typed and three of
+  them are NOT CALLABLE**, so "current" means the types match, not that the surface is reachable.
 - The additive classification was verified MECHANICALLY (every existing schema's `required` array
   and every property type diffed against HEAD), not read off the card — see `decisions/2026-Q3.md`.
 - `/health/*` is excluded from the document (`ASSUMPTIONS.md` section 2.9); `/reference/*` is
@@ -173,7 +172,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
 | TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **queued 2026-09-16** — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
-| TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DISPATCHED 2026-09-16** — `frontend-ci` red on every push today for this one reason. Discharges the standing "next frontend-dev dispatch regenerates first" drift instruction |
+| TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
@@ -426,9 +425,17 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   uniqueness rule is enforced on correction only, so a freshly issued number could duplicate a retired
   alias and make the portal lookup ambiguous. *Trigger: the portal redemption card, or any card changing
   reg-number composition or counter-reset settings. Owner: `backend-dev`.*
-- 2026-09-15 **`src/api/schema.d.ts` is STALE against `b293db2bc2b4…` and `check:api-drift` is RED** —
-  TASK-0063 shipped backend-only and no frontend card exists for the correction screen. *Trigger: the
-  next `frontend-dev` dispatch of any kind, before anything else. Owner: `frontend-dev`.*
+- 2026-09-15 ~~**`src/api/schema.d.ts` is STALE and `check:api-drift` is RED.**~~ **STRUCK 2026-09-16
+  by TASK-0074** — regenerated against `152dc1c2…`; drift gate re-run by the orchestrator, `No drift`,
+  exit 0. Full text: `drift/2026-Q3.md`.
+- 2026-09-16 **The contract's first two `PUT` operations are typed but NOT CALLABLE — `client.ts` has
+  no `apiPut`.** `UpdateAssessment`, `UpdateGrading` (and `ResetGrading` alongside them) exist in
+  `schema.d.ts` and in no application code. Every prior regeneration needed zero new wrapper code;
+  `src/api/README.md` predicted this is exactly where that streak breaks. **Found and flagged by the
+  implementing agent, which deliberately did NOT add the helper** — the card's Out of scope forbade
+  starting to consume the grading surface, and adding the verb is the first step of that. Correct
+  call; recorded so it is not rediscovered. *Trigger: the FIRST grading/assessment feature card —
+  it must add `apiPut` (mirroring `apiPatch`) before it can call anything. Owner: `frontend-dev`.*
 - 2026-09-15 **Published result snapshots do not exist, so TASK-0063's AC 6 is VACUOUS, not proven** —
   no results module, only the `IResultSetArmLookup` seam. Verified by the orchestrator, nothing invented.
   *Trigger: the results-module card that first persists a published snapshot, which must carry the test.
