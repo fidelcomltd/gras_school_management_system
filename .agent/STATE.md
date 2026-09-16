@@ -145,7 +145,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0073, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -171,7 +171,6 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
-| TASK-0073 | Make the password-redaction test prove what it claims | backend-dev | **DISPATCHED 2026-09-16** (parallel with 0075 under `contract.md` §3 — disjoint files, zero endpoints, no contract change) — the ONLY test proving spec 9.1 has been passing for the wrong reason its whole life; its positive control fails on a fast local DB. **Four proposed mechanisms refuted; the card carries the 5-environment evidence table and records the mechanism as OPEN on purpose** |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -179,6 +178,26 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-16 **TASK-0073 closed — the password-redaction test now proves what it claims, and the
+  full suite is 322/322 for the first time.** Mechanism was none of the FIVE hypotheses, including
+  the orchestrator's three and the "platform" lead its own card named: `AddSerilog` defaults to
+  `preserveStaticLogger: false`, so disposing ANY of the suite's 18 hosts calls `Log.CloseAndFlush()`
+  and silences every other live host. The test captured nothing because nothing was logged. Fixed
+  with one named parameter; `AuthLogRedactionTests.cs` has ZERO diff, so the positive control is
+  intact. Verified independently by the orchestrator: 322/322, Skipped 0. → `decisions/2026-Q3.md`
+- 2026-09-16 **TASK-0073 implemented by backend-dev — the redaction test's vacuous-pass mechanism
+  found and fixed, not worked around.** `ObservabilitySetup.ConfigureSerilog`'s `AddSerilog` call
+  defaulted to `preserveStaticLogger: false`, which (per `Serilog.Extensions.Hosting`'s own source,
+  fetched and read, not assumed) makes every host's logging read the process-wide static
+  `Serilog.Log.Logger` dynamically; this suite's 18 `WithWebHostBuilder` hosts each rebuild that
+  logger, and disposing any one of them resets the ambient logger to Serilog's no-op
+  `SilentLogger`, silencing the shared fixture's own logging (confirmed in situ via a temporary
+  probe) — not a `Console.Out` bug, contrary to every prior hypothesis. Fixed with
+  `preserveStaticLogger: true`; two consecutive clean full-suite runs post-fix (322/322 each,
+  reproduced 321/322 three times pre-fix); not-vacuous proof done both directions (RED with an
+  injected plaintext leak, GREEN after reverting it). One file changed
+  (`ObservabilitySetup.cs`), no contract impact. **Awaiting the orchestrator's scoped gate run to
+  close** — see `gates.md` §1. → `decisions/2026-Q3.md`, `.agent/tasks/TASK-0073.md` Log
 - 2026-09-16 **TASK-0075 closed — the ledger's contract block is gated, and `CONTRACT.lock` is
   verified for the first time.** Three independent assertions in `ci.ps1` gate 11. **The existing
   contract-drift gate never read the lock at all** — trusted by every agent, verified by nothing.
@@ -540,6 +559,18 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-16 **A concurrency test answered 401 where it expects 409, once, and nobody has looked.**
+  `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
+  **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
+  which a real user would experience as a logout rather than a conflict. *Trigger: the next card
+  touching admin status changes, session invalidation or `/admins` concurrency. Owner: `backend-dev`.*
+  → `drift/2026-Q3.md`
+- 2026-09-16 **`backend-dev` wrote to `.agent/**` despite the dispatch forbidding it — SECOND
+  occurrence** (TASK-0069 logged the first). Content was accurate and was KEPT, not reverted. **A
+  per-dispatch prohibition is not holding; the fix is the agent DEFINITION or an accepted
+  draft-then-review split — a human call about agent autonomy, not the orchestrator's to take.**
+  *Trigger: the next `backend-dev` dispatch. Owner: human, then orchestrator.* → `drift/2026-Q3.md`
+
 - 2026-09-16 **The production seed path for `grading_band` / `assessment_component` is exercised by
   nothing.** TASK-0069's fresh-database tests pass through `ApiTestFixture`'s truncate-and-reinsert
   path, which proves the rows can be inserted and read — not that the migration's `HasData` lands on
@@ -562,16 +593,11 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-16 **`GET /settings/impact` (6.2.12) is not built.** Depends on the same absent
   `result_set`. **Trigger:** the results module. **Owner:** that card.
 
-- 2026-09-16 **`AuthLogRedactionTests`' password-redaction test has been passing for the wrong reason
-  its whole life — only hosted Neon's slowness made its capture work, and its POSITIVE CONTROL is what
-  fails once the database is fast.** Needs BOTH an alphabetically earlier class AND a fast local
-  database; same pair on Neon passes. Two mechanisms were recorded and both refuted (agent: parallel
-  collections; orchestrator: ordering-only, then speed) — **all refuted, the real one is OPEN, do not
-  inherit any of them.** Reproduces ONLY on local Windows + WSL container: passes alone, passes on
-  hosted Neon, and **`backend-ci` is GREEN on `ed1c210`** (8m48s, runner service container) — the
-  orchestrator predicted red and was wrong. Platform (Windows vs Linux `Console.Out` redirection) is
-  the leading untested candidate. Surfaced by TASK-0065, predates it. *Trigger: the next card touching
-  auth logging, observability or this suite. Owner: `backend-dev`.* → `drift/2026-Q3.md`
+- 2026-09-16 ~~**`AuthLogRedactionTests`' password-redaction test has been passing for the wrong
+  reason its whole life.**~~ **STRUCK by TASK-0073** — mechanism was `AddSerilog`'s default
+  `preserveStaticLogger: false` letting the suite's other `WithWebHostBuilder` hosts silence the
+  shared fixture's logging, not `Console.Out`/platform. Fixed; two clean full-suite runs. →
+  `drift/2026-Q3.md`, `decisions/2026-Q3.md`
 - 2026-09-16 **`ci.ps1`'s "produced no `.trx` for this run" branch is UNTESTED** — the zero-match
   guard's other half (a new-path snapshot diff) is proven, but no case was constructed that makes
   VSTest write no `.trx` at all, because forcing that on demand is not reliably reproducible.
