@@ -99,9 +99,10 @@ for three weeks). Engine 29.8.1 in WSL2 Ubuntu as `dockerd -H fd:// -H tcp://0.0
 **reachable from Windows at `http://localhost:2375` — NOT at `127.0.0.1:2375`**, WSL2 NAT-mode
 localhost forwarding answers on the hostname path only. `$env:DOCKER_HOST` is set at user scope to
 the broken IPv4 literal. No Docker Desktop, no `\\.\pipe\docker_engine`, no `dotnet` inside WSL.
-Integration tests still use hosted Neon via `POSTGRES_TEST_CONNECTION`; CI uses a service-container
-Postgres; TASK-0065 is moving local runs onto Testcontainers against the WSL daemon ·
-psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
+**Local integration runs go through Testcontainers against the WSL daemon since TASK-0065**
+(2026-09-16): 322 tests in ~4 min, and **proven green with the network physically disconnected** —
+the WSL bridge survives the adapter going down. `POSTGRES_TEST_CONNECTION` still wins when set, and
+CI still uses a service-container Postgres · psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
 
 **PINNED — changing one side alone re-breaks CI (0024, 0026):** `global.json`
 `rollForward: latestPatch` · gitleaks **8.30.1** in `backend-ci.yml` must equal local · Node
