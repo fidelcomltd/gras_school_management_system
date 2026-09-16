@@ -8,6 +8,45 @@ which every agent was loading on every dispatch whether or not it was going to r
 
 ---
 
+## 0. Gate scope — the full suite is CI's job, not the orchestrator's
+
+**Human directive, 2026-09-16.** Running `ci.ps1` end to end once per card cost ~1 hour of wall
+clock regardless of card size, because the integration stage is 310 tests against *hosted* Neon at
+~8s each. Two cards could consume an afternoon for a few hundred lines of business value. That is
+no longer the default.
+
+**What changed underneath:** `.github/workflows/backend-ci.yml` now triggers on `staging` as well
+as `main`. It always did the full run properly — a `postgres:17.6-alpine` **service container**
+local to the runner, no TLS-over-internet, plus its own explicit skipped-tests-are-failures check
+— but it was watching a branch nobody worked on, so it never fired. The local hour was substituting
+for a CI job that was simply switched off.
+
+| Situation | What runs | Roughly |
+|---|---|---|
+| Per card, locally, before close | **Scoped gate**: every cheap gate in full, plus the integration tests the card actually touches | minutes |
+| Per push to `main`/`staging` | **Full `ci.ps1` in CI**, all 310 integration tests, authoritative | minutes, off this machine |
+| Before a release, or after a cross-cutting change | Full `ci.ps1` locally, deliberately | ~1 hour |
+
+**The cheap gates still run IN FULL every card, no exceptions** — restore, format, build
+`-warnaserror`, unit + architecture tests, OpenAPI generation, contract drift, vulnerable
+dependencies, secret scan. Together they are a few minutes and they catch most of what breaks.
+What is now scoped is the integration stage alone.
+
+**The honest trade:** a scoped local gate can miss a cross-cutting integration regression that a
+full run would catch. CI is what closes that hole, so **CI actually running is load-bearing, not a
+nicety.** A card may close on a green scoped gate, but if its CI run then goes red, that is a
+reopen, not a footnote. If CI is broken or disabled, the local full gate comes back until it is not.
+
+**Judgement, not a formula.** A card touching one endpoint gets the scoped gate. A card touching
+authorisation, the cursor/pagination substrate, the DbContext, a migration that rewrites existing
+rows, or anything every query passes through gets the full local run — the blast radius, not the
+diff size, decides. When genuinely unsure, run it full and say why.
+
+**`ci.ps1` has no scoping flag yet** (only `-NoFailFast`, `-AllowSkipped`, `-SkipContractDrift`), so
+the scoped gate is assembled by hand today — see TASK-0067, which adds `-SkipIntegration` and
+`-IntegrationFilter` so it stops being assembled by hand. Until it lands, §5's counts rule matters
+more than ever: **a hand-rolled `dotnet test --filter` skips silently and still exits 0.**
+
 ## 1. Who runs the full gate
 
 **Subagents do NOT run the full gate. Either side. Ever.**
@@ -16,7 +55,7 @@ which every agent was loading on every dispatch whether or not it was going to r
 |---|---|---|
 | `backend-dev` | `dotnet test --filter` over what it touched; `dotnet build -warnaserror` on the projects it changed | `backend/scripts/ci.ps1` |
 | `frontend-dev` | `npm run typecheck`, `npm run lint`, `npm run test -- <path>` over what it touched | `npm run verify`, `npm run test:e2e`, `npm run check:api-drift` |
-| `orchestrator` | the full canonical gate, ONCE per card, `run_in_background: true`, reviewing the diff while it runs | — |
+| `orchestrator` | the **scoped** gate once per card per §0 (full local run only when §0's blast-radius test says so), `run_in_background: true`, reviewing the diff while it runs | — |
 
 **Rationale (backend, 2026-09-09, after it cost THREE dispatches; extended to the frontend
 2026-09-14).** The backend suite is 700+ tests plus a Release build, coverage merge, gitleaks over

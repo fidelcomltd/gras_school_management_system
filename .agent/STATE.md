@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-15 by orchestrator (TASK-0064 + TASK-0066 closure) · no size cap, see
+Last reconciled: 2026-09-16 by orchestrator (TASK-0063 closure; TASK-0061 dispatched) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -146,19 +146,26 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **queued 2026-09-15, NEXT after TASK-0063** (same owner and surface; 0063 moves the contract, so no parallel dispatch) — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
+| TASK-0061 | `GET /pupils` class-progression sort | backend-dev | **DISPATCHED 2026-09-16** (TASK-0063 closed, surface free) — unblocked by the human ruling: an unenrolled pupil sorts LAST, one flat trailing block. Split from TASK-0059 at its pre-authorised cut line; dispatchable |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
+| TASK-0067 | Give `ci.ps1` a scoped mode (`-SkipIntegration`, `-IntegrationFilter`) | backend-dev | **queued 2026-09-16 — human directive, highest leverage in the queue.** Makes the ~1h/card gate cost avoidable; TASK-0065 makes it small. Pairs with CI now triggering on `staging` |
 | TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
+
+- 2026-09-16 **HUMAN DIRECTIVE: the full gate is no longer run per card.** Cheap gates in full +
+  scoped integration locally (minutes); the full suite is CI's job. **Root cause: `backend-ci.yml`
+  triggered on `main` only while all work happened on `staging`, so the full run never fired and an
+  hour of local Neon time was substituting for a CI job that was switched off.** CI now watches
+  `staging`; `rules/gates.md` §0 is the new policy; TASK-0067 carded for `ci.ps1` flags.
 
 - 2026-09-15 **TASK-0063 closed.** Reg-number correction + the permanent history alias; 1035 tests,
   Skipped 0, one Neon TLS drop re-run green in 13s against 12m51s. **A filtered `dotnet test` SKIPPED
