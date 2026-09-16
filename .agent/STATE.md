@@ -93,8 +93,15 @@ repo:      git, branch main, origin https://github.com/maxcotech/school-manageme
 ## Toolchain present on this machine
 
 dotnet SDK 10.0.100 · node v22.21.0 · npm 10.9.4 · yarn 1.22.22 · pnpm ABSENT · pwsh ABSENT ·
-docker ABSENT (integration tests use hosted Neon Postgres via `POSTGRES_TEST_CONNECTION`;
-CI uses a service-container Postgres) · psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
+docker **ABSENT ON THE WINDOWS HOST, LIVE IN WSL2** (corrected 2026-09-16 — the old flat "docker
+ABSENT" was read as "no container runtime anywhere" and is why the container path went unexercised
+for three weeks). Engine 29.8.1 in WSL2 Ubuntu as `dockerd -H fd:// -H tcp://0.0.0.0:2375`;
+**reachable from Windows at `http://localhost:2375` — NOT at `127.0.0.1:2375`**, WSL2 NAT-mode
+localhost forwarding answers on the hostname path only. `$env:DOCKER_HOST` is set at user scope to
+the broken IPv4 literal. No Docker Desktop, no `\\.\pipe\docker_engine`, no `dotnet` inside WSL.
+Integration tests still use hosted Neon via `POSTGRES_TEST_CONNECTION`; CI uses a service-container
+Postgres; TASK-0065 is moving local runs onto Testcontainers against the WSL daemon ·
+psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
 
 **PINNED — changing one side alone re-breaks CI (0024, 0026):** `global.json`
 `rollForward: latestPatch` · gitleaks **8.30.1** in `backend-ci.yml` must equal local · Node
@@ -104,10 +111,18 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `b293db2bc2b4fd86044cf2ec727051ab911920b71c4361e8d9dc6d0d379d8202`** · **51 paths** ·
-**93 schemas** · api version `v1` · moved 2026-09-15 by TASK-0063 (additive: `POST /pupils/{id}/registration-number`
-is new — one path, and one schema for its request command only, since the 200 reuses the existing
-`PupilDto`). TASK-0066 moved it earlier the same day to `37f8b4c2d19d…`, and TASK-0051 before that.
+**Current: `152dc1c27db77bfc6c2697580d8b3f86ebe16af42a828360ce235a6c6f215d0f`** · **54 paths** ·
+**102 schemas** · api version `v1` · moved 2026-09-16 by TASK-0069 (grading bands and assessment
+structure). Previous: `b293db2bc2b4…` / 51 paths / 93 schemas, TASK-0063 on 2026-09-15; before that
+`37f8b4c2d19d…` (TASK-0066) and TASK-0051.
+
+**Corrected 2026-09-16 — AGAIN, and this is the THIRD time this block has gone stale the same way.**
+It still named TASK-0063's `b293db2b…` / 51 / 93 after TASK-0069 moved the contract on 2026-09-16;
+closing 0069 updated the archive and not this block, exactly as closing 0062 did before it (see the
+2026-09-15 correction this replaces). Verified mechanically against the working tree — `sha256sum
+contracts/openapi.json` and `jq '.paths|keys|length'` — not read off a card. **`CONTRACT.lock`
+matched the live document throughout; it was only this prose that drifted, so the lock is the
+trustworthy source and this block is not. A closing card MUST update this block.**
 
 **Corrected 2026-09-15:** this block still named TASK-0055's `7a3c84e6…` / 47 paths / 86 schemas
 even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing TASK-0062 updated
@@ -153,7 +168,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0065 | Make the integration suite runnable without the network | backend-dev | **queued 2026-09-15** — written in full, NOT dispatched. Hosted Neon at ~8s/test makes every gate 45+ min and every network blip a restart; cost TASK-0051 three runs. Human granted the card while ruling product work outranks it |
+| TASK-0065 | Make the integration suite runnable without the network | backend-dev | **IMPLEMENTED 2026-09-16, all 9 AC met, AWAITING HUMAN CLOSURE.** Testcontainers against the WSL2 daemon; 322 tests in **3m40s offline vs 45+ min hosted**. **AC-4 proven on a genuinely disconnected machine — the WSL bridge survives the adapter going down.** Suite is 321/322: the residual failure is the separately-carded `AuthLogRedactionTests` defect, pre-existing and owned elsewhere. Not committed |
 | TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
@@ -523,6 +538,16 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-16 **`GET /settings/impact` (6.2.12) is not built.** Depends on the same absent
   `result_set`. **Trigger:** the results module. **Owner:** that card.
 
+- 2026-09-16 **`AuthLogRedactionTests`' password-redaction test has been passing for the wrong reason
+  its whole life — only hosted Neon's slowness made its capture work, and its POSITIVE CONTROL is what
+  fails once the database is fast.** Needs BOTH an alphabetically earlier class AND a fast local
+  database; same pair on Neon passes. Two mechanisms were recorded and both refuted (agent: parallel
+  collections; orchestrator: ordering-only, then speed) — **all refuted, the real one is OPEN, do not
+  inherit any of them.** Reproduces ONLY on local Windows + WSL container: passes alone, passes on
+  hosted Neon, and **`backend-ci` is GREEN on `ed1c210`** (8m48s, runner service container) — the
+  orchestrator predicted red and was wrong. Platform (Windows vs Linux `Console.Out` redirection) is
+  the leading untested candidate. Surfaced by TASK-0065, predates it. *Trigger: the next card touching
+  auth logging, observability or this suite. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **`ci.ps1`'s "produced no `.trx` for this run" branch is UNTESTED** — the zero-match
   guard's other half (a new-path snapshot diff) is proven, but no case was constructed that makes
   VSTest write no `.trx` at all, because forcing that on demand is not reliably reproducible.

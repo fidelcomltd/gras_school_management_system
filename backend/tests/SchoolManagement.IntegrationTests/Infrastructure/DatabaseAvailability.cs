@@ -10,10 +10,12 @@ namespace SchoolManagement.IntegrationTests.Infrastructure;
 /// translate SQL, and will happily pass a query that cannot execute against a real database.
 /// </para>
 /// <para>
-/// THE DELIBERATE DESIGN DECISION HERE: when no database is reachable these tests SKIP with an
-/// explanatory message. They do not silently pass, and they never fall back to the in-memory provider.
-/// A skipped test is visibly absent from the run; a test that quietly substitutes a weaker database
-/// reports success while having verified almost nothing, which is the worse failure by far.
+/// TASK-0065: when no database is reachable, <see cref="ApiTestFixture.InitializeAsync"/> THROWS rather
+/// than skipping. A skipped run is invisible — a set <c>POSTGRES_TEST_CONNECTION</c> always took
+/// priority over the container path, so nothing ever forced the Testcontainers fallback to prove
+/// itself (drift 2026-08-27, "Docker.DotNet.Enhanced is unverified in practice"). A thrown exception
+/// fails every test in the collection loudly, with an actionable message, and — same as before — never
+/// falls back to the in-memory provider.
 /// </para>
 /// <para>
 /// Two ways to make them run, in priority order:
@@ -21,8 +23,10 @@ namespace SchoolManagement.IntegrationTests.Infrastructure;
 /// <list type="number">
 /// <item>Set <c>POSTGRES_TEST_CONNECTION</c> to point at any PostgreSQL instance. Used as-is. This is
 /// what CI does with a service container.</item>
-/// <item>Install a container runtime (Docker Desktop or Podman). Testcontainers then starts and
-/// disposes a throwaway PostgreSQL automatically, with no configuration.</item>
+/// <item>Make a container runtime's Docker API reachable — a local socket/pipe, or a daemon reachable
+/// over TCP (for example one running inside WSL2, with no runtime visible from Windows itself).
+/// Testcontainers then starts and disposes a throwaway PostgreSQL automatically, with no
+/// configuration.</item>
 /// </list>
 /// </remarks>
 internal static class DatabaseAvailability
@@ -38,6 +42,29 @@ internal static class DatabaseAvailability
     /// </remarks>
     public const string PostgresImage = "postgres:17.6-alpine";
 
+    /// <summary>
+    /// The WSL2 NAT-mode localhost-forwarding address the Windows host can reach even when
+    /// <c>$env:DOCKER_HOST</c> is unset, or set to an address that does not actually work. TASK-0065
+    /// found the reference machine's <c>$env:DOCKER_HOST</c> set to the IPv4 literal
+    /// <c>tcp://127.0.0.1:2375</c>, which does NOT answer — only the hostname form below does.
+    /// </summary>
+    private const string LocalhostFallbackEndpoint = "tcp://localhost:2375";
+
+    /// <summary>How long a single endpoint probe may take before it counts as "does not answer".</summary>
+    /// <remarks>
+    /// Deliberately short, and never retried: this must stay far below the tens of seconds a failed
+    /// container START costs (see <see cref="ResolveDockerEndpointAsync"/>'s remarks) — a single HTTP
+    /// GET against <c>/_ping</c>, nothing more.
+    /// </remarks>
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromMilliseconds(750);
+
+    /// <summary>
+    /// Caches <see cref="ResolveDockerEndpointAsync"/>'s result for the lifetime of the process. The
+    /// probes it runs are real network calls; every caller (the availability check AND the container
+    /// build itself) must see the SAME resolved endpoint from a SINGLE set of probes, not repeat them.
+    /// </summary>
+    private static readonly Lazy<Task<string?>> LazyResolvedDockerEndpoint = new(ResolveDockerEndpointAsync);
+
     /// <summary>An externally supplied connection string, or <c>null</c> if none is configured.</summary>
     public static string? ExternalConnectionString =>
         Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable) is { } value &&
@@ -46,26 +73,121 @@ internal static class DatabaseAvailability
             : null;
 
     /// <summary>
-    /// Whether a container runtime appears to be available.
+    /// The Docker endpoint to hand Testcontainers explicitly via
+    /// <c>ContainerBuilder.WithDockerEndpoint</c>, or <c>null</c> if none answers. Never trust ambient
+    /// <c>$env:DOCKER_HOST</c> implicitly — TASK-0065 found it set to an address that does not work.
     /// </summary>
-    /// <remarks>
-    /// Probed by looking for the runtime's socket/pipe rather than by attempting to start a container,
-    /// because a failed container start takes tens of seconds and produces a wall of unrelated
-    /// Testcontainers logging before the test suite can report anything useful.
-    /// </remarks>
-    public static bool IsContainerRuntimeAvailable => OperatingSystem.IsWindows()
-        ? Directory.Exists(@"\\.\pipe\") && File.Exists(@"\\.\pipe\docker_engine")
-        : File.Exists("/var/run/docker.sock") ||
-          File.Exists($"/run/user/{Environment.GetEnvironmentVariable("UID")}/podman/podman.sock");
+    public static Task<string?> ResolvedDockerEndpointAsync => LazyResolvedDockerEndpoint.Value;
 
     /// <summary>The reason the tests cannot run, or <c>null</c> when a database is obtainable.</summary>
-    public static string? UnavailableReason =>
-        ExternalConnectionString is not null || IsContainerRuntimeAvailable
-            ? null
-            : "NO POSTGRESQL AVAILABLE — these integration tests were SKIPPED, not passed. " +
-              "They require a real database because the EF Core in-memory provider does not enforce " +
-              "constraints or translate SQL, so it would pass queries that cannot actually execute. " +
-              $"Fix either way: (1) set {ConnectionEnvironmentVariable} to a PostgreSQL connection " +
-              "string, or (2) install a container runtime (Docker Desktop / Podman) and Testcontainers " +
-              $"will start {PostgresImage} automatically. See backend/README.md, 'Running the tests'.";
+    public static async Task<string?> UnavailableReasonAsync()
+    {
+        if (ExternalConnectionString is not null)
+        {
+            return null;
+        }
+
+        if (await ResolvedDockerEndpointAsync.ConfigureAwait(false) is not null)
+        {
+            return null;
+        }
+
+        var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
+        var dockerHostTried = string.IsNullOrWhiteSpace(dockerHost) ? "unset" : $"'{dockerHost}' (did not answer)";
+
+        return "NO POSTGRESQL AVAILABLE for the integration tests — this FAILS the run, it does not " +
+               "skip it. They require a real database because the EF Core in-memory provider does not " +
+               "enforce constraints or translate SQL, so it would pass queries that cannot actually " +
+               "execute. Both fallbacks were tried and neither produced a database: " +
+               $"(1) {ConnectionEnvironmentVariable} is not set; " +
+               $"(2) no Docker endpoint answered a /_ping — tried $DOCKER_HOST ({dockerHostTried}), " +
+               $"{LocalhostFallbackEndpoint}, and the local named pipe/socket. " +
+               $"Fix either way: set {ConnectionEnvironmentVariable} to a PostgreSQL connection string, " +
+               $"or make a container runtime's Docker API reachable and Testcontainers will start " +
+               $"{PostgresImage} automatically. See backend/README.md, 'Running the tests'.";
+    }
+
+    /// <summary>
+    /// Resolves the Docker endpoint to use, first candidate that actually answers wins:
+    /// </summary>
+    /// <remarks>
+    /// <list type="number">
+    /// <item><c>$env:DOCKER_HOST</c>, if set — but only once a probe against it succeeds. Its mere
+    /// presence is never trusted on its own.</item>
+    /// <item><see cref="LocalhostFallbackEndpoint"/> — the WSL2 NAT-mode path that answers when the
+    /// literal IPv4 form in (1) does not.</item>
+    /// <item>The platform's local named pipe (Windows) or Unix socket (Linux/podman), if present.</item>
+    /// </list>
+    /// <para>
+    /// Probed by a short-timeout <c>/_ping</c>, never by starting a container: a failed container start
+    /// costs tens of seconds and buries the real message under a wall of unrelated Testcontainers
+    /// logging before the suite can report anything useful.
+    /// </para>
+    /// </remarks>
+    private static async Task<string?> ResolveDockerEndpointAsync()
+    {
+        var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
+        if (!string.IsNullOrWhiteSpace(dockerHost) &&
+            await TcpEndpointAnswersAsync(dockerHost).ConfigureAwait(false))
+        {
+            return dockerHost;
+        }
+
+        if (await TcpEndpointAnswersAsync(LocalhostFallbackEndpoint).ConfigureAwait(false))
+        {
+            return LocalhostFallbackEndpoint;
+        }
+
+        return LocalNamedEndpoint();
+    }
+
+    /// <summary>
+    /// True only if <paramref name="dockerEndpoint"/> parses as a <c>tcp://</c> endpoint AND a
+    /// short-timeout GET against its <c>/_ping</c> succeeds. Any other scheme, and any failure —
+    /// refused, timed out, DNS failure — answers <c>false</c>: a probe failing is the expected case on
+    /// a machine with no reachable daemon at that address, not an exceptional one.
+    /// </summary>
+    private static async Task<bool> TcpEndpointAnswersAsync(string dockerEndpoint)
+    {
+        if (!Uri.TryCreate(dockerEndpoint, UriKind.Absolute, out var uri) ||
+            !string.Equals(uri.Scheme, "tcp", StringComparison.OrdinalIgnoreCase))
+        {
+            // npipe:// and unix:// are handled by LocalNamedEndpoint's plain existence check below —
+            // pinging a named pipe/socket over HTTP needs a different transport than this TCP probe.
+            return false;
+        }
+
+        try
+        {
+            using var client = new HttpClient { Timeout = ProbeTimeout };
+            using var response = await client.GetAsync($"http://{uri.Host}:{uri.Port}/_ping")
+                .ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The platform's local named pipe (Windows) or Unix socket (Linux/podman), by existence check
+    /// only — no network round trip needed to stat a local file.
+    /// </summary>
+    private static string? LocalNamedEndpoint() => OperatingSystem.IsWindows()
+        ? (Directory.Exists(@"\\.\pipe\") && File.Exists(@"\\.\pipe\docker_engine")
+            ? "npipe://./pipe/docker_engine"
+            : null)
+        : UnixSocketEndpoint();
+
+    private static string? UnixSocketEndpoint()
+    {
+        if (File.Exists("/var/run/docker.sock"))
+        {
+            return "unix:///var/run/docker.sock";
+        }
+
+        var podmanSocket = $"/run/user/{Environment.GetEnvironmentVariable("UID")}/podman/podman.sock";
+        return File.Exists(podmanSocket) ? $"unix://{podmanSocket}" : null;
+    }
 }

@@ -36,7 +36,12 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
     private PostgreSqlContainer? _container;
     private string? _connectionString;
 
-    /// <summary>Whether a database was obtained. When false, every test in the collection skips.</summary>
+    /// <summary>
+    /// Whether a database was obtained. TASK-0065: always true once <see cref="InitializeAsync"/>
+    /// returns — when no database is obtainable, that method THROWS instead, failing every test in the
+    /// collection loudly rather than leaving this false for callers to skip around. Kept (rather than
+    /// removed) as the defensive flag <see cref="IntegrationTestBase"/> already checks.
+    /// </summary>
     public bool IsDatabaseAvailable { get; private set; }
 
     /// <summary>
@@ -49,17 +54,25 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         ?? throw new InvalidOperationException(
             $"{nameof(ConnectionString)} is unavailable — {nameof(IsDatabaseAvailable)} is false.");
 
-    /// <summary>Why the database is unavailable, for the skip message.</summary>
+    /// <summary>
+    /// Why the database is unavailable. TASK-0065: retained for <see cref="IntegrationTestBase"/>'s
+    /// defensive skip path, but in practice <see cref="InitializeAsync"/> now throws before this can be
+    /// observed as non-null — see its remarks.
+    /// </summary>
     public string? SkipReason { get; private set; }
 
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
-        if (DatabaseAvailability.UnavailableReason is { } reason)
+        if (await DatabaseAvailability.UnavailableReasonAsync().ConfigureAwait(false) is { } reason)
         {
+            // TASK-0065: THROW, not skip. A skipped run is invisible — this is the exact defect that
+            // let the Testcontainers fallback go unexercised for months (drift 2026-08-27) because a
+            // set POSTGRES_TEST_CONNECTION always took priority and nothing ever forced this path to
+            // prove itself. Every test in the collection now fails loudly with this actionable message
+            // instead of vanishing from the run as "Skipped".
             SkipReason = reason;
-            IsDatabaseAvailable = false;
-            return;
+            throw new InvalidOperationException(reason);
         }
 
         if (DatabaseAvailability.ExternalConnectionString is { } external)
@@ -70,9 +83,20 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         }
         else
         {
+            // The endpoint was already resolved (and probed) by the UnavailableReasonAsync call above —
+            // ResolvedDockerEndpointAsync is memoized, so this reuses that result rather than probing
+            // again. Passed explicitly via WithDockerEndpoint rather than left to ambient $env:DOCKER_HOST:
+            // TASK-0065 found that variable set to an address that does not work on the reference
+            // machine, so trusting it implicitly would silently undo the resolution above.
+            var dockerEndpoint = await DatabaseAvailability.ResolvedDockerEndpointAsync.ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    "Docker endpoint resolution changed between the availability check and the " +
+                    "container build; this should be unreachable because the result is memoized.");
+
             // Image passed to the constructor: the parameterless overload is obsolete in
             // Testcontainers 4.13 precisely because it hid which image you were about to run.
             _container = new PostgreSqlBuilder(DatabaseAvailability.PostgresImage)
+                .WithDockerEndpoint(dockerEndpoint)
                 .WithDatabase("schoolmanagement_tests")
                 // Credentials for a throwaway container that exists for the length of this test run and
                 // is then destroyed. Not a secret: it is reachable only from this machine, holds only
