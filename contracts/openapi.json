@@ -5928,6 +5928,455 @@
         }
       }
     },
+    "/api/v1/arms/{armId}/score-sheets": {
+      "get": {
+        "tags": [
+          "Score sheets"
+        ],
+        "summary": "Read one arm's score sheet for a subject and term",
+        "description": "Spec 6.7.4: every active pupil in the arm as a row, including one with no marks entered at all. `version` is null before any row exists; send it back unchanged on `PUT` to detect a concurrent edit.",
+        "operationId": "GetScoreSheet",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "subjectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreSheetDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Score sheets"
+        ],
+        "summary": "Save a whole score sheet",
+        "description": "Spec 6.7.4: whole-sheet save, one transaction; a single invalid cell rejects the whole save. The first save for an arm and term creates its result set (Draft). A row with every cell blank and not absent is not stored, and deletes an existing row. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.",
+        "operationId": "SaveScoreSheet",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveScoreSheetCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreSheetDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/{armId}/score-sheets/void": {
+      "post": {
+        "tags": [
+          "Score sheets"
+        ],
+        "summary": "Void every mark for a subject, arm and term",
+        "description": "Spec 6.7.4: a reason of at least ten characters is required. Voided rows are kept, excluded from computation, and vanish from `GET`. `Idempotency-Key` is ACCEPTED, not required.",
+        "operationId": "VoidScoreSheet",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidScoreSheetCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoidScoreSheetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sections": {
       "get": {
         "tags": [
@@ -13883,6 +14332,49 @@
           "reason": null
         }
       },
+      "ResultSetState": {
+        "enum": [
+          "Draft",
+          "AwaitingApproval",
+          "Approved",
+          "Published",
+          "ReturnedForCorrection",
+          "Withdrawn"
+        ],
+        "description": "A ResultSet's lifecycle state (spec 09 §6.7.11). A result set that does not exist\nyet is shown in the interface as \"Not started\" — the absence of a row, not a member of this enum.",
+        "example": "Draft"
+      },
+      "ResultSetSummaryDto": {
+        "required": [
+          "id",
+          "state",
+          "needsRecompute"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The result set's id.",
+            "example": "0192f0c4-37e9-7566-4a38-e6960588b1b0"
+          },
+          "state": {
+            "description": "Spec 6.7.11's six-member state machine.",
+            "$ref": "#/components/schemas/ResultSetState"
+          },
+          "needsRecompute": {
+            "type": "boolean",
+            "description": "Whether the computed rows are stale.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The arm's result set as it stands, or `null` when none exists yet (\"Not started\").",
+        "example": {
+          "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+          "state": "Draft",
+          "needsRecompute": true
+        }
+      },
       "RoleAssignmentDto": {
         "required": [
           "id",
@@ -14100,6 +14592,153 @@
           "modifiedAtUtc": null
         }
       },
+      "SaveScoreSheetCommand": {
+        "required": [
+          "armId",
+          "subjectId",
+          "termId",
+          "version",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm this sheet belongs to, from the route.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "The subject this sheet is for.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term this sheet is for.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sheet's version as last read, or `null` for a sheet with no rows yet. A\nmismatch against the server's current version is a 409 `score_sheet.stale_version`.",
+            "example": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaveScoreSheetRowInput"
+            },
+            "description": "Every row being saved. A row not present here is left untouched.",
+            "example": [
+              {
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "componentMarks": {
+                  "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+                },
+                "examMark": 55,
+                "examAbsent": false
+              },
+              {
+                "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+                "componentMarks": {
+                  "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+                },
+                "examMark": null,
+                "examAbsent": false
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/arms/{armId}/score-sheets` (spec 6.7.4; TASK-0076's approved contract delta) —\n        whole-sheet save, one transaction. The first save for an arm/term creates the result set (Draft).",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+          "rows": [
+            {
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "componentMarks": {
+                "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+              },
+              "examMark": 55,
+              "examAbsent": false
+            },
+            {
+              "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+              "componentMarks": {
+                "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+              },
+              "examMark": null,
+              "examAbsent": false
+            }
+          ]
+        }
+      },
+      "SaveScoreSheetRowInput": {
+        "required": [
+          "pupilId",
+          "componentMarks",
+          "examMark",
+          "examAbsent"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "Must be on the arm's active roster.",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "componentMarks": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "null",
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Every non-examination component id in the current assessment structure must be a key. A present\nkey with a `null` value is a blank cell — never an implicit zero. A missing key is\nrejected (`component_missing`).",
+            "example": {
+              "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+            }
+          },
+          "examMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` for a blank cell, or when ExamAbsent is true.",
+            "format": "int32",
+            "example": 55
+          },
+          "examAbsent": {
+            "type": "boolean",
+            "description": "True means the pupil did not sit the examination.",
+            "example": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "One submitted row of SaveScoreSheetCommand (spec 6.7.4).",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "componentMarks": {
+            "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+          },
+          "examMark": 55,
+          "examAbsent": false
+        }
+      },
       "SaveSubjectMappingGridCommand": {
         "required": [
           "termId",
@@ -14206,6 +14845,295 @@
         ],
         "description": "How a role assignment's grant is bounded. Spec 4.2: \"Scope is one of two things: school-wide,\nor a list of specific arms in a specific session.\"",
         "example": "ArmList"
+      },
+      "ScoreSheetComponentDto": {
+        "required": [
+          "id",
+          "label",
+          "maxMark"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The assessment component's id — also the key IReadOnlyDictionary&lt;string, int?&gt; ScoreSheetRowDto.ComponentMarks uses.",
+            "example": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3"
+          },
+          "label": {
+            "type": "string",
+            "description": "The component's short label, for a tight column header (for example \"CA1\").",
+            "example": "CA1"
+          },
+          "maxMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The component's maximum mark, from settings. Never a literal.",
+            "format": "int32",
+            "example": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "One assessment-structure column on the sheet (spec 6.7.4): a non-examination component, or the examination itself.",
+        "example": {
+          "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+          "label": "CA1",
+          "maxMark": 20
+        }
+      },
+      "ScoreSheetDto": {
+        "required": [
+          "armId",
+          "subjectId",
+          "termId",
+          "version",
+          "resultSet",
+          "components",
+          "examination",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm this sheet belongs to.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "The subject this sheet is for.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term this sheet is for.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque, derived from the rows the sheet covers (see `ScoreSheetVersion`).\n`null` before any row exists. Send back unchanged on `PUT` to detect a\nconcurrent edit.",
+            "example": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f"
+          },
+          "resultSet": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "`null` until the first save creates one (\"Not started\").",
+                "$ref": "#/components/schemas/ResultSetSummaryDto"
+              }
+            ]
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScoreSheetComponentDto"
+            },
+            "description": "Non-examination components only, in settings order.",
+            "example": [
+              {
+                "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+                "label": "CA1",
+                "maxMark": 20
+              }
+            ]
+          },
+          "examination": {
+            "description": "The examination column — always last, never in Components.",
+            "$ref": "#/components/schemas/ScoreSheetComponentDto"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScoreSheetRowDto"
+            },
+            "description": "Every active pupil in the arm, surname then id — fixed, never affected by marks.",
+            "example": [
+              {
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "registrationNumber": "GRAS/2026/0041",
+                "displayName": "Okafor Chidera Ngozi",
+                "componentMarks": {
+                  "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+                },
+                "examMark": 55,
+                "examAbsent": false,
+                "caTotal": 18,
+                "subjectTotal": 73
+              },
+              {
+                "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+                "registrationNumber": "GRAS/2026/0042",
+                "displayName": "Bello Musa",
+                "componentMarks": {
+                  "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+                },
+                "examMark": null,
+                "examAbsent": false,
+                "caTotal": null,
+                "subjectTotal": null
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One arm's score sheet for one subject and term (spec 6.7.4; TASK-0076's approved contract delta).\nDeparts from spec 6.7.13's `?arm_id=` query form — see the endpoint's own remarks.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+          "resultSet": {
+            "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+            "state": "Draft",
+            "needsRecompute": true
+          },
+          "components": [
+            {
+              "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+              "label": "CA1",
+              "maxMark": 20
+            }
+          ],
+          "examination": {
+            "id": "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4",
+            "label": "Exam",
+            "maxMark": 60
+          },
+          "rows": [
+            {
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "componentMarks": {
+                "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+              },
+              "examMark": 55,
+              "examAbsent": false,
+              "caTotal": 18,
+              "subjectTotal": 73
+            },
+            {
+              "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+              "registrationNumber": "GRAS/2026/0042",
+              "displayName": "Bello Musa",
+              "componentMarks": {
+                "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+              },
+              "examMark": null,
+              "examAbsent": false,
+              "caTotal": null,
+              "subjectTotal": null
+            }
+          ]
+        }
+      },
+      "ScoreSheetRowDto": {
+        "required": [
+          "pupilId",
+          "registrationNumber",
+          "displayName",
+          "componentMarks",
+          "examMark",
+          "examAbsent",
+          "caTotal",
+          "subjectTotal"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "The pupil's id.",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` only if somehow unissued.",
+            "example": "GRAS/2026/0041"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Composed \"Surname First Middle\", for the row identity alongside RegistrationNumber.",
+            "example": "Okafor Chidera Ngozi"
+          },
+          "componentMarks": {
+            "type": "object",
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "null",
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Component id to mark, `null` for a blank cell — never an implicit zero.",
+            "example": {
+              "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+            }
+          },
+          "examMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` when blank or when ExamAbsent is true.",
+            "format": "int32",
+            "example": 55
+          },
+          "examAbsent": {
+            "type": "boolean",
+            "description": "True when the pupil did not sit the examination.",
+            "example": false
+          },
+          "caTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Sum of the non-examination components. `null` unless every one of them is filled.",
+            "format": "int32",
+            "example": 18
+          },
+          "subjectTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "CaTotal plus the exam mark (or CaTotal alone if absent). `null` unless the row is complete.",
+            "format": "int32",
+            "example": 73
+          }
+        },
+        "additionalProperties": false,
+        "description": "One pupil's row on the sheet (spec 6.7.4) — every active pupil in the arm, including one with no marks entered at all.",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "registrationNumber": "GRAS/2026/0041",
+          "displayName": "Okafor Chidera Ngozi",
+          "componentMarks": {
+            "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+          },
+          "examMark": 55,
+          "examAbsent": false,
+          "caTotal": 18,
+          "subjectTotal": 73
+        }
       },
       "SectionDto": {
         "required": [
@@ -16906,6 +17834,68 @@
           "timesSchoolOpened": 118,
           "nextResumptionDate": "2027-01-05"
         }
+      },
+      "VoidScoreSheetCommand": {
+        "required": [
+          "armId",
+          "subjectId",
+          "termId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm this sheet belongs to, from the route.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "The subject to void.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term to void.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required, spec's ten-to-five-hundred-character reason floor.",
+            "example": "Whole class re-marked after a transcription error in the mark book."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved\n        contract delta) — voids every non-voided mark for one arm, subject and term. Super Admin only,\n        reason required. Used only to unwind an error.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "reason": "Whole class re-marked after a transcription error in the mark book."
+        }
+      },
+      "VoidScoreSheetResponse": {
+        "required": [
+          "voidedCount"
+        ],
+        "type": "object",
+        "properties": {
+          "voidedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many non-voided marks were voided. Zero when none existed.",
+            "format": "int32",
+            "example": 27
+          }
+        },
+        "additionalProperties": false,
+        "description": "The count of marks voided by VoidScoreSheetCommand.",
+        "example": {
+          "voidedCount": 27
+        }
       }
     },
     "securitySchemes": {
@@ -16950,6 +17940,9 @@
     },
     {
       "name": "Roles"
+    },
+    {
+      "name": "Score sheets"
     },
     {
       "name": "Sections"
