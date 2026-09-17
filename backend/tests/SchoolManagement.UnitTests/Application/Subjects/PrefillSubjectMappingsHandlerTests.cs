@@ -133,6 +133,7 @@ public sealed class PrefillSubjectMappingsHandlerTests
         await _mappings.DidNotReceive().AddAsync(Arg.Any<SubjectMapping>(), Arg.Any<CancellationToken>());
     }
 
+    // Spec 6.6.6, verbatim: "First Term 2026/2027 is closed. Its subject mappings cannot be changed."
     [Fact]
     public async Task HandleAsync_OnAClosedTerm_IsRejectedOutright_EvenUnderDryRun()
     {
@@ -149,5 +150,8 @@ public sealed class PrefillSubjectMappingsHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("subject_mapping.term_closed");
+        result.Error.Description.ShouldContain("First Term");
+        result.Error.Description.ShouldContain("2026/2027");
+        result.Error.Description.ShouldContain("Its subject mappings cannot be changed.");
     }
 }

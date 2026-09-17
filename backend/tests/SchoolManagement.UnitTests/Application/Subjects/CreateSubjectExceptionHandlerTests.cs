@@ -67,6 +67,9 @@ public sealed class CreateSubjectExceptionHandlerTests
 
     // The load-bearing assumption, end 1: an INCLUDE on a subject already actively mapped is
     // rejected — this is what stops the resolver ever seeing an include that duplicates a mapping.
+    // Spec 6.6.4 wording, verbatim shape: "English Studies is already mapped to Primary 2 this term.
+    // This arm already takes it." — pinned here against this test's own subject/level names
+    // (Mathematics / Primary 4) rather than whole-string equality.
     [Fact]
     public async Task HandleAsync_IncludeOnAnAlreadyMappedSubject_IsRejectedAsRedundant()
     {
@@ -76,10 +79,16 @@ public sealed class CreateSubjectExceptionHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("subject_exception.redundant_include");
+        result.Error.Description.ShouldContain("Mathematics");
+        result.Error.Description.ShouldContain("Primary 4");
+        result.Error.Description.ShouldContain("This arm already takes it.");
     }
 
     // The load-bearing assumption, end 2: an EXCLUDE on a subject NOT actively mapped is rejected —
     // this is what stops the resolver ever seeing an exclude with nothing to exclude.
+    // PROVISIONAL COPY — delta amendment 4: this rejection message has no spec wording of its own
+    // (mirrored from redundant_include); pinning it here records what it says TODAY, not a spec quote,
+    // and it may be changed freely without this test being read as blocking that change.
     [Fact]
     public async Task HandleAsync_ExcludeOnASubjectNotMapped_IsRejectedAsRedundant()
     {
@@ -89,6 +98,9 @@ public sealed class CreateSubjectExceptionHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("subject_exception.redundant_exclude");
+        result.Error.Description.ShouldContain("Mathematics");
+        result.Error.Description.ShouldContain("Primary 4");
+        result.Error.Description.ShouldContain("This arm does not take it.");
     }
 
     // Positive controls for the same rule: the NON-redundant half of each mode must succeed, or a

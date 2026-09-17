@@ -194,6 +194,7 @@ public sealed class SaveSubjectMappingGridHandlerTests
         mapping.Status.ShouldBe(SubjectMappingStatus.Ended);
     }
 
+    // Spec 6.6.6, verbatim: "First Term 2026/2027 is closed. Its subject mappings cannot be changed."
     [Fact]
     public async Task HandleAsync_OnAClosedTerm_IsRejectedOutright()
     {
@@ -210,6 +211,9 @@ public sealed class SaveSubjectMappingGridHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("subject_mapping.term_closed");
+        result.Error.Description.ShouldContain("First Term");
+        result.Error.Description.ShouldContain("2026/2027");
+        result.Error.Description.ShouldContain("Its subject mappings cannot be changed.");
     }
 
     // A NEW mapping against an inactive subject is rejected — the flip side of spec 6.6.6's
