@@ -168,7 +168,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **queued 2026-09-16** — behind 0069 only because both write `backend/**`; independent in substance |
+| TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **PARKED 2026-09-17 — blocked on the weekly limit, resets Sep 21 12:00.** Implementation complete and uncommitted: 8 paths, all handlers, migration, DI, `ReseedSubjectsAsync`. Build PASS under `10.0-All`, architecture 33/33, unit **738/745 — 7 failures, all `PipelineTests`, two missing `Substitute.For<>` lines**. **ZERO tests written**, so no AC is proven and the card cannot close. Contract NOT promoted |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
@@ -178,6 +178,15 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-17 **TASK-0070 dispatch 2 died a SECOND time, on the weekly limit (resets Sep 21 12:00).**
+  Implementation complete — 8 paths, all handlers, migration, DI, fixture reseed; build clean under
+  `10.0-All`, architecture 33/33. **Zero tests written**, and 7 `PipelineTests` failures traced to
+  two missing `Substitute.For<>` registrations, not a DI bug. Card cannot close. →
+  `decisions/2026-Q3.md`
+- 2026-09-17 **TASK-0070 dispatch 2 died on a session rate limit — FOURTH occurrence** (0003, 0019,
+  0005a, 0070); tree inventoried before anything was believed about it, seed verified mechanically
+  against the card, agent resumed rather than re-dispatched. **A line count is not progress.** →
+  `decisions/2026-Q3.md`
 - 2026-09-16 **TASK-0073 closed — the password-redaction test now proves what it claims, and the
   full suite is 322/322 for the first time.** Mechanism was none of the FIVE hypotheses, including
   the orchestrator's three and the "platform" lead its own card named: `AddSerilog` defaults to
@@ -440,6 +449,18 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 `drift/2026-Q3.md`. STRUCK entries are closed and live only in the archive.
 
 ### Live — product and spec gaps
+
+- 2026-09-16 **`08-module-subjects.md` §6.6.2 still says "No subjects are seeded" — rev 3.1 reversed
+  that and the superseded text was never deleted; THIRD instance of the §6.2.5-§6.2.7 pattern.**
+  *Trigger: any card citing §6.6.2, and the subject creation-screen card. Owner: human.* →
+  `drift/2026-Q3.md`
+- 2026-09-16 **`subject.code` ships NULLABLE and unseeded — deliberate departure from §6.6.2's
+  `Req: Yes`; nothing prints a code today and appendix C declares it optional.** *Trigger: the arm
+  broadsheet card. Owner: that card.* → `drift/2026-Q3.md`
+- 2026-09-16 **Three seeded subject pairs are probably one subject spelled twice (Handwriting/Hand
+  writing, Phonics/Phonics-Diction, Creative skills/Creative Art); both Handwriting spellings appear
+  on the school's own sheets.** *Trigger: before the first result sheet is printed. Owner: human plus
+  the school.* → `drift/2026-Q3.md`
 
 - 2026-09-16 **`04-module-school-settings.md` §6.2.5, §6.2.6 and §6.2.7 still print seed data that
   §6.2.13 replaces, and the superseded text was never deleted.** §6.2.5 shows six bands and a
