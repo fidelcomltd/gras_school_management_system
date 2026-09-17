@@ -7994,6 +7994,1558 @@
         }
       }
     },
+    "/api/v1/subjects": {
+      "get": {
+        "tags": [
+          "Subjects"
+        ],
+        "summary": "List subjects",
+        "description": "Spec 6.6.7: name, code, status, and — only when `termId` is supplied — the number of levels mapped, arm exceptions and pupils currently taking it this term. This endpoint never guesses a term: with `termId` absent, those three counts are null rather than resolved against a guessed term. Default sort by name ascending, cursor-paginated per spec 9.5.",
+        "operationId": "ListSubjects",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SubjectStatus"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfSubjectDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Subjects"
+        ],
+        "summary": "Create a subject",
+        "description": "Spec 6.6.2. `code` is OPTIONAL (TASK-0070 delta amendment 1) — nullable, unseeded, uppercase letters and digits when supplied. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateSubject",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubjectCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subjects/{id}": {
+      "patch": {
+        "tags": [
+          "Subjects"
+        ],
+        "summary": "Edit a subject",
+        "description": "Spec 6.6.2. Every field is independently optional; an absent field is left unchanged; an empty string clears `code`/`description`. Changing `status` ADDITIONALLY requires `subject.deactivate`, beyond the `subject.update` this route requires.",
+        "operationId": "UpdateSubject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubjectCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Subjects"
+        ],
+        "summary": "Delete a subject",
+        "description": "Spec 6.6.8: permitted only where it has never been mapped and never scored. Otherwise deactivate.",
+        "operationId": "DeleteSubject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subject-mappings": {
+      "get": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Read the subject mapping grid for a term",
+        "description": "Spec 6.6.5, 6.6.9: levels, subjects, ticks, and the per-arm exception summary.",
+        "operationId": "GetSubjectMappingGrid",
+        "parameters": [
+          {
+            "name": "term_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectMappingGridDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Save the whole subject mapping grid for a term",
+        "description": "Spec 6.6.5, 6.6.9: whole-grid save, atomic. `dryRun` returns the additions/endings preview without writing. TASK-0070 delta amendment 2: requires `subject.map` when the computed diff has additions and `subject.unmap` when it has endings — both when it has both — evaluated identically under `dryRun`. Rejected outright against a closed term; an ending is rejected when marks exist for that subject in any arm under the level (spec 6.6.6).",
+        "operationId": "SaveSubjectMappingGrid",
+        "parameters": [
+          {
+            "name": "term_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSubjectMappingGridCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveSubjectMappingGridResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subject-mappings/copy": {
+      "post": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Copy a term's subject mappings into another term",
+        "description": "Spec 6.6.5, 6.6.9. Additive only — never ends a destination mapping the source does not have, and never duplicates one already active in the destination. Requires `subject.map` only. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CopySubjectMappings",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopySubjectMappingsCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveSubjectMappingGridResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subject-mappings/prefill": {
+      "post": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Apply the school's standard subject list to a term",
+        "description": "TASK-0070 delta amendment 5 (human-ruled 2026-09-16; not in spec 6.6.9's own list) — the 14/19 standard nursery/primary list, `display_order` from the school's own result-sheet order. Additive only: can never end a mapping and never duplicates an existing active one. Requires `subject.map` only. `Idempotency-Key` is REQUIRED. Rejected outright against a closed term, `dryRun` included.",
+        "operationId": "PrefillSubjectMappings",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrefillSubjectMappingsCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveSubjectMappingGridResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subject-exceptions/{id}": {
+      "delete": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Delete a per-arm subject exception",
+        "description": "Spec 6.6.4, 6.6.9. TASK-0070 delta amendment 2: requires `subject.map.arm`, the same privilege as its create — NOT `subject.unmap`. No closed-session 409: spec 6.6.8's closed-session rejection applies to creation only.",
+        "operationId": "DeleteSubjectException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/{id}/subjects": {
+      "get": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Read one arm's resolved subject set",
+        "description": "Spec 6.6.1, 6.6.4, 6.6.9: level mappings for the term, plus the arm's include exceptions, minus its exclude exceptions — each row flagged level-inherited or arm exception. The endpoint the score entry screen and the result renderer both call. Unwrapped array, no pagination.",
+        "operationId": "GetArmSubjects",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "term_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArmSubjectDto"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/{id}/subject-exceptions": {
+      "post": {
+        "tags": [
+          "Subject mappings"
+        ],
+        "summary": "Create a per-arm subject exception",
+        "description": "Spec 6.6.4, 6.6.9. `include` adds a subject the level does not take; `exclude` removes one the level does take. Rejected as redundant when the mode already matches the level's own mapping, and when the arm's session is closed. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CreateSubjectException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubjectExceptionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectExceptionDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/terms/{id}": {
       "patch": {
         "tags": [
@@ -9142,6 +10694,58 @@
         "description": "An Arm's status (spec 6.4.3). Defaults ArmStatus.Active.",
         "example": "Active"
       },
+      "ArmSubjectDto": {
+        "required": [
+          "subjectId",
+          "subjectName",
+          "subjectCode",
+          "displayOrder",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "subjectName": {
+            "type": "string",
+            "description": "The subject's name.",
+            "example": "Mathematics"
+          },
+          "subjectCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when the subject carries none."
+          },
+          "displayOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The row order of the result sheet (spec 6.6.1, 6.6.3) — additive beyond §6.6.9's literal text,\nneeded by the result renderer (TASK-0071) for a deterministic order without a second query.",
+            "format": "int32",
+            "example": 1
+          },
+          "source": {
+            "description": "Whether this row reached the arm through its level's mapping or its own exception.",
+            "$ref": "#/components/schemas/SubjectSourceKind"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row of an arm's resolved subject set (spec 6.6.1, 6.6.9: \"the resolved set in effect for one\narm, with each row flagged as level-inherited or arm exception\").",
+        "example": {
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "subjectName": "Mathematics",
+          "subjectCode": null,
+          "displayOrder": 1,
+          "source": "LevelInherited"
+        }
+      },
       "AssessmentComponentDto": {
         "required": [
           "id",
@@ -9802,6 +11406,38 @@
           "changedGroup": "Identity",
           "actorAdminId": "0192f0c4-0000-7000-8000-000000000099",
           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+        }
+      },
+      "CopySubjectMappingsCommand": {
+        "required": [
+          "sourceTermId",
+          "destinationTermId",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceTermId": {
+            "type": "string",
+            "description": "Copy FROM this term's currently active mappings.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "destinationTermId": {
+            "type": "string",
+            "description": "Copy INTO this term.",
+            "example": "0192f0c4-37e9-7566-4a38-e696158802b1"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "When `true`, computes and returns the preview but writes nothing.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/subject-mappings/copy` (spec 6.6.5, 6.6.9): \"Body carries source term and\n        destination term.\" Additive only — this card's own judgement call (see the handler's remarks):\n        the one worked example spec 6.6.8 gives (\"a term with 14 mappings into a term that already has 3 →\n        11 additions, 0 endings, does not duplicate the 3\") never shows an ending, so copy never ends a\n        destination mapping the source term does not have. Requires `subject.map` only.",
+        "example": {
+          "sourceTermId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "destinationTermId": "0192f0c4-37e9-7566-4a38-e696158802b1",
+          "dryRun": true
         }
       },
       "CorrectRegistrationNumberCommand": {
@@ -10503,6 +12139,87 @@
           "nextResumptionDate": "2027-01-05"
         }
       },
+      "CreateSubjectCommand": {
+        "required": [
+          "name",
+          "code",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1..80 characters. Unique, case-insensitive.",
+            "example": "Mathematics"
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` or empty for none — TASK-0070 delta amendment 1 makes this OPTIONAL,\n        departing from spec 6.6.2's `Req: Yes` (see the card's \"Why code is optional\"). Uppercase\n        letters and digits only when supplied; unique where supplied."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional, up to 300 characters. Never printed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/subjects` (spec 6.6.2, 6.6.9).",
+        "example": {
+          "name": "Mathematics",
+          "code": null,
+          "description": null
+        }
+      },
+      "CreateSubjectExceptionCommand": {
+        "required": [
+          "armId",
+          "subjectId",
+          "termId",
+          "mode",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "Bound from the route. The one arm this exception applies to.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "Must reference an active subject.",
+            "example": "0192f0c4-f3a5-7162-0694-a252d13e8417"
+          },
+          "termId": {
+            "type": "string",
+            "description": "Must belong to the arm's session.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "mode": {
+            "description": "include or exclude.",
+            "$ref": "#/components/schemas/SubjectExceptionMode"
+          },
+          "reason": {
+            "type": "string",
+            "description": "1..200 characters. Required.",
+            "example": "This arm runs a French club this term."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/arms/{id}/subject-exceptions` (spec 6.6.4, 6.6.9). Requires `subject.map.arm`.\n        `Idempotency-Key` is REQUIRED (standing obligation: every retry-duplicable mutation declares\n        one — TASK-0070's own flagged gap beyond the card's original four examples).",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "mode": "Include",
+          "reason": "This arm runs a French club this term."
+        }
+      },
       "CsrfTokenResponse": {
         "required": [
           "csrfToken"
@@ -10982,6 +12699,58 @@
             }
           ],
           "nextCursor": "MjAyNi8yMDI3"
+        }
+      },
+      "CursorPageOfSubjectDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+                "name": "Mathematics",
+                "code": null,
+                "description": null,
+                "status": "Active",
+                "mappedLevelCount": 6,
+                "armExceptionCount": 1,
+                "pupilsTakingCount": 182
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+              "name": "Mathematics",
+              "code": null,
+              "description": null,
+              "status": "Active",
+              "mappedLevelCount": 6,
+              "armExceptionCount": 1,
+              "pupilsTakingCount": 182
+            }
+          ],
+          "nextCursor": null
         }
       },
       "DeclineAdmissionCommand": {
@@ -11504,6 +13273,31 @@
           "message": "Hello, Ada.",
           "serverTimeUtc": "2026-08-03T09:30:00+00:00",
           "apiVersion": "1.0"
+        }
+      },
+      "PrefillSubjectMappingsCommand": {
+        "required": [
+          "termId",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "termId": {
+            "type": "string",
+            "description": "The term to prefill.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "When `true`, computes and returns the preview but writes nothing. The closed-term refusal applies here too.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /api/v1/subject-mappings/prefill` (TASK-0070 delta amendment 5, human-ruled\n        2026-09-16 — not in spec 6.6.9's own endpoint list). Applies the school's standard 14/19 subject\n        list to a named term using the per-section sheet order (spec appendices E and F) as\n        `display_order`. Additive only — can never end a mapping — and never duplicates an existing\n        active one. Requires `subject.map` only; `subject.unmap` is never demanded because this\n        action cannot end anything.",
+        "example": {
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "dryRun": true
         }
       },
       "PrivilegeDescriptorDto": {
@@ -12304,6 +14098,105 @@
           "note": "Carried over from the previous academic year.",
           "createdAtUtc": "2026-08-03T09:30:00+00:00",
           "modifiedAtUtc": null
+        }
+      },
+      "SaveSubjectMappingGridCommand": {
+        "required": [
+          "termId",
+          "entries",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "termId": {
+            "type": "string",
+            "description": "Bound from the `term_id` query string, not the body.",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingGridEntryInput"
+            },
+            "description": "The FULL desired grid for this term — every entry not currently active becomes an addition; every currently active pair absent from this list becomes an ending.",
+            "example": [
+              {
+                "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "displayOrder": 1
+              }
+            ]
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "When `true`, computes and returns the preview but writes nothing. Evaluated against the SAME privilege rule as a real save (delta amendment 2).",
+            "example": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/subject-mappings?term_id=` (spec 6.6.5, 6.6.9): \"Whole-grid save. Atomic. Supports\n        dry_run returning the additions and endings summary.\" TASK-0070 delta amendment 2: requires\n        `Subject.Map` when the computed diff contains additions and `Subject.Unmap` when it\n        contains endings — both when it contains both, checked in the handler because it is data-dependent.",
+        "example": {
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "entries": [
+            {
+              "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "displayOrder": 1
+            }
+          ],
+          "dryRun": false
+        }
+      },
+      "SaveSubjectMappingGridResponse": {
+        "required": [
+          "additions",
+          "endings",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "additions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingChangeDto"
+            },
+            "description": "Mappings added (or, under bool SaveSubjectMappingGridResponse.DryRun, previewed).",
+            "example": [
+              {
+                "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+                "subjectName": "Mathematics",
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "classLevelName": "Primary 2"
+              }
+            ]
+          },
+          "endings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingChangeDto"
+            },
+            "description": "Mappings ended (or previewed). Always empty for `copy` and `prefill`.",
+            "example": [ ]
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Echoes the request's `dryRun` — `true` means nothing was written.",
+            "example": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "The shared response envelope for `PUT /subject-mappings`, `POST /subject-mappings/copy`\nand `POST /subject-mappings/prefill` (TASK-0070 delta amendment 5: \"the same\n`SaveSubjectMappingGridResponse` envelope as the grid save and copy\") — spec 6.6.5's preview,\n\"This will add 12 mappings and end 2 mappings.\"",
+        "example": {
+          "additions": [
+            {
+              "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+              "subjectName": "Mathematics",
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "classLevelName": "Primary 2"
+            }
+          ],
+          "endings": [ ],
+          "dryRun": false
         }
       },
       "ScopeType": {
@@ -13244,6 +15137,501 @@
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
         }
+      },
+      "SubjectDto": {
+        "required": [
+          "id",
+          "name",
+          "code",
+          "description",
+          "status",
+          "mappedLevelCount",
+          "armExceptionCount",
+          "pupilsTakingCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque identifier.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique, case-insensitive.",
+            "example": "Mathematics"
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when not supplied (the seed's own state — TASK-0070 delta amendment 1)."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Free text, for the administrator's benefit only. Never printed."
+          },
+          "status": {
+            "description": "active or inactive. The client tolerates an unknown member (§8).",
+            "$ref": "#/components/schemas/SubjectStatus"
+          },
+          "mappedLevelCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Number of levels this subject is actively mapped to in the requested term. `null`\nwhen the request carried no `termId` — TASK-0070 delta amendment 3: this endpoint never\nguesses a term.",
+            "format": "int32",
+            "example": 6
+          },
+          "armExceptionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` under the same condition as MappedLevelCount.",
+            "format": "int32",
+            "example": 1
+          },
+          "pupilsTakingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` under the same condition as MappedLevelCount.",
+            "format": "int32",
+            "example": 182
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of a Subject (spec 6.6.2, 6.6.7, 6.6.9).",
+        "example": {
+          "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "name": "Mathematics",
+          "code": null,
+          "description": null,
+          "status": "Active",
+          "mappedLevelCount": 6,
+          "armExceptionCount": 1,
+          "pupilsTakingCount": 182
+        }
+      },
+      "SubjectExceptionDto": {
+        "required": [
+          "id",
+          "armId",
+          "subjectId",
+          "subjectName",
+          "termId",
+          "mode",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0192f0c4-26d8-7465-3927-d585047719a0"
+          },
+          "armId": {
+            "type": "string",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "subjectId": {
+            "type": "string",
+            "example": "0192f0c4-f3a5-7162-0694-a252d13e8417"
+          },
+          "subjectName": {
+            "type": "string",
+            "example": "French"
+          },
+          "termId": {
+            "type": "string",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/SubjectExceptionMode"
+          },
+          "reason": {
+            "type": "string",
+            "example": "This arm runs a French club this term."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wire shape of a SubjectMappingException (spec 6.6.4, 6.6.9).",
+        "example": {
+          "id": "0192f0c4-26d8-7465-3927-d585047719a0",
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+          "subjectName": "French",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "mode": "Include",
+          "reason": "This arm runs a French club this term."
+        }
+      },
+      "SubjectExceptionMode": {
+        "enum": [
+          "Include",
+          "Exclude"
+        ],
+        "description": "A SubjectMappingException's mode (spec 6.6.4).",
+        "example": "Include"
+      },
+      "SubjectMappingChangeDto": {
+        "required": [
+          "subjectId",
+          "subjectName",
+          "classLevelId",
+          "classLevelName"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "subjectName": {
+            "type": "string",
+            "example": "Mathematics"
+          },
+          "classLevelId": {
+            "type": "string",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "classLevelName": {
+            "type": "string",
+            "example": "Primary 2"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One changed (subject, level) pair in a SaveSubjectMappingGridResponse preview or result.",
+        "example": {
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "subjectName": "Mathematics",
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "classLevelName": "Primary 2"
+        }
+      },
+      "SubjectMappingGridArmExceptionSummaryDto": {
+        "required": [
+          "armId",
+          "armDisplayName",
+          "includeCount",
+          "excludeCount"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "armDisplayName": {
+            "type": "string",
+            "example": "Primary 2C"
+          },
+          "includeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "example": 1
+          },
+          "excludeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "Spec 6.6.5's \"warning panel\" row — one arm whose subject set diverges from its level, with the\nexception counts driving it.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "armDisplayName": "Primary 2C",
+          "includeCount": 1,
+          "excludeCount": 0
+        }
+      },
+      "SubjectMappingGridCellDto": {
+        "required": [
+          "classLevelId",
+          "mapped",
+          "displayOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "description": "The column.",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "mapped": {
+            "type": "boolean",
+            "description": "Whether an active mapping exists for this (subject, level) pair in the requested term.",
+            "example": true
+          },
+          "displayOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "`null` when bool SubjectMappingGridCellDto.Mapped is `false`.",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "One ticked (or untickable) cell of the grid, for one level under one subject row.",
+        "example": {
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "mapped": true,
+          "displayOrder": 1
+        }
+      },
+      "SubjectMappingGridDto": {
+        "required": [
+          "levels",
+          "subjects",
+          "armExceptions"
+        ],
+        "type": "object",
+        "properties": {
+          "levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingGridLevelDto"
+            },
+            "example": [
+              {
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "classLevelName": "Primary 2",
+                "progressionOrder": 5
+              }
+            ]
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingGridSubjectRowDto"
+            },
+            "example": [
+              {
+                "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+                "subjectName": "Mathematics",
+                "subjectCode": null,
+                "cells": [
+                  {
+                    "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                    "mapped": true,
+                    "displayOrder": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "armExceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingGridArmExceptionSummaryDto"
+            },
+            "example": [
+              {
+                "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+                "armDisplayName": "Primary 2C",
+                "includeCount": 1,
+                "excludeCount": 0
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`GET /subject-mappings?term_id=`'s response (spec 6.6.5, 6.6.9): \"the whole grid for a term:\n        levels, subjects, ticks, and the arm exception summary.\"",
+        "example": {
+          "levels": [
+            {
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "classLevelName": "Primary 2",
+              "progressionOrder": 5
+            }
+          ],
+          "subjects": [
+            {
+              "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+              "subjectName": "Mathematics",
+              "subjectCode": null,
+              "cells": [
+                {
+                  "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                  "mapped": true,
+                  "displayOrder": 1
+                }
+              ]
+            }
+          ],
+          "armExceptions": [
+            {
+              "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+              "armDisplayName": "Primary 2C",
+              "includeCount": 1,
+              "excludeCount": 0
+            }
+          ]
+        }
+      },
+      "SubjectMappingGridEntryInput": {
+        "required": [
+          "subjectId",
+          "classLevelId",
+          "displayOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "description": "Must reference an active subject.",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "classLevelId": {
+            "type": "string",
+            "description": "Must reference an active level.",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "displayOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Row order of the subject on this level's result sheet (spec 6.6.3).",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "One ticked cell submitted to SaveSubjectMappingGridCommand.",
+        "example": {
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "displayOrder": 1
+        }
+      },
+      "SubjectMappingGridLevelDto": {
+        "required": [
+          "classLevelId",
+          "classLevelName",
+          "progressionOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "classLevelName": {
+            "type": "string",
+            "example": "Primary 2"
+          },
+          "progressionOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "example": 5
+          }
+        },
+        "additionalProperties": false,
+        "description": "One column header of the grid.",
+        "example": {
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "classLevelName": "Primary 2",
+          "progressionOrder": 5
+        }
+      },
+      "SubjectMappingGridSubjectRowDto": {
+        "required": [
+          "subjectId",
+          "subjectName",
+          "subjectCode",
+          "cells"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "subjectName": {
+            "type": "string",
+            "example": "Mathematics"
+          },
+          "subjectCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectMappingGridCellDto"
+            },
+            "example": [
+              {
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "mapped": true,
+                "displayOrder": 1
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row of the grid — a subject and its tick against every active level.",
+        "example": {
+          "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "subjectName": "Mathematics",
+          "subjectCode": null,
+          "cells": [
+            {
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "mapped": true,
+              "displayOrder": 1
+            }
+          ]
+        }
+      },
+      "SubjectSourceKind": {
+        "enum": [
+          "LevelInherited",
+          "ArmException"
+        ],
+        "description": "How a subject reached an arm's resolved set (spec 6.6.4, `GET /arms/{id}/subjects`) — \"each\nrow flagged as level-inherited or arm exception.\"",
+        "example": "LevelInherited"
+      },
+      "SubjectStatus": {
+        "enum": [
+          "Active",
+          "Inactive"
+        ],
+        "description": "A Subject's status (spec 6.6.2). Defaults SubjectStatus.Active.",
+        "example": "Active"
       },
       "TermDto": {
         "required": [
@@ -14388,6 +16776,65 @@
           "endDate": null
         }
       },
+      "UpdateSubjectCommand": {
+        "required": [
+          "id",
+          "name",
+          "code",
+          "description",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The subject being edited.",
+            "format": "uuid",
+            "example": "0192f0c4-e294-7061-f583-9141c02d7306"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged. Must stay unique."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged; an EMPTY string clears it."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` to leave unchanged; an EMPTY string clears it."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "`null` to leave unchanged.",
+                "$ref": "#/components/schemas/SubjectStatus"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PATCH /api/v1/subjects/{id}` (spec 6.6.2, 6.6.9). Every field is independently optional —\n        `null` leaves it unchanged, the same convention `UpdateArmCommand` and\n        `UpdateLevelCommand` established. Changing SubjectStatus? UpdateSubjectCommand.Status ADDITIONALLY requires\n        `subject.deactivate`, beyond the `subject.update` this route requires.",
+        "example": {
+          "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+          "name": null,
+          "code": null,
+          "description": null,
+          "status": null
+        }
+      },
       "UpdateTermCommand": {
         "required": [
           "id",
@@ -14512,6 +16959,12 @@
     },
     {
       "name": "Settings"
+    },
+    {
+      "name": "Subjects"
+    },
+    {
+      "name": "Subject mappings"
     },
     {
       "name": "Terms"

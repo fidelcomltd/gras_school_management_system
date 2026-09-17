@@ -112,10 +112,17 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `152dc1c27db77bfc6c2697580d8b3f86ebe16af42a828360ce235a6c6f215d0f`** · **54 paths** ·
-**102 schemas** · api version `v1` · moved 2026-09-16 by TASK-0069 (grading bands and assessment
-structure). Previous: `b293db2bc2b4…` / 51 paths / 93 schemas, TASK-0063 on 2026-09-15; before that
-`37f8b4c2d19d…` (TASK-0066) and TASK-0051.
+**Current: `57ea95b44bd40ae395d62294882d3422fb450e7b77f1d99131040909292aeca6`** · **62 paths** ·
+**123 schemas** · api version `v1` · moved 2026-09-17 by TASK-0070 (subjects, level mappings and
+per-arm exceptions). Previous: `152dc1c27db7…` / 54 paths / 102 schemas, TASK-0069 on 2026-09-16;
+before that `b293db2bc2b4…` (TASK-0063) and `37f8b4c2d19d…` (TASK-0066).
+
+**Updated by the closing card this time, at promotion, not afterwards** — the failure mode the three
+corrections below describe. Promotion run by the ORCHESTRATOR (`generate-openapi.ps1 -Promote`);
+`CONTRACT.lock` written in the same run. **Additive verified MECHANICALLY, not read off the card:**
+every existing schema's `required` array, every shared property's type, and every property name
+diffed against the previous document — 8 paths added, 21 schemas added, **zero removals, zero new
+required properties on an existing schema, zero type changes**. This is the check TASK-0069 failed.
 
 **Corrected 2026-09-16 — AGAIN, and this is the THIRD time this block has gone stale the same way.**
 It still named TASK-0063's `b293db2b…` / 51 / 93 after TASK-0069 moved the contract on 2026-09-16;
