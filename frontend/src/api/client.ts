@@ -1,4 +1,4 @@
-import { deleteRequest, getRequest, patchRequest, postRequest, type RequestOptions } from '@/lib/http';
+import { deleteRequest, getRequest, patchRequest, postRequest, putRequest, type RequestOptions } from '@/lib/http';
 import type {
   CallerOptions,
   OperationOf,
@@ -30,6 +30,8 @@ import type {
 export type GetPath = PathsWithMethod<'get'>;
 /** Paths that declare a POST operation in the contract. */
 export type PostPath = PathsWithMethod<'post'>;
+/** Paths that declare a PUT operation in the contract. */
+export type PutPath = PathsWithMethod<'put'>;
 /** Paths that declare a PATCH operation in the contract. */
 export type PatchPath = PathsWithMethod<'patch'>;
 /** Paths that declare a DELETE operation in the contract. */
@@ -108,6 +110,28 @@ export function apiPost<P extends PostPath>(
 ): Promise<SuccessBody<OperationOf<P, 'post'>>> {
   const { pathParams, request } = splitOptions(rest[0]);
   return postRequest<SuccessBody<OperationOf<P, 'post'>>, RequestBodyOf<OperationOf<P, 'post'>>>(
+    buildPath(path, pathParams),
+    body,
+    request,
+  );
+}
+
+/**
+ * PUTs a path declared in `contracts/openapi.json` — the transport
+ * (`putRequest`) already existed in `@/lib/http`; this is the typed wrapper
+ * the first PUT caller (`/arms/{armId}/score-sheets`, TASK-0079) needs and
+ * previously had no way to reach without bypassing `src/api/`. Mirrors
+ * `apiPatch` exactly: same CSRF handling (transport-owned, never a field
+ * here), same error normalisation, same `SuccessBody`/`RequestBodyOf`
+ * derivation — only the verb differs.
+ */
+export function apiPut<P extends PutPath>(
+  path: P,
+  body: RequestBodyOf<OperationOf<P, 'put'>>,
+  ...rest: OptionsArgs<OperationOf<P, 'put'>, CallerOptions>
+): Promise<SuccessBody<OperationOf<P, 'put'>>> {
+  const { pathParams, request } = splitOptions(rest[0]);
+  return putRequest<SuccessBody<OperationOf<P, 'put'>>, RequestBodyOf<OperationOf<P, 'put'>>>(
     buildPath(path, pathParams),
     body,
     request,

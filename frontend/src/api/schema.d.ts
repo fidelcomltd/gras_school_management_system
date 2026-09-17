@@ -791,6 +791,50 @@ export interface paths {
         patch: operations["UpdateRole"];
         trace?: never;
     };
+    "/api/v1/arms/{armId}/score-sheets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's score sheet for a subject and term
+         * @description Spec 6.7.4: every active pupil in the arm as a row, including one with no marks entered at all. `version` is null before any row exists; send it back unchanged on `PUT` to detect a concurrent edit.
+         */
+        get: operations["GetScoreSheet"];
+        /**
+         * Save a whole score sheet
+         * @description Spec 6.7.4: whole-sheet save, one transaction; a single invalid cell rejects the whole save. The first save for an arm and term creates its result set (Draft). A row with every cell blank and not absent is not stored, and deletes an existing row. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.
+         */
+        put: operations["SaveScoreSheet"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/score-sheets/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void every mark for a subject, arm and term
+         * @description Spec 6.7.4: a reason of at least ten characters is required. Voided rows are kept, excluded from computation, and vanish from `GET`. `Idempotency-Key` is ACCEPTED, not required.
+         */
+        post: operations["VoidScoreSheet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections": {
         parameters: {
             query?: never;
@@ -1077,6 +1121,178 @@ export interface paths {
         get: operations["GetConfigVersion"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List subjects
+         * @description Spec 6.6.7: name, code, status, and — only when `termId` is supplied — the number of levels mapped, arm exceptions and pupils currently taking it this term. This endpoint never guesses a term: with `termId` absent, those three counts are null rather than resolved against a guessed term. Default sort by name ascending, cursor-paginated per spec 9.5.
+         */
+        get: operations["ListSubjects"];
+        put?: never;
+        /**
+         * Create a subject
+         * @description Spec 6.6.2. `code` is OPTIONAL (TASK-0070 delta amendment 1) — nullable, unseeded, uppercase letters and digits when supplied. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSubject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subjects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a subject
+         * @description Spec 6.6.8: permitted only where it has never been mapped and never scored. Otherwise deactivate.
+         */
+        delete: operations["DeleteSubject"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a subject
+         * @description Spec 6.6.2. Every field is independently optional; an absent field is left unchanged; an empty string clears `code`/`description`. Changing `status` ADDITIONALLY requires `subject.deactivate`, beyond the `subject.update` this route requires.
+         */
+        patch: operations["UpdateSubject"];
+        trace?: never;
+    };
+    "/api/v1/subject-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the subject mapping grid for a term
+         * @description Spec 6.6.5, 6.6.9: levels, subjects, ticks, and the per-arm exception summary.
+         */
+        get: operations["GetSubjectMappingGrid"];
+        /**
+         * Save the whole subject mapping grid for a term
+         * @description Spec 6.6.5, 6.6.9: whole-grid save, atomic. `dryRun` returns the additions/endings preview without writing. TASK-0070 delta amendment 2: requires `subject.map` when the computed diff has additions and `subject.unmap` when it has endings — both when it has both — evaluated identically under `dryRun`. Rejected outright against a closed term; an ending is rejected when marks exist for that subject in any arm under the level (spec 6.6.6).
+         */
+        put: operations["SaveSubjectMappingGrid"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-mappings/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy a term's subject mappings into another term
+         * @description Spec 6.6.5, 6.6.9. Additive only — never ends a destination mapping the source does not have, and never duplicates one already active in the destination. Requires `subject.map` only. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CopySubjectMappings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-mappings/prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply the school's standard subject list to a term
+         * @description TASK-0070 delta amendment 5 (human-ruled 2026-09-16; not in spec 6.6.9's own list) — the 14/19 standard nursery/primary list, `display_order` from the school's own result-sheet order. Additive only: can never end a mapping and never duplicates an existing active one. Requires `subject.map` only. `Idempotency-Key` is REQUIRED. Rejected outright against a closed term, `dryRun` included.
+         */
+        post: operations["PrefillSubjectMappings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-exceptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a per-arm subject exception
+         * @description Spec 6.6.4, 6.6.9. TASK-0070 delta amendment 2: requires `subject.map.arm`, the same privilege as its create — NOT `subject.unmap`. No closed-session 409: spec 6.6.8's closed-session rejection applies to creation only.
+         */
+        delete: operations["DeleteSubjectException"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's resolved subject set
+         * @description Spec 6.6.1, 6.6.4, 6.6.9: level mappings for the term, plus the arm's include exceptions, minus its exclude exceptions — each row flagged level-inherited or arm exception. The endpoint the score entry screen and the result renderer both call. Unwrapped array, no pagination.
+         */
+        get: operations["GetArmSubjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}/subject-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a per-arm subject exception
+         * @description Spec 6.6.4, 6.6.9. `include` adds a subject the level does not take; `exclude` removes one the level does take. Rejected as redundant when the mode already matches the level's own mapping, and when the arm's session is closed. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSubjectException"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1517,6 +1733,40 @@ export interface components {
          * @enum {unknown}
          */
         ArmStatus: "Active" | "Inactive" | "Closed";
+        /**
+         * @description One row of an arm's resolved subject set (spec 6.6.1, 6.6.9: "the resolved set in effect for one
+         *     arm, with each row flagged as level-inherited or arm exception").
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "subjectCode": null,
+         *       "displayOrder": 1,
+         *       "source": "LevelInherited"
+         *     }
+         */
+        ArmSubjectDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The subject's name.
+             * @example Mathematics
+             */
+            subjectName: string;
+            /** @description `null` when the subject carries none. */
+            subjectCode: null | string;
+            /**
+             * Format: int32
+             * @description The row order of the result sheet (spec 6.6.1, 6.6.3) — additive beyond §6.6.9's literal text,
+             *     needed by the result renderer (TASK-0071) for a deterministic order without a second query.
+             * @example 1
+             */
+            displayOrder: number | string;
+            /** @description Whether this row reached the arm through its level's mapping or its own exception. */
+            source: components["schemas"]["SubjectSourceKind"];
+        };
         /**
          * @description One component, both inside SettingsAssessmentGroupDto and inside
          *     SettingsDto's envelope. An element of an ORDERED ARRAY (6.2.13's durability
@@ -2031,6 +2281,35 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             createdAtUtc: string;
+        };
+        /**
+         * @description `POST /api/v1/subject-mappings/copy` (spec 6.6.5, 6.6.9): "Body carries source term and
+         *             destination term." Additive only — this card's own judgement call (see the handler's remarks):
+         *             the one worked example spec 6.6.8 gives ("a term with 14 mappings into a term that already has 3 →
+         *             11 additions, 0 endings, does not duplicate the 3") never shows an ending, so copy never ends a
+         *             destination mapping the source term does not have. Requires `subject.map` only.
+         * @example {
+         *       "sourceTermId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "destinationTermId": "0192f0c4-37e9-7566-4a38-e696158802b1",
+         *       "dryRun": true
+         *     }
+         */
+        CopySubjectMappingsCommand: {
+            /**
+             * @description Copy FROM this term's currently active mappings.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            sourceTermId: string;
+            /**
+             * @description Copy INTO this term.
+             * @example 0192f0c4-37e9-7566-4a38-e696158802b1
+             */
+            destinationTermId: string;
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing.
+             * @example true
+             */
+            dryRun: boolean;
         };
         /**
          * @description `POST /api/v1/pupils/{id}/registration-number` (spec 6.5.10, "Immutability and
@@ -2549,6 +2828,65 @@ export interface components {
             nextResumptionDate: null | string;
         };
         /**
+         * @description `POST /api/v1/subjects` (spec 6.6.2, 6.6.9).
+         * @example {
+         *       "name": "Mathematics",
+         *       "code": null,
+         *       "description": null
+         *     }
+         */
+        CreateSubjectCommand: {
+            /**
+             * @description 1..80 characters. Unique, case-insensitive.
+             * @example Mathematics
+             */
+            name: string;
+            /**
+             * @description `null` or empty for none — TASK-0070 delta amendment 1 makes this OPTIONAL,
+             *             departing from spec 6.6.2's `Req: Yes` (see the card's "Why code is optional"). Uppercase
+             *             letters and digits only when supplied; unique where supplied.
+             */
+            code: null | string;
+            /** @description Optional, up to 300 characters. Never printed. */
+            description: null | string;
+        };
+        /**
+         * @description `POST /api/v1/arms/{id}/subject-exceptions` (spec 6.6.4, 6.6.9). Requires `subject.map.arm`.
+         *             `Idempotency-Key` is REQUIRED (standing obligation: every retry-duplicable mutation declares
+         *             one — TASK-0070's own flagged gap beyond the card's original four examples).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "mode": "Include",
+         *       "reason": "This arm runs a French club this term."
+         *     }
+         */
+        CreateSubjectExceptionCommand: {
+            /**
+             * @description Bound from the route. The one arm this exception applies to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Must reference an active subject.
+             * @example 0192f0c4-f3a5-7162-0694-a252d13e8417
+             */
+            subjectId: string;
+            /**
+             * @description Must belong to the arm's session.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /** @description include or exclude. */
+            mode: components["schemas"]["SubjectExceptionMode"];
+            /**
+             * @description 1..200 characters. Required.
+             * @example This arm runs a French club this term.
+             */
+            reason: string;
+        };
+        /**
          * @description Response to `GET /api/v1/auth/csrf`.
          * @example {
          *       "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
@@ -2940,6 +3278,46 @@ export interface components {
             nextCursor: null | string;
         };
         /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "name": "Mathematics",
+         *           "code": null,
+         *           "description": null,
+         *           "status": "Active",
+         *           "mappedLevelCount": 6,
+         *           "armExceptionCount": 1,
+         *           "pupilsTakingCount": 182
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfSubjectDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "name": "Mathematics",
+             *         "code": null,
+             *         "description": null,
+             *         "status": "Active",
+             *         "mappedLevelCount": 6,
+             *         "armExceptionCount": 1,
+             *         "pupilsTakingCount": 182
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["SubjectDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
          * @description `POST /api/v1/admissions/{id}/decline` (spec 6.5.14: pending -&gt; withdrawn). Id is the PUPIL id. Issues no registration number and leaves the counter's
          *             `last_serial` untouched — this command never calls the counter at all.
          * @example {
@@ -3318,6 +3696,30 @@ export interface components {
              * @example 1.0
              */
             apiVersion: string;
+        };
+        /**
+         * @description `POST /api/v1/subject-mappings/prefill` (TASK-0070 delta amendment 5, human-ruled
+         *             2026-09-16 — not in spec 6.6.9's own endpoint list). Applies the school's standard 14/19 subject
+         *             list to a named term using the per-section sheet order (spec appendices E and F) as
+         *             `display_order`. Additive only — can never end a mapping — and never duplicates an existing
+         *             active one. Requires `subject.map` only; `subject.unmap` is never demanded because this
+         *             action cannot end anything.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "dryRun": true
+         *     }
+         */
+        PrefillSubjectMappingsCommand: {
+            /**
+             * @description The term to prefill.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing. The closed-term refusal applies here too.
+             * @example true
+             */
+            dryRun: boolean;
         };
         /**
          * @description One row of the privilege register (spec 4.4).
@@ -3741,6 +4143,35 @@ export interface components {
             reason: null | string;
         };
         /**
+         * @description A ResultSet's lifecycle state (spec 09 §6.7.11). A result set that does not exist
+         *     yet is shown in the interface as "Not started" — the absence of a row, not a member of this enum.
+         * @example Draft
+         * @enum {unknown}
+         */
+        ResultSetState: "Draft" | "AwaitingApproval" | "Approved" | "Published" | "ReturnedForCorrection" | "Withdrawn";
+        /**
+         * @description The arm's result set as it stands, or `null` when none exists yet ("Not started").
+         * @example {
+         *       "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "state": "Draft",
+         *       "needsRecompute": true
+         *     }
+         */
+        ResultSetSummaryDto: {
+            /**
+             * @description The result set's id.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            id: string;
+            /** @description Spec 6.7.11's six-member state machine. */
+            state: components["schemas"]["ResultSetState"];
+            /**
+             * @description Whether the computed rows are stale.
+             * @example true
+             */
+            needsRecompute: boolean;
+        };
+        /**
          * @description Wire shape of a RoleAssignment (spec 6.1.5).
          * @example {
          *       "id": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
@@ -3911,12 +4342,418 @@ export interface components {
             modifiedAtUtc: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/score-sheets` (spec 6.7.4; TASK-0076's approved contract delta) —
+         *             whole-sheet save, one transaction. The first save for an arm/term creates the result set (Draft).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *           },
+         *           "examMark": 55,
+         *           "examAbsent": false
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+         *           },
+         *           "examMark": null,
+         *           "examAbsent": false
+         *         }
+         *       ]
+         *     }
+         */
+        SaveScoreSheetCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject this sheet is for.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The sheet's version as last read, or `null` for a sheet with no rows yet. A
+             *     mismatch against the server's current version is a 409 `score_sheet.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A row not present here is left untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *         },
+             *         "examMark": 55,
+             *         "examAbsent": false
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+             *         },
+             *         "examMark": null,
+             *         "examAbsent": false
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveScoreSheetRowInput"][];
+        };
+        /**
+         * @description One submitted row of SaveScoreSheetCommand (spec 6.7.4).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "componentMarks": {
+         *         "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *       },
+         *       "examMark": 55,
+         *       "examAbsent": false
+         *     }
+         */
+        SaveScoreSheetRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Every non-examination component id in the current assessment structure must be a key. A present
+             *     key with a `null` value is a blank cell — never an implicit zero. A missing key is
+             *     rejected (`component_missing`).
+             * @example {
+             *       "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *     }
+             */
+            componentMarks: null | {
+                [key: string]: null | number | string;
+            };
+            /**
+             * Format: int32
+             * @description `null` for a blank cell, or when ExamAbsent is true.
+             * @example 55
+             */
+            examMark: null | number | string;
+            /**
+             * @description True means the pupil did not sit the examination.
+             * @example false
+             */
+            examAbsent: boolean;
+        };
+        /**
+         * @description `PUT /api/v1/subject-mappings?term_id=` (spec 6.6.5, 6.6.9): "Whole-grid save. Atomic. Supports
+         *             dry_run returning the additions and endings summary." TASK-0070 delta amendment 2: requires
+         *             `Subject.Map` when the computed diff contains additions and `Subject.Unmap` when it
+         *             contains endings — both when it contains both, checked in the handler because it is data-dependent.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "entries": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "displayOrder": 1
+         *         }
+         *       ],
+         *       "dryRun": false
+         *     }
+         */
+        SaveSubjectMappingGridCommand: {
+            /**
+             * @description Bound from the `term_id` query string, not the body.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The FULL desired grid for this term — every entry not currently active becomes an addition; every currently active pair absent from this list becomes an ending.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "displayOrder": 1
+             *       }
+             *     ]
+             */
+            entries: components["schemas"]["SubjectMappingGridEntryInput"][];
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing. Evaluated against the SAME privilege rule as a real save (delta amendment 2).
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description The shared response envelope for `PUT /subject-mappings`, `POST /subject-mappings/copy`
+         *     and `POST /subject-mappings/prefill` (TASK-0070 delta amendment 5: "the same
+         *     `SaveSubjectMappingGridResponse` envelope as the grid save and copy") — spec 6.6.5's preview,
+         *     "This will add 12 mappings and end 2 mappings."
+         * @example {
+         *       "additions": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "subjectName": "Mathematics",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "classLevelName": "Primary 2"
+         *         }
+         *       ],
+         *       "endings": [],
+         *       "dryRun": false
+         *     }
+         */
+        SaveSubjectMappingGridResponse: {
+            /**
+             * @description Mappings added (or, under bool SaveSubjectMappingGridResponse.DryRun, previewed).
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "subjectName": "Mathematics",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "classLevelName": "Primary 2"
+             *       }
+             *     ]
+             */
+            additions: components["schemas"]["SubjectMappingChangeDto"][];
+            /**
+             * @description Mappings ended (or previewed). Always empty for `copy` and `prefill`.
+             * @example []
+             */
+            endings: components["schemas"]["SubjectMappingChangeDto"][];
+            /**
+             * @description Echoes the request's `dryRun` — `true` means nothing was written.
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
          *     or a list of specific arms in a specific session."
          * @example ArmList
          * @enum {unknown}
          */
         ScopeType: "SchoolWide" | "ArmList";
+        /**
+         * @description One assessment-structure column on the sheet (spec 6.7.4): a non-examination component, or the examination itself.
+         * @example {
+         *       "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+         *       "label": "CA1",
+         *       "maxMark": 20
+         *     }
+         */
+        ScoreSheetComponentDto: {
+            /**
+             * @description The assessment component's id — also the key IReadOnlyDictionary&lt;string, int?&gt; ScoreSheetRowDto.ComponentMarks uses.
+             * @example 0192f0c4-6a1c-7869-7d6b-19c938bbe4e3
+             */
+            id: string;
+            /**
+             * @description The component's short label, for a tight column header (for example "CA1").
+             * @example CA1
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description The component's maximum mark, from settings. Never a literal.
+             * @example 20
+             */
+            maxMark: number | string;
+        };
+        /**
+         * @description One arm's score sheet for one subject and term (spec 6.7.4; TASK-0076's approved contract delta).
+         *     Departs from spec 6.7.13's `?arm_id=` query form — see the endpoint's own remarks.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "components": [
+         *         {
+         *           "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+         *           "label": "CA1",
+         *           "maxMark": 20
+         *         }
+         *       ],
+         *       "examination": {
+         *         "id": "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4",
+         *         "label": "Exam",
+         *         "maxMark": 60
+         *       },
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *           },
+         *           "examMark": 55,
+         *           "examAbsent": false,
+         *           "caTotal": 18,
+         *           "subjectTotal": 73
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+         *           },
+         *           "examMark": null,
+         *           "examAbsent": false,
+         *           "caTotal": null,
+         *           "subjectTotal": null
+         *         }
+         *       ]
+         *     }
+         */
+        ScoreSheetDto: {
+            /**
+             * @description The arm this sheet belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject this sheet is for.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the rows the sheet covers (see `ScoreSheetVersion`).
+             *     `null` before any row exists. Send back unchanged on `PUT` to detect a
+             *     concurrent edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description Non-examination components only, in settings order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+             *         "label": "CA1",
+             *         "maxMark": 20
+             *       }
+             *     ]
+             */
+            components: components["schemas"]["ScoreSheetComponentDto"][];
+            /** @description The examination column — always last, never in Components. */
+            examination: components["schemas"]["ScoreSheetComponentDto"];
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by marks.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *         },
+             *         "examMark": 55,
+             *         "examAbsent": false,
+             *         "caTotal": 18,
+             *         "subjectTotal": 73
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+             *         },
+             *         "examMark": null,
+             *         "examAbsent": false,
+             *         "caTotal": null,
+             *         "subjectTotal": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["ScoreSheetRowDto"][];
+        };
+        /**
+         * @description One pupil's row on the sheet (spec 6.7.4) — every active pupil in the arm, including one with no marks entered at all.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "componentMarks": {
+         *         "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *       },
+         *       "examMark": 55,
+         *       "examAbsent": false,
+         *       "caTotal": 18,
+         *       "subjectTotal": 73
+         *     }
+         */
+        ScoreSheetRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", for the row identity alongside RegistrationNumber.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description Component id to mark, `null` for a blank cell — never an implicit zero.
+             * @example {
+             *       "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *     }
+             */
+            componentMarks: {
+                [key: string]: null | number | string;
+            };
+            /**
+             * Format: int32
+             * @description `null` when blank or when ExamAbsent is true.
+             * @example 55
+             */
+            examMark: null | number | string;
+            /**
+             * @description True when the pupil did not sit the examination.
+             * @example false
+             */
+            examAbsent: boolean;
+            /**
+             * Format: int32
+             * @description Sum of the non-examination components. `null` unless every one of them is filled.
+             * @example 18
+             */
+            caTotal: null | number | string;
+            /**
+             * Format: int32
+             * @description CaTotal plus the exam mark (or CaTotal alone if absent). `null` unless the row is complete.
+             * @example 73
+             */
+            subjectTotal: null | number | string;
+        };
         /**
          * @description The wire shape of a Section (spec 6.4.2, 6.4.9).
          * @example {
@@ -4720,6 +5557,326 @@ export interface components {
             password: string;
         };
         /**
+         * @description The wire shape of a Subject (spec 6.6.2, 6.6.7, 6.6.9).
+         * @example {
+         *       "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": "Mathematics",
+         *       "code": null,
+         *       "description": null,
+         *       "status": "Active",
+         *       "mappedLevelCount": 6,
+         *       "armExceptionCount": 1,
+         *       "pupilsTakingCount": 182
+         *     }
+         */
+        SubjectDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            id: string;
+            /**
+             * @description Unique, case-insensitive.
+             * @example Mathematics
+             */
+            name: string;
+            /** @description `null` when not supplied (the seed's own state — TASK-0070 delta amendment 1). */
+            code: null | string;
+            /** @description Free text, for the administrator's benefit only. Never printed. */
+            description: null | string;
+            /** @description active or inactive. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["SubjectStatus"];
+            /**
+             * Format: int32
+             * @description Number of levels this subject is actively mapped to in the requested term. `null`
+             *     when the request carried no `termId` — TASK-0070 delta amendment 3: this endpoint never
+             *     guesses a term.
+             * @example 6
+             */
+            mappedLevelCount: null | number | string;
+            /**
+             * Format: int32
+             * @description `null` under the same condition as MappedLevelCount.
+             * @example 1
+             */
+            armExceptionCount: null | number | string;
+            /**
+             * Format: int32
+             * @description `null` under the same condition as MappedLevelCount.
+             * @example 182
+             */
+            pupilsTakingCount: null | number | string;
+        };
+        /**
+         * @description The wire shape of a SubjectMappingException (spec 6.6.4, 6.6.9).
+         * @example {
+         *       "id": "0192f0c4-26d8-7465-3927-d585047719a0",
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+         *       "subjectName": "French",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "mode": "Include",
+         *       "reason": "This arm runs a French club this term."
+         *     }
+         */
+        SubjectExceptionDto: {
+            /** @example 0192f0c4-26d8-7465-3927-d585047719a0 */
+            id: string;
+            /** @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184 */
+            armId: string;
+            /** @example 0192f0c4-f3a5-7162-0694-a252d13e8417 */
+            subjectId: string;
+            /** @example French */
+            subjectName: string;
+            /** @example 0192f0c4-15c7-7364-2816-c474f3608639 */
+            termId: string;
+            mode: components["schemas"]["SubjectExceptionMode"];
+            /** @example This arm runs a French club this term. */
+            reason: string;
+        };
+        /**
+         * @description A SubjectMappingException's mode (spec 6.6.4).
+         * @example Include
+         * @enum {unknown}
+         */
+        SubjectExceptionMode: "Include" | "Exclude";
+        /**
+         * @description One changed (subject, level) pair in a SaveSubjectMappingGridResponse preview or result.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "classLevelName": "Primary 2"
+         *     }
+         */
+        SubjectMappingChangeDto: {
+            /** @example 0192f0c4-e294-7061-f583-9141c02d7306 */
+            subjectId: string;
+            /** @example Mathematics */
+            subjectName: string;
+            /** @example 0192f0c4-04b6-7263-1705-b363e24f9528 */
+            classLevelId: string;
+            /** @example Primary 2 */
+            classLevelName: string;
+        };
+        /**
+         * @description Spec 6.6.5's "warning panel" row — one arm whose subject set diverges from its level, with the
+         *     exception counts driving it.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armDisplayName": "Primary 2C",
+         *       "includeCount": 1,
+         *       "excludeCount": 0
+         *     }
+         */
+        SubjectMappingGridArmExceptionSummaryDto: {
+            /** @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184 */
+            armId: string;
+            /** @example Primary 2C */
+            armDisplayName: string;
+            /**
+             * Format: int32
+             * @example 1
+             */
+            includeCount: number | string;
+            /**
+             * Format: int32
+             * @example 0
+             */
+            excludeCount: number | string;
+        };
+        /**
+         * @description One ticked (or untickable) cell of the grid, for one level under one subject row.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "mapped": true,
+         *       "displayOrder": 1
+         *     }
+         */
+        SubjectMappingGridCellDto: {
+            /**
+             * @description The column.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * @description Whether an active mapping exists for this (subject, level) pair in the requested term.
+             * @example true
+             */
+            mapped: boolean;
+            /**
+             * Format: int32
+             * @description `null` when bool SubjectMappingGridCellDto.Mapped is `false`.
+             * @example 1
+             */
+            displayOrder: null | number | string;
+        };
+        /**
+         * @description `GET /subject-mappings?term_id=`'s response (spec 6.6.5, 6.6.9): "the whole grid for a term:
+         *             levels, subjects, ticks, and the arm exception summary."
+         * @example {
+         *       "levels": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "classLevelName": "Primary 2",
+         *           "progressionOrder": 5
+         *         }
+         *       ],
+         *       "subjects": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "subjectName": "Mathematics",
+         *           "subjectCode": null,
+         *           "cells": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "mapped": true,
+         *               "displayOrder": 1
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "armExceptions": [
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armDisplayName": "Primary 2C",
+         *           "includeCount": 1,
+         *           "excludeCount": 0
+         *         }
+         *       ]
+         *     }
+         */
+        SubjectMappingGridDto: {
+            /**
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "classLevelName": "Primary 2",
+             *         "progressionOrder": 5
+             *       }
+             *     ]
+             */
+            levels: components["schemas"]["SubjectMappingGridLevelDto"][];
+            /**
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "subjectName": "Mathematics",
+             *         "subjectCode": null,
+             *         "cells": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "mapped": true,
+             *             "displayOrder": 1
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            subjects: components["schemas"]["SubjectMappingGridSubjectRowDto"][];
+            /**
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armDisplayName": "Primary 2C",
+             *         "includeCount": 1,
+             *         "excludeCount": 0
+             *       }
+             *     ]
+             */
+            armExceptions: components["schemas"]["SubjectMappingGridArmExceptionSummaryDto"][];
+        };
+        /**
+         * @description One ticked cell submitted to SaveSubjectMappingGridCommand.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "displayOrder": 1
+         *     }
+         */
+        SubjectMappingGridEntryInput: {
+            /**
+             * @description Must reference an active subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Row order of the subject on this level's result sheet (spec 6.6.3).
+             * @example 1
+             */
+            displayOrder: number | string;
+        };
+        /**
+         * @description One column header of the grid.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "classLevelName": "Primary 2",
+         *       "progressionOrder": 5
+         *     }
+         */
+        SubjectMappingGridLevelDto: {
+            /** @example 0192f0c4-04b6-7263-1705-b363e24f9528 */
+            classLevelId: string;
+            /** @example Primary 2 */
+            classLevelName: string;
+            /**
+             * Format: int32
+             * @example 5
+             */
+            progressionOrder: number | string;
+        };
+        /**
+         * @description One row of the grid — a subject and its tick against every active level.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "subjectCode": null,
+         *       "cells": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "mapped": true,
+         *           "displayOrder": 1
+         *         }
+         *       ]
+         *     }
+         */
+        SubjectMappingGridSubjectRowDto: {
+            /** @example 0192f0c4-e294-7061-f583-9141c02d7306 */
+            subjectId: string;
+            /** @example Mathematics */
+            subjectName: string;
+            subjectCode: null | string;
+            /**
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "mapped": true,
+             *         "displayOrder": 1
+             *       }
+             *     ]
+             */
+            cells: components["schemas"]["SubjectMappingGridCellDto"][];
+        };
+        /**
+         * @description How a subject reached an arm's resolved set (spec 6.6.4, `GET /arms/{id}/subjects`) — "each
+         *     row flagged as level-inherited or arm exception."
+         * @example LevelInherited
+         * @enum {unknown}
+         */
+        SubjectSourceKind: "LevelInherited" | "ArmException";
+        /**
+         * @description A Subject's status (spec 6.6.2). Defaults SubjectStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        SubjectStatus: "Active" | "Inactive";
+        /**
          * @description The wire shape of a term (spec 6.3.4), shared by every term-facing endpoint and nested inside
          *     SessionDetailDto.
          * @example {
@@ -5500,6 +6657,34 @@ export interface components {
             endDate: null | string;
         };
         /**
+         * @description `PATCH /api/v1/subjects/{id}` (spec 6.6.2, 6.6.9). Every field is independently optional —
+         *             `null` leaves it unchanged, the same convention `UpdateArmCommand` and
+         *             `UpdateLevelCommand` established. Changing SubjectStatus? UpdateSubjectCommand.Status ADDITIONALLY requires
+         *             `subject.deactivate`, beyond the `subject.update` this route requires.
+         * @example {
+         *       "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": null,
+         *       "code": null,
+         *       "description": null,
+         *       "status": null
+         *     }
+         */
+        UpdateSubjectCommand: {
+            /**
+             * Format: uuid
+             * @description The subject being edited.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            id: string;
+            /** @description `null` to leave unchanged. Must stay unique. */
+            name: null | string;
+            /** @description `null` to leave unchanged; an EMPTY string clears it. */
+            code: null | string;
+            /** @description `null` to leave unchanged; an EMPTY string clears it. */
+            description: null | string;
+            status: null | components["schemas"]["SubjectStatus"];
+        };
+        /**
          * @description `PATCH /api/v1/terms/{id}` (spec 6.3.10): "Dates, label, times school opened, next
          *             resumption date." Every field is independently optional; an absent field is left unchanged.
          *             int? UpdateTermCommand.TimesSchoolOpened cannot be CLEARED back to blank through this command — spec never
@@ -5545,6 +6730,53 @@ export interface components {
              * @example 2027-01-05
              */
             nextResumptionDate: null | string;
+        };
+        /**
+         * @description `POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved
+         *             contract delta) — voids every non-voided mark for one arm, subject and term. Super Admin only,
+         *             reason required. Used only to unwind an error.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "reason": "Whole class re-marked after a transcription error in the mark book."
+         *     }
+         */
+        VoidScoreSheetCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject to void.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term to void.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Required, spec's ten-to-five-hundred-character reason floor.
+             * @example Whole class re-marked after a transcription error in the mark book.
+             */
+            reason: string;
+        };
+        /**
+         * @description The count of marks voided by VoidScoreSheetCommand.
+         * @example {
+         *       "voidedCount": 27
+         *     }
+         */
+        VoidScoreSheetResponse: {
+            /**
+             * Format: int32
+             * @description How many non-voided marks were voided. Zero when none existed.
+             * @example 27
+             */
+            voidedCount: number | string;
         };
     };
     responses: never;
@@ -9251,6 +10483,274 @@ export interface operations {
             };
         };
     };
+    GetScoreSheet: {
+        parameters: {
+            query: {
+                subjectId: string;
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveScoreSheet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveScoreSheetCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidScoreSheet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidScoreSheetCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoidScoreSheetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListSections: {
         parameters: {
             query?: never;
@@ -10528,6 +12028,934 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSubjects: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["SubjectStatus"];
+                levelId?: string;
+                termId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfSubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubjectCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSubjectCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSubjectMappingGrid: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectMappingGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveSubjectMappingGrid: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSubjectMappingGridCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CopySubjectMappings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopySubjectMappingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrefillSubjectMappings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefillSubjectMappingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteSubjectException: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetArmSubjects: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmSubjectDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSubjectException: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubjectExceptionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectExceptionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {

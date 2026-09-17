@@ -148,12 +148,13 @@ even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing
 the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-16.
-- Frontend client is **STALE** against this hash (it matches `152dc1c2…`); TASK-0079 regenerates it. The note below describes the TASK-0074 state.
-- Frontend client was CURRENT against `152dc1c2…` as of 2026-09-16 (TASK-0074). `check:api-drift`
+- Frontend client is **CURRENT against this hash** as of 2026-09-17 (TASK-0079). `check:api-drift`
   re-run by the ORCHESTRATOR, not accepted on report: `No drift`, exit 0 — which also proves
-  `schema.d.ts` carries no hand-edit, since regeneration reproduces it byte-for-byte. Typecheck and
-  lint both exit 0. **But see the `apiPut` drift entry: four new operations are typed and three of
-  them are NOT CALLABLE**, so "current" means the types match, not that the surface is reachable.
+  `schema.d.ts` carries no hand-edit, since regeneration reproduces it byte-for-byte. `npm run verify`
+  55 files / 381 tests / Skipped 0 / build clean, exit 0. **`apiPut` now exists, so the whole contract
+  surface is reachable** — `UpdateAssessment`, `UpdateGrading`, `ResetGrading` and `SaveScoreSheet` are
+  all callable, though none is called from application code yet. **TASK-0077 will move this hash and
+  restale the client**, needing a regeneration card after it.
 - The additive classification was verified MECHANICALLY (every existing schema's `required` array
   and every property type diffed against HEAD), not read off the card — see `decisions/2026-Q3.md`.
 - `/health/*` is excluded from the document (`ASSUMPTIONS.md` section 2.9); `/reference/*` is
@@ -164,7 +165,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0078, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0078, 0079, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -188,7 +189,6 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0079 | Regenerate the typed client against `c5c4d6c6…` | frontend-dev | **queued 2026-09-17** — 2 ops / 9 schemas from TASK-0076. Types only; `apiPut` is still absent and the score-sheet PUT needs it, so this card adds `apiPut` mirroring `apiPatch` |
 | TASK-0077 | Result rules settings (§6.2.8) | backend-dev | **queued 2026-09-17** — after 0076. Found missing while rewriting 0071; the engine reads five of its fields. Delta approved, additive |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **REWRITTEN 2026-09-17, blocked on 0076 + 0077 only**, both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
@@ -198,6 +198,11 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-17 **TASK-0079 closed — client regenerated against `c5c4d6c6…` and `apiPut` added, ending the
+  zero-new-wrapper-code streak exactly where `src/api/README.md` predicted.** CSRF needed no interceptor
+  change and the orchestrator VERIFIED why (denylist, not allowlist — an allowlist would have been a silent
+  bypass). Non-vacuity proven by two different mutations, the orchestrator's independent of the agent's.
+  `No drift` exit 0; verify 381 tests, Skipped 0. → `decisions/2026-Q3.md`
 - 2026-09-17 **TASK-0076 closed — result sets, subject scores and the score sheet exist.** Contract `c5c4d6c6…`,
   64 paths, additive verified mechanically. **Two production bugs found by the orchestrator gate over a dead
   dispatch's tree**, neither self-reported: version-before-state ordering, and a `jsonb` re-serialisation bug that
@@ -534,14 +539,15 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-15 ~~**`src/api/schema.d.ts` is STALE and `check:api-drift` is RED.**~~ **STRUCK 2026-09-16
   by TASK-0074** — regenerated against `152dc1c2…`; drift gate re-run by the orchestrator, `No drift`,
   exit 0. Full text: `drift/2026-Q3.md`.
-- 2026-09-16 **The contract's first two `PUT` operations are typed but NOT CALLABLE — `client.ts` has
-  no `apiPut`.** `UpdateAssessment`, `UpdateGrading` (and `ResetGrading` alongside them) exist in
-  `schema.d.ts` and in no application code. Every prior regeneration needed zero new wrapper code;
-  `src/api/README.md` predicted this is exactly where that streak breaks. **Found and flagged by the
-  implementing agent, which deliberately did NOT add the helper** — the card's Out of scope forbade
-  starting to consume the grading surface, and adding the verb is the first step of that. Correct
-  call; recorded so it is not rediscovered. *Trigger: the FIRST grading/assessment feature card —
-  it must add `apiPut` (mirroring `apiPatch`) before it can call anything. Owner: `frontend-dev`.*
+- 2026-09-16 ~~**The contract's first two `PUT` operations are typed but NOT CALLABLE — `client.ts` has
+  no `apiPut`.**~~ **STRUCK 2026-09-17 by TASK-0079** — `apiPut` added, mirroring `apiPatch`; CSRF
+  already covered (denylist interceptor, verified). Trigger fired a step early, via a regeneration card
+  rather than the feature card it named. All four PUT ops callable, none yet called. → `drift/2026-Q3.md`
+- 2026-09-17 **The `@ts-expect-error` type-level tests in `src/api/` fire real unawaited HTTP requests**
+  — `void apiX(...)` still executes, so the request goes out with a literal `{armId}` segment and MSW
+  matches it. Pre-existing since TASK-0029, not a production defect (`buildPath` is correct), but it
+  injects misleading errors into unrelated failures. *Trigger: the next card touching
+  `frontend/src/api/*.test.ts`, incl. the score-entry screen card. Owner: `frontend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-15 **Published result snapshots do not exist, so TASK-0063's AC 6 is VACUOUS, not proven** —
   no results module, only the `IResultSetArmLookup` seam. Verified by the orchestrator, nothing invented.
   *Trigger: the results-module card that first persists a published snapshot, which must carry the test.
