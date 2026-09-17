@@ -12,6 +12,7 @@ using SchoolManagement.Domain.Reference;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
+using SchoolManagement.Domain.Subjects;
 
 namespace SchoolManagement.Infrastructure.Persistence;
 
@@ -127,6 +128,19 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// 6.5.10) — see <c>Configurations.PupilRegNumberHistoryConfiguration</c>.
     /// </summary>
     internal DbSet<PupilRegNumberHistory> PupilRegNumberHistory => Set<PupilRegNumberHistory>();
+
+    /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Subject> Subjects => Set<Subject>();
+
+    /// <summary>
+    /// TASK-0070. Internal, not public: only this assembly's repositories may query it. NO rows are
+    /// seeded — a mapping needs a <c>term_id</c> and no session or term is seeded (see
+    /// <c>SubjectConfiguration</c>'s remarks and <c>PrefillSubjectMappingsHandler</c>).
+    /// </summary>
+    internal DbSet<SubjectMapping> SubjectMappings => Set<SubjectMapping>();
+
+    /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<SubjectMappingException> SubjectMappingExceptions => Set<SubjectMappingException>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

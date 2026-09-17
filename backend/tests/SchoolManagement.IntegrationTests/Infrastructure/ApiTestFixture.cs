@@ -10,6 +10,7 @@ using SchoolManagement.Api.Security;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Settings;
+using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Configurations;
 using Testcontainers.PostgreSql;
@@ -243,6 +244,12 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // assertions need the REAL migration-seeded rows, not an empty table.
         await ReseedGradingBandsAsync(context, cancellationToken);
         await ReseedAssessmentComponentsAsync(context, cancellationToken);
+
+        // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
+        // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
+        // shipped two seeds without this and its fresh-database criterion failed in review; this card
+        // names it as its own acceptance criterion for exactly that reason.
+        await ReseedSubjectsAsync(context, cancellationToken);
     }
 
     /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
@@ -370,6 +377,31 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 VALUES
                     ({ids[index]}, {component.Name}, {component.ShortLabel}, {component.MaxMark},
                      {component.IsExamination}, {index + 1})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.6.2's 28 seeded subjects, built from the SAME <see cref="SeededSubjects.All"/>
+    /// the <c>AddSubjects</c> migration itself is generated from, so this can never drift from what
+    /// the migration actually seeds. No <c>code</c> is seeded (TASK-0070 delta amendment 1), and no
+    /// <c>subject_mapping</c> row is reinserted — none is ever seeded (AC-3: a mapping needs a
+    /// <c>term_id</c>, and no session or term is seeded either).
+    /// </summary>
+    private static async Task ReseedSubjectsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        foreach (var subject in SeededSubjects.All)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO subjects
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key,
+                     code, code_key, description, status, version)
+                VALUES
+                    ({subject.Id}, {SeededSubjects.SeedTimestamp}, NULL, NULL, NULL,
+                     {subject.Name}, {subject.Name.ToLowerInvariant()}, NULL, NULL, NULL, 'Active',
+                     {subject.Version})
                 """,
                 cancellationToken);
         }

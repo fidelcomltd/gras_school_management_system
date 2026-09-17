@@ -37,6 +37,11 @@ public static class ApplicationDependencyInjection
         // privilege authorization handler.
         services.AddScoped<IScopeResolver, ScopeResolver>();
 
+        // TASK-0070: not an IRequestHandler, so assembly scanning below never finds it — the SOLE
+        // resolver of "subjects in effect for an arm this term" (spec 8.1), called directly by
+        // GetArmSubjectsHandler, ListSubjectsHandler and, later, the result-computation engine.
+        services.AddScoped<Subjects.SubjectsInEffectResolver>();
+
         AddPipelineBehaviors(services);
 
         services.AddValidatorsFromAssembly(Assembly, includeInternalTypes: true);

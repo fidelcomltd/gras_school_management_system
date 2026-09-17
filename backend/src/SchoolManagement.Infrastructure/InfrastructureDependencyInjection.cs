@@ -14,6 +14,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Settings;
@@ -211,6 +212,16 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0063: the permanent registration-number history alias (spec 6.5.10).
         services.AddScoped<IPupilRegNumberHistoryRepository, PupilRegNumberHistoryRepository>();
+
+        // TASK-0070: subjects, level mappings and per-arm exceptions (spec 6.6).
+        services.AddScoped<ISubjectRepository, SubjectRepository>();
+        services.AddScoped<ISubjectMappingRepository, SubjectMappingRepository>();
+        services.AddScoped<ISubjectMappingExceptionRepository, SubjectMappingExceptionRepository>();
+
+        // TASK-0070: a documented seam, honestly empty — no subject_score table exists yet. Same
+        // pattern as ISubjectScoreSessionLockLookup above, not NotYetImplementedResultSetArmLookup's
+        // throwing stand-in. See the interface's own remarks.
+        services.AddScoped<ISubjectMappingMarkLookup, SubjectMappingMarkLookup>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

@@ -16,6 +16,7 @@ using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
 using SchoolManagement.Application.Sessions;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Application.Subjects;
 using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
@@ -60,6 +61,13 @@ internal static class OpenApiExamples
     private const string ExampleSessionId = "0192f0c4-af61-7d4e-c250-6e1b8d9f4073";
     private const string ExampleArmId = "0192f0c4-c072-7e5f-d361-7f2c9e0a5184";
     private const string ExampleGrantedById = "0192f0c4-d183-7f60-e472-8030af1b6295";
+
+    /// <summary>Example identifiers for the TASK-0070 subject/mapping examples, each a distinct entity.</summary>
+    private const string ExampleSubjectId = "0192f0c4-e294-7061-f583-9141c02d7306";
+    private const string ExampleSecondSubjectId = "0192f0c4-f3a5-7162-0694-a252d13e8417";
+    private const string ExampleLevelId = "0192f0c4-04b6-7263-1705-b363e24f9528";
+    private const string ExampleTermId = "0192f0c4-15c7-7364-2816-c474f3608639";
+    private const string ExampleSubjectExceptionId = "0192f0c4-26d8-7465-3927-d585047719a0";
 
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
@@ -1008,6 +1016,196 @@ internal static class OpenApiExamples
                   "status": "Active"
                 }
               ]
+            }
+            """,
+
+        [typeof(SubjectDto)] = $$"""
+            {
+              "id": "{{ExampleSubjectId}}",
+              "name": "Mathematics",
+              "code": null,
+              "description": null,
+              "status": "Active",
+              "mappedLevelCount": 6,
+              "armExceptionCount": 1,
+              "pupilsTakingCount": 182
+            }
+            """,
+
+        [typeof(CursorPage<SubjectDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleSubjectId}}",
+                  "name": "Mathematics",
+                  "code": null,
+                  "description": null,
+                  "status": "Active",
+                  "mappedLevelCount": 6,
+                  "armExceptionCount": 1,
+                  "pupilsTakingCount": 182
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(CreateSubjectCommand)] = """
+            {
+              "name": "Mathematics",
+              "code": null,
+              "description": null
+            }
+            """,
+
+        [typeof(UpdateSubjectCommand)] = $$"""
+            {
+              "id": "{{ExampleSubjectId}}",
+              "name": null,
+              "code": null,
+              "description": null,
+              "status": null
+            }
+            """,
+
+        [typeof(SubjectMappingGridLevelDto)] = $$"""
+            {
+              "classLevelId": "{{ExampleLevelId}}",
+              "classLevelName": "Primary 2",
+              "progressionOrder": 5
+            }
+            """,
+
+        [typeof(SubjectMappingGridCellDto)] = $$"""
+            {
+              "classLevelId": "{{ExampleLevelId}}",
+              "mapped": true,
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SubjectMappingGridSubjectRowDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "subjectCode": null,
+              "cells": [
+                { "classLevelId": "{{ExampleLevelId}}", "mapped": true, "displayOrder": 1 }
+              ]
+            }
+            """,
+
+        [typeof(SubjectMappingGridArmExceptionSummaryDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "armDisplayName": "Primary 2C",
+              "includeCount": 1,
+              "excludeCount": 0
+            }
+            """,
+
+        [typeof(SubjectMappingGridDto)] = $$"""
+            {
+              "levels": [
+                { "classLevelId": "{{ExampleLevelId}}", "classLevelName": "Primary 2", "progressionOrder": 5 }
+              ],
+              "subjects": [
+                {
+                  "subjectId": "{{ExampleSubjectId}}",
+                  "subjectName": "Mathematics",
+                  "subjectCode": null,
+                  "cells": [
+                    { "classLevelId": "{{ExampleLevelId}}", "mapped": true, "displayOrder": 1 }
+                  ]
+                }
+              ],
+              "armExceptions": [
+                { "armId": "{{ExampleArmId}}", "armDisplayName": "Primary 2C", "includeCount": 1, "excludeCount": 0 }
+              ]
+            }
+            """,
+
+        [typeof(SubjectMappingGridEntryInput)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "classLevelId": "{{ExampleLevelId}}",
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SaveSubjectMappingGridCommand)] = $$"""
+            {
+              "termId": "{{ExampleTermId}}",
+              "entries": [
+                { "subjectId": "{{ExampleSubjectId}}", "classLevelId": "{{ExampleLevelId}}", "displayOrder": 1 }
+              ],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(SubjectMappingChangeDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "classLevelId": "{{ExampleLevelId}}",
+              "classLevelName": "Primary 2"
+            }
+            """,
+
+        [typeof(SaveSubjectMappingGridResponse)] = $$"""
+            {
+              "additions": [
+                { "subjectId": "{{ExampleSubjectId}}", "subjectName": "Mathematics", "classLevelId": "{{ExampleLevelId}}", "classLevelName": "Primary 2" }
+              ],
+              "endings": [],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(CopySubjectMappingsCommand)] = $$"""
+            {
+              "sourceTermId": "{{ExampleTermId}}",
+              "destinationTermId": "0192f0c4-37e9-7566-4a38-e696158802b1",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(PrefillSubjectMappingsCommand)] = $$"""
+            {
+              "termId": "{{ExampleTermId}}",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(ArmSubjectDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "subjectCode": null,
+              "displayOrder": 1,
+              "source": "LevelInherited"
+            }
+            """,
+
+        [typeof(CreateSubjectExceptionCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSecondSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "mode": "Include",
+              "reason": "This arm runs a French club this term."
+            }
+            """,
+
+        [typeof(SubjectExceptionDto)] = $$"""
+            {
+              "id": "{{ExampleSubjectExceptionId}}",
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSecondSubjectId}}",
+              "subjectName": "French",
+              "termId": "{{ExampleTermId}}",
+              "mode": "Include",
+              "reason": "This arm runs a French club this term."
             }
             """,
 
