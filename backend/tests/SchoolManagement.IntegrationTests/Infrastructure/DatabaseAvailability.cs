@@ -28,6 +28,16 @@ namespace SchoolManagement.IntegrationTests.Infrastructure;
 /// Testcontainers then starts and disposes a throwaway PostgreSQL automatically, with no
 /// configuration.</item>
 /// </list>
+/// <para>
+/// TASK-0078 (2026-09-17, human directive): which of the two this class actually sees is now decided
+/// one layer up, by <c>backend/scripts/ci.ps1</c> and <c>lib/postgres-test-connection.ps1</c>, not by
+/// this class. A gate run defaults to leaving <c>POSTGRES_TEST_CONNECTION</c> unset — i.e. path (2)
+/// above, the local container — and reads the hosted database
+/// (<c>~/.gras/pg-test.txt</c>) into path (1) only when the run is invoked with <c>-UseHostedDb</c>.
+/// The file no longer "wins" over the container by default; see <c>.agent/rules/gates.md</c> §7. This
+/// class's own priority order above is unchanged — it still just asks "is
+/// <c>POSTGRES_TEST_CONNECTION</c> set" — the change is entirely in who sets it and when.
+/// </para>
 /// </remarks>
 internal static class DatabaseAvailability
 {

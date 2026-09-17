@@ -24,11 +24,18 @@
     than re-trigger per fix.
 
     POSTGRES_TEST_CONNECTION (needed by gate 6, integration tests) is resolved BY THIS SCRIPT
-    (TASK-0031) before any gate runs: an explicitly set environment variable wins if present,
-    otherwise $HOME/.gras/pg-test.txt is read (BOM-stripped, trimmed) — see
-    lib/postgres-test-connection.ps1. Nothing else needs to be set first; the canonical invocation
-    is exactly `./scripts/ci.ps1 -NoFailFast`, no environment prelude. A missing file is not fatal —
-    the integration-tests gate below still just skips, and says so.
+    before any gate runs — see lib/postgres-test-connection.ps1. TASK-0078 (2026-09-17, human
+    directive): the default is the LOCAL container (Testcontainers; DatabaseAvailability.cs
+    resolves the Docker endpoint independently at test-host start), never the hosted database, by
+    default. $HOME/.gras/pg-test.txt is read ONLY when -UseHostedDb is passed — it no longer
+    "wins" over the container by default, which is exactly what let a run silently cost 45+
+    minutes against hosted Neon on 2026-09-17. An explicitly set POSTGRES_TEST_CONNECTION still
+    wins outright inside CI (its own service container, backend-ci.yml); outside CI, an explicit
+    value pointing at a non-local host is REJECTED (this script exits non-zero) unless
+    -UseHostedDb is also passed — a hosted connection must never arrive by an ambient environment
+    variable either. Nothing else needs to be set first; the canonical invocation is exactly
+    `./scripts/ci.ps1 -NoFailFast`, no environment prelude. A missing hosted file (even with
+    -UseHostedDb) is not fatal — the integration-tests gate below still just skips, and says so.
 
 .PARAMETER Configuration
     Build configuration. Defaults to Release, matching CI.
@@ -79,6 +86,14 @@
     Run every gate even after one fails, then exit non-zero with a summary, instead of stopping at
     the first failure. This is the CI workflow's mode.
 
+.PARAMETER UseHostedDb
+    (TASK-0078, human directive 2026-09-17) Explicit, per-run opt-in to the hosted database
+    ($HOME/.gras/pg-test.txt, Neon). Without it the file is ignored even when present and
+    non-empty, and the integration stage uses the local Testcontainers container instead. Also
+    required to keep an explicitly set POSTGRES_TEST_CONNECTION whose host is not
+    localhost/127.0.0.1/::1 outside CI — without it, that case is a hard failure, not a silent
+    fallback. Does not carry over between runs; pass it again next time if still needed.
+
 .EXAMPLE
     ./scripts/ci.ps1
 
@@ -90,6 +105,9 @@
 
 .EXAMPLE
     ./scripts/ci.ps1 -IntegrationFilter 'FullyQualifiedName~AdmissionApproval'
+
+.EXAMPLE
+    ./scripts/ci.ps1 -UseHostedDb
 #>
 [CmdletBinding()]
 param(
@@ -111,7 +129,10 @@ param(
     # above for the full rationale.
     [switch]$SkipIntegration,
 
-    [string]$IntegrationFilter
+    [string]$IntegrationFilter,
+
+    # TASK-0078: explicit, per-run opt-in to the hosted database. See the PARAMETER block above.
+    [switch]$UseHostedDb
 )
 
 if ($SkipIntegration -and $IntegrationFilter) {
@@ -130,12 +151,48 @@ Push-Location $backendRoot
 . (Join-Path $PSScriptRoot 'lib/gate-summary.ps1')
 
 # Same pattern: one implementation of "how POSTGRES_TEST_CONNECTION is resolved", shared with
-# backend/scripts/tests/postgres-test-connection.tests.ps1 (TASK-0031). Resolving it here, once,
-# before any gate runs, is what lets every dispatch invoke this whole script as
-# `./backend/scripts/ci.ps1 -NoFailFast` with no environment prelude — see STATE.md ## Gate
-# commands for why that matters.
+# backend/scripts/tests/postgres-test-connection.tests.ps1 (TASK-0031, extended by TASK-0078).
+# Resolving it here, once, before any gate runs, is what lets every dispatch invoke this whole
+# script as `./backend/scripts/ci.ps1 -NoFailFast` with no environment prelude — see STATE.md
+# ## Gate commands for why that matters.
 . (Join-Path $PSScriptRoot 'lib/postgres-test-connection.ps1')
-Initialize-PostgresTestConnection -HomeDirectory $HOME
+
+# TASK-0078: -SkipIntegration needs no database and no pre-flight -- resolution (and the non-local
+# env-var rejection below) is skipped entirely rather than possibly failing a run that was never
+# going to touch a database anyway.
+if ($SkipIntegration) {
+    Write-Host 'Integration database: not applicable (-SkipIntegration)' -ForegroundColor DarkGray
+}
+else {
+    # -IsCi mirrors GitHub Actions' own ambient signal (backend-ci.yml sets
+    # $env:GITHUB_ACTIONS=true on every runner) -- never something a local invocation sets itself,
+    # so a human cannot accidentally get the CI carve-out by exporting it.
+    try {
+        $script:postgresResolution = Initialize-PostgresTestConnection -HomeDirectory $HOME `
+            -UseHostedDb:$UseHostedDb -IsCi:([bool]$env:GITHUB_ACTIONS)
+    }
+    catch {
+        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    # The first line of every run names the database source -- never the connection string, on any
+    # path (postgres-test-connection.ps1's own contract). TASK-0078 (orchestrator ruling,
+    # 2026-09-17): the 'Unset' (local-container) branch names no endpoint -- DatabaseAvailability.cs
+    # resolves the Docker endpoint itself, independently, when the test fixture starts, and THROWS
+    # (never skips) if nothing answers, per its own TASK-0065 contract. That is the safety property;
+    # this line is purely informational. If the integration stage then fails, the OnFailure hook on
+    # the 'Integration tests' gate below prints Get-IntegrationFailureGuidance's text for this
+    # source, steering a human away from silently falling back to the hosted database.
+    switch ($script:postgresResolution.Source) {
+        'ExplicitCi' { Write-Host 'Integration database: explicit POSTGRES_TEST_CONNECTION (CI)' -ForegroundColor Cyan }
+        'ExplicitLocal' { Write-Host 'Integration database: explicit POSTGRES_TEST_CONNECTION (local host, outside CI)' -ForegroundColor Cyan }
+        'ExplicitHosted' { Write-Host 'Integration database: hosted (explicit POSTGRES_TEST_CONNECTION, confirmed via -UseHostedDb)' -ForegroundColor Cyan }
+        'HostedFile' { Write-Host 'Integration database: hosted (from ~/.gras/pg-test.txt, confirmed via -UseHostedDb)' -ForegroundColor Cyan }
+        'Unset' { Write-Host 'Integration database: local container (Docker endpoint resolved by the test fixture at startup)' -ForegroundColor Cyan }
+    }
+}
 
 # Same pattern again: one implementation of "does the ledger match", shared with
 # backend/scripts/tests/contract-ledger.tests.ps1 (TASK-0075).
@@ -183,7 +240,13 @@ function Write-FinalSummary {
 function Invoke-Gate {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][scriptblock]$Action
+        [Parameter(Mandatory)][scriptblock]$Action,
+
+        # TASK-0078: run only when this gate FAILS, after the FAIL line and before -NoFailFast
+        # decides whether to exit now -- so a caller (the Integration tests gate) can print extra
+        # guidance on failure regardless of fail-fast mode, since the plain -NoFailFast:$false path
+        # exits from INSIDE this catch block and never returns control to the call site.
+        [scriptblock]$OnFailure
     )
 
     Write-Host ''
@@ -201,6 +264,10 @@ function Invoke-Gate {
         Write-Host "FAIL: $Name -- $($_.Exception.Message)" -ForegroundColor Red
         $failures.Add($Name)
         $gateVerdicts.Add("FAIL: $Name -- $($_.Exception.Message)")
+
+        if ($OnFailure) {
+            & $OnFailure
+        }
 
         if (-not $NoFailFast) {
             # Cheapest-first ordering only pays off if a failure actually stops the run here. The
@@ -342,6 +409,15 @@ try {
             }
 
             $global:LASTEXITCODE = $testExitCode
+        } -OnFailure {
+            # TASK-0078: guidance only exists for the local-container source ('Unset') --
+            # Get-IntegrationFailureGuidance returns $null for every other source, so this prints
+            # nothing extra when the failure has nothing to do with the container path (an explicit
+            # or hosted connection that was simply unreachable, a real test regression, etc).
+            $guidance = Get-IntegrationFailureGuidance -Source $script:postgresResolution.Source
+            if ($guidance) {
+                Write-Host $guidance -ForegroundColor Yellow
+            }
         }
     }
 

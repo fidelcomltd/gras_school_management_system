@@ -137,12 +137,26 @@ regexes = [
 # that shape. `contracts/CONTRACT.lock` and `.agent/STATE.md` are the only two places this hash is
 # published, and both are known, specific, and unrelated to any other secret this rule should still
 # catch there.
+#
+# TASK-0078 (2026-09-17) extended this same family: backend/scripts/tests/fixtures/contract-ledger/
+# {valid,state-hash-mismatch,state-count-mismatch}/CONTRACT.lock (added by TASK-0075) publish the
+# exact same kind of value — `openapi.json.sha256 = <hex>` — for the same reason (a fixture
+# CONTRACT.lock a self-test reads, not a real lock file), and have been RED since TASK-0075 landed
+# (STATE.md drift 2026-09-17, "Secret scan gate has been RED"). One regex covers all three
+# directories rather than three literal paths, since new fixture variants are expected to be added
+# under this same directory as the ledger self-test grows. Checked against how gitleaks actually
+# reports paths in both ci.ps1 passes: history reports repo-root-relative
+# (`backend/scripts/tests/fixtures/contract-ledger/valid/CONTRACT.lock`), --no-git working-tree
+# reports relative to the scan source (`../backend/scripts/tests/fixtures/contract-ledger/valid/
+# CONTRACT.lock` when invoked from `backend/` against `--source ..`, matching ci.ps1:598) — `(^|/)`
+# anchors correctly against both.
 [[allowlists]]
-description = '''SHA-256 contract-hash publication points for generic-api-key (TASK-0011) — see the comment above this block.'''
+description = '''SHA-256 contract-hash publication points for generic-api-key (TASK-0011, extended TASK-0078) — see the comment above this block.'''
 targetRules = ["generic-api-key"]
 paths = [
   '''(^|/)contracts/CONTRACT\.lock$''',
   '''(^|/)\.agent/STATE\.md$''',
+  '''(^|/)backend/scripts/tests/fixtures/contract-ledger/[^/]+/CONTRACT\.lock$''',
 ]
 
 # TASK-0032 (2026-09-06), Family C — the fake `temporaryPassword` example value TASK-0027 put in
