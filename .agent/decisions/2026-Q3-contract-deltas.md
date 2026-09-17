@@ -804,6 +804,31 @@ Classification unchanged: a new path and one new schema. Additive.
   deletion and noted the asymmetry rather than resolving it silently. Correct; §6.6.8 states the rule
   for creation only.
 
+### Correction 2026-09-17 — `subject_mapping.copy_same_term` does not exist, and this record did not transcribe the proposal
+
+Two findings from dispatch 4, recorded together because the second is what let the first survive.
+
+**1. The error code was never built, and should not be.** The dispatch-1 proposal listed
+`422 subject_mapping.copy_same_term` for source-equals-destination on `POST /subject-mappings/copy`,
+and the orchestrator approved it. **No source file names it and the promoted contract names it zero
+times.** The rejection is enforced by `CopySubjectMappingsCommandValidator` (FluentValidation),
+which `ValidationBehavior` turns into the house-wide generic `request.validation_failed`
+(`Error.ValidationErrorCode`) before the handler runs — the same mechanism every other endpoint in
+this solution uses for a malformed request. So the document and the implementation agree with each
+other; **it was the approved delta that was wrong.** `backend-dev` tested the real mechanism and
+flagged the discrepancy rather than inventing a code to match the paperwork, which is exactly the
+call `rules/contract.md` §5 asks for. No code change — this record is the fix. A bespoke 422 here
+would be a behaviour change and needs its own card.
+
+**2. This archive entry never contained the delta it approved.** It recorded five amendments and a
+"confirmed as proposed" list, and pointed at a proposal that exists only in the dispatch
+conversation. `STATE.md`'s own index describes this file as the place to read "an approved contract
+delta verbatim" — so a reader following the index would not have found the error code at all, in
+either direction. That is why the phantom code went unnoticed at approval: the orchestrator approved
+a list of endpoint error codes by reference and never wrote them down. **Fix for the next delta:
+transcribe the proposal into the archive, then amend it in place — never approve by reference to a
+message.**
+
 ### Breaking vs additive
 
 Additive. Amendment 1 makes a proposed-required field optional before it ever ships, which is not a

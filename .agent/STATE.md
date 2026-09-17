@@ -152,7 +152,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0073, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -175,9 +175,8 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0070 | Subjects, level mappings, per-arm exceptions | backend-dev | **PARKED 2026-09-17 — blocked on the weekly limit, resets Sep 21 12:00.** Implementation complete and uncommitted: 8 paths, all handlers, migration, DI, `ReseedSubjectsAsync`. Build PASS under `10.0-All`, architecture 33/33, unit **738/745 — 7 failures, all `PipelineTests`, two missing `Substitute.For<>` lines**. **ZERO tests written**, so no AC is proven and the card cannot close. Contract NOT promoted |
-| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued 2026-09-16** — scale is per rating block, not school-wide (conflict 6) |
-| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **blocked 2026-09-16** on 0069 and 0070. Card carries the restated fixture tables inline |
+| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
+| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **UNBLOCKED 2026-09-17** — 0069 and 0070 both closed. The `(arm, term)` resolver it depends on is built and tested; consume it via `GET /arms/{id}/subjects`, never reimplement §8.1. Card carries the restated fixture tables inline |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -185,6 +184,12 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-17 **TASK-0070 closed — subjects, level mappings, per-arm exceptions and the §8.1 resolver
+  exist.** 867 tests, Skipped 0; contract `57ea95b4`, 62 paths, additive verified mechanically. Card
+  was unbuildable as written: **five defects found before dispatch**, including a seed the migration
+  could never apply and a privilege split letting `Map` end every mapping in a term. **Two of the
+  corrections were to the orchestrator's own delta**, which named an error code that never existed
+  and was never transcribed into the archive it was approved into. → `decisions/2026-Q3.md`
 - 2026-09-17 **TASK-0070 dispatch 2 died a SECOND time, on the weekly limit (resets Sep 21 12:00).**
   Implementation complete — 8 paths, all handlers, migration, DI, fixture reseed; build clean under
   `10.0-All`, architecture 33/33. **Zero tests written**, and 7 `PipelineTests` failures traced to
@@ -587,6 +592,11 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-17 **The `Secret scan` gate has been RED since TASK-0075 closed on 2026-09-16** — 3 gitleaks
+  false positives on the `sha256` value in three `CONTRACT.lock` test fixtures. Pre-existing and not
+  TASK-0070's; the concern is that a card closed green with a red gate. *Trigger: the next card
+  touching `backend/scripts/tests/fixtures/`, gitleaks config or `backend-ci.yml`, and before any
+  release. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **A concurrency test answered 401 where it expects 409, once, and nobody has looked.**
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
