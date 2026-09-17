@@ -170,3 +170,27 @@ Contract:  regenerate openapi.json → diff must be empty
            regenerate src/api      → diff must be empty
            CONTRACT.lock hash matches
 ```
+
+## 7. Which database an integration run uses — local container first, hosted only on human confirmation
+
+**Human directive, 2026-09-17. Binding on every agent, every run: `ci.ps1`, `-IntegrationFilter`, and
+any raw `dotnet test` over the integration project.**
+
+1. **Default is the local Testcontainers Postgres** on the WSL daemon (`http://localhost:2375`).
+2. If the container path is not working (daemon unreachable, container fails to start), **STOP and
+   ask the human.** They will check the local container. Do not diagnose around it, retry against
+   something else, or "just run it" on hosted.
+3. **The hosted database (Neon, `~/.gras/pg-test.txt`) is used ONLY after the human confirms, for that
+   run.** A confirmation does not carry over to later runs or later cards.
+4. Never export `POSTGRES_TEST_CONNECTION` to a non-local host to get a run through. CI's own
+   service-container value is the only sanctioned explicit connection.
+5. **A subagent never makes this call.** It stops and reports "local container unavailable". The
+   orchestrator asks the human.
+
+**Why:** on 2026-09-17 a TASK-0076 gate silently resolved `~/.gras/pg-test.txt` and ran ~370
+integration tests against hosted Neon (us-east-2, ~8 s/test, 45+ min) while this project's ledger said
+local runs had been container-backed since TASK-0065. The container path was working the whole time.
+
+**Enforced by `ci.ps1` since TASK-0078 (2026-09-17):** the hosted file is read only with `-UseHostedDb`, which the
+orchestrator passes only after the human confirms for that run. Outside CI, an explicit non-local connection string
+fails the gate. A failed container-backed integration stage prints the ask-the-human guidance.

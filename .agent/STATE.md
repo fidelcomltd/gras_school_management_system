@@ -98,8 +98,11 @@ ABSENT" was read as "no container runtime anywhere" and is why the container pat
 for three weeks). Engine 29.8.1 in WSL2 Ubuntu as `dockerd -H fd:// -H tcp://0.0.0.0:2375`;
 **reachable from Windows at `http://localhost:2375` — NOT at `127.0.0.1:2375`**, WSL2 NAT-mode
 localhost forwarding answers on the hostname path only. `$env:DOCKER_HOST` is set at user scope to
-the broken IPv4 literal. No Docker Desktop, no `\\.\pipe\docker_engine`, no `dotnet` inside WSL.
-**Local integration runs go through Testcontainers against the WSL daemon since TASK-0065**
+the broken IPv4 literal. No Docker Desktop, no `\.\pipe\docker_engine`, no `dotnet` inside WSL.
+**CORRECTED 2026-09-17: local `ci.ps1` runs were NOT container-backed. `~/.gras/pg-test.txt` (hosted Neon)
+exists and the script prefers it over the container, so gates silently ran on Neon.** Human directive:
+local container first, hosted ONLY on human confirmation per run (`rules/gates.md` §7; enforced by TASK-0078).
+Testcontainers against the WSL daemon has been available since TASK-0065
 (2026-09-16): 322 tests in ~4 min, and **proven green with the network physically disconnected** —
 the WSL bridge survives the adapter going down. `POSTGRES_TEST_CONNECTION` still wins when set, and
 CI still uses a service-container Postgres · psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
@@ -112,10 +115,18 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `57ea95b44bd40ae395d62294882d3422fb450e7b77f1d99131040909292aeca6`** · **62 paths** ·
-**123 schemas** · api version `v1` · moved 2026-09-17 by TASK-0070 (subjects, level mappings and
-per-arm exceptions). Previous: `152dc1c27db7…` / 54 paths / 102 schemas, TASK-0069 on 2026-09-16;
-before that `b293db2bc2b4…` (TASK-0063) and `37f8b4c2d19d…` (TASK-0066).
+**Current: `c5c4d6c6b8d48770fe40f0d2f860f02dc75c818588f2d51ed2dab14a01fe7510`** · **64 paths** ·
+**132 schemas** · api version `v1` · moved 2026-09-17 by TASK-0076 (result sets, subject scores, the
+score sheet). Previous: `57ea95b44bd4…` / 62 paths / 123 schemas, TASK-0070 on 2026-09-17; before that
+`152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
+
+**Updated by the closing card at promotion.** Promotion run by the ORCHESTRATOR
+(`generate-openapi.ps1 -Promote`); `CONTRACT.lock` written in the same run. **Additive verified
+MECHANICALLY, not read off the card:** every existing schema's `required` array, every shared
+property's shape and every property name diffed against the previous document, plus every existing
+path compared whole — **2 paths added, 9 schemas added, zero removals, zero new required properties on
+an existing schema, zero changed paths.** The ledger gate caught this block being stale on the first
+try, which is what TASK-0075 built it for.
 
 **Updated by the closing card this time, at promotion, not afterwards** — the failure mode the three
 corrections below describe. Promotion run by the ORCHESTRATOR (`generate-openapi.ps1 -Promote`);
@@ -137,7 +148,8 @@ even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing
 the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-16.
-- Frontend client is **CURRENT** against this hash as of 2026-09-16 (TASK-0074). `check:api-drift`
+- Frontend client is **STALE** against this hash (it matches `152dc1c2…`); TASK-0079 regenerates it. The note below describes the TASK-0074 state.
+- Frontend client was CURRENT against `152dc1c2…` as of 2026-09-16 (TASK-0074). `check:api-drift`
   re-run by the ORCHESTRATOR, not accepted on report: `No drift`, exit 0 — which also proves
   `schema.d.ts` carries no hand-edit, since regeneration reproduces it byte-for-byte. Typecheck and
   lint both exit 0. **But see the `apiPut` drift entry: four new operations are typed and three of
@@ -152,7 +164,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0078, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -176,7 +188,9 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **UNBLOCKED 2026-09-17** — 0069 and 0070 both closed. The `(arm, term)` resolver it depends on is built and tested; consume it via `GET /arms/{id}/subjects`, never reimplement §8.1. Card carries the restated fixture tables inline |
+| TASK-0079 | Regenerate the typed client against `c5c4d6c6…` | frontend-dev | **queued 2026-09-17** — 2 ops / 9 schemas from TASK-0076. Types only; `apiPut` is still absent and the score-sheet PUT needs it, so this card adds `apiPut` mirroring `apiPatch` |
+| TASK-0077 | Result rules settings (§6.2.8) | backend-dev | **queued 2026-09-17** — after 0076. Found missing while rewriting 0071; the engine reads five of its fields. Delta approved, additive |
+| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **REWRITTEN 2026-09-17, blocked on 0076 + 0077 only**, both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -184,6 +198,23 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-17 **TASK-0076 closed — result sets, subject scores and the score sheet exist.** Contract `c5c4d6c6…`,
+  64 paths, additive verified mechanically. **Two production bugs found by the orchestrator gate over a dead
+  dispatch's tree**, neither self-reported: version-before-state ordering, and a `jsonb` re-serialisation bug that
+  would have broken §6.7.4's autosave. Three agents, one rate-limit death. → `decisions/2026-Q3.md`
+- 2026-09-17 **HUMAN RULINGS on TASK-0071**: level position from all arms' live marks, written for own arm only;
+  Draft compute over gaps follows §8.3 literally. → `decisions/2026-Q3.md`
+- 2026-09-17 **TASK-0076 dispatch A done**: result_set, subject_score, roster, four placeholders made real, term-close
+  precondition. Contract unmoved. → `decisions/2026-Q3.md`
+- 2026-09-17 **HUMAN RULING: Returned for Correction blocks term close** (with marks entered); a returned set
+  would otherwise be stranded uneditable. Departs from §6.3.6's literal list. → `decisions/2026-Q3.md`
+- 2026-09-17 **TASK-0078 closed: `ci.ps1 -UseHostedDb` is the only path to hosted Neon; Secret scan green again.**
+  First local-container gate: integration 342 in 7m26s against 45+ min hosted. Pre-flight probe withdrawn by ruling. → `decisions/2026-Q3.md`
+- 2026-09-17 **HUMAN DIRECTIVE: integration runs use the local container; hosted DB only on the human's per-run
+  confirmation.** A TASK-0076 gate had silently run on Neon via `~/.gras/pg-test.txt`. `rules/gates.md` §7; TASK-0078.
+- 2026-09-17 **TASK-0071 held at pre-dispatch; Phase 3 re-carded 0076 → 0077 → 0071.** Its input and output
+  tables did not exist, nor did §6.2.8 result rules. Score-sheet routes depart from §6.7.13's query form
+  because scope reads route values only. Two questions on 0071 await the human. → `decisions/2026-Q3.md`
 - 2026-09-17 **TASK-0070 closed — subjects, level mappings, per-arm exceptions and the §8.1 resolver
   exist.** 867 tests, Skipped 0; contract `57ea95b4`, 62 paths, additive verified mechanically. Card
   was unbuildable as written: **five defects found before dispatch**, including a seed the migration
@@ -462,6 +493,14 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-17 **Sibling arms' stored level positions can go stale** (TASK-0071 ruling: compute writes own arm only).
+  *Trigger: the approval/publication card. Owner: that card.* → `drift/2026-Q3.md`
+- 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**
+  *Trigger: next spec revision or a card citing §6.3.6. Owner: human.* → `drift/2026-Q3.md`
+- 2026-09-17 **`needs_recompute` will be set by mark changes only** — transfer, mapping and settings
+  triggers are unbuilt after TASK-0076. *Trigger: the submission card. Owner: `backend-dev`.* → `drift/2026-Q3.md`
+- 2026-09-17 **Result-rules promotion lock not built** (§6.2.8 "editable until promotion is run").
+  *Trigger: TASK-0036. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **`08-module-subjects.md` §6.6.2 still says "No subjects are seeded" — rev 3.1 reversed
   that and the superseded text was never deleted; THIRD instance of the §6.2.5-§6.2.7 pattern.**
   *Trigger: any card citing §6.6.2, and the subject creation-screen card. Owner: human.* →
@@ -550,9 +589,8 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-08 **`DELETE /levels/{id}`'s reference check is PARTIAL and MORE PERMISSIVE than spec
   6.4.2's** "delete only where nothing has ever referenced the row". *Trigger: when history tables
   exist. Owner: `backend-dev`.*
-- 2026-09-07 **`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition**
-  (blocked by any set in Draft, Awaiting Approval or Approved). *Trigger: the results module.
-  Owner: `backend-dev`.*
+- 2026-09-07 ~~**`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition.**~~ **STRUCK
+  2026-09-17 by TASK-0076 A**, with marks entered, plus Returned for Correction by ruling. → `drift/2026-Q3.md`
 - 2026-09-06 **`DELETE /roles/{id}` hard-deletes unconditionally, and section 9.4 says it must not
   once assignments exist.** *Trigger: TASK-0046 (role archive). Owner: `backend-dev`.*
 - 2026-09-06 **6.1.7 rule 2 cannot be proven end-to-end by a real caller yet** — it needs an actor
@@ -592,11 +630,8 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
-- 2026-09-17 **The `Secret scan` gate has been RED since TASK-0075 closed on 2026-09-16** — 3 gitleaks
-  false positives on the `sha256` value in three `CONTRACT.lock` test fixtures. Pre-existing and not
-  TASK-0070's; the concern is that a card closed green with a red gate. *Trigger: the next card
-  touching `backend/scripts/tests/fixtures/`, gitleaks config or `backend-ci.yml`, and before any
-  release. Owner: `backend-dev`.* → `drift/2026-Q3.md`
+- 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
+  fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
 - 2026-09-16 **A concurrency test answered 401 where it expects 409, once, and nobody has looked.**
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
@@ -616,13 +651,8 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   levels, which have had the same harness shape since TASK-0005a. **Trigger:** first deployment to a
   fresh environment, or any card that changes a `HasData` seed. **Owner:** whoever builds the
   deployment path (open question 5).
-- 2026-09-16 **`ISubjectScoreSessionLockLookup` and `IPublishedResultsGate` return `false`/`0`
-  unconditionally.** Correct today — no `subject_score` or `result_set` table exists — and both
-  branches are unit-tested against fakes that report otherwise. But the 6.2.6 session lock and the
-  6.2.9 published-results reason gate are therefore **inert in production**. **Trigger:** the first
-  card that persists a `subject_score` or a published `result_set` (TASK-0071 reads these settings;
-  it does not write scores). **Owner:** that card. Must replace both Infrastructure classes with
-  real queries, not extend them.
+- 2026-09-16 ~~**`ISubjectScoreSessionLockLookup` and `IPublishedResultsGate` return false/0.**~~ **STRUCK
+  2026-09-17 by TASK-0076 A**: real queries, tests fail against the placeholders. → `drift/2026-Q3.md`
 - 2026-09-16 **`GradingScaleRules.ValidateWholeScale` reports rule 7 before rules 5 and 6.** Spec
   6.2.5 says "the first failure in the order listed here", so a scale that both starts above 0 and
   overlaps names the wrong rule. Cosmetic — both are real errors and the editor surfaces one at a

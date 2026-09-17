@@ -96,10 +96,12 @@ Largest module. `index.md` says split it; expect five or more cards.
 
 | Task | Title | Owner | Spec |
 |---|---|---|---|
-| — | Result set state machine + score entry + completeness gate | BE | 09 §6.7.3–6.7.5 |
-| — | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
+| TASK-0076 | Result set + subject score persistence + score sheet (completeness gate moved to the submission card) | BE | 09 §6.7.3–6.7.4 |
+| TASK-0077 | Result rules settings | BE | 04 §6.2.8 |
+| TASK-0071 | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
+| — | Readiness, completeness gate, submission (needs non-academic input) | BE | 09 §6.7.5, 6.7.11 |
 | — | Non-academic input, section-specific | BE | 09 §6.7.7, 6.7.12 |
-| — | Approval, publication, config snapshot | BE | 09 §6.7.8, 6.7.9 |
+| — | Approval, publication, config snapshot (must re-check sibling level positions, TASK-0071 ruling) | BE | 09 §6.7.8, 6.7.9 |
 | — | Annual cumulative result | BE | 09 §6.7.10 |
 | — | Score entry grid with offline resilience | FE | 09 §6.7.4, 14 §9.8.2 |
 | — | Nursery + primary result sheet renderers | BE+FE | 21, 22, 18 §C |

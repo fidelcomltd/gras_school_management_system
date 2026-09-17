@@ -56,6 +56,10 @@ Rules:
   that run, once per card, backgrounded. You verify with `dotnet test --filter` over what you
   touched and `dotnet build -warnaserror` on the projects you changed, and you report the counts.
   That is a complete report, not a half-done one. `.agent/rules/gates.md` section 1.
+- **Integration tests run against the LOCAL container only** (`.agent/rules/gates.md` §7, human
+  directive 2026-09-17). Never set `POSTGRES_TEST_CONNECTION` to a hosted host, never read
+  `~/.gras/pg-test.txt`. If the local container does not work, STOP and report it; the human decides
+  whether a hosted run is allowed, never you.
 - A run with anything SKIPPED is not a passing run — say so rather than reporting green.
 - Append to `.agent/STATE.md` and the card's Log as your final action. **STATE.md's `## Decisions`
   and `## Known drift` are INDEXES: write your full account into the card's Log, and leave ONE

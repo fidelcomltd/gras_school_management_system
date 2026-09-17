@@ -834,3 +834,22 @@ message.**
 Additive. Amendment 1 makes a proposed-required field optional before it ever ships, which is not a
 narrowing of anything live. Amendment 3 makes three proposed fields nullable, likewise pre-ship.
 Amendment 2 changes authorisation, not shape.
+
+## TASK-0076 / TASK-0077 / TASK-0071 — results Phase 3 opening deltas — APPROVED (orchestrator, 2026-09-17)
+
+Orchestrator-authored, not agent-proposed. The tables in each card's `## Contract delta` are the
+verbatim delta; this entry records approval and classification, and does not duplicate them. An
+implementing agent that finds a delta unbuildable must bounce it, not amend it silently.
+
+- **TASK-0076** — `GET` + `PUT /api/v1/arms/{armId}/score-sheets`, `POST .../score-sheets/void`.
+  Three new operations, new schemas only. **Deliberate departure from §6.7.13's query-string
+  form** (`/score-sheets?arm_id=`): scope resolution reads route values only
+  (`PrivilegeAuthorizationHandler.cs:91`). `Idempotency-Key` accepted, not required, on PUT and void.
+- **TASK-0077** — `GET` + `PUT /api/v1/settings/result-rules`. One new path, new schemas only.
+- **TASK-0071** — `POST /api/v1/result-sets/{resultSetId}/compute`, ResultSet scope. One new path.
+  No computed-row read endpoint; reads belong to the broadsheet / pupil-result cards.
+
+**Classification: additive, all three.** New paths and schemas only; no existing request gains a
+field, no existing schema changes. The close-time mechanical diff (every `required` array, every
+property type vs the previous document) is still mandatory. TASK-0062 and TASK-0069 both show why
+a card's header is not evidence.
