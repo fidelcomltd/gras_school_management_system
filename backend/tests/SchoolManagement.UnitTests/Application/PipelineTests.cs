@@ -92,6 +92,15 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IAcademicSessionRepository>());
         services.AddSingleton(Substitute.For<ITermRepository>());
 
+        // TASK-0076 dispatch A: CloseTermHandler depends on this port for spec 6.3.6's result-set
+        // precondition, implemented by Infrastructure — same treatment as every other repository
+        // stubbed above.
+        services.AddSingleton(Substitute.For<IResultSetRepository>());
+
+        // TASK-0076 dispatch B: the score-sheet handlers (Get/Save/Void) depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<ISubjectScoreRepository>());
+
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());

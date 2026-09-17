@@ -192,7 +192,8 @@ internal sealed class NoOpSystemAuditSink : ISystemAuditSink
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminId,
         CancellationToken cancellationToken,
-        string? reason = null) => Task.CompletedTask;
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null) => Task.CompletedTask;
 
     public Task RecordRejectionAsync(
         string action,

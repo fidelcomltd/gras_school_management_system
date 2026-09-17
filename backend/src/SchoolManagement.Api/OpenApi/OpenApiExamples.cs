@@ -11,6 +11,7 @@ using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
@@ -68,6 +69,13 @@ internal static class OpenApiExamples
     private const string ExampleLevelId = "0192f0c4-04b6-7263-1705-b363e24f9528";
     private const string ExampleTermId = "0192f0c4-15c7-7364-2816-c474f3608639";
     private const string ExampleSubjectExceptionId = "0192f0c4-26d8-7465-3927-d585047719a0";
+
+    /// <summary>Example identifiers for the TASK-0076 score-sheet examples, each a distinct entity.</summary>
+    private const string ExampleResultSetId = "0192f0c4-37e9-7566-4a38-e6960588b1b0";
+    private const string ExamplePupilId = "0192f0c4-48fa-7667-5b49-f7a71699c2c1";
+    private const string ExampleSecondPupilId = "0192f0c4-590b-7768-6c5a-08b827aad3d2";
+    private const string ExampleComponentId = "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3";
+    private const string ExampleExaminationComponentId = "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4";
 
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
@@ -1442,6 +1450,142 @@ internal static class OpenApiExamples
                 }
               ],
               "nextCursor": null
+            }
+            """,
+
+        [typeof(ScoreSheetComponentDto)] = $$"""
+            {
+              "id": "{{ExampleComponentId}}",
+              "label": "CA1",
+              "maxMark": 20
+            }
+            """,
+
+        [typeof(ResultSetSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleResultSetId}}",
+              "state": "Draft",
+              "needsRecompute": true
+            }
+            """,
+
+        [typeof(ScoreSheetRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "componentMarks": {
+                "{{ExampleComponentId}}": 18
+              },
+              "examMark": 55,
+              "examAbsent": false,
+              "caTotal": 18,
+              "subjectTotal": 73
+            }
+            """,
+
+        [typeof(ScoreSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": true
+              },
+              "components": [
+                {
+                  "id": "{{ExampleComponentId}}",
+                  "label": "CA1",
+                  "maxMark": 20
+                }
+              ],
+              "examination": {
+                "id": "{{ExampleExaminationComponentId}}",
+                "label": "Exam",
+                "maxMark": 60
+              },
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": 18
+                  },
+                  "examMark": 55,
+                  "examAbsent": false,
+                  "caTotal": 18,
+                  "subjectTotal": 73
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": null
+                  },
+                  "examMark": null,
+                  "examAbsent": false,
+                  "caTotal": null,
+                  "subjectTotal": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(SaveScoreSheetRowInput)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "componentMarks": {
+                "{{ExampleComponentId}}": 18
+              },
+              "examMark": 55,
+              "examAbsent": false
+            }
+            """,
+
+        [typeof(SaveScoreSheetCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": 18
+                  },
+                  "examMark": 55,
+                  "examAbsent": false
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": null
+                  },
+                  "examMark": null,
+                  "examAbsent": false
+                }
+              ]
+            }
+            """,
+
+        [typeof(VoidScoreSheetCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "reason": "Whole class re-marked after a transcription error in the mark book."
+            }
+            """,
+
+        [typeof(VoidScoreSheetResponse)] = """
+            {
+              "voidedCount": 27
             }
             """,
     };

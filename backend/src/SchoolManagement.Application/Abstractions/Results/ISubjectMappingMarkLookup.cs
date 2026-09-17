@@ -12,18 +12,11 @@ public sealed record SubjectMarkArmSummary(Guid ArmId, string ArmDisplayName, in
 /// under the level is rejected. The message names the arms and the counts."
 /// </summary>
 /// <remarks>
-/// THIS IS A DOCUMENTED SEAM, NOT A STAND-IN PRETENDING TO BE REAL — the same pattern
-/// <c>ISubjectScoreSessionLockLookup</c> establishes (TASK-0069), not <c>IResultSetArmLookup</c>'s
-/// throwing stand-in: no <c>subject_score</c> table exists anywhere in this codebase as of TASK-0070,
-/// so "no marks exist for this subject in any arm" is today's only CORRECT answer, not a placeholder
-/// one — the same reasoning <c>ISubjectScoreSessionLockLookup</c>'s own remarks give. Both branches of
-/// the handler that calls this (marks found vs. not found) are unit-tested against a fake, because the
-/// real implementation can never exercise the "found" branch until scoring exists.
-/// <para>
-/// Whichever future card first persists a <c>subject_score</c> row must replace the Infrastructure
-/// implementation with a real query grouped by arm and pupil count, and add the integration test this
-/// seam cannot carry today.
-/// </para>
+/// TASK-0076 dispatch A replaced the Infrastructure implementation with a real query against
+/// <c>subject_score</c>/<c>result_set</c>, now that both tables exist — see
+/// <c>SchoolManagement.Infrastructure.Results.SubjectMappingMarkLookup</c>. Before this card the
+/// stand-in honestly answered empty unconditionally: no <c>subject_score</c> table existed anywhere
+/// in this codebase, so that was today's only correct answer, not a placeholder one.
 /// </remarks>
 public interface ISubjectMappingMarkLookup
 {

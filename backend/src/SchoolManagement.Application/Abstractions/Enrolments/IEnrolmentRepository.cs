@@ -2,6 +2,17 @@ using SchoolManagement.Domain.Enrolments;
 
 namespace SchoolManagement.Application.Abstractions.Enrolments;
 
+/// <summary>
+/// One pupil on an arm's roster (spec 09 §6.7.4) — the row identity a score sheet or the computation
+/// engine (TASK-0071) needs, nothing else.
+/// </summary>
+/// <param name="PupilId">The pupil's id.</param>
+/// <param name="RegistrationNumber">Null only if somehow unissued; every <see cref="Domain.Pupils.PupilStatus.Active"/> pupil has one in practice (spec 6.5.10).</param>
+/// <param name="Surname">Row-ordering key (spec 6.7.4: "Surname ascending... never affected by marks").</param>
+/// <param name="FirstName">For the composed display name.</param>
+/// <param name="MiddleName">For the composed display name. Optional.</param>
+public sealed record ArmRosterPupil(Guid PupilId, string? RegistrationNumber, string Surname, string FirstName, string? MiddleName);
+
 /// <summary>Persistence port for <see cref="Enrolment"/>.</summary>
 /// <remarks>
 /// Pupil-scale, same convention as <c>IPupilRepository</c> — reads go through targeted,
@@ -36,4 +47,16 @@ public interface IEnrolmentRepository
     /// that limit is a later card's endpoint.
     /// </summary>
     Task<int> CountOpenExcludingPendingByArmAsync(Guid armId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The arm's score-sheet roster (spec 09 §6.7.4, TASK-0076): every pupil with an OPEN enrolment in
+    /// <paramref name="armId"/> whose <see cref="Domain.Pupils.PupilStatus"/> is
+    /// <see cref="Domain.Pupils.PupilStatus.Active"/> — pending is already excluded by
+    /// <c>PupilConfiguration</c>'s query filter, checked again here the same defence-in-depth way
+    /// <see cref="CountOpenExcludingPendingByArmAsync"/> does, because Transferred/Withdrawn/Graduated
+    /// pupils must not appear even if a future change ever left their enrolment open. Ordered surname
+    /// then id (fixed, never affected by marks). <c>AsNoTracking</c>. TASK-0071's computation engine
+    /// reuses this for the same roster.
+    /// </summary>
+    Task<IReadOnlyList<ArmRosterPupil>> ListActiveRosterByArmAsync(Guid armId, CancellationToken cancellationToken);
 }

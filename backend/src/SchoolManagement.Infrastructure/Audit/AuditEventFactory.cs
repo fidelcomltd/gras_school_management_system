@@ -36,7 +36,8 @@ internal sealed class AuditEventFactory(
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminIdText,
         string? reason,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
 
@@ -50,6 +51,10 @@ internal sealed class AuditEventFactory(
             ? null
             : JsonSerializer.Serialize(metadata);
 
+        var beforeJson = beforeMetadata is null || beforeMetadata.Count == 0
+            ? null
+            : JsonSerializer.Serialize(beforeMetadata);
+
         return AuditEvent.Create(
             timeProvider.GetUtcNow(),
             actorId,
@@ -58,7 +63,7 @@ internal sealed class AuditEventFactory(
             entityType ?? UnknownEntityType,
             entityId,
             outcome,
-            beforeJson: null,
+            beforeJson,
             afterJson,
             reason,
             AuditFieldTruncation.TruncateSourceIp(currentUser.RemoteIpAddress),

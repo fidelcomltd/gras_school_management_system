@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Domain.Enrolments;
+using SchoolManagement.Domain.Pupils;
 
 namespace SchoolManagement.Infrastructure.Persistence.Repositories;
 
@@ -41,4 +42,19 @@ internal sealed class EnrolmentRepository(ApplicationDbContext context) : IEnrol
          join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
          select enrolment.Id)
         .CountAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ArmRosterPupil>> ListActiveRosterByArmAsync(Guid armId, CancellationToken cancellationToken) =>
+        await (from enrolment in context.Enrolments.AsNoTracking()
+               where enrolment.ArmId == armId && enrolment.EffectiveTo == null
+               join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+               // Defence in depth, same reasoning as CountOpenExcludingPendingByArmAsync above:
+               // pending is already excluded by PupilConfiguration's query filter, but
+               // Transferred/Withdrawn/Graduated pupils are not, and none of them belongs on a live
+               // score sheet (spec 6.5.14).
+               where pupil.Status == PupilStatus.Active
+               orderby pupil.Surname.ToLower(), pupil.Id
+               select new ArmRosterPupil(pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 }

@@ -25,10 +25,11 @@ internal sealed class SystemAuditSink(
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminId,
         CancellationToken cancellationToken,
-        string? reason = null)
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null)
     {
         var auditEvent = await factory
-            .BuildAsync(AuditOutcome.Success, action, entityType, entityId, metadata, actorAdminId, reason, cancellationToken)
+            .BuildAsync(AuditOutcome.Success, action, entityType, entityId, metadata, actorAdminId, reason, cancellationToken, beforeMetadata)
             .ConfigureAwait(false);
 
         // No SaveChangesAsync: joins the ambient DbContext's change tracker, committed by

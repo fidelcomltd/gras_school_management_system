@@ -127,7 +127,11 @@ public static class InfrastructureDependencyInjection
         // replaces NotYetImplementedPupilArmOfRecordLookup (DELETED, not left registered behind a
         // flag, same convention TASK-0030 used for SuperAdminFlagEffectivePrivilegeProvider).
         services.AddScoped<IPupilArmOfRecordLookup, PupilArmOfRecordLookup>();
-        services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
+        // TASK-0076 dispatch A: the real implementation, resolving a result set's arm with a direct
+        // query against result_set — replaces NotYetImplementedResultSetArmLookup (DELETED, not left
+        // registered behind a flag, same convention TASK-0059 used above for
+        // NotYetImplementedPupilArmOfRecordLookup).
+        services.AddScoped<IResultSetArmLookup, ResultSetArmLookup>();
 
         // TASK-0003: authentication and session management (spec 6.1.11, spec 9.1). Bound the same
         // way DatabaseOptions is above — the Api project's AddValidatedOptions helper is off-limits
@@ -179,11 +183,14 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IGradingBandRepository, GradingBandRepository>();
         services.AddScoped<IAssessmentComponentRepository, AssessmentComponentRepository>();
 
-        // TASK-0069: documented seams, honestly empty — no scoring/results module exists yet. See
-        // each interface's own remarks for why this is NOT the same pattern as
-        // NotYetImplementedResultSetArmLookup (which throws).
+        // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
+        // honestly-empty TASK-0069 stand-ins now that the tables exist.
         services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();
         services.AddScoped<IPublishedResultsGate, PublishedResultsGate>();
+        services.AddScoped<IResultSetRepository, ResultSetRepository>();
+
+        // TASK-0076 dispatch B: the score-sheet endpoints' own mark persistence.
+        services.AddScoped<ISubjectScoreRepository, SubjectScoreRepository>();
 
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();
@@ -218,9 +225,8 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<ISubjectMappingRepository, SubjectMappingRepository>();
         services.AddScoped<ISubjectMappingExceptionRepository, SubjectMappingExceptionRepository>();
 
-        // TASK-0070: a documented seam, honestly empty — no subject_score table exists yet. Same
-        // pattern as ISubjectScoreSessionLockLookup above, not NotYetImplementedResultSetArmLookup's
-        // throwing stand-in. See the interface's own remarks.
+        // TASK-0076 dispatch A: a real query against subject_score, replacing the honestly-empty
+        // TASK-0070 stand-in now that the table exists.
         services.AddScoped<ISubjectMappingMarkLookup, SubjectMappingMarkLookup>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while

@@ -50,6 +50,13 @@ public interface ISystemAuditSink
     /// Spec 6.1.12's mandatory reason for the actions it lists, or <see langword="null"/>. Optional
     /// and trailing so every pre-existing call site is unaffected.
     /// </param>
+    /// <param name="beforeMetadata">
+    /// The prior state of the fields this action changed — becomes <c>AuditEvent.BeforeJson</c>, the
+    /// same way <paramref name="metadata"/> becomes <c>AfterJson</c> (2026-09-09's standing
+    /// obligation: "before_json is never populated... every card writing an audited mutation must
+    /// populate both"). <see langword="null"/> on a pure create, where there is no prior state.
+    /// Optional and trailing so every pre-existing call site is unaffected.
+    /// </param>
     Task RecordAsync(
         string action,
         string? entityType,
@@ -57,7 +64,8 @@ public interface ISystemAuditSink
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminId,
         CancellationToken cancellationToken,
-        string? reason = null);
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null);
 
     /// <summary>
     /// Records a REJECTED attempt (an escalation-rule refusal) — durable even though the command

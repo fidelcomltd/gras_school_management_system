@@ -5,9 +5,11 @@ namespace SchoolManagement.Application.Abstractions.Authorization;
 /// that result set's arm."
 /// </summary>
 /// <remarks>
-/// A SEAM — no results module exists yet, so no route uses
-/// <see cref="ScopeParameterKind.ResultSet"/> in TASK-0002. Implement this against the results
-/// module when it lands.
+/// TASK-0076 dispatch A gave this a real implementation
+/// (<c>SchoolManagement.Infrastructure.Authorization.ResultSetArmLookup</c>) now that <c>result_set</c>
+/// exists. Still unreached by any real caller — no route declares
+/// <see cref="ScopeParameterKind.ResultSet"/> yet, including dispatch B's score-sheet routes, which
+/// scope by arm id directly (this card's contract delta).
 /// </remarks>
 public interface IResultSetArmLookup
 {

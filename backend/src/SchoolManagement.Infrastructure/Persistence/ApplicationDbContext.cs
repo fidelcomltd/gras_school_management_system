@@ -9,6 +9,7 @@ using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Idempotency;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Reference;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
@@ -141,6 +142,18 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<SubjectMappingException> SubjectMappingExceptions => Set<SubjectMappingException>();
+
+    /// <summary>
+    /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
+    /// One row per arm per term (spec 09 §6.7.3).
+    /// </summary>
+    internal DbSet<ResultSet> ResultSets => Set<ResultSet>();
+
+    /// <summary>
+    /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
+    /// One row per pupil per subject per term (spec 09 §6.7.3).
+    /// </summary>
+    internal DbSet<SubjectScore> SubjectScores => Set<SubjectScore>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

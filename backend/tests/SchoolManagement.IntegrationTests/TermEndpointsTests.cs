@@ -13,8 +13,11 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Sessions;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Pupils;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
+using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
 
@@ -262,6 +265,109 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
 
+    // TASK-0076 dispatch A / spec 6.3.6: "Closing a term is blocked when any result set in the term
+    // is in state Draft, Awaiting Approval or Approved... The message lists the offending arms:
+    // These arms have results that are not published: Primary 2B (Awaiting Approval), Primary 5A
+    // (Draft). Publish or withdraw them before closing the term." Would FAIL against the previous,
+    // pre-TASK-0076 handler, which never checked result_set at all (STATE.md's now-struck drift
+    // entry) and always returned 200 here.
+    // ReturnedForCorrection ALSO blocks — HUMAN RULING 2026-09-17, a deliberate departure from
+    // §6.3.6's literal three-state list: a returned set has marks editable too (spec 6.7.11) and
+    // would otherwise be stranded once the term closes, since score entry then 409s against the
+    // closed term and the class teacher can never act on the return reason.
+    [Theory]
+    [InlineData(ResultSetState.Draft, true)]
+    [InlineData(ResultSetState.AwaitingApproval, true)]
+    [InlineData(ResultSetState.Approved, true)]
+    [InlineData(ResultSetState.ReturnedForCorrection, true)]
+    [InlineData(ResultSetState.Published, false)]
+    [InlineData(ResultSetState.Withdrawn, false)]
+    public async Task Close_WithAResultSetInTheTerm_BlocksDraftAwaitingApprovalApprovedAndReturnedForCorrection(
+        ResultSetState state, bool shouldBlock)
+    {
+        RequireDatabase();
+
+        var (sessionId, termIds) = await SeedSessionAsync(
+            "2026/2027", SessionState.Active, [TermState.Active, TermState.Upcoming, TermState.Upcoming], timesSchoolOpened: [55, null, null]);
+        var armId = await SeedArmAsync(sessionId);
+        var resultSetId = await SeedResultSetAsync(armId, termIds[0], state);
+
+        // Spec 6.3.6: blocking requires marks ENTERED, not merely a matching state — see the two
+        // Facts below for the no-marks / all-voided cases this Theory does not cover.
+        var subjectId = await SeedSubjectAsync();
+        var pupilId = await SeedPupilAsync();
+        await SeedSubjectScoreAsync(resultSetId, termIds[0], pupilId, subjectId, voided: false);
+
+        var jar = await SignInWithGrantsAsync(Privileges.Term.Close);
+
+        var response = await PostAsync($"{TermsUrl}/{termIds[0]}/close", jar);
+
+        if (shouldBlock)
+        {
+            response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+            var json = await ReadJsonAsync(response);
+            json.RootElement.GetProperty("errorCode").GetString().ShouldBe("term.close_blocked_by_result_sets");
+            var detail = json.RootElement.GetProperty("detail").GetString() ?? string.Empty;
+            detail.ShouldStartWith("These arms have results that are not published:");
+            detail.ShouldContain($"({DescribeState(state)})");
+            detail.ShouldEndWith("Publish or withdraw them before closing the term.");
+        }
+        else
+        {
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+    }
+
+    // Spec 6.3.6, literally: "An arm with no marks entered at all does not block closure." A result
+    // set can exist with NO subject_score row at all — spec 6.7.11 also creates one from a first save
+    // of a trait, attendance entry or remark, none of which is a mark.
+    [Fact]
+    public async Task Close_WhenTheOnlyResultSetInTheTermHasNoScoresAtAll_Succeeds()
+    {
+        RequireDatabase();
+
+        var (sessionId, termIds) = await SeedSessionAsync(
+            "2026/2027", SessionState.Active, [TermState.Active, TermState.Upcoming, TermState.Upcoming], timesSchoolOpened: [55, null, null]);
+        var armId = await SeedArmAsync(sessionId);
+        await SeedResultSetAsync(armId, termIds[0], ResultSetState.Draft);
+
+        var jar = await SignInWithGrantsAsync(Privileges.Term.Close);
+
+        var response = await PostAsync($"{TermsUrl}/{termIds[0]}/close", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    // Same rule, the other route to zero live marks: every subject_score row for the set has been
+    // voided. Spec 6.7.4: "A voided row is excluded from computation and retained" — retained, so a
+    // naive "does any subject_score row exist" check would wrongly still block here.
+    [Fact]
+    public async Task Close_WhenTheOnlyResultSetsScoresAreAllVoided_Succeeds()
+    {
+        RequireDatabase();
+
+        var (sessionId, termIds) = await SeedSessionAsync(
+            "2026/2027", SessionState.Active, [TermState.Active, TermState.Upcoming, TermState.Upcoming], timesSchoolOpened: [55, null, null]);
+        var armId = await SeedArmAsync(sessionId);
+        var resultSetId = await SeedResultSetAsync(armId, termIds[0], ResultSetState.Draft);
+        var subjectId = await SeedSubjectAsync();
+        var pupilId = await SeedPupilAsync();
+        await SeedSubjectScoreAsync(resultSetId, termIds[0], pupilId, subjectId, voided: true);
+
+        var jar = await SignInWithGrantsAsync(Privileges.Term.Close);
+
+        var response = await PostAsync($"{TermsUrl}/{termIds[0]}/close", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    private static string DescribeState(ResultSetState state) => state switch
+    {
+        ResultSetState.AwaitingApproval => "Awaiting Approval",
+        ResultSetState.ReturnedForCorrection => "Returned for Correction",
+        _ => state.ToString(),
+    };
+
     [Fact]
     public async Task Reopen_AsSuperAdminWithValidReason_Succeeds()
     {
@@ -471,6 +577,83 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return arm.Id;
+    }
+
+    /// <summary>
+    /// Seeds a <c>result_set</c> row for (<paramref name="armId"/>, <paramref name="termId"/>) in
+    /// <paramref name="state"/>. Built through <see cref="ResultSet.Create"/> (always Draft) and, for
+    /// any other state, moved there with a direct SQL update — the same accepted technique
+    /// <c>EnrolmentPersistenceTests.SeedPupilAsync</c> uses for a status this card's own entity
+    /// exposes no ordinary transition for yet (every later state belongs to a future card's endpoint).
+    /// </summary>
+    private async Task<Guid> SeedResultSetAsync(Guid armId, Guid termId, ResultSetState state)
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), armId, termId).Value;
+        context.Add(resultSet);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        if (state != ResultSetState.Draft)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE result_set SET state = {state.ToString()} WHERE id = {resultSet.Id}",
+                TestContext.Current.CancellationToken);
+        }
+
+        return resultSet.Id;
+    }
+
+    /// <summary>Seeds a bare subject, distinct name per call, for a <c>subject_score</c> FK.</summary>
+    private async Task<Guid> SeedSubjectAsync()
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var subject = Subject.Create(Guid.CreateVersion7(), $"Test Subject {Guid.CreateVersion7():N}", null, null).Value;
+        context.Add(subject);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return subject.Id;
+    }
+
+    /// <summary>Seeds a bare, unenrolled pupil for a <c>subject_score</c> FK — this suite tests term closure, not the roster.</summary>
+    private async Task<Guid> SeedPupilAsync()
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var pupil = Pupil.Create(
+            Guid.CreateVersion7(), "Adeyemi", "Chidera", null, PupilSex.Female,
+            new DateOnly(2018, 1, 1), new DateOnly(2026, 9, 9), null,
+            "Anambra", "Awka South", "14 Zik Avenue, Awka", null, null, null).Value;
+        context.Add(pupil);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return pupil.Id;
+    }
+
+    /// <summary>
+    /// Seeds one <c>subject_score</c> row against an existing result set, optionally VOIDED — spec
+    /// 6.3.6's "marks entered" precondition (orchestrator correction) turns on whether a NON-voided
+    /// row exists, not on the result set's state alone.
+    /// </summary>
+    private async Task SeedSubjectScoreAsync(Guid resultSetId, Guid termId, Guid pupilId, Guid subjectId, bool voided)
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var score = SubjectScore.Create(
+            Guid.CreateVersion7(), resultSetId, pupilId, subjectId, termId, "{}", examMark: 40, examAbsent: false).Value;
+
+        if (voided)
+        {
+            score.Void("Entered against the wrong pupil.", "tester", DateTimeOffset.UtcNow).IsSuccess.ShouldBeTrue();
+        }
+
+        context.Add(score);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<CookieJar> SignInWithGrantsAsync(params string[] privileges)

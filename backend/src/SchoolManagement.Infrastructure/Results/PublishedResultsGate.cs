@@ -1,16 +1,22 @@
+using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Results;
+using SchoolManagement.Domain.Results;
+using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Results;
 
 /// <summary>
-/// Default <see cref="IPublishedResultsGate"/>: honestly zero. See the interface's remarks — no
-/// <c>result_set</c>/publish module exists anywhere in this codebase as of TASK-0069, so zero
-/// published result sets is today's only correct answer, not a stand-in. Replace this with a real
-/// query against <c>result_set</c> when the results/publish module lands.
+/// The real <see cref="IPublishedResultsGate"/> (TASK-0076 dispatch A): a real query against
+/// <c>result_set</c>, replacing the honestly-zero stand-in that predated the table's existence (see
+/// the interface's remarks for why that was correct, not a placeholder, at the time).
 /// </summary>
-internal sealed class PublishedResultsGate : IPublishedResultsGate
+internal sealed class PublishedResultsGate(ApplicationDbContext context) : IPublishedResultsGate
 {
     /// <inheritdoc />
     public Task<int> CountPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
-        Task.FromResult(0);
+        (from resultSet in context.ResultSets.AsNoTracking()
+         join term in context.Terms.AsNoTracking() on resultSet.TermId equals term.Id
+         where term.SessionId == sessionId && resultSet.State == ResultSetState.Published
+         select resultSet.Id)
+        .CountAsync(cancellationToken);
 }

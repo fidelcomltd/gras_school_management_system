@@ -7,14 +7,15 @@ namespace SchoolManagement.Application.Abstractions.Results;
 /// characters."
 /// </summary>
 /// <remarks>
-/// Same seam pattern and the same reasoning as <c>ISubjectScoreSessionLockLookup</c> — no
-/// <c>result_set</c>/publish module exists in this codebase yet, so zero published result sets is
-/// honestly today's answer everywhere, not a stand-in. <c>GET /settings/impact</c> (spec 6.2.12,
-/// "the interface calls this to build the warnings") is NOT built by TASK-0069 — its own card's
-/// approved contract delta named only <c>/settings/grading</c> and <c>/settings/assessment</c> — this
-/// port exists solely so <c>PUT /settings/grading</c>, <c>POST /settings/grading/reset</c> and
-/// <c>PUT /settings/assessment</c> can enforce the SAVE-TIME half of 6.2.9 (the conditional reason
-/// requirement) for real, ahead of the banner/impact-summary UI that a later card builds.
+/// TASK-0076 dispatch A replaced the Infrastructure implementation with a real query against
+/// <c>result_set</c>, now that it exists — see
+/// <c>SchoolManagement.Infrastructure.Results.PublishedResultsGate</c>. Before this card the stand-in
+/// honestly answered zero unconditionally (same reasoning as <c>ISubjectScoreSessionLockLookup</c>).
+/// <c>GET /settings/impact</c> (spec 6.2.12, "the interface calls this to build the warnings") is
+/// STILL not built — this port exists solely so <c>PUT /settings/grading</c>,
+/// <c>POST /settings/grading/reset</c> and <c>PUT /settings/assessment</c> can enforce the SAVE-TIME
+/// half of 6.2.9 (the conditional reason requirement) for real, ahead of the banner/impact-summary UI
+/// that a later card builds.
 /// </remarks>
 public interface IPublishedResultsGate
 {

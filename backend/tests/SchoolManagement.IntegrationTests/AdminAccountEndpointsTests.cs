@@ -682,7 +682,9 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
 /// </summary>
 internal sealed class RecordingSystemAuditSink : ISystemAuditSink
 {
-    public List<(string Action, string? EntityType, string? EntityId, string? ActorAdminId, AuditOutcome Outcome)> Records { get; } = [];
+    public List<(string Action, string? EntityType, string? EntityId, string? ActorAdminId, AuditOutcome Outcome,
+        IReadOnlyDictionary<string, object?>? Metadata, IReadOnlyDictionary<string, object?>? BeforeMetadata)> Records
+    { get; } = [];
 
     public Task RecordAsync(
         string action,
@@ -691,9 +693,10 @@ internal sealed class RecordingSystemAuditSink : ISystemAuditSink
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminId,
         CancellationToken cancellationToken,
-        string? reason = null)
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null)
     {
-        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Success));
+        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Success, metadata, beforeMetadata));
         return Task.CompletedTask;
     }
 
@@ -706,7 +709,7 @@ internal sealed class RecordingSystemAuditSink : ISystemAuditSink
         CancellationToken cancellationToken,
         string? reason = null)
     {
-        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Rejected));
+        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Rejected, metadata, null));
         return Task.CompletedTask;
     }
 }
