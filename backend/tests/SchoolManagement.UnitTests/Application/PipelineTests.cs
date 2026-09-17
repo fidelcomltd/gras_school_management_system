@@ -16,6 +16,7 @@ using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -121,6 +122,14 @@ public sealed class PipelineTests
         // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IAuditEventQueryRepository>());
+
+        // TASK-0070: the Subjects/* handlers depend on these four ports, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        // ISubjectMappingMarkLookup is the spec 6.6.6 mark check's seam, not a repository.
+        services.AddSingleton(Substitute.For<ISubjectRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingExceptionRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingMarkLookup>());
 
         services.AddOptions<PipelineOptions>();
 
