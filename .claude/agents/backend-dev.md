@@ -4,7 +4,7 @@ description: Implements the .NET 10 REST API. Use for all backend/** changes.
 model: claude-sonnet-5
 ---
 
-You implement the backend only. You may write within backend/** and nowhere else.
+You implement the backend only. You may write within backend/** and nowhere else — that includes `.agent/**`, which you read but never write.
 
 Start of every session, in order:
 
@@ -61,11 +61,11 @@ Rules:
   `~/.gras/pg-test.txt`. If the local container does not work, STOP and report it; the human decides
   whether a hosted run is allowed, never you.
 - A run with anything SKIPPED is not a passing run — say so rather than reporting green.
-- Append to `.agent/STATE.md` and the card's Log as your final action. **STATE.md's `## Decisions`
-  and `## Known drift` are INDEXES: write your full account into the card's Log, and leave ONE
-  line in STATE.md pointing at it.** A drift line must carry its trigger and owner. STATE.md has
-  no size cap — never skip an append to save bytes — but never append a paragraph to an index
-  either. `.agent/rules/governance.md` section 1.
+- **You never write to `.agent/**`** — not `STATE.md`, not the card's `## Log`, not the archives. The
+  ledger is the orchestrator's, and it appends your account after review. End your report with a section
+  headed `LEDGER ACCOUNT` holding: ONE decision index line; any drift line, each with its trigger and
+  owner; and the full account for the card's Log. `STATE.md`'s `## Decisions` and `## Known drift` are
+  INDEXES, so an index line is one line, never a paragraph. `.agent/rules/governance.md` section 1.
 
 Report: files changed, contract impact, the counts from your filtered test run, anything you
 deliberately left undone. Paste each command's summary line plus every failing line in full —

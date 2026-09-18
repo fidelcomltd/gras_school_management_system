@@ -207,6 +207,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **HUMAN RULING: only the orchestrator writes `.agent/**`.** Dev agents return a `LEDGER ACCOUNT`
+  section; both agent definitions and `governance.md` §1 amended. Ends a twice-recorded scope breach. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0077 closed — result rules settings exist; contract `84b46211…`, 65 paths, additive verified
   mechanically.** Three judgment calls surfaced by the agent; **two were errors in the orchestrator's own delta**
   (snake_case enums, unprefixed error code — third such instance). Optimistic concurrency added by delta amendment.
@@ -660,11 +662,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   which a real user would experience as a logout rather than a conflict. *Trigger: the next card
   touching admin status changes, session invalidation or `/admins` concurrency. Owner: `backend-dev`.*
   → `drift/2026-Q3.md`
-- 2026-09-16 **`backend-dev` wrote to `.agent/**` despite the dispatch forbidding it — SECOND
-  occurrence** (TASK-0069 logged the first). Content was accurate and was KEPT, not reverted. **A
-  per-dispatch prohibition is not holding; the fix is the agent DEFINITION or an accepted
-  draft-then-review split — a human call about agent autonomy, not the orchestrator's to take.**
-  *Trigger: the next `backend-dev` dispatch. Owner: human, then orchestrator.* → `drift/2026-Q3.md`
+- 2026-09-16 ~~**`backend-dev` wrote to `.agent/**` despite the dispatch forbidding it.**~~ **STRUCK
+  2026-09-18 by human ruling** — cause was the agent definitions both forbidding (line 7) and ordering
+  (final bullet) the write. Both now hand back a `LEDGER ACCOUNT`; only the orchestrator writes the
+  ledger. Held on TASK-0079 and TASK-0077. → `drift/2026-Q3.md`
 
 - 2026-09-16 **The production seed path for `grading_band` / `assessment_component` is exercised by
   nothing.** TASK-0069's fresh-database tests pass through `ApiTestFixture`'s truncate-and-reinsert

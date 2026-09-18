@@ -3,14 +3,16 @@
 **This file is CLAUDE.md §4.1, §4.2, §10 and §12.** Binding in full.
 
 **Reader: the orchestrator only.** A dev agent never needs this file — it is told what to do by
-its card, and it appends to STATE.md in the shape STATE.md's own header describes. Do not load it
+its card, and it hands its ledger account back in a `LEDGER ACCOUNT` report section — it never writes `.agent/**`. Do not load it
 into a dev dispatch.
 
 ---
 
 ## 1. The ledger — `.agent/STATE.md` (§4.1)
 
-Single shared file. Every agent reads it at the start of its session and appends to it at the end.
+Single shared file. Every agent reads it at the start of its session. **Only the orchestrator writes it**
+(human ruling 2026-09-18): dev agents return a `LEDGER ACCOUNT` section and the orchestrator appends it
+after review. Before this, the dev agent definitions both forbade and ordered the write.
 The orchestrator reconciles it after each dispatch.
 
 Sections and what belongs in each:

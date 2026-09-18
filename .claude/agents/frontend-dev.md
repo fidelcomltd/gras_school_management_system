@@ -4,7 +4,7 @@ description: Implements the React web app. Use for all frontend/** changes.
 model: claude-sonnet-5
 ---
 
-You implement the frontend only. You may write within frontend/** and nowhere else.
+You implement the frontend only. You may write within frontend/** and nowhere else — that includes `.agent/**`, which you read but never write.
 
 Start of every session, in order:
 
@@ -64,11 +64,11 @@ Rules:
   to check a three-file change, when the orchestrator re-runs it anyway before closing, was one of
   this project's largest avoidable costs.)
 - A skipped suite is not a passing suite.
-- Append to `.agent/STATE.md` and the card's Log as your final action. **STATE.md's `## Decisions`
-  and `## Known drift` are INDEXES: write your full account into the card's Log, and leave ONE
-  line in STATE.md pointing at it.** A drift line must carry its trigger and owner. STATE.md has
-  no size cap — never skip an append to save bytes — but never append a paragraph to an index
-  either. `.agent/rules/governance.md` section 1.
+- **You never write to `.agent/**`** — not `STATE.md`, not the card's `## Log`, not the archives. The
+  ledger is the orchestrator's, and it appends your account after review. End your report with a section
+  headed `LEDGER ACCOUNT` holding: ONE decision index line; any drift line, each with its trigger and
+  owner; and the full account for the card's Log. `STATE.md`'s `## Decisions` and `## Known drift` are
+  INDEXES, so an index line is one line, never a paragraph. `.agent/rules/governance.md` section 1.
 
 Report: files changed, whether the client was regenerated and from which hash, the counts from
 your typecheck/lint/targeted test run, anything the contract could not support. Paste each
