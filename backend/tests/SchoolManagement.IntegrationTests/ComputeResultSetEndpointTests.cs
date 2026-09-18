@@ -294,6 +294,68 @@ public sealed class ComputeResultSetEndpointTests(ApiTestFixture fixture) : Inte
         bResultAfter.ArmPosition.ShouldBe(bResultBaseline.ArmPosition);
     }
 
+    // ---- Spec 6.7.12 edge cases: "every pupil ... absent for one subject's examination" and
+    // "an arm with one pupil", closing the two rows TASK-0071 stage 3's card names explicitly ---------
+
+    [Fact]
+    public async Task Compute_EveryPupilAbsentForTheSubjectsExamination_CountsZeroAndFlagsNoExaminationSat()
+    {
+        RequireDatabase();
+        var (armId, subjectId, termId, _) = await SeedArmWithSubjectAsync();
+        var jar = await SignInAsSuperAdminAsync();
+        var pupilOne = await SeedPupilOnRosterAsync(armId, "Uche");
+        var pupilTwo = await SeedPupilOnRosterAsync(armId, "Nkem");
+        await SaveSheetAsync(armId, jar, subjectId, termId, version: null,
+            AbsentRow(pupilOne, 10, 12), AbsentRow(pupilTwo, 8, 9));
+        var resultSetId = await GetResultSetIdAsync(armId, termId);
+
+        var response = await ComputeAsync(resultSetId, jar);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<ComputeResultSetResponse>(response);
+        body.Flags.ShouldContain(flag => flag.Code == "no_examination_sat" && flag.SubjectId == subjectId.ToString());
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var statistic = await context.Set<SubjectArmStatistic>().AsNoTracking()
+            .SingleAsync(s => s.ResultSetId == resultSetId, TestContext.Current.CancellationToken);
+        statistic.CountedPupils.ShouldBe(0); // §6.7.12: nobody counted, but computation neither divides by zero nor fails
+        statistic.RankedPupils.ShouldBe(2);
+        statistic.HighestScore.ShouldBeNull();
+        statistic.LowestScore.ShouldBeNull();
+        statistic.ClassAverage.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Compute_ArmWithOnePupil_PositionIsFirstOfOne_ClassAverageEqualsThatPupilsTotal()
+    {
+        RequireDatabase();
+        var (armId, subjectId, termId, _) = await SeedArmWithSubjectAsync();
+        var jar = await SignInAsSuperAdminAsync();
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Nnamdi");
+        await SaveSheetAsync(armId, jar, subjectId, termId, version: null, RowWithMarks(pupilId, 15, 15, 40)); // 70
+        var resultSetId = await GetResultSetIdAsync(armId, termId);
+
+        var response = await ComputeAsync(resultSetId, jar);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // §6.7.12: "all correct, no special case, and the sheet does not hide the position."
+        var statistic = await context.Set<SubjectArmStatistic>().AsNoTracking()
+            .SingleAsync(s => s.ResultSetId == resultSetId, TestContext.Current.CancellationToken);
+        statistic.CountedPupils.ShouldBe(1);
+        statistic.HighestScore.ShouldBe(70);
+        statistic.LowestScore.ShouldBe(70);
+        statistic.ClassAverage.ShouldBe(70.0m);
+
+        var pupilResult = await context.Set<PupilTermResult>().AsNoTracking()
+            .SingleAsync(p => p.ResultSetId == resultSetId, TestContext.Current.CancellationToken);
+        pupilResult.ArmPosition.ShouldBe(1);
+        pupilResult.ArmPositionTied.ShouldBeFalse();
+        pupilResult.ArmPupilCount.ShouldBe(1);
+    }
+
     // ---- Seeding and HTTP helpers ---------------------------------------------------------------
 
     private static object RowWithMarks(Guid pupilId, int? ca1, int? ca2, int? exam) => new
@@ -302,6 +364,14 @@ public sealed class ComputeResultSetEndpointTests(ApiTestFixture fixture) : Inte
         componentMarks = new Dictionary<string, int?> { [Ca1Id.ToString()] = ca1, [Ca2Id.ToString()] = ca2 },
         examMark = exam,
         examAbsent = false,
+    };
+
+    private static object AbsentRow(Guid pupilId, int? ca1, int? ca2) => new
+    {
+        pupilId = pupilId.ToString(),
+        componentMarks = new Dictionary<string, int?> { [Ca1Id.ToString()] = ca1, [Ca2Id.ToString()] = ca2 },
+        examMark = (int?)null,
+        examAbsent = true,
     };
 
     private async Task<(Guid ArmId, Guid SubjectId, Guid TermId, Guid SessionId)> SeedArmWithSubjectAsync()

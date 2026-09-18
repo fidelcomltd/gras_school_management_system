@@ -1,5 +1,6 @@
 using SchoolManagement.Application.Results.Computation;
 using SchoolManagement.Domain.Settings;
+using SchoolManagement.IntegrationTests.Fixtures;
 
 namespace SchoolManagement.UnitTests.Application.Results.Computation;
 
@@ -222,6 +223,47 @@ public sealed class ResultComputationEngineTests
         lines[p1.PupilId].SubjectPosition.ShouldBe(1);
         lines[p1.PupilId].SubjectPositionTied.ShouldBeFalse();
         lines[p2.PupilId].SubjectPosition.ShouldBe(2);
+    }
+
+    [Fact]
+    public void TieBreak_ExamThenCa_OnTheFullFixture_MatchesSpec845sAlternateOutcome()
+    {
+        // The SAME Primary 3A Mathematics data as the §8.4 fixture (ResultComputationFixtureData,
+        // linked into this project — see SchoolManagement.UnitTests.csproj), so the literal "6th"/
+        // "7th"/"8th" this test asserts are spec 8.4.5's own words, not a miniature stand-in. The
+        // fixture-driven integration test (ResultComputationFixtureIntegrationTests) proves the
+        // DEFAULT shared_position outcome (Adaeze and Chidi both 6th) against the same data; this is
+        // that data under exam_then_ca instead — spec 8.4.5: "Adaeze scored 45 in the Mathematics
+        // examination and Chidi scored 41, so Adaeze would be 6th and Chidi 7th, with the next pupil
+        // 8th either way."
+        var arm3A = ResultComputationFixtureData.Pupils
+            .Where(row => row.Arm == ResultComputationFixtureData.Arm3A)
+            .ToList();
+        var idByName = arm3A.ToDictionary(row => row.Pupil, _ => Guid.CreateVersion7(), StringComparer.Ordinal);
+
+        var pupils = arm3A.Select(row => new ComputationPupil(idByName[row.Pupil], row.Pupil, row.Pupil)).ToList();
+        var marks = arm3A.Select(row =>
+        {
+            var mark = row[ResultComputationFixtureData.Mathematics];
+            return Row(idByName[row.Pupil], Maths, mark.Ca1, mark.Ca2, mark.ExamAbsent ? null : mark.Exam, mark.ExamAbsent);
+        }).ToList();
+
+        var arm = SingleSubjectArm(Guid.CreateVersion7(), pupils, marks);
+        var result = ResultComputationEngine.Compute(BasicInput(arm, Rules(TieBreakRule.ExamThenCa)));
+
+        result.IsSuccess.ShouldBeTrue();
+        var lines = result.Value.SubjectLines.ToDictionary(line => line.PupilId);
+
+        var adaezeId = idByName[ResultComputationFixtureData.Adaeze];
+        var chidiId = idByName[ResultComputationFixtureData.Chidi];
+        var rank8Id = idByName[ResultComputationFixtureData.MathsRank8Pupil];
+
+        lines[adaezeId].SubjectPosition.ShouldBe(6);
+        lines[adaezeId].SubjectPositionTied.ShouldBeFalse();
+        lines[chidiId].SubjectPosition.ShouldBe(7);
+        lines[chidiId].SubjectPositionTied.ShouldBeFalse();
+        lines[rank8Id].SubjectPosition.ShouldBe(8); // "the next pupil 8th either way"
+        lines[rank8Id].SubjectTotal.ShouldBe(74);
     }
 
     [Fact]
