@@ -465,7 +465,7 @@ public sealed class RoleEndpointsTests : IAsyncLifetime
         // Must still exist, unchanged — nothing about a rejected delete may remove or narrow the row.
         var stored = await ReadAsync<RoleDto>(await GetAsync($"{RolesUrl}/{SeededRoles.SuperAdminId}", jar));
         stored.IsSystem.ShouldBeTrue();
-        stored.Privileges.Count.ShouldBe(93);
+        stored.Privileges.Count.ShouldBe(PrivilegeRegistry.All.Count);
     }
 
     [Fact]

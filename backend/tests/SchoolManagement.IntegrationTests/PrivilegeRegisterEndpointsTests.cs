@@ -50,7 +50,7 @@ public sealed class PrivilegeRegisterEndpointsTests(ApiTestFixture fixture) : In
             "pins_and_reports",
         ]);
 
-        body.Groups.Sum(group => group.Privileges.Count).ShouldBe(93);
+        body.Groups.Sum(group => group.Privileges.Count).ShouldBe(PrivilegeRegistry.All.Count);
     }
 
     [Fact]
