@@ -123,13 +123,106 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         var jar = await SignInAsSuperAdminAsync();
 
-        // The submitted set omits all three seeded scales — allowed today because TASK-0072 stage 1
-        // has no development-domain or trait-block table to reference one yet.
+        // The submitted set omits all three seeded scales (no id echoed back for any of them) —
+        // allowed today because TASK-0072 stage 1 has no development-domain or trait-block table to
+        // reference one yet.
         var response = await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var ratingScales = await ReadAsync<SettingsRatingScaleGroupDto>(response);
         ratingScales.Scales.ShouldNotContain(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
+    }
+
+    [Fact]
+    public async Task UpdateRatingScales_ResavedWithTheSameEchoedIds_KeepsEveryScaleAndPointIdStable()
+    {
+        // The stage-1 review fix this proves: stage 2/3 rating blocks will store a rating_scale_id
+        // FK, so a resave that changes nothing must not silently mint new ids underneath it.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0)));
+        var scaleId = created.Scales[0].Id;
+        var pointIds = created.Scales[0].Points.Select(point => point.Id).ToList();
+
+        var resubmit = new UpdateRatingScalesCommand(
+            [
+                new RatingScaleInput(
+                    "Custom",
+                    [
+                        new RatingScalePointInput("N", "Needs Improvement", 1, Id: Guid.Parse(pointIds[0])),
+                        new RatingScalePointInput("E", "Excellent", 2, Id: Guid.Parse(pointIds[1])),
+                    ],
+                    Id: Guid.Parse(scaleId)),
+            ],
+            ExpectedVersion: 1,
+            Reason: null);
+
+        var response = await PutAsync(RatingScalesUrl, jar, resubmit);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var resaved = await ReadAsync<SettingsRatingScaleGroupDto>(response);
+        resaved.VersionNumber.ShouldBe(2);
+        resaved.Scales[0].Id.ShouldBe(scaleId);
+        resaved.Scales[0].Points.Select(point => point.Id).ShouldBe(pointIds, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task UpdateRatingScales_RenamingByEchoedId_KeepsTheId()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0)));
+        var scaleId = created.Scales[0].Id;
+        var pointIds = created.Scales[0].Points.Select(point => point.Id).ToList();
+
+        var rename = new UpdateRatingScalesCommand(
+            [
+                new RatingScaleInput(
+                    "Renamed",
+                    [
+                        new RatingScalePointInput("N", "Needs Improvement", 1, Id: Guid.Parse(pointIds[0])),
+                        new RatingScalePointInput("E", "Excellent", 2, Id: Guid.Parse(pointIds[1])),
+                    ],
+                    Id: Guid.Parse(scaleId)),
+            ],
+            ExpectedVersion: 1,
+            Reason: null);
+
+        var response = await PutAsync(RatingScalesUrl, jar, rename);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var renamed = await ReadAsync<SettingsRatingScaleGroupDto>(response);
+        renamed.Scales[0].Id.ShouldBe(scaleId);
+        renamed.Scales[0].Name.ShouldBe("Renamed");
+    }
+
+    [Fact]
+    public async Task UpdateRatingScales_WithAnUnknownScaleId_Returns422NamingTheScaleIndex()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var command = new UpdateRatingScalesCommand(
+            [
+                new RatingScaleInput(
+                    "Custom",
+                    [new RatingScalePointInput("N", "Needs Improvement", 1), new RatingScalePointInput("E", "Excellent", 2)],
+                    Id: Guid.CreateVersion7()),
+            ],
+            ExpectedVersion: 0,
+            Reason: null);
+
+        var response = await PutAsync(RatingScalesUrl, jar, command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.ratingscales.unknown_scale_id");
+        document.RootElement.GetProperty("scaleIndex").GetInt32().ShouldBe(0);
     }
 
     private static UpdateRatingScalesCommand CustomScale(int expectedVersion) => new(

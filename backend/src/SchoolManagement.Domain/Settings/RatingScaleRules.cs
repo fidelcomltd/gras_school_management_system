@@ -3,16 +3,39 @@ using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Domain.Settings;
 
-/// <summary>One submitted point, before persistence (no id — <c>PUT /settings/rating-scales</c> replaces the whole set; see <see cref="RatingScale"/>'s remarks).</summary>
+/// <summary>
+/// One submitted point, before persistence. TASK-0072 stage 1 review fix: <paramref name="Id"/>
+/// present means "update this existing point in place, preserving its id"; absent means "this is a
+/// new point". Trailing and optional so every pre-existing positional call site (seeds, tests) still
+/// compiles unchanged.
+/// </summary>
 /// <param name="PointCode">Up to <see cref="RatingScalePoint.PointCodeMaxLength"/> character. Unique within the scale.</param>
 /// <param name="PointLabel">Up to <see cref="RatingScalePoint.PointLabelMaxLength"/> characters.</param>
 /// <param name="PointOrder">Ascending from worst to best. Unique within the scale.</param>
-public sealed record RatingScalePointInput(string PointCode, string PointLabel, int PointOrder);
+/// <param name="Id">
+/// The existing point's opaque id, when updating one in place. <see langword="null"/> for a new
+/// point. An id absent from the owning scale's current points is rejected
+/// <c>422 settings.ratingscales.unknown_point_id</c> (checked against live state, so it lives in
+/// <c>UpdateRatingScalesCommandHandler</c>, not here).
+/// </param>
+public sealed record RatingScalePointInput(string PointCode, string PointLabel, int PointOrder, Guid? Id = null);
 
-/// <summary>One submitted scale, before persistence.</summary>
+/// <summary>
+/// One submitted scale, before persistence. TASK-0072 stage 1 review fix: <paramref name="Id"/>
+/// present means "update this existing scale in place, preserving its id — stage 2/3 rating blocks
+/// reference a scale by this id and must never see it change under an unrelated rename"; absent means
+/// "this is a new scale". An EXISTING scale whose id is absent from the whole submitted set is being
+/// removed, refused <c>409 settings.ratingscales.in_use</c> when a rating block still references it.
+/// </summary>
 /// <param name="Name">Up to <see cref="RatingScale.NameMaxLength"/> characters. Unique, case-insensitive, across the whole submitted set.</param>
 /// <param name="Points">Between <see cref="RatingScalePoint.MinPointsPerScale"/> and <see cref="RatingScalePoint.MaxPointsPerScale"/> points.</param>
-public sealed record RatingScaleInput(string Name, IReadOnlyList<RatingScalePointInput> Points);
+/// <param name="Id">
+/// The existing scale's opaque id, when updating one in place. <see langword="null"/> for a new
+/// scale. An id absent from the current set is rejected
+/// <c>422 settings.ratingscales.unknown_scale_id</c> (checked against live state, so it lives in
+/// <c>UpdateRatingScalesCommandHandler</c>, not here).
+/// </param>
+public sealed record RatingScaleInput(string Name, IReadOnlyList<RatingScalePointInput> Points, Guid? Id = null);
 
 /// <summary>
 /// A rating-scale rejection carrying WHICH submitted scale (and, where the failure is about one

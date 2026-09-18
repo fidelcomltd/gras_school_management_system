@@ -335,16 +335,20 @@ public sealed class SettingsEndpoints : IEndpointModule
             .WithName("UpdateRatingScales")
             .WithSummary("Replace the rating scales")
             .WithDescription(
-                "Whole set as one array, atomic (spec 6.2.13) — a scale omitted from the array is " +
-                "removed, which is rejected `409 settings.ratingscales.in_use` when a rating block " +
-                "still references it (matched by name, since no id travels with a submitted scale — " +
-                "the same blind-replace convention as `PUT /settings/grading`). All save-time rules " +
-                "run over the whole submitted set as one unit; on the first failure nothing is " +
-                "written and the response's `scaleIndex`/`pointIndex` extensions name the offending " +
-                "position in the submitted array. `expectedVersion` must match the rating-scales " +
-                "group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` " +
-                "before anything is written. `reason` is required, at least ten characters, only when " +
-                "a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.")
+                "Whole set as one array, atomic (spec 6.2.13). A scale's or point's `id`, when " +
+                "supplied, must match an existing row — that is how a rename/reorder is told apart " +
+                "from an add or a remove, matching `PUT /settings/assessment`'s own convention, and " +
+                "matters because stage 2/3 rating blocks reference a scale BY that id. An existing " +
+                "scale whose id is absent from the submitted array is removed, rejected " +
+                "`409 settings.ratingscales.in_use` when a rating block still references it; an id " +
+                "that matches no current row is rejected `422 settings.ratingscales.unknown_scale_id` " +
+                "/ `settings.ratingscales.unknown_point_id`. All other save-time rules run over the " +
+                "whole submitted set as one unit; on the first failure nothing is written and the " +
+                "response's `scaleIndex`/`pointIndex` extensions name the offending position in the " +
+                "submitted array. `expectedVersion` must match the rating-scales group's current " +
+                "`versionNumber` (from `GET /settings`) or the save is rejected `409` before anything " +
+                "is written. `reason` is required, at least ten characters, only when a result set is " +
+                "Published in the active session (spec 6.2.9); otherwise it is ignored.")
             .Produces<SettingsRatingScaleGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

@@ -18,13 +18,16 @@ namespace SchoolManagement.Application.Settings;
 /// <see cref="SchoolProfile.RatingScalesVersionNumber"/> BEFORE anything is validated or written.
 /// </para>
 /// <para>
-/// A SCALE IS "REMOVED" BY NAME, NOT BY ID: no id travels with a submitted scale, matching
-/// <c>GradingBand</c>'s own blind-replace convention (see its remarks). An existing scale whose name
-/// is absent from the submitted set is therefore the one checked against
+/// IDS ARE STABLE ACROSS A SAVE (TASK-0072 stage 1 review fix — this handler originally matched a
+/// removal by NAME and minted a fresh id for every scale/point on every save, which is fine for
+/// <c>GradingBand</c>, nothing references, but wrong here: stage 2/3 rating blocks reference a scale
+/// BY ID, and a rescale save must never silently change it out from under them). A submitted scale or
+/// point carrying an <c>id</c> is updated in place, id preserved; one with no <c>id</c> is new. An
+/// EXISTING scale whose id is absent from the whole submitted set is the one checked against
 /// <see cref="IRatingScaleUsageGate"/> before anything is written — <c>409
-/// settings.ratingscales.in_use</c> when it is still referenced. Renaming a scale and removing it are
-/// indistinguishable on the wire, exactly as a renamed grade letter and a removed one are; this is an
-/// accepted consequence of the whole-array-replace shape, not a gap this card introduces.
+/// settings.ratingscales.in_use</c> when it is still referenced. A submitted id that matches no
+/// current row is rejected <c>422 settings.ratingscales.unknown_scale_id</c> /
+/// <c>settings.ratingscales.unknown_point_id</c>, naming the offending position.
 /// </para>
 /// <para>
 /// THE SNAPSHOT CARRIES EVERY GROUP, NOT ONLY THE ONE THAT CHANGED (spec 6.2.9) — this handler reads
@@ -52,6 +55,12 @@ internal sealed class UpdateRatingScalesCommandHandler(
 
     /// <summary>Stable error code for removing a scale a rating block still references.</summary>
     public const string InUseErrorCode = "settings.ratingscales.in_use";
+
+    /// <summary>Stable error code for a submitted scale id that matches no current scale.</summary>
+    public const string UnknownScaleIdErrorCode = "settings.ratingscales.unknown_scale_id";
+
+    /// <summary>Stable error code for a submitted point id that matches no current point of its owning scale.</summary>
+    public const string UnknownPointIdErrorCode = "settings.ratingscales.unknown_point_id";
 
     private const string SchoolProfileEntityType = "school_profile";
 
@@ -104,13 +113,47 @@ internal sealed class UpdateRatingScalesCommandHandler(
         }
 
         var existingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var submittedNames = request.Scales
-            .Select(scale => scale.Name.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingScalesById = existingScales.ToDictionary(scale => scale.Id);
+        var submittedScaleIds = request.Scales
+            .Where(scale => scale.Id is not null)
+            .Select(scale => scale.Id!.Value)
+            .ToHashSet();
 
+        // A submitted scale id that matches no current scale — 422, names the offending position.
+        for (var scaleIndex = 0; scaleIndex < request.Scales.Count; scaleIndex++)
+        {
+            var scaleInput = request.Scales[scaleIndex];
+            if (scaleInput.Id is Guid submittedScaleId && !existingScalesById.ContainsKey(submittedScaleId))
+            {
+                return Result.Failure<SettingsRatingScaleGroupDto>(new RatingScaleValidationError(
+                    UnknownScaleIdErrorCode,
+                    $"Scale {scaleInput.Name} has an id that does not match any existing scale. Reload and try again.",
+                    scaleIndex,
+                    null));
+            }
+
+            var existingPointIds = scaleInput.Id is Guid ownerId && existingScalesById.TryGetValue(ownerId, out var ownerScale)
+                ? ownerScale.Points.Select(point => point.Id).ToHashSet()
+                : [];
+
+            for (var pointIndex = 0; pointIndex < scaleInput.Points.Count; pointIndex++)
+            {
+                var pointInput = scaleInput.Points[pointIndex];
+                if (pointInput.Id is Guid submittedPointId && !existingPointIds.Contains(submittedPointId))
+                {
+                    return Result.Failure<SettingsRatingScaleGroupDto>(new RatingScaleValidationError(
+                        UnknownPointIdErrorCode,
+                        $"Point {pointInput.PointCode} has an id that does not match any existing point of scale {scaleInput.Name}. Reload and try again.",
+                        scaleIndex,
+                        pointIndex));
+                }
+            }
+        }
+
+        // An EXISTING scale whose id is absent from the whole submitted set is being removed.
         foreach (var existingScale in existingScales)
         {
-            if (submittedNames.Contains(existingScale.Name))
+            if (submittedScaleIds.Contains(existingScale.Id))
             {
                 continue;
             }
@@ -137,10 +180,10 @@ internal sealed class UpdateRatingScalesCommandHandler(
         var scales = request.Scales
             .Select(scaleInput =>
             {
-                var scaleId = Guid.CreateVersion7();
+                var scaleId = scaleInput.Id ?? Guid.CreateVersion7();
                 var points = scaleInput.Points
                     .Select(pointInput => RatingScalePoint.Create(
-                        Guid.CreateVersion7(),
+                        pointInput.Id ?? Guid.CreateVersion7(),
                         scaleId,
                         pointInput.PointCode,
                         pointInput.PointLabel,

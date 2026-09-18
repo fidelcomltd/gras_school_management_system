@@ -59,4 +59,17 @@ public sealed class RatingScalePoint : Entity<Guid>
     /// </summary>
     public static RatingScalePoint Create(Guid id, Guid ratingScaleId, string pointCode, string pointLabel, int pointOrder) =>
         new(id, ratingScaleId, pointCode.Trim(), pointLabel.Trim(), pointOrder);
+
+    /// <summary>
+    /// Updates an EXISTING, tracked point in place (TASK-0072 stage 1 review fix). Used only by
+    /// <c>RatingScaleRepository.ReplaceAllAsync</c> against a row already loaded from the database,
+    /// whose id a submitted point echoed back. Never changes the id or
+    /// <see cref="RatingScaleId"/> — a point does not move between scales this way.
+    /// </summary>
+    public void Update(string pointCode, string pointLabel, int pointOrder)
+    {
+        PointCode = pointCode.Trim();
+        PointLabel = pointLabel.Trim();
+        PointOrder = pointOrder;
+    }
 }

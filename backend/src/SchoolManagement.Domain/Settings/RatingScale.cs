@@ -58,4 +58,12 @@ public sealed class RatingScale : Entity<Guid>
     /// </summary>
     public static RatingScale Create(Guid id, string name, IReadOnlyList<RatingScalePoint> points) =>
         new(id, name.Trim(), points);
+
+    /// <summary>
+    /// Renames an EXISTING, tracked scale in place (TASK-0072 stage 1 review fix). Used only by
+    /// <c>RatingScaleRepository.ReplaceAllAsync</c> against a row already loaded from the database,
+    /// whose id a submitted scale echoed back — a rename must never change the id, because stage 2/3
+    /// rating blocks reference a scale BY that id.
+    /// </summary>
+    public void Rename(string name) => Name = name.Trim();
 }

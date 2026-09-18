@@ -13,8 +13,10 @@ namespace SchoolManagement.UnitTests.Application.Settings;
 
 /// <summary>
 /// Tests <see cref="UpdateRatingScalesCommandHandler"/>: optimistic concurrency, the whole-set
-/// validation gate, the 6.2.9 conditional reason requirement, the name-matched in-use refusal, and
-/// that a winning save replaces every scale and bumps <see cref="SchoolProfile.RatingScalesVersionNumber"/>.
+/// validation gate, the 6.2.9 conditional reason requirement, the id-matched in-use refusal (stage 1
+/// review fix — matching moved from scale NAME to scale ID, since stage 2/3 rating blocks reference a
+/// scale by id and a save must never silently mint it a new one), and that a winning save replaces
+/// every scale and bumps <see cref="SchoolProfile.RatingScalesVersionNumber"/>.
 /// </summary>
 public sealed class UpdateRatingScalesCommandHandlerTests
 {
@@ -208,5 +210,158 @@ public sealed class UpdateRatingScalesCommandHandlerTests
         await _configVersionRepository.Received(1).AddAsync(
             Arg.Is<ConfigVersion>(version => version != null && version.Reason == "The school added a custom scale."),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ResavingWithoutChanges_KeepsEveryScaleAndPointId()
+    {
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var pointId = Guid.CreateVersion7();
+        var secondPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [
+                RatingScalePoint.Create(pointId, scaleId, "N", "Needs Improvement", 1),
+                RatingScalePoint.Create(secondPointId, scaleId, "E", "Excellent", 2),
+            ]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+
+        var resubmitted = new RatingScaleInput(
+            "Custom",
+            [
+                new RatingScalePointInput("N", "Needs Improvement", 1, Id: pointId),
+                new RatingScalePointInput("E", "Excellent", 2, Id: secondPointId),
+            ],
+            Id: existingScale.Id);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([resubmitted], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Scales[0].Id.ShouldBe(existingScale.Id.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+        result.Value.Scales[0].Points[0].Id.ShouldBe(pointId.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+
+        // The usage gate must never be asked about a scale that is still present (by id) in the
+        // submitted set — it is not being removed, merely resaved unchanged.
+        await _ratingScaleUsageGate.DidNotReceive().IsInUseAsync(existingScale.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_RenamingAnExistingScaleById_KeepsItsIdAndNeverConsultsTheUsageGate()
+    {
+        CreateTrackedProfile();
+
+        var existingScale = RatingScale.Create(
+            Guid.CreateVersion7(),
+            "Old name",
+            [RatingScalePoint.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), "N", "Needs Improvement", 1),
+             RatingScalePoint.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), "E", "Excellent", 2)]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+
+        var renamed = new RatingScaleInput(
+            "New name",
+            existingScale.Points.Select(point => new RatingScalePointInput(point.PointCode, point.PointLabel, point.PointOrder, Id: point.Id)).ToList(),
+            Id: existingScale.Id);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([renamed], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Scales[0].Id.ShouldBe(existingScale.Id.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+        result.Value.Scales[0].Name.ShouldBe("New name");
+        await _ratingScaleUsageGate.DidNotReceive().IsInUseAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ANewScaleSharingAnExistingScalesName_StillTreatsTheExistingOneAsRemovedById()
+    {
+        // The load-bearing regression this stage-1 fix closes: matching used to go by NAME, so a
+        // same-named replacement read as an update. It must now read as remove-old/add-new by id.
+        CreateTrackedProfile();
+
+        var existingScale = RatingScale.Create(
+            Guid.CreateVersion7(),
+            "Custom",
+            [RatingScalePoint.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), "N", "Needs Improvement", 1),
+             RatingScalePoint.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), "E", "Excellent", 2)]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+        _ratingScaleUsageGate.IsInUseAsync(existingScale.Id, Arg.Any<CancellationToken>()).Returns(false);
+
+        // Same name, no id — a genuinely new scale on the wire, not a rename.
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand(ValidScales, ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Scales[0].Id.ShouldNotBe(existingScale.Id.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+        await _ratingScaleUsageGate.Received(1).IsInUseAsync(existingScale.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithAnUnknownScaleId_Returns422NamingTheScaleIndex()
+    {
+        CreateTrackedProfile();
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
+
+        var unknownId = Guid.CreateVersion7();
+        var command = new UpdateRatingScalesCommand(
+            [
+                new RatingScaleInput(
+                    "Custom",
+                    [new RatingScalePointInput("N", "Needs Improvement", 1), new RatingScalePointInput("E", "Excellent", 2)],
+                    Id: unknownId),
+            ],
+            ExpectedVersion: 0,
+            Reason: null);
+
+        var result = await CreateHandler().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateRatingScalesCommandHandler.UnknownScaleIdErrorCode);
+        var error = result.Error.ShouldBeOfType<RatingScaleValidationError>();
+        error.ScaleIndex.ShouldBe(0);
+        await _ratingScaleRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<RatingScale>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithAnUnknownPointIdOnAnExistingScale_Returns422NamingScaleAndPointIndex()
+    {
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var knownPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [RatingScalePoint.Create(knownPointId, scaleId, "N", "Needs Improvement", 1)]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+
+        var unknownPointId = Guid.CreateVersion7();
+        var command = new UpdateRatingScalesCommand(
+            [
+                new RatingScaleInput(
+                    "Custom",
+                    [
+                        new RatingScalePointInput("N", "Needs Improvement", 1, Id: knownPointId),
+                        new RatingScalePointInput("E", "Excellent", 2, Id: unknownPointId),
+                    ],
+                    Id: existingScale.Id),
+            ],
+            ExpectedVersion: 0,
+            Reason: null);
+
+        var result = await CreateHandler().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateRatingScalesCommandHandler.UnknownPointIdErrorCode);
+        var error = result.Error.ShouldBeOfType<RatingScaleValidationError>();
+        error.ScaleIndex.ShouldBe(0);
+        error.PointIndex.ShouldBe(1);
+        await _ratingScaleRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<RatingScale>>(), Arg.Any<CancellationToken>());
     }
 }
