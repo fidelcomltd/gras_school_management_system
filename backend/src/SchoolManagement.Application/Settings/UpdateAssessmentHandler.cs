@@ -49,6 +49,7 @@ internal sealed class UpdateAssessmentCommandHandler(
     IPublishedResultsGate publishedResultsGate,
     ISubjectScoreSessionLockLookup subjectScoreSessionLockLookup,
     IResultRulesRepository resultRulesRepository,
+    IRatingScaleRepository ratingScaleRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -222,10 +223,11 @@ internal sealed class UpdateAssessmentCommandHandler(
 
         var currentBands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
+        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, currentBands, savedComponents, resultRules),
+            SettingsSnapshotBuilder.Build(profile, currentBands, savedComponents, resultRules, ratingScales),
             ConfigVersionGroup.Assessment,
             currentUser.UserId,
             reason: reasonCheck.Value,

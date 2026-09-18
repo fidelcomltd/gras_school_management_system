@@ -30,6 +30,7 @@ public sealed class UpdateResultRulesCommandHandlerTests
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly ISubjectRepository _subjectRepository = Substitute.For<ISubjectRepository>();
+    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -38,6 +39,7 @@ public sealed class UpdateResultRulesCommandHandlerTests
     {
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
         CreateTrackedProfile();
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
     }
@@ -51,6 +53,7 @@ public sealed class UpdateResultRulesCommandHandlerTests
         _academicSessionRepository,
         _publishedResultsGate,
         _subjectRepository,
+        _ratingScaleRepository,
         _currentUser,
         _auditSink,
         _timeProvider);

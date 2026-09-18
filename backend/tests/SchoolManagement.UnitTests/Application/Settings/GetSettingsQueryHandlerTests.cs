@@ -15,6 +15,8 @@ public sealed class GetSettingsQueryHandlerTests
     private readonly IAssessmentComponentRepository _assessmentComponentRepository =
         Substitute.For<IAssessmentComponentRepository>();
 
+    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
+
     // Defaults set in the CONSTRUCTOR (runs once before each test method, per xUnit's per-test
     // instance model) so a test's own .Returns() setup — configured inside the test method body,
     // necessarily AFTER construction — always wins. Setting these same defaults inside CreateHandler()
@@ -25,10 +27,11 @@ public sealed class GetSettingsQueryHandlerTests
     {
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
     }
 
     private GetSettingsQueryHandler CreateHandler() =>
-        new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository);
+        new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository, _ratingScaleRepository);
 
     [Fact]
     public async Task HandleAsync_ReturnsTheIdentityGroupMappedFromTheProfile()

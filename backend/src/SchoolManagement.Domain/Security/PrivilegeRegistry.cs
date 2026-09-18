@@ -66,6 +66,8 @@ public static class PrivilegeRegistry
             Permits: "Edit default pin length, default maximum uses and the character set."),
         new(Privileges.Settings.ResetDefaults, Scopable: false, Module: PrivilegeModule.Settings,
             Permits: "Restore the grading scale, assessment structure or trait lists to seeded values."),
+        new(Privileges.Settings.RatingScalesUpdate, Scopable: false, Module: PrivilegeModule.Settings,
+            Permits: "Add, rename, remove and reorder rating scales and their points."),
 
         // 4.4.3 Academic structure
         new(Privileges.Session.View, Scopable: false, Module: PrivilegeModule.AcademicStructure,

@@ -46,6 +46,7 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapUpdateAssessment(settingsGroup);
         MapGetResultRules(settingsGroup);
         MapUpdateResultRules(settingsGroup);
+        MapUpdateRatingScales(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -313,6 +314,38 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "refused. `reason` is required, at least ten characters, only when a result set is " +
                 "Published in the active session (spec 6.2.9); otherwise it is ignored.")
             .Produces<ResultRulesDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateRatingScales(RouteGroupBuilder group) =>
+        group.MapPut("/rating-scales", async (
+                UpdateRatingScalesCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.RatingScalesUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateRatingScales")
+            .WithSummary("Replace the rating scales")
+            .WithDescription(
+                "Whole set as one array, atomic (spec 6.2.13) — a scale omitted from the array is " +
+                "removed, which is rejected `409 settings.ratingscales.in_use` when a rating block " +
+                "still references it (matched by name, since no id travels with a submitted scale — " +
+                "the same blind-replace convention as `PUT /settings/grading`). All save-time rules " +
+                "run over the whole submitted set as one unit; on the first failure nothing is " +
+                "written and the response's `scaleIndex`/`pointIndex` extensions name the offending " +
+                "position in the submitted array. `expectedVersion` must match the rating-scales " +
+                "group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` " +
+                "before anything is written. `reason` is required, at least ten characters, only when " +
+                "a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsRatingScaleGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

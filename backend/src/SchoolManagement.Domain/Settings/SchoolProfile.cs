@@ -114,7 +114,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int regNumberVersionNumber,
         int gradingVersionNumber,
         int assessmentVersionNumber,
-        int resultRulesVersionNumber)
+        int resultRulesVersionNumber,
+        int ratingScalesVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -135,6 +136,7 @@ public sealed class SchoolProfile : Entity<Guid>
         GradingVersionNumber = gradingVersionNumber;
         AssessmentVersionNumber = assessmentVersionNumber;
         ResultRulesVersionNumber = resultRulesVersionNumber;
+        RatingScalesVersionNumber = ratingScalesVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -217,6 +219,13 @@ public sealed class SchoolProfile : Entity<Guid>
     /// <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
     /// </summary>
     public int ResultRulesVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The rating-scales group's own, independent optimistic-concurrency pointer (TASK-0072 stage 1).
+    /// The scales themselves live in the separate <see cref="RatingScale"/>/<see cref="RatingScalePoint"/>
+    /// tables — see <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
+    /// </summary>
+    public int RatingScalesVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -305,6 +314,12 @@ public sealed class SchoolProfile : Entity<Guid>
     public void IncrementResultRulesVersion() => ResultRulesVersionNumber++;
 
     /// <summary>
+    /// Bumps <see cref="RatingScalesVersionNumber"/> for a successful <c>PUT /settings/rating-scales</c>
+    /// save (TASK-0072 stage 1). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementRatingScalesVersion() => RatingScalesVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -330,7 +345,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int regNumberVersionNumber = 0,
         int gradingVersionNumber = 0,
         int assessmentVersionNumber = 0,
-        int resultRulesVersionNumber = 0) =>
+        int resultRulesVersionNumber = 0,
+        int ratingScalesVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -350,5 +366,6 @@ public sealed class SchoolProfile : Entity<Guid>
             regNumberVersionNumber,
             gradingVersionNumber,
             assessmentVersionNumber,
-            resultRulesVersionNumber);
+            resultRulesVersionNumber,
+            ratingScalesVersionNumber);
 }

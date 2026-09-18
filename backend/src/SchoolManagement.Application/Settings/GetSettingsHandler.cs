@@ -9,7 +9,8 @@ internal sealed class GetSettingsQueryHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IPupilRepository pupils,
     IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository)
+    IAssessmentComponentRepository assessmentComponentRepository,
+    IRatingScaleRepository ratingScaleRepository)
     : IRequestHandler<GetSettingsQuery, Result<SettingsDto>>
 {
     /// <inheritdoc />
@@ -29,12 +30,14 @@ internal sealed class GetSettingsQueryHandler(
 
         var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
 
         return Result.Success(new SettingsDto(
             SettingsMapper.ToIdentityDto(profile),
             SettingsMapper.ToAbbreviationDto(profile, issuedCount),
             SettingsMapper.ToRegNumberDto(profile),
             SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber),
-            SettingsMapper.ToAssessmentDto(components, profile.AssessmentVersionNumber)));
+            SettingsMapper.ToAssessmentDto(components, profile.AssessmentVersionNumber),
+            SettingsMapper.ToRatingScalesDto(ratingScales, profile.RatingScalesVersionNumber)));
     }
 }

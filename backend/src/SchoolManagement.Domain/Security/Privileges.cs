@@ -120,6 +120,13 @@ public static class Privileges
 
         /// <summary>Restore the grading scale, assessment structure or trait lists to seeded values.</summary>
         public const string ResetDefaults = "settings.reset.defaults";
+
+        /// <summary>
+        /// Add, rename, remove and reorder rating scales and their points (spec 6.2.13; TASK-0072
+        /// stage 1). Separate from <see cref="TraitsUpdate"/> because scales are now shared records
+        /// referenced by any rating block, not owned by the trait screen alone.
+        /// </summary>
+        public const string RatingScalesUpdate = "settings.ratingscales.update";
     }
 
     /// <summary>Academic sessions and terms (spec 4.4.3). None are scopable.</summary>

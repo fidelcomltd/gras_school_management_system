@@ -14,6 +14,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -27,6 +28,7 @@ using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
 using SchoolManagement.Infrastructure.Results;
 using SchoolManagement.Infrastructure.Secrets;
+using SchoolManagement.Infrastructure.Settings;
 
 namespace SchoolManagement.Infrastructure;
 
@@ -185,6 +187,11 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0077: result rules.
         services.AddScoped<IResultRulesRepository, ResultRulesRepository>();
+
+        // TASK-0072 stage 1: rating scales. IRatingScaleUsageGate honestly reports "not in use"
+        // unconditionally until stage 2/3 give it something to query — see its own remarks.
+        services.AddScoped<IRatingScaleRepository, RatingScaleRepository>();
+        services.AddScoped<IRatingScaleUsageGate, RatingScaleUsageGate>();
 
         // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
         // honestly-empty TASK-0069 stand-ins now that the tables exist.

@@ -29,4 +29,7 @@ public enum ConfigVersionGroup
 
     /// <summary>A save through <c>PUT /settings/result-rules</c> (TASK-0077).</summary>
     ResultRules = 5,
+
+    /// <summary>A save through <c>PUT /settings/rating-scales</c> (TASK-0072 stage 1).</summary>
+    RatingScales = 6,
 }

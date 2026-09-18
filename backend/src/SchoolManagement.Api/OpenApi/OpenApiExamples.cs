@@ -195,6 +195,21 @@ internal static class OpenApiExamples
                 ],
                 "versionNumber": 0
               },
+              "ratingScales": {
+                "scales": [
+                  {
+                    "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                    "name": "Nursery development",
+                    "points": [
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701", "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702", "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703", "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                    ]
+                  }
+                ],
+                "versionNumber": 0
+              },
               "assessment": {
                 "components": [
                   { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false, "displayOrder": 1 },
@@ -264,6 +279,84 @@ internal static class OpenApiExamples
         [typeof(ResetGradingCommand)] = """
             {
               "expectedVersion": 3,
+              "reason": null
+            }
+            """,
+
+        [typeof(RatingScalePointDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+              "pointCode": "E",
+              "pointLabel": "Excellent",
+              "pointOrder": 4
+            }
+            """,
+
+        [typeof(RatingScaleDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+              "name": "Nursery development",
+              "points": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701", "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702", "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703", "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+              ]
+            }
+            """,
+
+        [typeof(SettingsRatingScaleGroupDto)] = """
+            {
+              "scales": [
+                {
+                  "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                  "name": "Nursery development",
+                  "points": [
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701", "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702", "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703", "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                  ]
+                }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(RatingScalePointInput)] = """
+            {
+              "pointCode": "E",
+              "pointLabel": "Excellent",
+              "pointOrder": 4
+            }
+            """,
+
+        [typeof(RatingScaleInput)] = """
+            {
+              "name": "Nursery development",
+              "points": [
+                { "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                { "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                { "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                { "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+              ]
+            }
+            """,
+
+        [typeof(UpdateRatingScalesCommand)] = """
+            {
+              "scales": [
+                {
+                  "name": "Nursery development",
+                  "points": [
+                    { "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                    { "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                    { "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                    { "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                  ]
+                }
+              ],
+              "expectedVersion": 0,
               "reason": null
             }
             """,

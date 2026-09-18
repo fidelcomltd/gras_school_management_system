@@ -28,6 +28,7 @@ public sealed class UpdateAssessmentCommandHandlerTests
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly ISubjectScoreSessionLockLookup _subjectScoreSessionLockLookup = Substitute.For<ISubjectScoreSessionLockLookup>();
     private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
+    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -50,6 +51,7 @@ public sealed class UpdateAssessmentCommandHandlerTests
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
     }
 
     private UpdateAssessmentCommandHandler CreateHandler()
@@ -63,6 +65,7 @@ public sealed class UpdateAssessmentCommandHandlerTests
             _publishedResultsGate,
             _subjectScoreSessionLockLookup,
             _resultRulesRepository,
+            _ratingScaleRepository,
             _currentUser,
             _auditSink,
             _timeProvider);

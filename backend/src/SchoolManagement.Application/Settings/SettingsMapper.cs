@@ -88,6 +88,29 @@ internal static class SettingsMapper
         return new SettingsAssessmentGroupDto(dtos, versionNumber);
     }
 
+    /// <summary>Maps <paramref name="scales"/> (already carrying their own points) to the wire DTO.</summary>
+    public static SettingsRatingScaleGroupDto ToRatingScalesDto(IReadOnlyList<RatingScale> scales, int versionNumber)
+    {
+        ArgumentNullException.ThrowIfNull(scales);
+
+        var dtos = scales
+            .OrderBy(scale => scale.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(scale => new RatingScaleDto(
+                scale.Id.ToString("D", CultureInfo.InvariantCulture),
+                scale.Name,
+                scale.Points
+                    .OrderBy(point => point.PointOrder)
+                    .Select(point => new RatingScalePointDto(
+                        point.Id.ToString("D", CultureInfo.InvariantCulture),
+                        point.PointCode,
+                        point.PointLabel,
+                        point.PointOrder))
+                    .ToList()))
+            .ToList();
+
+        return new SettingsRatingScaleGroupDto(dtos, versionNumber);
+    }
+
     /// <summary>Maps <paramref name="resultRules"/> to the wire DTO. <paramref name="versionNumber"/> comes from the caller's <see cref="SchoolProfile.ResultRulesVersionNumber"/> read, matching <see cref="ToGradingDto"/>'s and <see cref="ToAssessmentDto"/>'s own pattern.</summary>
     public static ResultRulesDto ToResultRulesDto(ResultRules resultRules, int versionNumber)
     {

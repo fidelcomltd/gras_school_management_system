@@ -93,6 +93,14 @@ internal static class ResultExtensions
             extensions["bandIndex"] = gradingBandError.BandIndex;
         }
 
+        // Same reasoning as GradingBandValidationError above, extended to a second dimension: which
+        // scale, and — where the failure is about one point — which point within it (spec 6.2.13).
+        if (error is RatingScaleValidationError ratingScaleError)
+        {
+            extensions["scaleIndex"] = ratingScaleError.ScaleIndex;
+            extensions["pointIndex"] = ratingScaleError.PointIndex;
+        }
+
         return TypedResults.Problem(
             detail: error.Description,
             statusCode: statusCode,

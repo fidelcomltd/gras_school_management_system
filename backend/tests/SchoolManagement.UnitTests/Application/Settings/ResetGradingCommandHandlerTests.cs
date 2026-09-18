@@ -28,6 +28,7 @@ public sealed class ResetGradingCommandHandlerTests
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
+    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -39,6 +40,7 @@ public sealed class ResetGradingCommandHandlerTests
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
     }
 
     private ResetGradingCommandHandler CreateHandler()
@@ -51,6 +53,7 @@ public sealed class ResetGradingCommandHandlerTests
             _academicSessionRepository,
             _publishedResultsGate,
             _resultRulesRepository,
+            _ratingScaleRepository,
             _currentUser,
             _auditSink,
             _timeProvider);

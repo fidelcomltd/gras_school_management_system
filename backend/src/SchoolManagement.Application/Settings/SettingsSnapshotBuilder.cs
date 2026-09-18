@@ -23,19 +23,22 @@ internal static class SettingsSnapshotBuilder
 
     /// <summary>
     /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>,
-    /// <paramref name="components"/> and <paramref name="resultRules"/> into a snapshot document — the
-    /// WHOLE configuration as of this save, regardless of which group actually changed.
+    /// <paramref name="components"/>, <paramref name="resultRules"/> and <paramref name="ratingScales"/>
+    /// into a snapshot document — the WHOLE configuration as of this save, regardless of which group
+    /// actually changed.
     /// </summary>
     public static string Build(
         SchoolProfile profile,
         IReadOnlyList<GradingBand> bands,
         IReadOnlyList<AssessmentComponent> components,
-        ResultRules resultRules)
+        ResultRules resultRules,
+        IReadOnlyList<RatingScale> ratingScales)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(bands);
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(resultRules);
+        ArgumentNullException.ThrowIfNull(ratingScales);
 
         var snapshot = new SettingsSnapshot(
             new SchoolProfileSnapshot(
@@ -87,7 +90,17 @@ internal static class SettingsSnapshotBuilder
                 resultRules.RequireCorePass,
                 resultRules.CoreSubjectIds,
                 resultRules.MinSubjectsForPosition),
-            profile.ResultRulesVersionNumber);
+            profile.ResultRulesVersionNumber,
+            ratingScales
+                .OrderBy(scale => scale.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(scale => new RatingScaleSnapshot(
+                    scale.Name,
+                    scale.Points
+                        .OrderBy(point => point.PointOrder)
+                        .Select(point => new RatingScalePointSnapshot(point.PointCode, point.PointLabel, point.PointOrder))
+                        .ToList()))
+                .ToList(),
+            profile.RatingScalesVersionNumber);
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
@@ -99,7 +112,9 @@ internal static class SettingsSnapshotBuilder
         IReadOnlyList<AssessmentComponentSnapshot> AssessmentComponents,
         int AssessmentVersionNumber,
         ResultRulesSnapshot ResultRules,
-        int ResultRulesVersionNumber);
+        int ResultRulesVersionNumber,
+        IReadOnlyList<RatingScaleSnapshot> RatingScales,
+        int RatingScalesVersionNumber);
 
     private sealed record SchoolProfileSnapshot(
         string SchoolName,
@@ -145,4 +160,8 @@ internal static class SettingsSnapshotBuilder
         bool RequireCorePass,
         IReadOnlyList<Guid> CoreSubjectIds,
         int MinSubjectsForPosition);
+
+    private sealed record RatingScaleSnapshot(string Name, IReadOnlyList<RatingScalePointSnapshot> Points);
+
+    private sealed record RatingScalePointSnapshot(string PointCode, string PointLabel, int PointOrder);
 }

@@ -250,6 +250,11 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // row, not an empty table.
         await ReseedResultRulesAsync(context, cancellationToken);
 
+        // TASK-0072 stage 1: same reasoning, for spec 6.2.13's three seeded rating scales and their
+        // points — SettingsRatingScalesEndpointsTests' fresh-database assertions need the REAL
+        // migration-seeded rows, not an empty table.
+        await ReseedRatingScalesAsync(context, cancellationToken);
+
         // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
         // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
         // shipped two seeds without this and its fresh-database criterion failed in review; this card
@@ -430,6 +435,52 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                      {subject.Version})
                 """,
                 cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13's three seeded rating scales and their points, using the SAME fixed ids
+    /// <see cref="RatingScaleConfiguration.SeededIds"/>/<see cref="RatingScalePointConfiguration.AllSeededIds"/>
+    /// the migration itself seeds with — see <see cref="ReseedGradingBandsAsync"/>'s remarks for why.
+    /// Scales are inserted before points, matching the migration's own order (a point's FK must find
+    /// its scale already present).
+    /// </summary>
+    private static async Task ReseedRatingScalesAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var scaleIds = RatingScaleConfiguration.SeededIds;
+
+        for (var scaleIndex = 0; scaleIndex < RatingScaleSeed.SeededScales.Count; scaleIndex++)
+        {
+            var scale = RatingScaleSeed.SeededScales[scaleIndex];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO rating_scale (id, name)
+                VALUES
+                    ({scaleIds[scaleIndex]}, {scale.Name})
+                """,
+                cancellationToken);
+        }
+
+        var pointIds = RatingScalePointConfiguration.AllSeededIds;
+        var pointIndex = 0;
+
+        for (var scaleIndex = 0; scaleIndex < RatingScaleSeed.SeededScales.Count; scaleIndex++)
+        {
+            var scale = RatingScaleSeed.SeededScales[scaleIndex];
+            var scaleId = scaleIds[scaleIndex];
+
+            foreach (var point in scale.Points)
+            {
+                await context.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO rating_scale_point (id, rating_scale_id, point_code, point_label, point_order)
+                    VALUES
+                        ({pointIds[pointIndex]}, {scaleId}, {point.PointCode}, {point.PointLabel}, {point.PointOrder})
+                    """,
+                    cancellationToken);
+                pointIndex++;
+            }
         }
     }
 
