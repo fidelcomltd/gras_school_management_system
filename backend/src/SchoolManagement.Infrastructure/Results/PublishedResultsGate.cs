@@ -12,6 +12,9 @@ namespace SchoolManagement.Infrastructure.Results;
 /// </summary>
 internal sealed class PublishedResultsGate(ApplicationDbContext context) : IPublishedResultsGate
 {
+    /// <summary>Term.Ordinal for the third term of a session (spec 6.3.4).</summary>
+    private const int ThirdTermOrdinal = 3;
+
     /// <inheritdoc />
     public Task<int> CountPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
         (from resultSet in context.ResultSets.AsNoTracking()
@@ -19,4 +22,12 @@ internal sealed class PublishedResultsGate(ApplicationDbContext context) : IPubl
          where term.SessionId == sessionId && resultSet.State == ResultSetState.Published
          select resultSet.Id)
         .CountAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> AnyThirdTermPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        (from resultSet in context.ResultSets.AsNoTracking()
+         join term in context.Terms.AsNoTracking() on resultSet.TermId equals term.Id
+         where term.SessionId == sessionId && term.Ordinal == ThirdTermOrdinal && resultSet.State == ResultSetState.Published
+         select resultSet.Id)
+        .AnyAsync(cancellationToken);
 }

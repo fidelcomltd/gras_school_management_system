@@ -312,6 +312,43 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(ResultRulesDto)] = """
+            {
+              "annualMethod": "SimpleAverage",
+              "weightFirst": null,
+              "weightSecond": null,
+              "weightThird": null,
+              "primaryPositionScope": "Arm",
+              "showLevelPosition": true,
+              "tieBreakRule": "SharedPosition",
+              "passMark": 40,
+              "promotionThreshold": 40,
+              "requireCorePass": true,
+              "coreSubjectIds": [],
+              "minSubjectsForPosition": 1,
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateResultRulesCommand)] = """
+            {
+              "annualMethod": "SimpleAverage",
+              "weightFirst": null,
+              "weightSecond": null,
+              "weightThird": null,
+              "primaryPositionScope": "Arm",
+              "showLevelPosition": true,
+              "tieBreakRule": "SharedPosition",
+              "passMark": 40,
+              "promotionThreshold": 40,
+              "requireCorePass": true,
+              "coreSubjectIds": [],
+              "minSubjectsForPosition": 1,
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
         [typeof(SettingsAbbreviationGroupDto)] = """
             {
               "abbreviation": "GRAS",

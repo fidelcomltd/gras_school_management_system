@@ -74,6 +74,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0069. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<AssessmentComponent> AssessmentComponents => Set<AssessmentComponent>();
 
+    /// <summary>TASK-0077. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<ResultRules> ResultRules => Set<ResultRules>();
+
     /// <summary>TASK-0028 dispatch 2. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Role> Roles => Set<Role>();
 

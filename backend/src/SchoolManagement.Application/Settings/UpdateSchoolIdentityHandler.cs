@@ -30,6 +30,7 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
     IConfigVersionRepository configVersionRepository,
     IGradingBandRepository gradingBandRepository,
     IAssessmentComponentRepository assessmentComponentRepository,
+    IResultRulesRepository resultRulesRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -90,10 +91,11 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
         // 6.2.9) — read the grading/assessment groups' CURRENT state purely to hand them through.
         var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, components),
+            SettingsSnapshotBuilder.Build(profile, bands, components, resultRules),
             ConfigVersionGroup.Identity,
             currentUser.UserId,
             reason: null,

@@ -183,6 +183,9 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IGradingBandRepository, GradingBandRepository>();
         services.AddScoped<IAssessmentComponentRepository, AssessmentComponentRepository>();
 
+        // TASK-0077: result rules.
+        services.AddScoped<IResultRulesRepository, ResultRulesRepository>();
+
         // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
         // honestly-empty TASK-0069 stand-ins now that the tables exist.
         services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();

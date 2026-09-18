@@ -26,4 +26,7 @@ public enum ConfigVersionGroup
 
     /// <summary>A save through <c>PUT /settings/assessment</c> (TASK-0069).</summary>
     Assessment = 4,
+
+    /// <summary>A save through <c>PUT /settings/result-rules</c> (TASK-0077).</summary>
+    ResultRules = 5,
 }

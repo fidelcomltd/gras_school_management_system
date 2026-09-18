@@ -26,4 +26,13 @@ public interface IPublishedResultsGate
     /// <param name="sessionId">The academic session to check.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<int> CountPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether any <c>result_set</c> for the THIRD term (<c>Term.Ordinal == 3</c>) of the session
+    /// identified by <paramref name="sessionId"/> is <c>Published</c>, for any arm — spec 6.2.8/6.2.10:
+    /// "annual_method and its weights are locked once Third Term is published for any arm." TASK-0077.
+    /// </summary>
+    /// <param name="sessionId">The academic session to check.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<bool> AnyThirdTermPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
 }

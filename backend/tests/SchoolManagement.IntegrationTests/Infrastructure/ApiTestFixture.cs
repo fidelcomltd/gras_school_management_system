@@ -245,6 +245,11 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         await ReseedGradingBandsAsync(context, cancellationToken);
         await ReseedAssessmentComponentsAsync(context, cancellationToken);
 
+        // TASK-0077: same reasoning, for spec 6.2.8's seeded result-rules singleton row —
+        // SettingsResultRulesEndpointsTests' fresh-database assertions need the REAL migration-seeded
+        // row, not an empty table.
+        await ReseedResultRulesAsync(context, cancellationToken);
+
         // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
         // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
         // shipped two seeds without this and its fresh-database criterion failed in review; this card
@@ -381,6 +386,27 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Reinserts spec 6.2.8's seeded result-rules singleton row, matching
+    /// <see cref="ResultRulesConfiguration"/>'s <c>HasData</c> exactly (empty <c>core_subject_ids</c> —
+    /// see <see cref="ResultRules"/>'s own remarks for why that is never guessed).
+    /// </summary>
+    private static Task<int> ReseedResultRulesAsync(ApplicationDbContext context, CancellationToken cancellationToken) =>
+        context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO result_rules
+                (id, annual_method, weight_first, weight_second, weight_third, primary_position_scope,
+                 show_level_position, tie_break_rule, pass_mark, promotion_threshold, require_core_pass,
+                 core_subject_ids, min_subjects_for_position)
+            VALUES
+                ({ResultRules.SingletonId}, {ResultRules.DefaultAnnualMethod.ToString()}, NULL, NULL, NULL,
+                 {ResultRules.DefaultPrimaryPositionScope.ToString()}, {ResultRules.DefaultShowLevelPosition},
+                 {ResultRules.DefaultTieBreakRule.ToString()}, {ResultRules.DefaultPassMark},
+                 {ResultRules.DefaultPromotionThreshold}, {ResultRules.DefaultRequireCorePass}, '',
+                 {ResultRules.DefaultMinSubjectsForPosition})
+            """,
+            cancellationToken);
 
     /// <summary>
     /// Reinserts spec 6.6.2's 28 seeded subjects, built from the SAME <see cref="SeededSubjects.All"/>

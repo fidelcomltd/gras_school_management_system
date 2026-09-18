@@ -87,4 +87,25 @@ internal static class SettingsMapper
 
         return new SettingsAssessmentGroupDto(dtos, versionNumber);
     }
+
+    /// <summary>Maps <paramref name="resultRules"/> to the wire DTO. <paramref name="versionNumber"/> comes from the caller's <see cref="SchoolProfile.ResultRulesVersionNumber"/> read, matching <see cref="ToGradingDto"/>'s and <see cref="ToAssessmentDto"/>'s own pattern.</summary>
+    public static ResultRulesDto ToResultRulesDto(ResultRules resultRules, int versionNumber)
+    {
+        ArgumentNullException.ThrowIfNull(resultRules);
+
+        return new ResultRulesDto(
+            resultRules.AnnualMethod,
+            resultRules.WeightFirst,
+            resultRules.WeightSecond,
+            resultRules.WeightThird,
+            resultRules.PrimaryPositionScope,
+            resultRules.ShowLevelPosition,
+            resultRules.TieBreakRule,
+            resultRules.PassMark,
+            resultRules.PromotionThreshold,
+            resultRules.RequireCorePass,
+            resultRules.CoreSubjectIds,
+            resultRules.MinSubjectsForPosition,
+            versionNumber);
+    }
 }

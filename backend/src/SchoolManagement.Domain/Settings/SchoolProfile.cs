@@ -113,7 +113,8 @@ public sealed class SchoolProfile : Entity<Guid>
         RegNumberSerialReset serialReset,
         int regNumberVersionNumber,
         int gradingVersionNumber,
-        int assessmentVersionNumber)
+        int assessmentVersionNumber,
+        int resultRulesVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -133,6 +134,7 @@ public sealed class SchoolProfile : Entity<Guid>
         RegNumberVersionNumber = regNumberVersionNumber;
         GradingVersionNumber = gradingVersionNumber;
         AssessmentVersionNumber = assessmentVersionNumber;
+        ResultRulesVersionNumber = resultRulesVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -208,6 +210,13 @@ public sealed class SchoolProfile : Entity<Guid>
     /// See <see cref="GradingVersionNumber"/>'s remarks — same reasoning, for <see cref="AssessmentComponent"/>.
     /// </summary>
     public int AssessmentVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The result-rules group's own, independent optimistic-concurrency pointer (TASK-0077). The
+    /// rules themselves live in the separate <see cref="ResultRules"/> table — see
+    /// <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
+    /// </summary>
+    public int ResultRulesVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -290,6 +299,12 @@ public sealed class SchoolProfile : Entity<Guid>
     public void IncrementAssessmentVersion() => AssessmentVersionNumber++;
 
     /// <summary>
+    /// Bumps <see cref="ResultRulesVersionNumber"/> for a successful <c>PUT /settings/result-rules</c>
+    /// save (TASK-0077). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementResultRulesVersion() => ResultRulesVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -314,7 +329,8 @@ public sealed class SchoolProfile : Entity<Guid>
         RegNumberSerialReset serialReset = DefaultSerialReset,
         int regNumberVersionNumber = 0,
         int gradingVersionNumber = 0,
-        int assessmentVersionNumber = 0) =>
+        int assessmentVersionNumber = 0,
+        int resultRulesVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -333,5 +349,6 @@ public sealed class SchoolProfile : Entity<Guid>
             serialReset,
             regNumberVersionNumber,
             gradingVersionNumber,
-            assessmentVersionNumber);
+            assessmentVersionNumber,
+            resultRulesVersionNumber);
 }

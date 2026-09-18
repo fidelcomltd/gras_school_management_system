@@ -48,6 +48,7 @@ internal sealed class UpdateAssessmentCommandHandler(
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ISubjectScoreSessionLockLookup subjectScoreSessionLockLookup,
+    IResultRulesRepository resultRulesRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -220,10 +221,11 @@ internal sealed class UpdateAssessmentCommandHandler(
         profile.IncrementAssessmentVersion();
 
         var currentBands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, currentBands, savedComponents),
+            SettingsSnapshotBuilder.Build(profile, currentBands, savedComponents, resultRules),
             ConfigVersionGroup.Assessment,
             currentUser.UserId,
             reason: reasonCheck.Value,

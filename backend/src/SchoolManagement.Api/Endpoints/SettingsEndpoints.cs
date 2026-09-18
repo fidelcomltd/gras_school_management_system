@@ -44,6 +44,8 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapUpdateGrading(settingsGroup);
         MapResetGrading(settingsGroup);
         MapUpdateAssessment(settingsGroup);
+        MapGetResultRules(settingsGroup);
+        MapUpdateResultRules(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -262,6 +264,55 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "written. `reason` is required, at least ten characters, only when a result set is " +
                 "Published in the active session (spec 6.2.9); otherwise it is ignored.")
             .Produces<SettingsAssessmentGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetResultRules(RouteGroupBuilder group) =>
+        group.MapGet("/result-rules", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetResultRulesQuery(), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetResultRules")
+            .WithSummary("Read the result rules")
+            .WithDescription(
+                "Tie-break, position scope, level position, pass mark and minimum subjects for " +
+                "position the computation engine reads (spec 6.2.8). A fresh database returns 6.2.8's " +
+                "seeded defaults, with `coreSubjectIds` empty until the administrator sets it.")
+            .Produces<ResultRulesDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateResultRules(RouteGroupBuilder group) =>
+        group.MapPut("/result-rules", async (
+                UpdateResultRulesCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.ResultRulesUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateResultRules")
+            .WithSummary("Replace the result rules")
+            .WithDescription(
+                "The whole row as one save (spec 6.2.8). `expectedVersion` must match the result-rules " +
+                "group's current `versionNumber` (from `GET /settings/result-rules`) or the save is " +
+                "rejected `409 settings.resultrules.stale_version` before anything is written. " +
+                "`primaryPositionScope` and `tieBreakRule` are rejected `409 settings.resultrules.locked` " +
+                "once any result set is Published in the active session; `annualMethod` and the three " +
+                "weights are rejected the same way once Third Term is published for any arm (spec " +
+                "6.2.10) — changing a locked field to its current value is not a change and is never " +
+                "refused. `reason` is required, at least ten characters, only when a result set is " +
+                "Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<ResultRulesDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

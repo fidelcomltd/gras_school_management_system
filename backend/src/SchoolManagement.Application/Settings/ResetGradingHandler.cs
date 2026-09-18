@@ -26,6 +26,7 @@ internal sealed class ResetGradingCommandHandler(
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
+    IResultRulesRepository resultRulesRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -95,10 +96,11 @@ internal sealed class ResetGradingCommandHandler(
         var currentComponents = await assessmentComponentRepository
             .ListReadOnlyOrderedAsync(cancellationToken)
             .ConfigureAwait(false);
+        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, currentComponents),
+            SettingsSnapshotBuilder.Build(profile, bands, currentComponents, resultRules),
             ConfigVersionGroup.Grading,
             currentUser.UserId,
             reason: reasonCheck.Value,

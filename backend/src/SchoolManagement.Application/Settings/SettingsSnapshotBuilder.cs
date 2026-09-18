@@ -13,6 +13,8 @@ namespace SchoolManagement.Application.Settings;
 /// "the whole serialised configuration", every group, not only the one that changed). Every existing
 /// caller (identity, abbreviation, reg-number saves) was updated to read the other group's CURRENT
 /// state and pass it through, rather than continuing to snapshot only <see cref="SchoolProfile"/>.
+/// TASK-0077 adds the result-rules section the same way — every caller now also reads the CURRENT
+/// <see cref="ResultRules"/> row and passes it through.
 /// </remarks>
 internal static class SettingsSnapshotBuilder
 {
@@ -20,18 +22,20 @@ internal static class SettingsSnapshotBuilder
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>
-    /// and <paramref name="components"/> into a snapshot document — the WHOLE configuration as of this
-    /// save, regardless of which group actually changed.
+    /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>,
+    /// <paramref name="components"/> and <paramref name="resultRules"/> into a snapshot document — the
+    /// WHOLE configuration as of this save, regardless of which group actually changed.
     /// </summary>
     public static string Build(
         SchoolProfile profile,
         IReadOnlyList<GradingBand> bands,
-        IReadOnlyList<AssessmentComponent> components)
+        IReadOnlyList<AssessmentComponent> components,
+        ResultRules resultRules)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(bands);
         ArgumentNullException.ThrowIfNull(components);
+        ArgumentNullException.ThrowIfNull(resultRules);
 
         var snapshot = new SettingsSnapshot(
             new SchoolProfileSnapshot(
@@ -69,7 +73,21 @@ internal static class SettingsSnapshotBuilder
                     component.IsExamination,
                     component.DisplayOrder))
                 .ToList(),
-            profile.AssessmentVersionNumber);
+            profile.AssessmentVersionNumber,
+            new ResultRulesSnapshot(
+                resultRules.AnnualMethod,
+                resultRules.WeightFirst,
+                resultRules.WeightSecond,
+                resultRules.WeightThird,
+                resultRules.PrimaryPositionScope,
+                resultRules.ShowLevelPosition,
+                resultRules.TieBreakRule,
+                resultRules.PassMark,
+                resultRules.PromotionThreshold,
+                resultRules.RequireCorePass,
+                resultRules.CoreSubjectIds,
+                resultRules.MinSubjectsForPosition),
+            profile.ResultRulesVersionNumber);
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
@@ -79,7 +97,9 @@ internal static class SettingsSnapshotBuilder
         IReadOnlyList<GradingBandSnapshot> GradingBands,
         int GradingVersionNumber,
         IReadOnlyList<AssessmentComponentSnapshot> AssessmentComponents,
-        int AssessmentVersionNumber);
+        int AssessmentVersionNumber,
+        ResultRulesSnapshot ResultRules,
+        int ResultRulesVersionNumber);
 
     private sealed record SchoolProfileSnapshot(
         string SchoolName,
@@ -111,4 +131,18 @@ internal static class SettingsSnapshotBuilder
         int MaxMark,
         bool IsExamination,
         int DisplayOrder);
+
+    private sealed record ResultRulesSnapshot(
+        AnnualMethod AnnualMethod,
+        int? WeightFirst,
+        int? WeightSecond,
+        int? WeightThird,
+        PrimaryPositionScope PrimaryPositionScope,
+        bool ShowLevelPosition,
+        TieBreakRule TieBreakRule,
+        int PassMark,
+        int PromotionThreshold,
+        bool RequireCorePass,
+        IReadOnlyList<Guid> CoreSubjectIds,
+        int MinSubjectsForPosition);
 }

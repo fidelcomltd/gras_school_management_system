@@ -24,22 +24,26 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
     private readonly IAssessmentComponentRepository _assessmentComponentRepository =
         Substitute.For<IAssessmentComponentRepository>();
 
+    private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
-    // TASK-0069: the snapshot now reads the current grading/assessment state even from a save that
-    // does not touch either group — stub both empty so SettingsSnapshotBuilder.Build never sees null.
+    // TASK-0069/TASK-0077: the snapshot now reads the current grading/assessment/result-rules state
+    // even from a save that does not touch any of them — stub all three so SettingsSnapshotBuilder.Build
+    // never sees null.
     private UpdateSchoolIdentityCommandHandler CreateHandler()
     {
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+        _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
 
         return new(
             _schoolProfileRepository,
             _configVersionRepository,
             _gradingBandRepository,
             _assessmentComponentRepository,
+            _resultRulesRepository,
             _currentUser,
             _auditSink,
             _timeProvider);
