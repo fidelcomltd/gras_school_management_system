@@ -1131,6 +1131,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/rating-scales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the rating scales
+         * @description Whole set as one array, atomic (spec 6.2.13). A scale's or point's `id`, when supplied, must match an existing row — that is how a rename/reorder is told apart from an add or a remove, matching `PUT /settings/assessment`'s own convention, and matters because stage 2/3 rating blocks reference a scale BY that id. An existing scale whose id is absent from the submitted array is removed, rejected `409 settings.ratingscales.in_use` when a rating block still references it; an id that matches no current row is rejected `422 settings.ratingscales.unknown_scale_id` / `settings.ratingscales.unknown_point_id`. All other save-time rules run over the whole submitted set as one unit; on the first failure nothing is written and the response's `scaleIndex`/`pointIndex` extensions name the offending position in the submitted array. `expectedVersion` must match the rating-scales group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateRatingScales"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/development-domains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the nursery development domains and their indicators
+         * @description Whole set as one array, atomic (spec 6.2.13). A domain's or indicator's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/rating-scales`'s own convention. An unknown `sectionId` or `ratingScaleId` is rejected `422 settings.developmentdomains.unknown_section_id` / `unknown_rating_scale_id`, naming the offending domain's `domainIndex`; an unknown domain or indicator `id` is rejected `422 settings.developmentdomains.unknown_domain_id` / `unknown_indicator_id`. A duplicate domain name within the same section, or a duplicate indicator name within a domain, is rejected `422 settings.developmentdomains.duplicate_name` / `duplicate_indicator_name` — the same domain name is allowed in a different section. Archiving a submitted id is always allowed and never gated; an EXISTING domain or indicator whose id is absent from the submission is being removed, and is refused `409 settings.developmentdomains.indicator_rated` if it, or any indicator of an omitted domain, has ever been rated — archive it instead. `expectedVersion` must match the development-domains group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateDevelopmentDomains"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/traits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the traits and their block rating scales
+         * @description Whole trait set as one array, atomic (spec 6.2.7 / 6.2.13), plus which rating scale each of the two blocks (affective, psychomotor) is rated against. A trait's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/development-domains`'s own convention. Traits are NOT section-scoped. `affectiveRatingScaleId`/`psychomotorRatingScaleId` must each match an existing rating scale, rejected `422 settings.traits.unknown_scale_id` otherwise; an unknown trait `id` is rejected `422 settings.traits.unknown_trait_id`; a duplicate trait name within the same domain is rejected `422 settings.traits.duplicate_name` — the same name is allowed in the other domain. Archiving a submitted id is always allowed and never gated; an EXISTING trait whose id is absent from the submission is being removed, and is refused `409 settings.traits.trait_rated` if it has ever been rated — archive it instead. `expectedVersion` must match the traits group's current `versionNumber` (from `GET /settings`) or the save is rejected `409 settings.traits.stale_version` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateTraits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-versions": {
         parameters: {
             query?: never;
@@ -3465,6 +3525,238 @@ export interface components {
             reason: string;
         };
         /**
+         * @description One domain, both inside SettingsDto's envelope and as an element of SettingsDevelopmentDomainGroupDto's `Domains` array (spec 6.2.13).
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+         *       "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+         *       "section": "Nursery",
+         *       "name": "Personal & Physical Development",
+         *       "displayOrder": 3,
+         *       "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *       "allowsIndicatorComment": true,
+         *       "status": "Active",
+         *       "activeIndicatorCount": 1,
+         *       "indicators": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *           "name": "Potty trained",
+         *           "displayOrder": 1,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        DevelopmentDomainDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801
+             */
+            id: string;
+            /**
+             * @description The owning section's opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301
+             */
+            sectionId: string;
+            /**
+             * @description The owning section's display name, for a client that does not want to join against the section list itself.
+             * @example Nursery
+             */
+            section: string;
+            /**
+             * @description For example `Personal &amp; Physical Development`.
+             * @example Personal & Physical Development
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed block order within the section.
+             * @example 3
+             */
+            displayOrder: number | string;
+            /**
+             * @description The scale this domain's indicators are rated against.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601
+             */
+            ratingScaleId: string;
+            /**
+             * @description Whether the entry screen prints a per-indicator Comments column for this domain.
+             * @example true
+             */
+            allowsIndicatorComment: boolean;
+            /** @description Active or archived. An archived domain leaves new entry screens but stays on historical sheets. */
+            status: components["schemas"]["DevelopmentDomainStatus"];
+            /**
+             * Format: int32
+             * @description The count the &gt;60 entry-screen warning reads (spec 6.2.13). Active indicators only, and always
+             *     `0` for an archived domain regardless of its indicators' own individual status — an archived
+             *     domain never appears on an entry screen, so nothing there is asking for a rating.
+             * @example 1
+             */
+            activeIndicatorCount: number | string;
+            /**
+             * @description Every indicator on this domain, ordered by `displayOrder`.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+             *         "name": "Potty trained",
+             *         "displayOrder": 1,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            indicators: components["schemas"]["DevelopmentIndicatorDto"][];
+        };
+        /**
+         * @description One submitted domain, before persistence. Same id-stable convention as
+         *     DevelopmentIndicatorInput — see DevelopmentDomain's remarks.
+         * @example {
+         *       "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+         *       "name": "Personal & Physical Development",
+         *       "displayOrder": 3,
+         *       "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *       "allowsIndicatorComment": true,
+         *       "status": "Active",
+         *       "indicators": [
+         *         {
+         *           "name": "Potty trained",
+         *           "displayOrder": 1,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        DevelopmentDomainInput: {
+            /**
+             * Format: uuid
+             * @description The owning section. Must match an existing Section.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301
+             */
+            sectionId: string;
+            /**
+             * @description Up to int DevelopmentDomain.NameMaxLength characters. Unique, case-insensitive, within SectionId across the whole submitted set.
+             * @example Personal & Physical Development
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed block order within the section.
+             * @example 3
+             */
+            displayOrder: number | string;
+            /**
+             * Format: uuid
+             * @description The scale this domain's indicators are rated against. Must match an existing RatingScale.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601
+             */
+            ratingScaleId: string;
+            /**
+             * @description Whether the entry screen prints a per-indicator Comments column.
+             * @example true
+             */
+            allowsIndicatorComment: boolean;
+            /** @description Active or archived. Archiving a submitted id is always allowed, never gated. */
+            status: components["schemas"]["DevelopmentDomainStatus"];
+            /**
+             * @description Every indicator on this domain, in the order they should list.
+             * @example [
+             *       {
+             *         "name": "Potty trained",
+             *         "displayOrder": 1,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            indicators: components["schemas"]["DevelopmentIndicatorInput"][];
+            /**
+             * Format: uuid
+             * @description The existing domain's opaque id, when updating one in place. `null` for a new
+             *     domain. An id absent from the current set is rejected
+             *     `422 settings.developmentdomains.unknown_domain_id` (checked against live state, so it lives
+             *     in `UpdateDevelopmentDomainsCommandHandler`, not here).
+             */
+            id?: null | string;
+        };
+        /**
+         * @description Lifecycle state of a DevelopmentDomain (spec 6.2.13: "status (active or archived)").
+         *     Archiving, not deleting, is how a domain whose indicators have ever been rated is removed from new
+         *     entry screens while staying on historical sheets through the publication snapshot.
+         * @example Active
+         * @enum {unknown}
+         */
+        DevelopmentDomainStatus: "Active" | "Archived";
+        /**
+         * @description One indicator, both inside DevelopmentDomainDto and as an element of an ordered array (spec 6.2.13).
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *       "name": "Potty trained",
+         *       "displayOrder": 1,
+         *       "status": "Active"
+         *     }
+         */
+        DevelopmentIndicatorDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901
+             */
+            id: string;
+            /**
+             * @description The printed row label, for example `Potty trained`.
+             * @example Potty trained
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed order within the domain.
+             * @example 1
+             */
+            displayOrder: number | string;
+            /** @description Active or archived. An archived indicator leaves new entry screens but stays on historical sheets. */
+            status: components["schemas"]["DevelopmentIndicatorStatus"];
+        };
+        /**
+         * @description One submitted indicator, before persistence. Same "id present means update in place, id
+         *     preserved; id absent means new" convention RatingScalePointInput established
+         *     (TASK-0072 stage 1 review fix), applied here from the start — see DevelopmentIndicator's
+         *     remarks for why an indicator's id must never change under an unrelated edit.
+         * @example {
+         *       "name": "Potty trained",
+         *       "displayOrder": 1,
+         *       "status": "Active"
+         *     }
+         */
+        DevelopmentIndicatorInput: {
+            /**
+             * @description Up to int DevelopmentIndicator.NameMaxLength characters.
+             * @example Potty trained
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed order within the domain.
+             * @example 1
+             */
+            displayOrder: number | string;
+            /** @description Active or archived. Archiving a submitted id is always allowed, never gated. */
+            status: components["schemas"]["DevelopmentIndicatorStatus"];
+            /**
+             * Format: uuid
+             * @description The existing indicator's opaque id, when updating one in place. `null` for a new
+             *     indicator. An id absent from the owning domain's current indicators is rejected
+             *     `422 settings.developmentdomains.unknown_indicator_id` (checked against live state, so it
+             *     lives in `UpdateDevelopmentDomainsCommandHandler`, not here).
+             */
+            id?: null | string;
+        };
+        /**
+         * @description Lifecycle state of a DevelopmentIndicator (spec 6.2.13: "status (active or
+         *     archived)"). Distinct from DevelopmentDomainStatus despite the identical two values —
+         *     grep-able and matches this codebase's per-entity convention (`RoleStatus`, `LevelStatus`),
+         *     rather than one shared enum coupling an indicator's lifecycle to its domain's.
+         * @example Active
+         * @enum {unknown}
+         */
+        DevelopmentIndicatorStatus: "Active" | "Archived";
+        /**
          * @description One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant
          *                 minus its session id — that field is server-internal and never crosses the wire.
          * @example {
@@ -4165,6 +4457,223 @@ export interface components {
          * @enum {unknown}
          */
         PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
+        /**
+         * @description One scale, both inside SettingsDto's envelope and as an element of SettingsRatingScaleGroupDto's `Scales` array (spec 6.2.13).
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *       "name": "Nursery development",
+         *       "points": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *           "pointCode": "N",
+         *           "pointLabel": "Needs Improvement",
+         *           "pointOrder": 1
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+         *           "pointCode": "I",
+         *           "pointLabel": "Improving",
+         *           "pointOrder": 2
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+         *           "pointCode": "S",
+         *           "pointLabel": "Satisfied",
+         *           "pointOrder": 3
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *           "pointCode": "E",
+         *           "pointLabel": "Excellent",
+         *           "pointOrder": 4
+         *         }
+         *       ]
+         *     }
+         */
+        RatingScaleDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601
+             */
+            id: string;
+            /**
+             * @description For example `Nursery development`.
+             * @example Nursery development
+             */
+            name: string;
+            /**
+             * @description Every point on this scale, ordered by `pointOrder`.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+             *         "pointCode": "N",
+             *         "pointLabel": "Needs Improvement",
+             *         "pointOrder": 1
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+             *         "pointCode": "I",
+             *         "pointLabel": "Improving",
+             *         "pointOrder": 2
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+             *         "pointCode": "S",
+             *         "pointLabel": "Satisfied",
+             *         "pointOrder": 3
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *         "pointCode": "E",
+             *         "pointLabel": "Excellent",
+             *         "pointOrder": 4
+             *       }
+             *     ]
+             */
+            points: components["schemas"]["RatingScalePointDto"][];
+        };
+        /**
+         * @description One submitted scale, before persistence. TASK-0072 stage 1 review fix: Id
+         *     present means "update this existing scale in place, preserving its id — stage 2/3 rating blocks
+         *     reference a scale by this id and must never see it change under an unrelated rename"; absent means
+         *     "this is a new scale". An EXISTING scale whose id is absent from the whole submitted set is being
+         *     removed, refused `409 settings.ratingscales.in_use` when a rating block still references it.
+         * @example {
+         *       "name": "Nursery development",
+         *       "points": [
+         *         {
+         *           "pointCode": "N",
+         *           "pointLabel": "Needs Improvement",
+         *           "pointOrder": 1
+         *         },
+         *         {
+         *           "pointCode": "I",
+         *           "pointLabel": "Improving",
+         *           "pointOrder": 2
+         *         },
+         *         {
+         *           "pointCode": "S",
+         *           "pointLabel": "Satisfied",
+         *           "pointOrder": 3
+         *         },
+         *         {
+         *           "pointCode": "E",
+         *           "pointLabel": "Excellent",
+         *           "pointOrder": 4
+         *         }
+         *       ]
+         *     }
+         */
+        RatingScaleInput: {
+            /**
+             * @description Up to int RatingScale.NameMaxLength characters. Unique, case-insensitive, across the whole submitted set.
+             * @example Nursery development
+             */
+            name: string;
+            /**
+             * @description Between int RatingScalePoint.MinPointsPerScale and int RatingScalePoint.MaxPointsPerScale points.
+             * @example [
+             *       {
+             *         "pointCode": "N",
+             *         "pointLabel": "Needs Improvement",
+             *         "pointOrder": 1
+             *       },
+             *       {
+             *         "pointCode": "I",
+             *         "pointLabel": "Improving",
+             *         "pointOrder": 2
+             *       },
+             *       {
+             *         "pointCode": "S",
+             *         "pointLabel": "Satisfied",
+             *         "pointOrder": 3
+             *       },
+             *       {
+             *         "pointCode": "E",
+             *         "pointLabel": "Excellent",
+             *         "pointOrder": 4
+             *       }
+             *     ]
+             */
+            points: components["schemas"]["RatingScalePointInput"][];
+            /**
+             * Format: uuid
+             * @description The existing scale's opaque id, when updating one in place. `null` for a new
+             *     scale. An id absent from the current set is rejected
+             *     `422 settings.ratingscales.unknown_scale_id` (checked against live state, so it lives in
+             *     `UpdateRatingScalesCommandHandler`, not here).
+             */
+            id?: null | string;
+        };
+        /**
+         * @description One point, both inside RatingScaleDto and inside SettingsRatingScaleGroupDto's envelope. An element of an ORDERED ARRAY, sorted by `pointOrder`.
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *       "pointCode": "E",
+         *       "pointLabel": "Excellent",
+         *       "pointOrder": 4
+         *     }
+         */
+        RatingScalePointDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701
+             */
+            id: string;
+            /**
+             * @description Up to 1 character — the mark printed in the rating column, for example `E` or `5`.
+             * @example E
+             */
+            pointCode: string;
+            /**
+             * @description The legend text for this point.
+             * @example Excellent
+             */
+            pointLabel: string;
+            /**
+             * Format: int32
+             * @description Ascending from worst to best.
+             * @example 4
+             */
+            pointOrder: number | string;
+        };
+        /**
+         * @description One submitted point, before persistence. TASK-0072 stage 1 review fix: Id
+         *     present means "update this existing point in place, preserving its id"; absent means "this is a
+         *     new point". Trailing and optional so every pre-existing positional call site (seeds, tests) still
+         *     compiles unchanged.
+         * @example {
+         *       "pointCode": "E",
+         *       "pointLabel": "Excellent",
+         *       "pointOrder": 4
+         *     }
+         */
+        RatingScalePointInput: {
+            /**
+             * @description Up to int RatingScalePoint.PointCodeMaxLength character. Unique within the scale.
+             * @example E
+             */
+            pointCode: string;
+            /**
+             * @description Up to int RatingScalePoint.PointLabelMaxLength characters.
+             * @example Excellent
+             */
+            pointLabel: string;
+            /**
+             * Format: int32
+             * @description Ascending from worst to best. Unique within the scale.
+             * @example 4
+             */
+            pointOrder: number | string;
+            /**
+             * Format: uuid
+             * @description The existing point's opaque id, when updating one in place. `null` for a new
+             *     point. An id absent from the owning scale's current points is rejected
+             *     `422 settings.ratingscales.unknown_point_id` (checked against live state, so it lives in
+             *     `UpdateRatingScalesCommandHandler`, not here).
+             */
+            id?: null | string;
+        };
         /**
          * @description The response body of GetRegNumberPreviewQuery.
          * @example {
@@ -5326,6 +5835,68 @@ export interface components {
             versionNumber: number | string;
         };
         /**
+         * @description The development-domains group, both inside SettingsDto and as
+         *     `PUT /api/v1/settings/development-domains`'s own success body (spec 6.2.13).
+         * @example {
+         *       "domains": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+         *           "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+         *           "section": "Nursery",
+         *           "name": "Personal & Physical Development",
+         *           "displayOrder": 3,
+         *           "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *           "allowsIndicatorComment": true,
+         *           "status": "Active",
+         *           "activeIndicatorCount": 1,
+         *           "indicators": [
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *               "name": "Potty trained",
+         *               "displayOrder": 1,
+         *               "status": "Active"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsDevelopmentDomainGroupDto: {
+            /**
+             * @description Every domain, ordered by section then `displayOrder`.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+             *         "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+             *         "section": "Nursery",
+             *         "name": "Personal & Physical Development",
+             *         "displayOrder": 3,
+             *         "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+             *         "allowsIndicatorComment": true,
+             *         "status": "Active",
+             *         "activeIndicatorCount": 1,
+             *         "indicators": [
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+             *             "name": "Potty trained",
+             *             "displayOrder": 1,
+             *             "status": "Active"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            domains: components["schemas"]["DevelopmentDomainDto"][];
+            /**
+             * Format: int32
+             * @description The development-domains group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
          * @description The response body of `GET /api/v1/settings`. TASK-0005b extends this same envelope
          *     additively (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving
          *     endpoints rather than a new top-level field here).
@@ -5430,6 +6001,41 @@ export interface components {
          *         ],
          *         "versionNumber": 0
          *       },
+         *       "ratingScales": {
+         *         "scales": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *             "name": "Nursery development",
+         *             "points": [
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *                 "pointCode": "N",
+         *                 "pointLabel": "Needs Improvement",
+         *                 "pointOrder": 1
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+         *                 "pointCode": "I",
+         *                 "pointLabel": "Improving",
+         *                 "pointOrder": 2
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+         *                 "pointCode": "S",
+         *                 "pointLabel": "Satisfied",
+         *                 "pointOrder": 3
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *                 "pointCode": "E",
+         *                 "pointLabel": "Excellent",
+         *                 "pointOrder": 4
+         *               }
+         *             ]
+         *           }
+         *         ],
+         *         "versionNumber": 0
+         *       },
          *       "assessment": {
          *         "components": [
          *           {
@@ -5458,6 +6064,44 @@ export interface components {
          *           }
          *         ],
          *         "versionNumber": 0
+         *       },
+         *       "developmentDomains": {
+         *         "domains": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+         *             "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+         *             "section": "Nursery",
+         *             "name": "Personal & Physical Development",
+         *             "displayOrder": 3,
+         *             "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *             "allowsIndicatorComment": true,
+         *             "status": "Active",
+         *             "activeIndicatorCount": 1,
+         *             "indicators": [
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *                 "name": "Potty trained",
+         *                 "displayOrder": 1,
+         *                 "status": "Active"
+         *               }
+         *             ]
+         *           }
+         *         ],
+         *         "versionNumber": 0
+         *       },
+         *       "traits": {
+         *         "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *         "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *         "traits": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+         *             "domain": "Affective",
+         *             "name": "Punctuality",
+         *             "displayOrder": 2,
+         *             "status": "Active"
+         *           }
+         *         ],
+         *         "versionNumber": 0
          *       }
          *     }
          */
@@ -5472,6 +6116,12 @@ export interface components {
             grading: components["schemas"]["SettingsGradingGroupDto"];
             /** @description The assessment-structure group (TASK-0069). */
             assessment: components["schemas"]["SettingsAssessmentGroupDto"];
+            /** @description The rating-scales group (TASK-0072 stage 1). */
+            ratingScales: components["schemas"]["SettingsRatingScaleGroupDto"];
+            /** @description The development-domains group, nursery only (TASK-0072 stage 2b). */
+            developmentDomains: components["schemas"]["SettingsDevelopmentDomainGroupDto"];
+            /** @description The traits group (TASK-0072 stage 3b). */
+            traits: components["schemas"]["SettingsTraitsGroupDto"];
         };
         /**
          * @description The grading-scale group, both inside SettingsDto and as
@@ -5707,6 +6357,90 @@ export interface components {
             versionNumber: number | string;
         };
         /**
+         * @description The rating-scales group, both inside SettingsDto and as
+         *     `PUT /api/v1/settings/rating-scales`'s own success body (spec 6.2.13).
+         * @example {
+         *       "scales": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *           "name": "Nursery development",
+         *           "points": [
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *               "pointCode": "N",
+         *               "pointLabel": "Needs Improvement",
+         *               "pointOrder": 1
+         *             },
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+         *               "pointCode": "I",
+         *               "pointLabel": "Improving",
+         *               "pointOrder": 2
+         *             },
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+         *               "pointCode": "S",
+         *               "pointLabel": "Satisfied",
+         *               "pointOrder": 3
+         *             },
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *               "pointCode": "E",
+         *               "pointLabel": "Excellent",
+         *               "pointOrder": 4
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsRatingScaleGroupDto: {
+            /**
+             * @description Every scale, ordered by name.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+             *         "name": "Nursery development",
+             *         "points": [
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+             *             "pointCode": "N",
+             *             "pointLabel": "Needs Improvement",
+             *             "pointOrder": 1
+             *           },
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+             *             "pointCode": "I",
+             *             "pointLabel": "Improving",
+             *             "pointOrder": 2
+             *           },
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+             *             "pointCode": "S",
+             *             "pointLabel": "Satisfied",
+             *             "pointOrder": 3
+             *           },
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *             "pointCode": "E",
+             *             "pointLabel": "Excellent",
+             *             "pointOrder": 4
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            scales: components["schemas"]["RatingScaleDto"][];
+            /**
+             * Format: int32
+             * @description The rating-scales group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
          * @description The registration-number pattern group, both inside SettingsDto and as
          *     `PATCH /api/v1/settings/reg-number`'s own success body (spec 6.2.4).
          * @example {
@@ -5741,6 +6475,57 @@ export interface components {
              * Format: int32
              * @description The reg-number group's current optimistic-concurrency pointer. Echo this back as
              *     `expectedVersion` on the next `PATCH`.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description The traits group, both inside SettingsDto and as `PUT /api/v1/settings/traits`'s
+         *     own success body (spec 6.2.7 / 6.2.13). Both blocks' scale ids travel alongside the trait list
+         *     because they are, together, the whole group a single `versionNumber` guards.
+         * @example {
+         *       "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *       "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *       "traits": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+         *           "domain": "Affective",
+         *           "name": "Punctuality",
+         *           "displayOrder": 2,
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsTraitsGroupDto: {
+            /**
+             * @description The scale the affective block's traits are rated against.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602
+             */
+            affectiveRatingScaleId: string;
+            /**
+             * @description The scale the psychomotor block's traits are rated against.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602
+             */
+            psychomotorRatingScaleId: string;
+            /**
+             * @description Every trait, ordered by domain then `displayOrder`.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+             *         "domain": "Affective",
+             *         "name": "Punctuality",
+             *         "displayOrder": 2,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            traits: components["schemas"]["TraitDto"][];
+            /**
+             * Format: int32
+             * @description The traits group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
              * @example 0
              */
             versionNumber: number | string;
@@ -6179,6 +6964,91 @@ export interface components {
          */
         TieBreakRule: "SharedPosition" | "ExamThenCa" | "ExamThenAlphabetical";
         /**
+         * @description Which trait block a Trait or TraitBlock belongs to (Appendix F.3's two
+         *     side-by-side blocks, printed with independent E/I/N rating columns). TASK-0072 stage 0 open
+         *     question 1, human-approved: traits are NOT section-scoped, unlike DevelopmentDomain —
+         *     this enum, not a `sectionId`, is the whole grouping a trait carries.
+         * @example Affective
+         * @enum {unknown}
+         */
+        TraitDomain: "Affective" | "Psychomotor";
+        /**
+         * @description One trait, both inside SettingsDto's envelope and as an element of SettingsTraitsGroupDto's `Traits` array (spec 6.2.7 / 6.2.13).
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+         *       "domain": "Affective",
+         *       "name": "Punctuality",
+         *       "displayOrder": 2,
+         *       "status": "Active"
+         *     }
+         */
+        TraitDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01
+             */
+            id: string;
+            /** @description Affective or psychomotor. */
+            domain: components["schemas"]["TraitDomain"];
+            /**
+             * @description For example `Punctuality`.
+             * @example Punctuality
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed row order within its block.
+             * @example 2
+             */
+            displayOrder: number | string;
+            /** @description Active or archived. An archived trait leaves new entry screens but stays on historical sheets. */
+            status: components["schemas"]["TraitStatus"];
+        };
+        /**
+         * @description One submitted trait, before persistence. Same "id present means update in place, id preserved; id
+         *     absent means new" convention DevelopmentIndicatorInput established, applied here from
+         *     the start (TASK-0072 stage 3's own instruction: "Ids on traits are optional and preserved,
+         *     id-stable from day one").
+         * @example {
+         *       "domain": "Affective",
+         *       "name": "Punctuality",
+         *       "displayOrder": 2,
+         *       "status": "Active"
+         *     }
+         */
+        TraitInput: {
+            /** @description Affective or psychomotor. NOT a section — see TraitDomain. */
+            domain: components["schemas"]["TraitDomain"];
+            /**
+             * @description Up to int Trait.NameMaxLength characters. Unique, case-insensitive, within Domain across the whole submitted set.
+             * @example Punctuality
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed row order within the block.
+             * @example 2
+             */
+            displayOrder: number | string;
+            /** @description Active or archived. Archiving a submitted id is always allowed, never gated. */
+            status: components["schemas"]["TraitStatus"];
+            /**
+             * Format: uuid
+             * @description The existing trait's opaque id, when updating one in place. `null` for a new trait.
+             *     An id absent from the current set is rejected `422 settings.traits.unknown_trait_id` (checked
+             *     against live state, so it lives in `UpdateTraitsCommandHandler`, not here).
+             */
+            id?: null | string;
+        };
+        /**
+         * @description Lifecycle state of a Trait (spec 6.2.7's status rule, carried into 6.2.13's per-block
+         *     scales). Archiving, not deleting, is how a trait that has ever been rated is removed from new entry
+         *     screens while staying on historical sheets through the publication snapshot.
+         * @example Active
+         * @enum {unknown}
+         */
+        TraitStatus: "Active" | "Archived";
+        /**
          * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
          *             string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: "the
          *             save writes an audit event with a mandatory reason") — deliberately NO 10-character floor, unlike
@@ -6443,6 +7313,69 @@ export interface components {
             reason: null | string;
         };
         /**
+         * @description `PUT /api/v1/settings/development-domains` (spec 6.2.13: "Development domains and
+         *             indicators, nursery only"). Every domain in the new set — this is a REPLACE, not a patch;
+         *             omitting a currently-saved domain removes it, refused `409` when any of its indicators has
+         *             ever been rated. Same convention as UpdateRatingScalesCommand.
+         * @example {
+         *       "domains": [
+         *         {
+         *           "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+         *           "name": "Personal & Physical Development",
+         *           "displayOrder": 3,
+         *           "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *           "allowsIndicatorComment": true,
+         *           "status": "Active",
+         *           "indicators": [
+         *             {
+         *               "name": "Potty trained",
+         *               "displayOrder": 1,
+         *               "status": "Active"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateDevelopmentDomainsCommand: {
+            /**
+             * @description The whole set, in the order it should list. See DevelopmentDomainRules for the structural save-time rules.
+             * @example [
+             *       {
+             *         "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+             *         "name": "Personal & Physical Development",
+             *         "displayOrder": 3,
+             *         "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+             *         "allowsIndicatorComment": true,
+             *         "status": "Active",
+             *         "indicators": [
+             *           {
+             *             "name": "Potty trained",
+             *             "displayOrder": 1,
+             *             "status": "Active"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            domains: components["schemas"]["DevelopmentDomainInput"][];
+            /**
+             * Format: int32
+             * @description The development-domains group's current `versionNumber`, as last read from
+             *     `GET /settings`. A stale value is rejected
+             *     `409 settings.developmentdomains.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise — the same conditional gate every other settings group uses.
+             */
+            reason: null | string;
+        };
+        /**
          * @description `PUT /api/v1/settings/grading` (spec 6.2.5, 6.2.12: "Whole scale as one array. Atomic.").
          *             Every band in the new scale — this is a REPLACE, not a patch; omitting a currently-seeded band
          *             deletes it.
@@ -6691,6 +7624,88 @@ export interface components {
              *     the pupil's current number, is a 409. Never written.
              */
             registrationNumber: null | string;
+        };
+        /**
+         * @description `PUT /api/v1/settings/rating-scales` (spec 6.2.13: "Rating scales become records"). Every
+         *             scale in the new set — this is a REPLACE, not a patch; omitting a currently-seeded scale removes
+         *             it, refused `409` when that scale is still referenced by a rating block.
+         * @example {
+         *       "scales": [
+         *         {
+         *           "name": "Nursery development",
+         *           "points": [
+         *             {
+         *               "pointCode": "N",
+         *               "pointLabel": "Needs Improvement",
+         *               "pointOrder": 1
+         *             },
+         *             {
+         *               "pointCode": "I",
+         *               "pointLabel": "Improving",
+         *               "pointOrder": 2
+         *             },
+         *             {
+         *               "pointCode": "S",
+         *               "pointLabel": "Satisfied",
+         *               "pointOrder": 3
+         *             },
+         *             {
+         *               "pointCode": "E",
+         *               "pointLabel": "Excellent",
+         *               "pointOrder": 4
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateRatingScalesCommand: {
+            /**
+             * @description The whole set, in the order it should list. See RatingScaleRules for the save-time rules.
+             * @example [
+             *       {
+             *         "name": "Nursery development",
+             *         "points": [
+             *           {
+             *             "pointCode": "N",
+             *             "pointLabel": "Needs Improvement",
+             *             "pointOrder": 1
+             *           },
+             *           {
+             *             "pointCode": "I",
+             *             "pointLabel": "Improving",
+             *             "pointOrder": 2
+             *           },
+             *           {
+             *             "pointCode": "S",
+             *             "pointLabel": "Satisfied",
+             *             "pointOrder": 3
+             *           },
+             *           {
+             *             "pointCode": "E",
+             *             "pointLabel": "Excellent",
+             *             "pointOrder": 4
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            scales: components["schemas"]["RatingScaleInput"][];
+            /**
+             * Format: int32
+             * @description The rating-scales group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.ratingscales.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise. See UpdateGradingCommandHandler's remarks — the
+             *     same conditional gate, applied to this group.
+             */
+            reason: null | string;
         };
         /**
          * @description `PATCH /api/v1/settings/reg-number` (spec 6.2.4). `yearSource` is deliberately absent
@@ -7044,6 +8059,64 @@ export interface components {
              * @example 2027-01-05
              */
             nextResumptionDate: null | string;
+        };
+        /**
+         * @description `PUT /api/v1/settings/traits` (spec 6.2.7's trait rules, carried into 6.2.13's "Trait lists
+         *             replaced" and per-block scales). Every trait in the new set — this is a REPLACE, not a patch;
+         *             omitting a currently-saved trait removes it, refused `409` when that trait has ever been
+         *             rated. Same convention as UpdateDevelopmentDomainsCommand.
+         * @example {
+         *       "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *       "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *       "traits": [
+         *         {
+         *           "domain": "Affective",
+         *           "name": "Punctuality",
+         *           "displayOrder": 2,
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateTraitsCommand: {
+            /**
+             * Format: uuid
+             * @description The scale the affective block's traits are rated against. Must match an existing RatingScale.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602
+             */
+            affectiveRatingScaleId: string;
+            /**
+             * Format: uuid
+             * @description The scale the psychomotor block's traits are rated against. Must match an existing RatingScale.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602
+             */
+            psychomotorRatingScaleId: string;
+            /**
+             * @description The whole set, in the order it should list. See TraitRules for the structural save-time rules.
+             * @example [
+             *       {
+             *         "domain": "Affective",
+             *         "name": "Punctuality",
+             *         "displayOrder": 2,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            traits: components["schemas"]["TraitInput"][];
+            /**
+             * Format: int32
+             * @description The traits group's current `versionNumber`, as last read from `GET /settings`. A stale
+             *     value is rejected `409 settings.traits.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise — the same conditional gate every other settings group uses.
+             */
+            reason: null | string;
         };
         /**
          * @description `POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved
@@ -12391,6 +13464,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultRulesDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateRatingScales: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRatingScalesCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsRatingScaleGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateDevelopmentDomains: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDevelopmentDomainsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsDevelopmentDomainGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTraits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTraitsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsTraitsGroupDto"];
                 };
             };
             /** @description Unauthorized */
