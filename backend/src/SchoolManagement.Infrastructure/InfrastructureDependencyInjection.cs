@@ -195,6 +195,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0076 dispatch B: the score-sheet endpoints' own mark persistence.
         services.AddScoped<ISubjectScoreRepository, SubjectScoreRepository>();
 
+        // TASK-0071: the computation engine's own persistence for the three computed tables.
+        services.AddScoped<IResultComputationRepository, ResultComputationRepository>();
+
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();
 

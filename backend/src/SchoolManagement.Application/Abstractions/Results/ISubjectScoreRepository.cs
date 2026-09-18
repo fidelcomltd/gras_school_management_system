@@ -13,6 +13,19 @@ namespace SchoolManagement.Application.Abstractions.Results;
 public sealed record ScoreSheetRowSnapshot(
     Guid PupilId, string ComponentMarksJson, int? ExamMark, bool ExamAbsent);
 
+/// <summary>
+/// One active (non-voided) mark row across EVERY subject in a result set, read-only (TASK-0071's
+/// computation engine — unlike <see cref="ScoreSheetRowSnapshot"/>, which is already scoped to one
+/// subject by its caller's route, this reads the whole set in one query).
+/// </summary>
+/// <param name="PupilId">The pupil this row belongs to.</param>
+/// <param name="SubjectId">The subject this row belongs to.</param>
+/// <param name="ComponentMarksJson">Raw JSON text — a map from component id to an integer mark.</param>
+/// <param name="ExamMark">Null unless a mark was entered.</param>
+/// <param name="ExamAbsent">True when the pupil did not sit the examination.</param>
+public sealed record ResultSetMarkSnapshot(
+    Guid PupilId, Guid SubjectId, string ComponentMarksJson, int? ExamMark, bool ExamAbsent);
+
 /// <summary>Persistence port for <see cref="SubjectScore"/> (TASK-0076 dispatch B).</summary>
 public interface ISubjectScoreRepository
 {
@@ -22,6 +35,14 @@ public interface ISubjectScoreRepository
     /// </summary>
     Task<IReadOnlyList<ScoreSheetRowSnapshot>> ListActiveReadOnlyAsync(
         Guid resultSetId, Guid subjectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every active (non-voided) mark for <paramref name="resultSetId"/>, across every subject
+    /// (TASK-0071: the computation engine reads a whole arm's marks in one pass, not one subject at a
+    /// time). <c>AsNoTracking</c>.
+    /// </summary>
+    Task<IReadOnlyList<ResultSetMarkSnapshot>> ListAllActiveReadOnlyAsync(
+        Guid resultSetId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Every active (non-voided) mark for <paramref name="resultSetId"/>/<paramref name="subjectId"/>,

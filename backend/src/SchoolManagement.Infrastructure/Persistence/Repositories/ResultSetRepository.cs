@@ -60,6 +60,10 @@ internal sealed class ResultSetRepository(ApplicationDbContext context) : IResul
             resultSet => resultSet.ArmId == armId && resultSet.TermId == termId, cancellationToken);
 
     /// <inheritdoc />
+    public Task<ResultSet?> FindTrackedByIdAsync(Guid resultSetId, CancellationToken cancellationToken) =>
+        context.ResultSets.FirstOrDefaultAsync(resultSet => resultSet.Id == resultSetId, cancellationToken);
+
+    /// <inheritdoc />
     public Task AddAsync(ResultSet resultSet, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resultSet);

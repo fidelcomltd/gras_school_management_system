@@ -106,6 +106,10 @@ public sealed class PipelineTests
         // implemented by Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISubjectScoreRepository>());
 
+        // TASK-0071: ComputeResultSetHandler depends on this port for the three computed tables,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IResultComputationRepository>());
+
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());

@@ -142,4 +142,19 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
     /// at this card's close.
     /// </summary>
     public void MarkNeedsRecompute() => NeedsRecompute = true;
+
+    /// <summary>
+    /// Applies computation's outcome (spec 8.2 step 11): stamps <see cref="ComputedAtUtc"/>/
+    /// <see cref="ComputedBy"/>, writes <see cref="PupilCount"/> (the ranked denominator printed on
+    /// the sheet), and clears <see cref="NeedsRecompute"/>. Does NOT change <see cref="State"/> —
+    /// computation is a same-state transition in Draft, Awaiting Approval, Approved and Returned for
+    /// Correction alike (spec 6.7.11 row 2; TASK-0071's contract delta).
+    /// </summary>
+    public void MarkComputed(Guid? computedBy, DateTimeOffset computedAtUtc, int pupilCount)
+    {
+        ComputedAtUtc = computedAtUtc;
+        ComputedBy = computedBy;
+        PupilCount = pupilCount;
+        NeedsRecompute = false;
+    }
 }

@@ -34,6 +34,13 @@ public interface IResultSetRepository
     Task<ResultSet?> FindTrackedByArmTermAsync(Guid armId, Guid termId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Loads a TRACKED result set by its own id (TASK-0071) — <c>POST /result-sets/{resultSetId}/compute</c>
+    /// is scoped by result set id directly, unlike the score-sheet routes which are scoped by arm.
+    /// <see langword="null"/> when no result set exists with that id.
+    /// </summary>
+    Task<ResultSet?> FindTrackedByIdAsync(Guid resultSetId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Loads a read-only result set for <paramref name="armId"/>/<paramref name="termId"/>, for the
     /// score-sheet read handler. <see langword="null"/> when none exists yet. <c>AsNoTracking</c>.
     /// </summary>

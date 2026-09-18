@@ -1625,6 +1625,30 @@ internal static class OpenApiExamples
               "voidedCount": 27
             }
             """,
+
+        [typeof(ComputeResultSetResponse)] = $$"""
+            {
+              "resultSetId": "{{ExampleResultSetId}}",
+              "computedAt": "2026-12-18T09:30:00Z",
+              "pupilCount": 28,
+              "subjectCount": 9,
+              "flags": [
+                {
+                  "code": "absent_all_examinations",
+                  "subjectId": null,
+                  "pupilId": "{{ExamplePupilId}}"
+                }
+              ]
+            }
+            """,
+
+        [typeof(ComputeResultSetFlagDto)] = $$"""
+            {
+              "code": "no_examination_sat",
+              "subjectId": "{{ExampleSubjectId}}",
+              "pupilId": null
+            }
+            """,
     };
 
     /// <summary>

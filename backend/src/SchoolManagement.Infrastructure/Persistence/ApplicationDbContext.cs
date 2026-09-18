@@ -158,6 +158,25 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// </summary>
     internal DbSet<SubjectScore> SubjectScores => Set<SubjectScore>();
 
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// pupil per subject per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every
+    /// computation.
+    /// </summary>
+    internal DbSet<SubjectResultLine> SubjectResultLines => Set<SubjectResultLine>();
+
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// subject per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every computation.
+    /// </summary>
+    internal DbSet<SubjectArmStatistic> SubjectArmStatistics => Set<SubjectArmStatistic>();
+
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// pupil per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every computation.
+    /// </summary>
+    internal DbSet<PupilTermResult> PupilTermResults => Set<PupilTermResult>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

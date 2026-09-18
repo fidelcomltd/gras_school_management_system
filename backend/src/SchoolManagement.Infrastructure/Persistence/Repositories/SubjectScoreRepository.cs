@@ -21,6 +21,20 @@ internal sealed class SubjectScoreRepository(ApplicationDbContext context) : ISu
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ResultSetMarkSnapshot>> ListAllActiveReadOnlyAsync(
+        Guid resultSetId, CancellationToken cancellationToken) =>
+        await context.SubjectScores.AsNoTracking()
+            .Where(score => score.ResultSetId == resultSetId && score.VoidedAt == null)
+            .Select(score => new ResultSetMarkSnapshot(
+                score.PupilId,
+                score.SubjectId,
+                score.ComponentMarksJson,
+                score.ExamMark,
+                score.ExamAbsent))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<SubjectScore>> ListActiveTrackedAsync(
         Guid resultSetId, Guid subjectId, CancellationToken cancellationToken) =>
         LoadTrackedAsync(resultSetId, subjectId, cancellationToken);
