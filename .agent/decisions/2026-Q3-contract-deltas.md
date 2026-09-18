@@ -862,3 +862,9 @@ convention before any code exists: `result_set.published` (409), `result_set.no_
 (422). The `flags[].code` values (`no_examination_sat`, `absent_all_examinations`) are response-body data
 and are unchanged. Still additive; nothing consumes the endpoint. Same defect class as TASK-0077's
 `result_rules_locked`, caught at dispatch this time rather than in review.
+
+### 2026-09-18 amendment 2 — TASK-0071: no documented 404 (human ruling)
+
+`POST /api/v1/result-sets/{resultSetId}/compute` documents **403** for an unknown or unresolvable id, and no
+404. The scope layer fails closed before the handler; the 404 was unreachable. Unreleased endpoint, not
+breaking. See `decisions/2026-Q3.md` 2026-09-18.

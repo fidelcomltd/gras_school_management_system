@@ -198,7 +198,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **DISPATCHABLE 2026-09-18** — 0076 and 0077 both closed; both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
+| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **IN PROGRESS 2026-09-18** — stages 1–2 built and green (engine, tables, endpoint); stage 3 fixture dispatched fresh. Both pre-promotion questions ruled 2026-09-18 (band threshold semantics; 403, no documented 404). Earlier: both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -206,6 +206,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **HUMAN RULINGS on TASK-0071:** a fractional average is banded by threshold (84.60 is B, 85.00 is A),
+  like `passMark`; an unknown result-set id is 403 and the contract drops the unreachable 404. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0080 closed — client current against `84b46211…`**, one generated file, zero wrapper code. Drift and
   verify re-run by the orchestrator (381 tests, Skipped 0). First dispatch under the `LEDGER ACCOUNT` rule; held. → `decisions/2026-Q3.md`
 - 2026-09-18 **HUMAN RULING on the seeded result rules: keep `requireCorePass: true` and the strict validator.**
@@ -517,6 +519,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-18 **The school has not been told how fractional averages are banded** (ruled: threshold, 84.60 is B).
+  It decides printed grades and the spec is silent. *Trigger: before the first result sheet is printed. Owner: human
+  plus the school.* → `decisions/2026-Q3.md`
 - 2026-09-18 **The seeded default result rules cannot be saved back unchanged** — `requireCorePass: true` with empty
   `coreSubjectIds` fails the PUT validator (422). **Ruled 2026-09-18** — screen requires core subjects; publication and
   promotion refuse the incomplete state. *Trigger: the result-rules screen card, the publication card, TASK-0036
