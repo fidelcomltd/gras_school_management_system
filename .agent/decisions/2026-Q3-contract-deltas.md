@@ -853,3 +853,12 @@ implementing agent that finds a delta unbuildable must bounce it, not amend it s
 field, no existing schema changes. The close-time mechanical diff (every `required` array, every
 property type vs the previous document) is still mandatory. TASK-0062 and TASK-0069 both show why
 a card's header is not evidence.
+
+### 2026-09-18 amendment — TASK-0071 error codes (orchestrator, before dispatch)
+
+The 2026-09-17 approval above named TASK-0071's problem codes unprefixed. Renamed to the codebase's dotted
+convention before any code exists: `result_set.published` (409), `result_set.no_active_pupils`,
+`result_set.no_subjects_in_effect`, `result_set.no_complete_scores`, `result_set.grading_band_not_found`
+(422). The `flags[].code` values (`no_examination_sat`, `absent_all_examinations`) are response-body data
+and are unchanged. Still additive; nothing consumes the endpoint. Same defect class as TASK-0077's
+`result_rules_locked`, caught at dispatch this time rather than in review.
