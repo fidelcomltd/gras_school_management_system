@@ -207,6 +207,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **HUMAN RULING on the seeded result rules: keep `requireCorePass: true` and the strict validator.**
+  The screen requires core subjects on first save (pre-selects English + Mathematics, admin confirms); Third Term
+  publication and promotion refuse the incomplete state. Rejected: seed false, validator exemption. → `decisions/2026-Q3.md`
 - 2026-09-18 **HUMAN RULING: only the orchestrator writes `.agent/**`.** Dev agents return a `LEDGER ACCOUNT`
   section; both agent definitions and `governance.md` §1 amended. Ends a twice-recorded scope breach. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0077 closed — result rules settings exist; contract `84b46211…`, 65 paths, additive verified
@@ -514,8 +517,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 ### Live — product and spec gaps
 
 - 2026-09-18 **The seeded default result rules cannot be saved back unchanged** — `requireCorePass: true` with empty
-  `coreSubjectIds` fails the PUT validator (422). Tension is in §6.2.8 itself. *Trigger: the result-rules screen card
-  and TASK-0036. Owner: human ruling, then that card.* → `drift/2026-Q3.md`
+  `coreSubjectIds` fails the PUT validator (422). **Ruled 2026-09-18** — screen requires core subjects; publication and
+  promotion refuse the incomplete state. *Trigger: the result-rules screen card, the publication card, TASK-0036
+  (all three carry it). Owner: those cards.* → `drift/2026-Q3.md`
 - 2026-09-17 **Sibling arms' stored level positions can go stale** (TASK-0071 ruling: compute writes own arm only).
   *Trigger: the approval/publication card. Owner: that card.* → `drift/2026-Q3.md`
 - 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**

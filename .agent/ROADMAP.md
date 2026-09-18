@@ -101,9 +101,10 @@ Largest module. `index.md` says split it; expect five or more cards.
 | TASK-0071 | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
 | — | Readiness, completeness gate, submission (needs non-academic input) | BE | 09 §6.7.5, 6.7.11 |
 | — | Non-academic input, section-specific | BE | 09 §6.7.7, 6.7.12 |
-| — | Approval, publication, config snapshot (must re-check sibling level positions, TASK-0071 ruling) | BE | 09 §6.7.8, 6.7.9 |
+| — | Approval, publication, config snapshot (must re-check sibling level positions, TASK-0071 ruling; Third Term publish refuses `requireCorePass` with no core subjects, 2026-09-18 ruling) | BE | 09 §6.7.8, 6.7.9 |
 | — | Annual cumulative result | BE | 09 §6.7.10 |
 | — | Score entry grid with offline resilience | FE | 09 §6.7.4, 14 §9.8.2 |
+| — | Result rules settings screen (first save requires core subjects, pre-selecting English + Mathematics for confirmation, 2026-09-18 ruling) | FE | 04 §6.2.8, 6.2.9 |
 | — | Nursery + primary result sheet renderers | BE+FE | 21, 22, 18 §C |
 
 `13-result-computation-rules.md` is not a build task — it is the spec the engine satisfies, and
