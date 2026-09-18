@@ -188,10 +188,16 @@ public static class InfrastructureDependencyInjection
         // TASK-0077: result rules.
         services.AddScoped<IResultRulesRepository, ResultRulesRepository>();
 
-        // TASK-0072 stage 1: rating scales. IRatingScaleUsageGate honestly reports "not in use"
-        // unconditionally until stage 2/3 give it something to query — see its own remarks.
+        // TASK-0072 stage 1: rating scales.
         services.AddScoped<IRatingScaleRepository, RatingScaleRepository>();
+
+        // TASK-0072 stage 2a: development domains and indicators. IRatingScaleUsageGate is now a real
+        // query against development_domain, replacing stage 1's unconditional "not in use" stand-in.
+        // IDevelopmentIndicatorUsageGate is itself the new stand-in — no rating table exists until
+        // Phase 3 — see its own remarks.
         services.AddScoped<IRatingScaleUsageGate, RatingScaleUsageGate>();
+        services.AddScoped<IDevelopmentDomainRepository, DevelopmentDomainRepository>();
+        services.AddScoped<IDevelopmentIndicatorUsageGate, DevelopmentIndicatorUsageGate>();
 
         // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
         // honestly-empty TASK-0069 stand-ins now that the tables exist.

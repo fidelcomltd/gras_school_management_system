@@ -1,18 +1,21 @@
+using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Settings;
 
 /// <summary>
-/// TASK-0072 STAGE 1 stand-in for <see cref="IRatingScaleUsageGate"/> — honestly answers "not in use"
-/// unconditionally. No development domain or trait block exists yet to reference a rating scale;
-/// stage 2 (development domains) and stage 3 (traits) each extend this to query their own new
-/// reference column once it exists, the same documented-seam shape
-/// <c>SchoolManagement.Application.Abstractions.Results.IPublishedResultsGate</c> used before
-/// <c>result_set</c> existed.
+/// Real implementation of <see cref="IRatingScaleUsageGate"/> (TASK-0072 stage 2a) — a scale is in use
+/// when any <c>development_domain</c> row references it. Replaces the stage 1 stand-in that
+/// unconditionally answered "not in use", now that <c>development_domain.rating_scale_id</c> exists to
+/// query, per the port's own documented seam. Stage 3 (trait blocks) extends this with an
+/// <c>OR EXISTS</c> against its own new reference column, not a second query method.
 /// </summary>
-internal sealed class RatingScaleUsageGate : IRatingScaleUsageGate
+internal sealed class RatingScaleUsageGate(ApplicationDbContext context) : IRatingScaleUsageGate
 {
     /// <inheritdoc />
     public Task<bool> IsInUseAsync(Guid ratingScaleId, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
+        context.DevelopmentDomains
+            .AsNoTracking()
+            .AnyAsync(domain => domain.RatingScaleId == ratingScaleId, cancellationToken);
 }

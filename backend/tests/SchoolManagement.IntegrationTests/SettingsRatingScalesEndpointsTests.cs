@@ -10,9 +10,12 @@ namespace SchoolManagement.IntegrationTests;
 /// <summary>
 /// End-to-end proof of TASK-0072 stage 1's endpoint against the approved contract delta: the three
 /// seeded rating scales on a fresh database (spec 6.2.13), the whole-set atomic replace with its
-/// save-time rules, optimistic concurrency, and that removing a scale nothing yet references succeeds
-/// (the <c>settings.ratingscales.in_use</c> refusal has no reference table to exercise it against
-/// until TASK-0072 stages 2/3 land — see <c>SchoolManagement.Infrastructure.Settings.RatingScaleUsageGate</c>'s remarks).
+/// save-time rules, and optimistic concurrency. TASK-0072 stage 2a makes
+/// <c>SchoolManagement.Infrastructure.Settings.RatingScaleUsageGate</c> a real query against
+/// <c>development_domain</c>, so the seeded Nursery development scale is now referenced by the seeded
+/// nursery development domains — every test below that needs a clean scale to mutate echoes it back
+/// unchanged, and two tests prove the in-use gate itself in both directions (removing an unreferenced
+/// scale succeeds; removing the referenced one is refused 409).
 /// </summary>
 public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
@@ -51,7 +54,7 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         using var request = new HttpRequestMessage(HttpMethod.Put, RatingScalesUrl)
         {
-            Content = JsonContent.Create(CustomScale(expectedVersion: 0)),
+            Content = JsonContent.Create(new UpdateRatingScalesCommand([CustomScale()], ExpectedVersion: 0, Reason: null)),
         };
 
         var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -66,16 +69,18 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         var jar = await SignInAsSuperAdminAsync();
 
-        var response = await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0));
+        var command = await PreservingNurseryDevelopmentAsync(jar, CustomScale(), expectedVersion: 0);
+        var response = await PutAsync(RatingScalesUrl, jar, command);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var ratingScales = await ReadAsync<SettingsRatingScaleGroupDto>(response);
         ratingScales.VersionNumber.ShouldBe(1);
-        ratingScales.Scales.Count.ShouldBe(1);
-        ratingScales.Scales[0].Name.ShouldBe("Custom");
+        ratingScales.Scales.Count.ShouldBe(2);
+        ratingScales.Scales.ShouldContain(scale => scale.Name == "Custom");
+        ratingScales.Scales.ShouldContain(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
 
         var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
-        settings.RatingScales.Scales.Count.ShouldBe(1);
+        settings.RatingScales.Scales.Count.ShouldBe(2);
         settings.RatingScales.VersionNumber.ShouldBe(1);
     }
 
@@ -106,10 +111,11 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         var jar = await SignInAsSuperAdminAsync();
 
-        var firstResponse = await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0));
+        var firstCommand = await PreservingNurseryDevelopmentAsync(jar, CustomScale(), expectedVersion: 0);
+        var firstResponse = await PutAsync(RatingScalesUrl, jar, firstCommand);
         firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var secondResponse = await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0));
+        var secondResponse = await PutAsync(RatingScalesUrl, jar, firstCommand);
 
         secondResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(secondResponse);
@@ -117,20 +123,40 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
     }
 
     [Fact]
-    public async Task UpdateRatingScales_RemovingASeededScale_SucceedsBecauseNothingYetReferencesIt()
+    public async Task UpdateRatingScales_RemovingAnUnreferencedSeededScale_Succeeds()
     {
         RequireDatabase();
 
         var jar = await SignInAsSuperAdminAsync();
 
-        // The submitted set omits all three seeded scales (no id echoed back for any of them) —
-        // allowed today because TASK-0072 stage 1 has no development-domain or trait-block table to
-        // reference one yet.
-        var response = await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0));
+        // The submitted set echoes Nursery development back unchanged (referenced by the seeded
+        // nursery development domains, TASK-0072 stage 2a) but omits Primary trait and Five-point
+        // numeric — both genuinely unreferenced, so removing them succeeds.
+        var command = await PreservingNurseryDevelopmentAsync(jar, CustomScale(), expectedVersion: 0);
+        var response = await PutAsync(RatingScalesUrl, jar, command);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var ratingScales = await ReadAsync<SettingsRatingScaleGroupDto>(response);
-        ratingScales.Scales.ShouldNotContain(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
+        ratingScales.Scales.ShouldContain(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
+        ratingScales.Scales.ShouldNotContain(scale => scale.Name == RatingScaleSeed.PrimaryTraitName);
+        ratingScales.Scales.ShouldNotContain(scale => scale.Name == RatingScaleSeed.FivePointNumericName);
+    }
+
+    [Fact]
+    public async Task UpdateRatingScales_RemovingTheReferencedSeededScale_Returns409InUse()
+    {
+        // The positive control for the gate becoming real in TASK-0072 stage 2a: without this, a
+        // bug that refused every removal for ANY reason would still make the test above pass.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+
+        var command = new UpdateRatingScalesCommand([CustomScale()], ExpectedVersion: 0, Reason: null);
+        var response = await PutAsync(RatingScalesUrl, jar, command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.ratingscales.in_use");
     }
 
     [Fact]
@@ -142,12 +168,16 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         var jar = await SignInAsSuperAdminAsync();
 
-        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0)));
-        var scaleId = created.Scales[0].Id;
-        var pointIds = created.Scales[0].Points.Select(point => point.Id).ToList();
+        var createCommand = await PreservingNurseryDevelopmentAsync(jar, CustomScale(), expectedVersion: 0);
+        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, createCommand));
+        var custom = created.Scales.Single(scale => scale.Name == "Custom");
+        var scaleId = custom.Id;
+        var pointIds = custom.Points.Select(point => point.Id).ToList();
+        var nursery = createCommand.Scales.Single(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
 
         var resubmit = new UpdateRatingScalesCommand(
             [
+                nursery,
                 new RatingScaleInput(
                     "Custom",
                     [
@@ -164,8 +194,9 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var resaved = await ReadAsync<SettingsRatingScaleGroupDto>(response);
         resaved.VersionNumber.ShouldBe(2);
-        resaved.Scales[0].Id.ShouldBe(scaleId);
-        resaved.Scales[0].Points.Select(point => point.Id).ShouldBe(pointIds, ignoreOrder: true);
+        var resavedCustom = resaved.Scales.Single(scale => scale.Name == "Custom");
+        resavedCustom.Id.ShouldBe(scaleId);
+        resavedCustom.Points.Select(point => point.Id).ShouldBe(pointIds, ignoreOrder: true);
     }
 
     [Fact]
@@ -175,12 +206,16 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         var jar = await SignInAsSuperAdminAsync();
 
-        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, CustomScale(expectedVersion: 0)));
-        var scaleId = created.Scales[0].Id;
-        var pointIds = created.Scales[0].Points.Select(point => point.Id).ToList();
+        var createCommand = await PreservingNurseryDevelopmentAsync(jar, CustomScale(), expectedVersion: 0);
+        var created = await ReadAsync<SettingsRatingScaleGroupDto>(await PutAsync(RatingScalesUrl, jar, createCommand));
+        var custom = created.Scales.Single(scale => scale.Name == "Custom");
+        var scaleId = custom.Id;
+        var pointIds = custom.Points.Select(point => point.Id).ToList();
+        var nursery = createCommand.Scales.Single(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
 
         var rename = new UpdateRatingScalesCommand(
             [
+                nursery,
                 new RatingScaleInput(
                     "Renamed",
                     [
@@ -196,8 +231,8 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var renamed = await ReadAsync<SettingsRatingScaleGroupDto>(response);
-        renamed.Scales[0].Id.ShouldBe(scaleId);
-        renamed.Scales[0].Name.ShouldBe("Renamed");
+        var renamedScale = renamed.Scales.Single(scale => scale.Id == scaleId);
+        renamedScale.Name.ShouldBe("Renamed");
     }
 
     [Fact]
@@ -225,10 +260,35 @@ public sealed class SettingsRatingScalesEndpointsTests(ApiTestFixture fixture) :
         document.RootElement.GetProperty("scaleIndex").GetInt32().ShouldBe(0);
     }
 
-    private static UpdateRatingScalesCommand CustomScale(int expectedVersion) => new(
-        [new RatingScaleInput("Custom", [new RatingScalePointInput("N", "Needs Improvement", 1), new RatingScalePointInput("E", "Excellent", 2)])],
-        expectedVersion,
-        null);
+    // TASK-0072 stage 2a: the seeded "Nursery development" scale is now referenced by the seeded
+    // nursery development domains (RatingScaleUsageGate is a real query from this stage on), so ANY
+    // submission that omits it is refused 409 settings.ratingscales.in_use. These tests are about the
+    // rating-scales group's own behaviour (version, id stability, removing an UNREFERENCED scale), not
+    // about the in-use gate itself, so every submission below echoes the Nursery development scale back
+    // unchanged (by id) alongside whatever it is actually testing.
+    private static RatingScaleInput CustomScale() =>
+        new("Custom", [new RatingScalePointInput("N", "Needs Improvement", 1), new RatingScalePointInput("E", "Excellent", 2)]);
+
+    private static RatingScaleInput ToInput(RatingScaleDto scale) => new(
+        scale.Name,
+        scale.Points
+            .Select(point => new RatingScalePointInput(point.PointCode, point.PointLabel, point.PointOrder, Guid.Parse(point.Id)))
+            .ToList(),
+        Guid.Parse(scale.Id));
+
+    private async Task<RatingScaleInput> GetUnchangedNurseryDevelopmentScaleAsync(CookieJar jar)
+    {
+        var settings = await ReadAsync<SettingsDto>(await GetAsync(SettingsUrl, jar));
+        var nursery = settings.RatingScales.Scales.Single(scale => scale.Name == RatingScaleSeed.NurseryDevelopmentName);
+        return ToInput(nursery);
+    }
+
+    private async Task<UpdateRatingScalesCommand> PreservingNurseryDevelopmentAsync(
+        CookieJar jar, RatingScaleInput scale, int expectedVersion)
+    {
+        var nursery = await GetUnchangedNurseryDevelopmentScaleAsync(jar);
+        return new UpdateRatingScalesCommand([nursery, scale], expectedVersion, null);
+    }
 
     private async Task<CookieJar> SignInAsSuperAdminAsync()
     {

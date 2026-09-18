@@ -255,6 +255,11 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // migration-seeded rows, not an empty table.
         await ReseedRatingScalesAsync(context, cancellationToken);
 
+        // TASK-0072 stage 2a: same reasoning, for spec 6.2.13 / Appendix E.3's four seeded nursery
+        // development domains and 45 indicators — DevelopmentDomainRepositoryTests' fresh-database
+        // assertions need the REAL migration-seeded rows, not an empty table.
+        await ReseedDevelopmentDomainsAsync(context, cancellationToken);
+
         // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
         // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
         // shipped two seeds without this and its fresh-database criterion failed in review; this card
@@ -480,6 +485,57 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                     """,
                     cancellationToken);
                 pointIndex++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13 / Appendix E.3's four seeded nursery development domains and their 45
+    /// indicators, using the SAME fixed ids
+    /// <see cref="DevelopmentDomainConfiguration.SeededIds"/>/<see cref="DevelopmentIndicatorConfiguration.AllSeededIds"/>
+    /// the migration itself seeds with — see <see cref="ReseedGradingBandsAsync"/>'s remarks for why.
+    /// Domains are inserted before indicators, matching the migration's own order.
+    /// </summary>
+    private static async Task ReseedDevelopmentDomainsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var domainIds = DevelopmentDomainConfiguration.SeededIds;
+        var nurseryDevelopmentScaleId = RatingScaleConfiguration.SeededIds[0];
+
+        for (var domainIndex = 0; domainIndex < DevelopmentDomainSeed.NurseryDomains.Count; domainIndex++)
+        {
+            var domain = DevelopmentDomainSeed.NurseryDomains[domainIndex];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO development_domain
+                    (id, section_id, name, display_order, rating_scale_id, allows_indicator_comment, status)
+                VALUES
+                    ({domainIds[domainIndex]}, {SeededClassLevels.NurserySectionId}, {domain.Name},
+                     {domain.DisplayOrder}, {nurseryDevelopmentScaleId}, {domain.AllowsIndicatorComment},
+                     {DevelopmentDomainStatus.Active.ToString()})
+                """,
+                cancellationToken);
+        }
+
+        var indicatorIds = DevelopmentIndicatorConfiguration.AllSeededIds;
+        var indicatorIndex = 0;
+
+        for (var domainIndex = 0; domainIndex < DevelopmentDomainSeed.NurseryDomains.Count; domainIndex++)
+        {
+            var domain = DevelopmentDomainSeed.NurseryDomains[domainIndex];
+            var domainId = domainIds[domainIndex];
+
+            foreach (var indicator in domain.Indicators)
+            {
+                await context.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO development_indicator (id, domain_id, name, display_order, status)
+                    VALUES
+                        ({indicatorIds[indicatorIndex]}, {domainId}, {indicator.Name},
+                         {indicator.DisplayOrder}, {DevelopmentIndicatorStatus.Active.ToString()})
+                    """,
+                    cancellationToken);
+                indicatorIndex++;
             }
         }
     }
