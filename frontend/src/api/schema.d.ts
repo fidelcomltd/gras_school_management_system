@@ -1087,6 +1087,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/result-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the result rules
+         * @description Tie-break, position scope, level position, pass mark and minimum subjects for position the computation engine reads (spec 6.2.8). A fresh database returns 6.2.8's seeded defaults, with `coreSubjectIds` empty until the administrator sets it.
+         */
+        get: operations["GetResultRules"];
+        /**
+         * Replace the result rules
+         * @description The whole row as one save (spec 6.2.8). `expectedVersion` must match the result-rules group's current `versionNumber` (from `GET /settings/result-rules`) or the save is rejected `409 settings.resultrules.stale_version` before anything is written. `primaryPositionScope` and `tieBreakRule` are rejected `409 settings.resultrules.locked` once any result set is Published in the active session; `annualMethod` and the three weights are rejected the same way once Third Term is published for any arm (spec 6.2.10) — changing a locked field to its current value is not a change and is never refused. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateResultRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-versions": {
         parameters: {
             query?: never;
@@ -1618,6 +1642,14 @@ export interface components {
          * @enum {unknown}
          */
         AdmissionType: "New" | "Returning";
+        /**
+         * @description How the annual average is computed from the three terminal averages (spec 6.2.8). Stored as a
+         *     string (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`), so a future member is a
+         *     code-only change, matching RegNumberSerialReset's convention.
+         * @example SimpleAverage
+         * @enum {unknown}
+         */
+        AnnualMethod: "SimpleAverage" | "Weighted";
         /**
          * @description `POST /api/v1/admissions/{id}/approve` (spec 6.5.10, 6.5.11 step 9, 6.5.14). Id is the PUPIL id, the same identity `PATCH /admissions/{id}` already uses. The
          *             only route into `PupilStatus.Active` for a new record: in ONE transaction, issues the
@@ -3722,6 +3754,13 @@ export interface components {
             dryRun: boolean;
         };
         /**
+         * @description Which position is printed as "Position in Class" (spec 6.2.8). Stored as a string
+         *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
+         * @example Arm
+         * @enum {unknown}
+         */
+        PrimaryPositionScope: "Arm" | "Level";
+        /**
          * @description One row of the privilege register (spec 4.4).
          * @example {
          *       "code": "result.score.enter",
@@ -4141,6 +4180,88 @@ export interface components {
              *     ordinary edit under 6.2.9"); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks.
              */
             reason: null | string;
+        };
+        /**
+         * @description The result-rules wire shape (spec 6.2.8) — both `GET /api/v1/settings/result-rules`'s
+         *     success body and `PUT /api/v1/settings/result-rules`'s success body.
+         * @example {
+         *       "annualMethod": "SimpleAverage",
+         *       "weightFirst": null,
+         *       "weightSecond": null,
+         *       "weightThird": null,
+         *       "primaryPositionScope": "Arm",
+         *       "showLevelPosition": true,
+         *       "tieBreakRule": "SharedPosition",
+         *       "passMark": 40,
+         *       "promotionThreshold": 40,
+         *       "requireCorePass": true,
+         *       "coreSubjectIds": [],
+         *       "minSubjectsForPosition": 1,
+         *       "versionNumber": 0
+         *     }
+         */
+        ResultRulesDto: {
+            /** @description Simple average or weighted. */
+            annualMethod: components["schemas"]["AnnualMethod"];
+            /**
+             * Format: int32
+             * @description Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100.
+             */
+            weightFirst: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightSecond: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightThird: null | number | string;
+            /** @description Which position prints as Position in Class: arm or level. */
+            primaryPositionScope: components["schemas"]["PrimaryPositionScope"];
+            /**
+             * @description Whether a second, level-wide position line prints alongside the arm position.
+             * @example true
+             */
+            showLevelPosition: boolean;
+            /** @description How a tied position is broken. */
+            tieBreakRule: components["schemas"]["TieBreakRule"];
+            /**
+             * Format: int32
+             * @description 0 to 100. A subject total at or above this is a pass.
+             * @example 40
+             */
+            passMark: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100. Annual average at or above this proposes promotion.
+             * @example 40
+             */
+            promotionThreshold: number | string;
+            /**
+             * @description When true, promotion also requires a pass in every core subject.
+             * @example true
+             */
+            requireCorePass: boolean;
+            /**
+             * @description Required non-empty when RequireCorePass is true. Every id an existing active subject.
+             * @example []
+             */
+            coreSubjectIds: string[];
+            /**
+             * Format: int32
+             * @description A pupil with fewer scored subjects than this is excluded from position ranking.
+             * @example 1
+             */
+            minSubjectsForPosition: number | string;
+            /**
+             * Format: int32
+             * @description The result-rules group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
         };
         /**
          * @description A ResultSet's lifecycle state (spec 09 §6.7.11). A result set that does not exist
@@ -5957,6 +6078,13 @@ export interface components {
          */
         TermState: "Upcoming" | "Active" | "Closed";
         /**
+         * @description How a tied subject/annual total is broken for position ranking (spec 6.2.8). Stored as a string
+         *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
+         * @example SharedPosition
+         * @enum {unknown}
+         */
+        TieBreakRule: "SharedPosition" | "ExamThenCa" | "ExamThenAlphabetical";
+        /**
          * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
          *             string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: "the
          *             save writes an audit event with a mandatory reason") — deliberately NO 10-character floor, unlike
@@ -6506,6 +6634,98 @@ export interface components {
              * @example 0
              */
             expectedVersion: number | string;
+        };
+        /**
+         * @description `PUT /api/v1/settings/result-rules` (spec 6.2.8). A REPLACE of the whole singleton row — there
+         *             is no partial edit, matching UpdateGradingCommand's blind-replace shape rather than
+         *             UpdateAssessmentCommand's per-row identity (this row has no children to preserve
+         *             identity for).
+         * @example {
+         *       "annualMethod": "SimpleAverage",
+         *       "weightFirst": null,
+         *       "weightSecond": null,
+         *       "weightThird": null,
+         *       "primaryPositionScope": "Arm",
+         *       "showLevelPosition": true,
+         *       "tieBreakRule": "SharedPosition",
+         *       "passMark": 40,
+         *       "promotionThreshold": 40,
+         *       "requireCorePass": true,
+         *       "coreSubjectIds": [],
+         *       "minSubjectsForPosition": 1,
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateResultRulesCommand: {
+            /** @description Simple average or weighted. Locked once Third Term is published for any arm (spec 6.2.10). */
+            annualMethod: components["schemas"]["AnnualMethod"];
+            /**
+             * Format: int32
+             * @description Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100. Locked with AnnualMethod.
+             */
+            weightFirst: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightSecond: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightThird: null | number | string;
+            /** @description Arm or level. Locked once anything is published in the active session (spec 6.2.10). */
+            primaryPositionScope: components["schemas"]["PrimaryPositionScope"];
+            /**
+             * @description Whether a second, level-wide position line prints alongside the arm position.
+             * @example true
+             */
+            showLevelPosition: boolean;
+            /** @description How a tied position is broken. Locked once anything is published in the active session (spec 6.2.10). */
+            tieBreakRule: components["schemas"]["TieBreakRule"];
+            /**
+             * Format: int32
+             * @description 0 to 100. A subject total at or above this is a pass.
+             * @example 40
+             */
+            passMark: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100. Annual average at or above this proposes promotion.
+             * @example 40
+             */
+            promotionThreshold: number | string;
+            /**
+             * @description When true, promotion also requires a pass in every core subject.
+             * @example true
+             */
+            requireCorePass: boolean;
+            /**
+             * @description Required non-empty when RequireCorePass is true. Every id must be an existing active subject.
+             * @example []
+             */
+            coreSubjectIds: string[];
+            /**
+             * Format: int32
+             * @description At least 1. A pupil with fewer scored subjects than this is excluded from position ranking.
+             * @example 1
+             */
+            minSubjectsForPosition: number | string;
+            /**
+             * Format: int32
+             * @description The result-rules group's current `versionNumber`, as last read from
+             *     `GET /settings/result-rules`. A stale value is rejected
+             *     `409 settings.resultrules.stale_version` before anything is written, checked BEFORE the 6.2.9
+             *     reason gate — matches `UpdateAssessmentCommandHandler`'s documented ORDER OF CHECKS.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks.
+             */
+            reason: null | string;
         };
         /**
          * @description `PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):
@@ -11860,6 +12080,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsAssessmentGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetResultRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultRulesDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateResultRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateResultRulesCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultRulesDto"];
                 };
             };
             /** @description Unauthorized */

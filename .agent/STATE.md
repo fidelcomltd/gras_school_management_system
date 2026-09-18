@@ -158,9 +158,9 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **STALE against this hash** — it matches `c5c4d6c6…` (TASK-0079). TASK-0080
-  regenerates it: 1 path / 5 schemas from TASK-0077. **No new wrapper code needed** — the new surface is
-  `GET` + `PUT` on one path and `apiPut` already exists as of TASK-0079, so this is types only.
+- Frontend client is **CURRENT against this hash** as of 2026-09-18 (TASK-0080). `check:api-drift` re-run by
+  the orchestrator: `No drift`, exit 0; `npm run verify` 55 files / 381 tests / build clean, exit 0. Types only,
+  zero new wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
   from application code yet.
@@ -174,7 +174,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -198,7 +198,6 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0080 | Regenerate the typed client against `84b46211…` | frontend-dev | **queued 2026-09-18** — 1 path / 5 schemas from TASK-0077. Types only; no new wrapper code (`apiPut` landed in 0079) |
 | TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **DISPATCHABLE 2026-09-18** — 0076 and 0077 both closed; both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
@@ -207,6 +206,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **TASK-0080 closed — client current against `84b46211…`**, one generated file, zero wrapper code. Drift and
+  verify re-run by the orchestrator (381 tests, Skipped 0). First dispatch under the `LEDGER ACCOUNT` rule; held. → `decisions/2026-Q3.md`
 - 2026-09-18 **HUMAN RULING on the seeded result rules: keep `requireCorePass: true` and the strict validator.**
   The screen requires core subjects on first save (pre-selects English + Mathematics, admin confirms); Third Term
   publication and promotion refuse the incomplete state. Rejected: seed false, validator exemption. → `decisions/2026-Q3.md`
