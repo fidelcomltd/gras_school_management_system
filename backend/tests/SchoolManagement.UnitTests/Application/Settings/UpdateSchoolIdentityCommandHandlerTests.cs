@@ -35,7 +35,9 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
             Array.Empty<AssessmentComponent>(),
             ResultRules.CreateSeed(Guid.CreateVersion7()),
             Array.Empty<RatingScale>(),
-            Array.Empty<DevelopmentDomain>()));
+            Array.Empty<DevelopmentDomain>(),
+            Array.Empty<Trait>(),
+            Array.Empty<TraitBlock>()));
 
         return new(
             _schoolProfileRepository,

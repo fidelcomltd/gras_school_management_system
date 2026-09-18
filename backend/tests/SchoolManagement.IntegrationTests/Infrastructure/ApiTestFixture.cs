@@ -260,6 +260,11 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // assertions need the REAL migration-seeded rows, not an empty table.
         await ReseedDevelopmentDomainsAsync(context, cancellationToken);
 
+        // TASK-0072 stage 3b: same reasoning, for spec 6.2.7 / Appendix F.3's 11 seeded affective and
+        // 8 seeded psychomotor traits, plus the two trait_block rows — SettingsTraitsEndpointsTests'
+        // fresh-database assertions need the REAL migration-seeded rows, not an empty table.
+        await ReseedTraitsAsync(context, cancellationToken);
+
         // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
         // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
         // shipped two seeds without this and its fresh-database criterion failed in review; this card
@@ -538,6 +543,50 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 indicatorIndex++;
             }
         }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.7 / Appendix F.3's 19 seeded traits (11 affective, 8 psychomotor) and the
+    /// two seeded trait_block rows (both pointing at the Primary trait scale), using the SAME fixed
+    /// ids <see cref="TraitConfiguration.AllSeededIds"/> the migration itself seeds with — see
+    /// <see cref="ReseedGradingBandsAsync"/>'s remarks for why. Traits are inserted before nothing
+    /// (trait_block has no FK to trait) but AFTER rating_scale, whose seeded row trait_block's FK needs.
+    /// </summary>
+    private static async Task ReseedTraitsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var traitIds = TraitConfiguration.AllSeededIds;
+        var allTraits = TraitSeed.AffectiveTraits.Concat(TraitSeed.PsychomotorTraits).ToList();
+
+        for (var index = 0; index < allTraits.Count; index++)
+        {
+            var trait = allTraits[index];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO trait (id, domain, name, display_order, status)
+                VALUES
+                    ({traitIds[index]}, {trait.Domain.ToString()}, {trait.Name}, {trait.DisplayOrder}, {TraitStatus.Active.ToString()})
+                """,
+                cancellationToken);
+        }
+
+        var primaryTraitScaleId = RatingScaleConfiguration.SeededIds[1];
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO trait_block (id, rating_scale_id)
+            VALUES
+                ({TraitDomain.Affective.ToString()}, {primaryTraitScaleId})
+            """,
+            cancellationToken);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO trait_block (id, rating_scale_id)
+            VALUES
+                ({TraitDomain.Psychomotor.ToString()}, {primaryTraitScaleId})
+            """,
+            cancellationToken);
     }
 
     /// <summary>Creates a scope for resolving application services inside a test.</summary>

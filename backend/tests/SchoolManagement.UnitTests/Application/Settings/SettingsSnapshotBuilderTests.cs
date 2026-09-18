@@ -26,7 +26,8 @@ public sealed class SettingsSnapshotBuilderTests
             assessmentVersionNumber: 5,
             resultRulesVersionNumber: 6,
             ratingScalesVersionNumber: 7,
-            developmentDomainsVersionNumber: 8);
+            developmentDomainsVersionNumber: 8,
+            traitsVersionNumber: 9);
 
         var band = GradingBand.Create(Guid.CreateVersion7(), 50, 100, "P", "Pass", displayOrder: 1);
         var component = AssessmentComponent.Create(Guid.CreateVersion7(), "Exam", "EXAM", 100, isExamination: true, displayOrder: 1);
@@ -49,12 +50,17 @@ public sealed class SettingsSnapshotBuilderTests
             DevelopmentDomainStatus.Active,
             [DevelopmentIndicator.Create(Guid.CreateVersion7(), domainId, "Ability to Count", 1, DevelopmentIndicatorStatus.Active)]);
 
+        var trait = Trait.Create(Guid.CreateVersion7(), TraitDomain.Affective, "Punctuality", 1, TraitStatus.Active);
+        var traitBlock = TraitBlock.Create(TraitDomain.Affective, scaleId);
+
         var state = new SettingsSnapshotState(
             [band],
             [component],
             resultRules,
             [scale],
-            [domain]);
+            [domain],
+            [trait],
+            [traitBlock]);
 
         var json = SettingsSnapshotBuilder.Build(profile, state);
         var node = JsonNode.Parse(json)!.AsObject();
@@ -75,6 +81,8 @@ public sealed class SettingsSnapshotBuilderTests
             "resultRules",
             "resultRulesVersionNumber",
             "schoolProfile",
+            "traits",
+            "traitsVersionNumber",
         }.Order(StringComparer.Ordinal).ToList();
 
         topLevelKeys.ShouldBe(expectedKeys);
@@ -96,5 +104,9 @@ public sealed class SettingsSnapshotBuilderTests
         node["resultRulesVersionNumber"]!.GetValue<int>().ShouldBe(6);
         node["ratingScalesVersionNumber"]!.GetValue<int>().ShouldBe(7);
         node["developmentDomainsVersionNumber"]!.GetValue<int>().ShouldBe(8);
+        node["traits"]!["affectiveRatingScaleId"]!.GetValue<string>().ShouldBe(scaleId.ToString());
+        node["traits"]!["items"]!.AsArray().Count.ShouldBe(1);
+        node["traits"]!["items"]![0]!["name"]!.GetValue<string>().ShouldBe("Punctuality");
+        node["traitsVersionNumber"]!.GetValue<int>().ShouldBe(9);
     }
 }

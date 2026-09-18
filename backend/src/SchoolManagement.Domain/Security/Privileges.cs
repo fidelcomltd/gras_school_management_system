@@ -106,7 +106,11 @@ public static class Privileges
         /// </summary>
         public const string AssessmentUpdate = "settings.assessment.update";
 
-        /// <summary>Edit the affective and psychomotor trait lists and the trait rating scale.</summary>
+        /// <summary>
+        /// Edit the affective and psychomotor trait lists and which rating scale each block is rated
+        /// against (spec 6.2.13; TASK-0072 stage 3b: each trait block references its own
+        /// <see cref="RatingScalesUpdate"/>-managed scale by id, not one shared school-wide scale).
+        /// </summary>
         public const string TraitsUpdate = "settings.traits.update";
 
         /// <summary>

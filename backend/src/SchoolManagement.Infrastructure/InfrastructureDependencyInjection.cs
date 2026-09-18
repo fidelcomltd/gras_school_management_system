@@ -199,6 +199,11 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IDevelopmentDomainRepository, DevelopmentDomainRepository>();
         services.AddScoped<IDevelopmentIndicatorUsageGate, DevelopmentIndicatorUsageGate>();
 
+        // TASK-0072 stage 3b: traits. ITraitUsageGate is a documented stand-in that returns false until
+        // Phase 3 creates a rating table — same pattern as IDevelopmentIndicatorUsageGate.
+        services.AddScoped<ITraitRepository, TraitRepository>();
+        services.AddScoped<ITraitUsageGate, TraitUsageGate>();
+
         // TASK-0072 stage 3a: one seam every settings handler asks for the whole config_version
         // snapshot input through, replacing the one-repository-per-OTHER-group constructor ripple —
         // see ISettingsSnapshotSource's own remarks.

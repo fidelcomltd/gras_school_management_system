@@ -14,6 +14,7 @@ namespace SchoolManagement.Application.Settings;
 /// <param name="Assessment">The assessment-structure group (TASK-0069).</param>
 /// <param name="RatingScales">The rating-scales group (TASK-0072 stage 1).</param>
 /// <param name="DevelopmentDomains">The development-domains group, nursery only (TASK-0072 stage 2b).</param>
+/// <param name="Traits">The traits group (TASK-0072 stage 3b).</param>
 public sealed record SettingsDto(
     SettingsIdentityGroupDto Identity,
     SettingsAbbreviationGroupDto Abbreviation,
@@ -21,7 +22,8 @@ public sealed record SettingsDto(
     SettingsGradingGroupDto Grading,
     SettingsAssessmentGroupDto Assessment,
     SettingsRatingScaleGroupDto RatingScales,
-    SettingsDevelopmentDomainGroupDto DevelopmentDomains);
+    SettingsDevelopmentDomainGroupDto DevelopmentDomains,
+    SettingsTraitsGroupDto Traits);
 
 /// <summary>
 /// The school identity group, both inside <see cref="SettingsDto"/> and as

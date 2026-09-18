@@ -2,6 +2,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Application.Settings;
 
@@ -13,7 +14,8 @@ internal sealed class GetSettingsQueryHandler(
     IAssessmentComponentRepository assessmentComponentRepository,
     IRatingScaleRepository ratingScaleRepository,
     IDevelopmentDomainRepository developmentDomainRepository,
-    ISectionRepository sectionRepository)
+    ISectionRepository sectionRepository,
+    ITraitRepository traitRepository)
     : IRequestHandler<GetSettingsQuery, Result<SettingsDto>>
 {
     /// <inheritdoc />
@@ -38,6 +40,11 @@ internal sealed class GetSettingsQueryHandler(
         var sections = await sectionRepository.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false);
         var sectionNamesById = sections.ToDictionary(section => section.Id, section => section.Name);
 
+        var traits = await traitRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var traitBlocks = await traitRepository.ListBlocksReadOnlyAsync(cancellationToken).ConfigureAwait(false);
+        var affectiveScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Affective)?.RatingScaleId ?? Guid.Empty;
+        var psychomotorScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Psychomotor)?.RatingScaleId ?? Guid.Empty;
+
         return Result.Success(new SettingsDto(
             SettingsMapper.ToIdentityDto(profile),
             SettingsMapper.ToAbbreviationDto(profile, issuedCount),
@@ -45,6 +52,7 @@ internal sealed class GetSettingsQueryHandler(
             SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber),
             SettingsMapper.ToAssessmentDto(components, profile.AssessmentVersionNumber),
             SettingsMapper.ToRatingScalesDto(ratingScales, profile.RatingScalesVersionNumber),
-            SettingsMapper.ToDevelopmentDomainsDto(domains, sectionNamesById, profile.DevelopmentDomainsVersionNumber)));
+            SettingsMapper.ToDevelopmentDomainsDto(domains, sectionNamesById, profile.DevelopmentDomainsVersionNumber),
+            SettingsMapper.ToTraitsDto(traits, affectiveScaleId, psychomotorScaleId, profile.TraitsVersionNumber)));
     }
 }

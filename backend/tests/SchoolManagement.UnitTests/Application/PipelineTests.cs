@@ -131,6 +131,11 @@ public sealed class PipelineTests
         // group itself — same treatment as every other port stubbed above.
         services.AddSingleton(Substitute.For<ISettingsSnapshotSource>());
 
+        // TASK-0072 stage 3b: the traits handler depends on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository/gate stubbed above.
+        services.AddSingleton(Substitute.For<ITraitRepository>());
+        services.AddSingleton(Substitute.For<ITraitUsageGate>());
+
         // TASK-0039: the Arms/* handlers (plus UpdateSessionHandler/GetSessionHandler's new arm-count
         // read) depend on this port, implemented by Infrastructure — same treatment as every other
         // repository stubbed above.
