@@ -8287,6 +8287,205 @@
         }
       }
     },
+    "/api/v1/settings/result-rules": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the result rules",
+        "description": "Tie-break, position scope, level position, pass mark and minimum subjects for position the computation engine reads (spec 6.2.8). A fresh database returns 6.2.8's seeded defaults, with `coreSubjectIds` empty until the administrator sets it.",
+        "operationId": "GetResultRules",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultRulesDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Replace the result rules",
+        "description": "The whole row as one save (spec 6.2.8). `expectedVersion` must match the result-rules group's current `versionNumber` (from `GET /settings/result-rules`) or the save is rejected `409 settings.resultrules.stale_version` before anything is written. `primaryPositionScope` and `tieBreakRule` are rejected `409 settings.resultrules.locked` once any result set is Published in the active session; `annualMethod` and the three weights are rejected the same way once Third Term is published for any arm (spec 6.2.10) — changing a locked field to its current value is not a change and is never refused. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.",
+        "operationId": "UpdateResultRules",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResultRulesCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultRulesDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config-versions": {
       "get": {
         "tags": [
@@ -11000,6 +11199,14 @@
         ],
         "description": "An AdmissionRecord's section A \"New / Returning\" tick (spec 6.5.9).",
         "example": "New"
+      },
+      "AnnualMethod": {
+        "enum": [
+          "SimpleAverage",
+          "Weighted"
+        ],
+        "description": "How the annual average is computed from the three terminal averages (spec 6.2.8). Stored as a\nstring (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`), so a future member is a\ncode-only change, matching RegNumberSerialReset's convention.",
+        "example": "SimpleAverage"
       },
       "ApproveAdmissionCommand": {
         "required": [
@@ -13749,6 +13956,14 @@
           "dryRun": true
         }
       },
+      "PrimaryPositionScope": {
+        "enum": [
+          "Arm",
+          "Level"
+        ],
+        "description": "Which position is printed as \"Position in Class\" (spec 6.2.8). Stored as a string\n(`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).",
+        "example": "Arm"
+      },
       "PrivilegeDescriptorDto": {
         "required": [
           "code",
@@ -14330,6 +14545,144 @@
         "example": {
           "expectedVersion": 3,
           "reason": null
+        }
+      },
+      "ResultRulesDto": {
+        "required": [
+          "annualMethod",
+          "weightFirst",
+          "weightSecond",
+          "weightThird",
+          "primaryPositionScope",
+          "showLevelPosition",
+          "tieBreakRule",
+          "passMark",
+          "promotionThreshold",
+          "requireCorePass",
+          "coreSubjectIds",
+          "minSubjectsForPosition",
+          "versionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "annualMethod": {
+            "description": "Simple average or weighted.",
+            "$ref": "#/components/schemas/AnnualMethod"
+          },
+          "weightFirst": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100.",
+            "format": "int32"
+          },
+          "weightSecond": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "See WeightFirst.",
+            "format": "int32"
+          },
+          "weightThird": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "See WeightFirst.",
+            "format": "int32"
+          },
+          "primaryPositionScope": {
+            "description": "Which position prints as Position in Class: arm or level.",
+            "$ref": "#/components/schemas/PrimaryPositionScope"
+          },
+          "showLevelPosition": {
+            "type": "boolean",
+            "description": "Whether a second, level-wide position line prints alongside the arm position.",
+            "example": true
+          },
+          "tieBreakRule": {
+            "description": "How a tied position is broken.",
+            "$ref": "#/components/schemas/TieBreakRule"
+          },
+          "passMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100. A subject total at or above this is a pass.",
+            "format": "int32",
+            "example": 40
+          },
+          "promotionThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100. Annual average at or above this proposes promotion.",
+            "format": "int32",
+            "example": 40
+          },
+          "requireCorePass": {
+            "type": "boolean",
+            "description": "When true, promotion also requires a pass in every core subject.",
+            "example": true
+          },
+          "coreSubjectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Required non-empty when RequireCorePass is true. Every id an existing active subject.",
+            "example": [ ]
+          },
+          "minSubjectsForPosition": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "A pupil with fewer scored subjects than this is excluded from position ranking.",
+            "format": "int32",
+            "example": 1
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The result-rules group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next save.",
+            "format": "int32",
+            "example": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result-rules wire shape (spec 6.2.8) — both `GET /api/v1/settings/result-rules`'s\nsuccess body and `PUT /api/v1/settings/result-rules`'s success body.",
+        "example": {
+          "annualMethod": "SimpleAverage",
+          "weightFirst": null,
+          "weightSecond": null,
+          "weightThird": null,
+          "primaryPositionScope": "Arm",
+          "showLevelPosition": true,
+          "tieBreakRule": "SharedPosition",
+          "passMark": 40,
+          "promotionThreshold": 40,
+          "requireCorePass": true,
+          "coreSubjectIds": [ ],
+          "minSubjectsForPosition": 1,
+          "versionNumber": 0
         }
       },
       "ResultSetState": {
@@ -16679,6 +17032,15 @@
         "description": "Lifecycle of a Term (spec 6.3.4, 6.3.6). Only one term system-wide may be\nTermState.Active — enforced by a partial unique index (spec 6.3.9), not application code.",
         "example": "Upcoming"
       },
+      "TieBreakRule": {
+        "enum": [
+          "SharedPosition",
+          "ExamThenCa",
+          "ExamThenAlphabetical"
+        ],
+        "description": "How a tied subject/annual total is broken for position ranking (spec 6.2.8). Stored as a string\n(`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).",
+        "example": "SharedPosition"
+      },
       "UpdateAbbreviationCommand": {
         "required": [
           "abbreviation",
@@ -17489,6 +17851,153 @@
           "serialWidth": 4,
           "serialReset": "PerYear",
           "expectedVersion": 0
+        }
+      },
+      "UpdateResultRulesCommand": {
+        "required": [
+          "annualMethod",
+          "weightFirst",
+          "weightSecond",
+          "weightThird",
+          "primaryPositionScope",
+          "showLevelPosition",
+          "tieBreakRule",
+          "passMark",
+          "promotionThreshold",
+          "requireCorePass",
+          "coreSubjectIds",
+          "minSubjectsForPosition",
+          "expectedVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "annualMethod": {
+            "description": "Simple average or weighted. Locked once Third Term is published for any arm (spec 6.2.10).",
+            "$ref": "#/components/schemas/AnnualMethod"
+          },
+          "weightFirst": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100. Locked with AnnualMethod.",
+            "format": "int32"
+          },
+          "weightSecond": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "See WeightFirst.",
+            "format": "int32"
+          },
+          "weightThird": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "See WeightFirst.",
+            "format": "int32"
+          },
+          "primaryPositionScope": {
+            "description": "Arm or level. Locked once anything is published in the active session (spec 6.2.10).",
+            "$ref": "#/components/schemas/PrimaryPositionScope"
+          },
+          "showLevelPosition": {
+            "type": "boolean",
+            "description": "Whether a second, level-wide position line prints alongside the arm position.",
+            "example": true
+          },
+          "tieBreakRule": {
+            "description": "How a tied position is broken. Locked once anything is published in the active session (spec 6.2.10).",
+            "$ref": "#/components/schemas/TieBreakRule"
+          },
+          "passMark": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100. A subject total at or above this is a pass.",
+            "format": "int32",
+            "example": 40
+          },
+          "promotionThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "0 to 100. Annual average at or above this proposes promotion.",
+            "format": "int32",
+            "example": 40
+          },
+          "requireCorePass": {
+            "type": "boolean",
+            "description": "When true, promotion also requires a pass in every core subject.",
+            "example": true
+          },
+          "coreSubjectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Required non-empty when RequireCorePass is true. Every id must be an existing active subject.",
+            "example": [ ]
+          },
+          "minSubjectsForPosition": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "At least 1. A pupil with fewer scored subjects than this is excluded from position ranking.",
+            "format": "int32",
+            "example": 1
+          },
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The result-rules group's current `versionNumber`, as last read from\n`GET /settings/result-rules`. A stale value is rejected\n`409 settings.resultrules.stale_version` before anything is written, checked BEFORE the 6.2.9\nreason gate — matches `UpdateAssessmentCommandHandler`'s documented ORDER OF CHECKS.",
+            "format": "int32",
+            "example": 0
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required, at least ten characters, ONLY when a result set is Published in the active session\n(spec 6.2.9); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/settings/result-rules` (spec 6.2.8). A REPLACE of the whole singleton row — there\n        is no partial edit, matching UpdateGradingCommand's blind-replace shape rather than\n        UpdateAssessmentCommand's per-row identity (this row has no children to preserve\n        identity for).",
+        "example": {
+          "annualMethod": "SimpleAverage",
+          "weightFirst": null,
+          "weightSecond": null,
+          "weightThird": null,
+          "primaryPositionScope": "Arm",
+          "showLevelPosition": true,
+          "tieBreakRule": "SharedPosition",
+          "passMark": 40,
+          "promotionThreshold": 40,
+          "requireCorePass": true,
+          "coreSubjectIds": [ ],
+          "minSubjectsForPosition": 1,
+          "expectedVersion": 0,
+          "reason": null
         }
       },
       "UpdateRoleCommand": {
