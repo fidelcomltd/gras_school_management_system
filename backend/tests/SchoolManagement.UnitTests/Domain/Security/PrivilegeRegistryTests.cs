@@ -6,16 +6,21 @@ namespace SchoolManagement.UnitTests.Domain.Security;
 /// <summary>
 /// Pins the privilege register to spec 4.4.1 through 4.4.6, transcribed independently of
 /// <see cref="PrivilegeRegistry"/> so a code change that drifts from the spec — or a future spec
-/// revision nobody updated the code for — fails a test rather than shipping silently.
+/// revision nobody updated the code for — fails a test rather than shipping silently. TASK-0072
+/// (stages 1 and 2b) added two privileges the spec's own table does not enumerate — a deliberate,
+/// human-approved product decision, not spec drift — so this is no longer a PURE spec transcription;
+/// see the two entries below marked as such.
 /// </summary>
 public sealed class PrivilegeRegistryTests
 {
     /// <summary>
-    /// Every privilege code, its <c>scopable</c> flag, its module group and its verbatim spec 4.4
-    /// "Permits" sentence, transcribed directly from spec 4.4.1 through 4.4.6, IN SPEC TABLE ORDER.
-    /// This is the register's SOURCE, independent of <see cref="PrivilegeRegistry.All"/> — do not
-    /// "simplify" this by referencing the production list. Order matters here: this is what proves
-    /// TASK-0028 dispatch 1's "row for row and in order" acceptance criterion, not just set equality.
+    /// Every privilege code, its <c>scopable</c> flag, its module group and its verbatim "Permits"
+    /// sentence, transcribed directly from spec 4.4.1 through 4.4.6 IN SPEC TABLE ORDER, with two
+    /// named exceptions inserted at the exact position <see cref="PrivilegeRegistry"/> itself puts
+    /// them (see their own comments below). This is the register's SOURCE, independent of
+    /// <see cref="PrivilegeRegistry.All"/> — do not "simplify" this by referencing the production
+    /// list. Order matters here: this is what proves TASK-0028 dispatch 1's "row for row and in
+    /// order" acceptance criterion, not just set equality.
     /// </summary>
     private static readonly (string Code, bool Scopable, PrivilegeModule Module, string Permits)[] ExpectedFromSpec =
     [
@@ -57,6 +62,21 @@ public sealed class PrivilegeRegistryTests
             "Edit default pin length, default maximum uses and the character set."),
         ("settings.reset.defaults", false, PrivilegeModule.Settings,
             "Restore the grading scale, assessment structure or trait lists to seeded values."),
+
+        // NOT from spec 4.4.2's literal table (01-actors-and-privileges.md still lists only
+        // settings.traits.update for both scales and domains) — added by two deliberate,
+        // human-approved product decisions (TASK-0072's approved contract delta,
+        // decisions/2026-Q3.md) that split rating-scale and development-domain administration into
+        // their own privileges, distinct from the trait screen. Listed here, not appended at the end
+        // of this array, because this is where PrivilegeRegistry.cs itself inserts them — immediately
+        // after settings.reset.defaults, still inside the Settings module and before Academic
+        // Structure begins. This test's actual contract (below) is exact row-for-row, in-order
+        // equality against the real registry, not against spec 4.4 alone, so the two amendments must
+        // sit at the position the registry puts them, not wherever would keep a round count tidy.
+        ("settings.ratingscales.update", false, PrivilegeModule.Settings,
+            "Add, rename, remove and reorder rating scales and their points."),
+        ("settings.developmentdomains.update", false, PrivilegeModule.Settings,
+            "Add, rename, reorder, archive and remove development domains and indicators."),
 
         // 4.4.3 Academic structure
         ("session.view", false, PrivilegeModule.AcademicStructure, "List sessions and terms."),
@@ -148,11 +168,16 @@ public sealed class PrivilegeRegistryTests
     ];
 
     [Fact]
-    public void TheRegisterHasExactlyNinetyThreePrivileges()
+    public void TheRegisterHasExactlyNinetyThreeSpecPrivilegesPlusTwoApprovedAdditions()
     {
-        // Spec 4.4: 15 + 10 + 18 + 27 + 16 + 7 = 93.
-        ExpectedFromSpec.Length.ShouldBe(93, "the transcription above is wrong, not the production code");
-        PrivilegeRegistry.All.Count.ShouldBe(93);
+        // Spec 4.4 itself still enumerates exactly 93: 15 + 10 + 18 + 27 + 16 + 7. TASK-0072 stage 1
+        // and stage 2b each added one privilege beyond that table (settings.ratingscales.update,
+        // settings.developmentdomains.update) by human-approved product decision, not spec revision —
+        // see the two entries' own comments above. 95 is therefore the correct total, not a rounding
+        // of 93; if a future spec revision folds these into 4.4.2 directly, this comment (and the
+        // "NOT from spec" comments above) is what should be deleted, not the count.
+        ExpectedFromSpec.Length.ShouldBe(95, "the transcription above is wrong, not the production code");
+        PrivilegeRegistry.All.Count.ShouldBe(95);
     }
 
     [Fact]

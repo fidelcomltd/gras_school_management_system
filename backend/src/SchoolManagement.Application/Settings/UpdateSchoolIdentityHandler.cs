@@ -32,6 +32,7 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
     IAssessmentComponentRepository assessmentComponentRepository,
     IResultRulesRepository resultRulesRepository,
     IRatingScaleRepository ratingScaleRepository,
+    IDevelopmentDomainRepository developmentDomainRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -94,10 +95,11 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
         var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, components, resultRules, ratingScales),
+            SettingsSnapshotBuilder.Build(profile, bands, components, resultRules, ratingScales, developmentDomains),
             ConfigVersionGroup.Identity,
             currentUser.UserId,
             reason: null,

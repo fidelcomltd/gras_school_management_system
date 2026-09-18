@@ -87,6 +87,9 @@ internal sealed class SchoolProfileConfiguration : IEntityTypeConfiguration<Scho
         builder.Property(profile => profile.RatingScalesVersionNumber)
             .IsRequired();
 
+        builder.Property(profile => profile.DevelopmentDomainsVersionNumber)
+            .IsRequired();
+
         // Spec 6.2.2: the abbreviation is seeded `GRAS`; every other identity field is explicitly NOT
         // seeded ("Admin must supply") and so starts empty rather than a placeholder value that would
         // look like real data. Both version pointers start at 0 — "installed, never yet saved through
@@ -114,6 +117,7 @@ internal sealed class SchoolProfileConfiguration : IEntityTypeConfiguration<Scho
             AssessmentVersionNumber = 0,
             ResultRulesVersionNumber = 0,
             RatingScalesVersionNumber = 0,
+            DevelopmentDomainsVersionNumber = 0,
         });
     }
 }

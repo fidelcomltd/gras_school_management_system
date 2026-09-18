@@ -13,13 +13,15 @@ namespace SchoolManagement.Application.Settings;
 /// <param name="Grading">The grading-scale group (TASK-0069).</param>
 /// <param name="Assessment">The assessment-structure group (TASK-0069).</param>
 /// <param name="RatingScales">The rating-scales group (TASK-0072 stage 1).</param>
+/// <param name="DevelopmentDomains">The development-domains group, nursery only (TASK-0072 stage 2b).</param>
 public sealed record SettingsDto(
     SettingsIdentityGroupDto Identity,
     SettingsAbbreviationGroupDto Abbreviation,
     SettingsRegNumberGroupDto RegNumber,
     SettingsGradingGroupDto Grading,
     SettingsAssessmentGroupDto Assessment,
-    SettingsRatingScaleGroupDto RatingScales);
+    SettingsRatingScaleGroupDto RatingScales,
+    SettingsDevelopmentDomainGroupDto DevelopmentDomains);
 
 /// <summary>
 /// The school identity group, both inside <see cref="SettingsDto"/> and as

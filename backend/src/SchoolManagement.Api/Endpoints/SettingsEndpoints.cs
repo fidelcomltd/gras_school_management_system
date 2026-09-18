@@ -47,6 +47,7 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapGetResultRules(settingsGroup);
         MapUpdateResultRules(settingsGroup);
         MapUpdateRatingScales(settingsGroup);
+        MapUpdateDevelopmentDomains(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -350,6 +351,46 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "is written. `reason` is required, at least ten characters, only when a result set is " +
                 "Published in the active session (spec 6.2.9); otherwise it is ignored.")
             .Produces<SettingsRatingScaleGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateDevelopmentDomains(RouteGroupBuilder group) =>
+        group.MapPut("/development-domains", async (
+                UpdateDevelopmentDomainsCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.DevelopmentDomainsUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateDevelopmentDomains")
+            .WithSummary("Replace the nursery development domains and their indicators")
+            .WithDescription(
+                "Whole set as one array, atomic (spec 6.2.13). A domain's or indicator's `id`, when " +
+                "supplied, must match an existing row — that is how a rename/reorder/archive is told " +
+                "apart from an add or a remove, matching `PUT /settings/rating-scales`'s own " +
+                "convention. An unknown `sectionId` or `ratingScaleId` is rejected " +
+                "`422 settings.developmentdomains.unknown_section_id` / `unknown_rating_scale_id`, " +
+                "naming the offending domain's `domainIndex`; an unknown domain or indicator `id` is " +
+                "rejected `422 settings.developmentdomains.unknown_domain_id` / `unknown_indicator_id`. " +
+                "A duplicate domain name within the same section, or a duplicate indicator name within " +
+                "a domain, is rejected `422 settings.developmentdomains.duplicate_name` / " +
+                "`duplicate_indicator_name` — the same domain name is allowed in a different section. " +
+                "Archiving a submitted id is always allowed and never gated; an EXISTING domain or " +
+                "indicator whose id is absent from the submission is being removed, and is refused " +
+                "`409 settings.developmentdomains.indicator_rated` if it, or any indicator of an " +
+                "omitted domain, has ever been rated — archive it instead. `expectedVersion` must " +
+                "match the development-domains group's current `versionNumber` (from `GET /settings`) " +
+                "or the save is rejected `409` before anything is written. `reason` is required, at " +
+                "least ten characters, only when a result set is Published in the active session " +
+                "(spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsDevelopmentDomainGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

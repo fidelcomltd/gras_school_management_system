@@ -30,19 +30,21 @@ public sealed class UpdateRegNumberCommandHandlerTests
 
     private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
+    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     // TASK-0069/TASK-0077/TASK-0072: the snapshot now reads the current grading/assessment/result-rules/
-    // rating-scales state even from a save that does not touch any of them — stub all four so
-    // SettingsSnapshotBuilder.Build never sees null.
+    // rating-scales/development-domains state even from a save that does not touch any of them — stub
+    // all five so SettingsSnapshotBuilder.Build never sees null.
     private UpdateRegNumberCommandHandler CreateHandler()
     {
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
         _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
 
         return new(
             _schoolProfileRepository,
@@ -52,6 +54,7 @@ public sealed class UpdateRegNumberCommandHandlerTests
             _assessmentComponentRepository,
             _resultRulesRepository,
             _ratingScaleRepository,
+            _developmentDomainRepository,
             _currentUser,
             _auditSink,
             _timeProvider);

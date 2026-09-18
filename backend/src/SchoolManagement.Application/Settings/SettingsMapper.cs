@@ -111,6 +111,48 @@ internal static class SettingsMapper
         return new SettingsRatingScaleGroupDto(dtos, versionNumber);
     }
 
+    /// <summary>
+    /// Maps <paramref name="domains"/> (already carrying their own indicators) to the wire DTO.
+    /// <paramref name="sectionNamesById"/> resolves each domain's <c>section</c> display name — the
+    /// mapper takes it rather than a repository so a caller that has already loaded the section list
+    /// for its own id-validation need not load it twice.
+    /// </summary>
+    public static SettingsDevelopmentDomainGroupDto ToDevelopmentDomainsDto(
+        IReadOnlyList<DevelopmentDomain> domains,
+        IReadOnlyDictionary<Guid, string> sectionNamesById,
+        int versionNumber)
+    {
+        ArgumentNullException.ThrowIfNull(domains);
+        ArgumentNullException.ThrowIfNull(sectionNamesById);
+
+        var dtos = domains
+            .OrderBy(domain => domain.SectionId)
+            .ThenBy(domain => domain.DisplayOrder)
+            .Select(domain => new DevelopmentDomainDto(
+                domain.Id.ToString("D", CultureInfo.InvariantCulture),
+                domain.SectionId.ToString("D", CultureInfo.InvariantCulture),
+                sectionNamesById.TryGetValue(domain.SectionId, out var sectionName) ? sectionName : string.Empty,
+                domain.Name,
+                domain.DisplayOrder,
+                domain.RatingScaleId.ToString("D", CultureInfo.InvariantCulture),
+                domain.AllowsIndicatorComment,
+                domain.Status,
+                domain.Status == DevelopmentDomainStatus.Active
+                    ? domain.Indicators.Count(indicator => indicator.Status == DevelopmentIndicatorStatus.Active)
+                    : 0,
+                domain.Indicators
+                    .OrderBy(indicator => indicator.DisplayOrder)
+                    .Select(indicator => new DevelopmentIndicatorDto(
+                        indicator.Id.ToString("D", CultureInfo.InvariantCulture),
+                        indicator.Name,
+                        indicator.DisplayOrder,
+                        indicator.Status))
+                    .ToList()))
+            .ToList();
+
+        return new SettingsDevelopmentDomainGroupDto(dtos, versionNumber);
+    }
+
     /// <summary>Maps <paramref name="resultRules"/> to the wire DTO. <paramref name="versionNumber"/> comes from the caller's <see cref="SchoolProfile.ResultRulesVersionNumber"/> read, matching <see cref="ToGradingDto"/>'s and <see cref="ToAssessmentDto"/>'s own pattern.</summary>
     public static ResultRulesDto ToResultRulesDto(ResultRules resultRules, int versionNumber)
     {

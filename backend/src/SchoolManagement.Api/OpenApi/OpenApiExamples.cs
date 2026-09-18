@@ -217,6 +217,25 @@ internal static class OpenApiExamples
                   { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true, "displayOrder": 3 }
                 ],
                 "versionNumber": 0
+              },
+              "developmentDomains": {
+                "domains": [
+                  {
+                    "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+                    "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+                    "section": "Nursery",
+                    "name": "Personal & Physical Development",
+                    "displayOrder": 3,
+                    "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                    "allowsIndicatorComment": true,
+                    "status": "Active",
+                    "activeIndicatorCount": 1,
+                    "indicators": [
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901", "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+                    ]
+                  }
+                ],
+                "versionNumber": 0
               }
             }
             """,
@@ -353,6 +372,96 @@ internal static class OpenApiExamples
                     { "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
                     { "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
                     { "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                  ]
+                }
+              ],
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(DevelopmentIndicatorDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+              "name": "Potty trained",
+              "displayOrder": 1,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(DevelopmentDomainDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+              "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+              "section": "Nursery",
+              "name": "Personal & Physical Development",
+              "displayOrder": 3,
+              "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+              "allowsIndicatorComment": true,
+              "status": "Active",
+              "activeIndicatorCount": 1,
+              "indicators": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901", "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+              ]
+            }
+            """,
+
+        [typeof(SettingsDevelopmentDomainGroupDto)] = """
+            {
+              "domains": [
+                {
+                  "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+                  "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+                  "section": "Nursery",
+                  "name": "Personal & Physical Development",
+                  "displayOrder": 3,
+                  "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                  "allowsIndicatorComment": true,
+                  "status": "Active",
+                  "activeIndicatorCount": 1,
+                  "indicators": [
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901", "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+                  ]
+                }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(DevelopmentIndicatorInput)] = """
+            {
+              "name": "Potty trained",
+              "displayOrder": 1,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(DevelopmentDomainInput)] = """
+            {
+              "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+              "name": "Personal & Physical Development",
+              "displayOrder": 3,
+              "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+              "allowsIndicatorComment": true,
+              "status": "Active",
+              "indicators": [
+                { "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+              ]
+            }
+            """,
+
+        [typeof(UpdateDevelopmentDomainsCommand)] = """
+            {
+              "domains": [
+                {
+                  "sectionId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6301",
+                  "name": "Personal & Physical Development",
+                  "displayOrder": 3,
+                  "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                  "allowsIndicatorComment": true,
+                  "status": "Active",
+                  "indicators": [
+                    { "name": "Potty trained", "displayOrder": 1, "status": "Active" }
                   ]
                 }
               ],

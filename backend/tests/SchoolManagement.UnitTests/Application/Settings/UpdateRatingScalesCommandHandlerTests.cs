@@ -39,6 +39,7 @@ public sealed class UpdateRatingScalesCommandHandlerTests
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly IRatingScaleUsageGate _ratingScaleUsageGate = Substitute.For<IRatingScaleUsageGate>();
+    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -51,6 +52,7 @@ public sealed class UpdateRatingScalesCommandHandlerTests
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
         _ratingScaleUsageGate.IsInUseAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
     }
 
     private UpdateRatingScalesCommandHandler CreateHandler() => new(
@@ -63,6 +65,7 @@ public sealed class UpdateRatingScalesCommandHandlerTests
         _academicSessionRepository,
         _publishedResultsGate,
         _ratingScaleUsageGate,
+        _developmentDomainRepository,
         _currentUser,
         _auditSink,
         _timeProvider);

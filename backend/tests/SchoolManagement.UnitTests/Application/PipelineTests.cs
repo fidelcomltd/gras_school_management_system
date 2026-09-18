@@ -16,6 +16,7 @@ using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Reference.Ping;
@@ -114,6 +115,16 @@ public sealed class PipelineTests
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());
         services.AddSingleton(Substitute.For<IClassLevelRepository>());
+
+        // TASK-0072 stages 1/2b: the rating-scales and development-domains handlers (plus every other
+        // Settings/* handler, since the snapshot now carries both groups regardless of which one
+        // changed) depend on these four ports, implemented by Infrastructure — same treatment as every
+        // other repository/gate stubbed above. Missing until now: stage 1 never added them here, which
+        // is exactly the gap this card's STEP 1 closes (decisions/2026-Q3.md, stage 2a closure note).
+        services.AddSingleton(Substitute.For<IRatingScaleRepository>());
+        services.AddSingleton(Substitute.For<IRatingScaleUsageGate>());
+        services.AddSingleton(Substitute.For<IDevelopmentDomainRepository>());
+        services.AddSingleton(Substitute.For<IDevelopmentIndicatorUsageGate>());
 
         // TASK-0039: the Arms/* handlers (plus UpdateSessionHandler/GetSessionHandler's new arm-count
         // read) depend on this port, implemented by Infrastructure — same treatment as every other

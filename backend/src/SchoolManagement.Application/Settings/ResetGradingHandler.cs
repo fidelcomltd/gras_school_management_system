@@ -28,6 +28,7 @@ internal sealed class ResetGradingCommandHandler(
     IPublishedResultsGate publishedResultsGate,
     IResultRulesRepository resultRulesRepository,
     IRatingScaleRepository ratingScaleRepository,
+    IDevelopmentDomainRepository developmentDomainRepository,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -99,10 +100,11 @@ internal sealed class ResetGradingCommandHandler(
             .ConfigureAwait(false);
         var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, currentComponents, resultRules, ratingScales),
+            SettingsSnapshotBuilder.Build(profile, bands, currentComponents, resultRules, ratingScales, developmentDomains),
             ConfigVersionGroup.Grading,
             currentUser.UserId,
             reason: reasonCheck.Value,

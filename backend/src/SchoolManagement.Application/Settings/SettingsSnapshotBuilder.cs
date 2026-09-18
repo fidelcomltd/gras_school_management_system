@@ -23,22 +23,24 @@ internal static class SettingsSnapshotBuilder
 
     /// <summary>
     /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>,
-    /// <paramref name="components"/>, <paramref name="resultRules"/> and <paramref name="ratingScales"/>
-    /// into a snapshot document — the WHOLE configuration as of this save, regardless of which group
-    /// actually changed.
+    /// <paramref name="components"/>, <paramref name="resultRules"/>, <paramref name="ratingScales"/>
+    /// and <paramref name="developmentDomains"/> into a snapshot document — the WHOLE configuration as
+    /// of this save, regardless of which group actually changed.
     /// </summary>
     public static string Build(
         SchoolProfile profile,
         IReadOnlyList<GradingBand> bands,
         IReadOnlyList<AssessmentComponent> components,
         ResultRules resultRules,
-        IReadOnlyList<RatingScale> ratingScales)
+        IReadOnlyList<RatingScale> ratingScales,
+        IReadOnlyList<DevelopmentDomain> developmentDomains)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(bands);
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(resultRules);
         ArgumentNullException.ThrowIfNull(ratingScales);
+        ArgumentNullException.ThrowIfNull(developmentDomains);
 
         var snapshot = new SettingsSnapshot(
             new SchoolProfileSnapshot(
@@ -100,7 +102,23 @@ internal static class SettingsSnapshotBuilder
                         .Select(point => new RatingScalePointSnapshot(point.PointCode, point.PointLabel, point.PointOrder))
                         .ToList()))
                 .ToList(),
-            profile.RatingScalesVersionNumber);
+            profile.RatingScalesVersionNumber,
+            developmentDomains
+                .OrderBy(domain => domain.SectionId)
+                .ThenBy(domain => domain.DisplayOrder)
+                .Select(domain => new DevelopmentDomainSnapshot(
+                    domain.SectionId,
+                    domain.Name,
+                    domain.DisplayOrder,
+                    domain.RatingScaleId,
+                    domain.AllowsIndicatorComment,
+                    domain.Status,
+                    domain.Indicators
+                        .OrderBy(indicator => indicator.DisplayOrder)
+                        .Select(indicator => new DevelopmentIndicatorSnapshot(indicator.Name, indicator.DisplayOrder, indicator.Status))
+                        .ToList()))
+                .ToList(),
+            profile.DevelopmentDomainsVersionNumber);
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
@@ -114,7 +132,9 @@ internal static class SettingsSnapshotBuilder
         ResultRulesSnapshot ResultRules,
         int ResultRulesVersionNumber,
         IReadOnlyList<RatingScaleSnapshot> RatingScales,
-        int RatingScalesVersionNumber);
+        int RatingScalesVersionNumber,
+        IReadOnlyList<DevelopmentDomainSnapshot> DevelopmentDomains,
+        int DevelopmentDomainsVersionNumber);
 
     private sealed record SchoolProfileSnapshot(
         string SchoolName,
@@ -164,4 +184,15 @@ internal static class SettingsSnapshotBuilder
     private sealed record RatingScaleSnapshot(string Name, IReadOnlyList<RatingScalePointSnapshot> Points);
 
     private sealed record RatingScalePointSnapshot(string PointCode, string PointLabel, int PointOrder);
+
+    private sealed record DevelopmentDomainSnapshot(
+        Guid SectionId,
+        string Name,
+        int DisplayOrder,
+        Guid RatingScaleId,
+        bool AllowsIndicatorComment,
+        DevelopmentDomainStatus Status,
+        IReadOnlyList<DevelopmentIndicatorSnapshot> Indicators);
+
+    private sealed record DevelopmentIndicatorSnapshot(string Name, int DisplayOrder, DevelopmentIndicatorStatus Status);
 }

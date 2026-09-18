@@ -101,6 +101,14 @@ internal static class ResultExtensions
             extensions["pointIndex"] = ratingScaleError.PointIndex;
         }
 
+        // Same reasoning as RatingScaleValidationError above, for spec 6.2.13's development domains:
+        // which domain, and — where the failure is about one indicator — which indicator within it.
+        if (error is DevelopmentDomainValidationError developmentDomainError)
+        {
+            extensions["domainIndex"] = developmentDomainError.DomainIndex;
+            extensions["indicatorIndex"] = developmentDomainError.IndicatorIndex;
+        }
+
         return TypedResults.Problem(
             detail: error.Description,
             statusCode: statusCode,

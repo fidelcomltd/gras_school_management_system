@@ -115,7 +115,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int gradingVersionNumber,
         int assessmentVersionNumber,
         int resultRulesVersionNumber,
-        int ratingScalesVersionNumber)
+        int ratingScalesVersionNumber,
+        int developmentDomainsVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -137,6 +138,7 @@ public sealed class SchoolProfile : Entity<Guid>
         AssessmentVersionNumber = assessmentVersionNumber;
         ResultRulesVersionNumber = resultRulesVersionNumber;
         RatingScalesVersionNumber = ratingScalesVersionNumber;
+        DevelopmentDomainsVersionNumber = developmentDomainsVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -226,6 +228,14 @@ public sealed class SchoolProfile : Entity<Guid>
     /// tables — see <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
     /// </summary>
     public int RatingScalesVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The development-domains group's own, independent optimistic-concurrency pointer (TASK-0072
+    /// stage 2b). The domains and indicators themselves live in the separate
+    /// <see cref="DevelopmentDomain"/>/<see cref="DevelopmentIndicator"/> tables — see
+    /// <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
+    /// </summary>
+    public int DevelopmentDomainsVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -320,6 +330,13 @@ public sealed class SchoolProfile : Entity<Guid>
     public void IncrementRatingScalesVersion() => RatingScalesVersionNumber++;
 
     /// <summary>
+    /// Bumps <see cref="DevelopmentDomainsVersionNumber"/> for a successful
+    /// <c>PUT /settings/development-domains</c> save (TASK-0072 stage 2b). See
+    /// <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementDevelopmentDomainsVersion() => DevelopmentDomainsVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -346,7 +363,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int gradingVersionNumber = 0,
         int assessmentVersionNumber = 0,
         int resultRulesVersionNumber = 0,
-        int ratingScalesVersionNumber = 0) =>
+        int ratingScalesVersionNumber = 0,
+        int developmentDomainsVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -367,5 +385,6 @@ public sealed class SchoolProfile : Entity<Guid>
             gradingVersionNumber,
             assessmentVersionNumber,
             resultRulesVersionNumber,
-            ratingScalesVersionNumber);
+            ratingScalesVersionNumber,
+            developmentDomainsVersionNumber);
 }

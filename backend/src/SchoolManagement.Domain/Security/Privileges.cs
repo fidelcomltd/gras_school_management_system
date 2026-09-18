@@ -127,6 +127,14 @@ public static class Privileges
         /// referenced by any rating block, not owned by the trait screen alone.
         /// </summary>
         public const string RatingScalesUpdate = "settings.ratingscales.update";
+
+        /// <summary>
+        /// Add, rename, reorder, archive and remove development domains and indicators (spec 6.2.13;
+        /// TASK-0072 stage 2b). Separate from <see cref="TraitsUpdate"/> for the same reason as
+        /// <see cref="RatingScalesUpdate"/> — a distinct, nursery-only configuration screen, not the
+        /// trait editor.
+        /// </summary>
+        public const string DevelopmentDomainsUpdate = "settings.developmentdomains.update";
     }
 
     /// <summary>Academic sessions and terms (spec 4.4.3). None are scopable.</summary>

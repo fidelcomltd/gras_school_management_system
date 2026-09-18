@@ -1,6 +1,8 @@
 using NSubstitute;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.UnitTests.Application.Settings;
@@ -16,6 +18,8 @@ public sealed class GetSettingsQueryHandlerTests
         Substitute.For<IAssessmentComponentRepository>();
 
     private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
+    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
+    private readonly ISectionRepository _sectionRepository = Substitute.For<ISectionRepository>();
 
     // Defaults set in the CONSTRUCTOR (runs once before each test method, per xUnit's per-test
     // instance model) so a test's own .Returns() setup — configured inside the test method body,
@@ -28,10 +32,13 @@ public sealed class GetSettingsQueryHandlerTests
         _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
         _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
+        _sectionRepository.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<Section>());
     }
 
     private GetSettingsQueryHandler CreateHandler() =>
-        new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository, _ratingScaleRepository);
+        new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository, _ratingScaleRepository,
+            _developmentDomainRepository, _sectionRepository);
 
     [Fact]
     public async Task HandleAsync_ReturnsTheIdentityGroupMappedFromTheProfile()

@@ -68,6 +68,8 @@ public static class PrivilegeRegistry
             Permits: "Restore the grading scale, assessment structure or trait lists to seeded values."),
         new(Privileges.Settings.RatingScalesUpdate, Scopable: false, Module: PrivilegeModule.Settings,
             Permits: "Add, rename, remove and reorder rating scales and their points."),
+        new(Privileges.Settings.DevelopmentDomainsUpdate, Scopable: false, Module: PrivilegeModule.Settings,
+            Permits: "Add, rename, reorder, archive and remove development domains and indicators."),
 
         // 4.4.3 Academic structure
         new(Privileges.Session.View, Scopable: false, Module: PrivilegeModule.AcademicStructure,
