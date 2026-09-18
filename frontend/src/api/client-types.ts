@@ -21,17 +21,36 @@ export type OperationOf<P extends keyof paths, M extends Method> = paths[P] exte
 type JsonOf<Content> = Content extends { 'application/json': infer J } ? J : never;
 
 /**
- * The first successful (2xx) JSON response body an operation declares, or
- * `void` for a `204 No Content` — `DELETE /admins/{id}/sessions` is the
- * first operation in this contract with no 2xx body at all, so without this
+ * A response body for whatever single content-type an operation declares.
+ * `application/json` is matched first (every prior operation in this
+ * contract), falling through to the declared type of any other content-type
+ * key for the rest — `ExportAuditEvents`' `200` is `{ "text/csv": string }`
+ * (TASK-0054), the contract's first non-JSON response body, so without this
+ * fallback `SuccessBody` below would resolve `never` for it (see `JsonOf`)
+ * and `apiGet` would mistype the CSV payload as unreachable rather than
+ * `string`. Deliberately narrower than a general "any content-type" helper:
+ * it only widens the *response* side (`RequestBodyOf` below still calls
+ * `JsonOf` directly, unchanged, because every request body in this contract
+ * remains JSON).
+ */
+type ResponseBodyOf<Content> = Content extends { 'application/json': infer J }
+  ? J
+  : Content extends Record<string, infer V>
+    ? V
+    : never;
+
+/**
+ * The first successful (2xx) response body an operation declares, or `void`
+ * for a `204 No Content` — `DELETE /admins/{id}/sessions` is the first
+ * operation in this contract with no 2xx body at all, so without this
  * branch `SuccessBody` would resolve `never` for it and no caller could ever
  * type the result of calling `apiDelete`.
  */
 export type SuccessBody<Op> = Op extends { responses: infer R }
   ? R extends { 200: { content: infer C } }
-    ? JsonOf<C>
+    ? ResponseBodyOf<C>
     : R extends { 201: { content: infer C } }
-      ? JsonOf<C>
+      ? ResponseBodyOf<C>
       : R extends { 204: unknown }
         ? void
         : never

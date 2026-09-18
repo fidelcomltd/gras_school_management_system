@@ -5,7 +5,12 @@ name: backend-ci
 
 on:
   push:
-    branches: [main]
+    # `staging` added 2026-09-16 (human directive). Until then CI watched `main` only, while all
+    # real work happened on `staging` — so the full integration suite was never running off-machine
+    # and the orchestrator paid ~1 hour locally per card against hosted Neon to substitute for it.
+    # The runner's postgres service container is local to the job, so the same suite costs minutes
+    # here. This trigger is what makes the scoped local gate in `.agent/rules/gates.md` safe.
+    branches: [main, staging]
     paths:
       - 'backend/**'
       - 'contracts/**'          # a contract change must re-run the drift check

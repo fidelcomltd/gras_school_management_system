@@ -1,11 +1,19 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using SchoolManagement.Domain.Admissions;
+using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Idempotency;
+using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Reference;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
+using SchoolManagement.Domain.Subjects;
 
 namespace SchoolManagement.Infrastructure.Persistence;
 
@@ -57,8 +65,117 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<ConfigVersion> ConfigVersions => Set<ConfigVersion>();
 
+    /// <summary>TASK-0005c. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<RegistrationCounter> RegistrationCounters => Set<RegistrationCounter>();
+
+    /// <summary>TASK-0069. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<GradingBand> GradingBands => Set<GradingBand>();
+
+    /// <summary>TASK-0069. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<AssessmentComponent> AssessmentComponents => Set<AssessmentComponent>();
+
+    /// <summary>TASK-0077. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<ResultRules> ResultRules => Set<ResultRules>();
+
     /// <summary>TASK-0028 dispatch 2. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Role> Roles => Set<Role>();
+
+    /// <summary>TASK-0030. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
+    /// <summary>TASK-0035. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<AcademicSession> AcademicSessions => Set<AcademicSession>();
+
+    /// <summary>TASK-0035. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Term> Terms => Set<Term>();
+
+    /// <summary>TASK-0038. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Section> Sections => Set<Section>();
+
+    /// <summary>TASK-0038. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<ClassLevel> ClassLevels => Set<ClassLevel>();
+
+    /// <summary>TASK-0039. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Arm> Arms => Set<Arm>();
+
+    /// <summary>
+    /// TASK-0048. Internal, not public: only <see cref="Repositories.AuditEventRepository"/> and the
+    /// audit sinks in <c>Infrastructure/Audit</c> and <c>Infrastructure/Authorization</c> ever touch
+    /// this set — it has no update or delete path anywhere (spec 9.4).
+    /// </summary>
+    internal DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    /// <summary>
+    /// TASK-0050. Internal, not public: only this assembly's repositories may query it. Carries the
+    /// pending-exclusion model-level query filter (spec 6.5.14) — see
+    /// <c>Configurations.PupilConfiguration</c>.
+    /// </summary>
+    internal DbSet<Pupil> Pupils => Set<Pupil>();
+
+    /// <summary>
+    /// TASK-0059. Internal, not public: only this assembly's repositories may query it. Spec 02
+    /// §5.2's arm-of-record relationship — no <c>Pupil</c> or <c>Arm</c> column ever substitutes
+    /// for a query against this set for the open row.
+    /// </summary>
+    internal DbSet<Enrolment> Enrolments => Set<Enrolment>();
+
+    /// <summary>
+    /// TASK-0062. Internal, not public: only this assembly's repositories may query it. Sections A, I
+    /// and J of the admission form (spec 6.5.9) — one row per <see cref="Pupil"/>, created in the same
+    /// transaction as the pupil.
+    /// </summary>
+    internal DbSet<AdmissionRecord> AdmissionRecords => Set<AdmissionRecord>();
+
+    /// <summary>
+    /// TASK-0063. Internal, not public: only this assembly's repositories may query it. Every
+    /// superseded registration number, appended by a correction and never updated or deleted (spec
+    /// 6.5.10) — see <c>Configurations.PupilRegNumberHistoryConfiguration</c>.
+    /// </summary>
+    internal DbSet<PupilRegNumberHistory> PupilRegNumberHistory => Set<PupilRegNumberHistory>();
+
+    /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<Subject> Subjects => Set<Subject>();
+
+    /// <summary>
+    /// TASK-0070. Internal, not public: only this assembly's repositories may query it. NO rows are
+    /// seeded — a mapping needs a <c>term_id</c> and no session or term is seeded (see
+    /// <c>SubjectConfiguration</c>'s remarks and <c>PrefillSubjectMappingsHandler</c>).
+    /// </summary>
+    internal DbSet<SubjectMapping> SubjectMappings => Set<SubjectMapping>();
+
+    /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
+    internal DbSet<SubjectMappingException> SubjectMappingExceptions => Set<SubjectMappingException>();
+
+    /// <summary>
+    /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
+    /// One row per arm per term (spec 09 §6.7.3).
+    /// </summary>
+    internal DbSet<ResultSet> ResultSets => Set<ResultSet>();
+
+    /// <summary>
+    /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
+    /// One row per pupil per subject per term (spec 09 §6.7.3).
+    /// </summary>
+    internal DbSet<SubjectScore> SubjectScores => Set<SubjectScore>();
+
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// pupil per subject per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every
+    /// computation.
+    /// </summary>
+    internal DbSet<SubjectResultLine> SubjectResultLines => Set<SubjectResultLine>();
+
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// subject per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every computation.
+    /// </summary>
+    internal DbSet<SubjectArmStatistic> SubjectArmStatistics => Set<SubjectArmStatistic>();
+
+    /// <summary>
+    /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
+    /// pupil per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every computation.
+    /// </summary>
+    internal DbSet<PupilTermResult> PupilTermResults => Set<PupilTermResult>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

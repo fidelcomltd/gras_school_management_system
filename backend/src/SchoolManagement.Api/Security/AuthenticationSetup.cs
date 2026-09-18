@@ -170,4 +170,24 @@ internal sealed class HttpCurrentUser(IHttpContextAccessor httpContextAccessor)
     /// <inheritdoc />
     public bool IsAuthenticated =>
         httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// TASK-0048. <c>RemoteIpAddress</c> reads the transport-level connection address rather than
+    /// an <c>X-Forwarded-For</c> header — trusting a client-suppliable header for an audit column
+    /// would let a caller forge the very value spec 9.3 records to keep the trail honest. Adding
+    /// forwarded-header support behind a reverse proxy is a deployment-time decision (Open question
+    /// 5), not this seam's to guess at.
+    /// </remarks>
+    public string? RemoteIpAddress => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    /// <inheritdoc />
+    public string? UserAgent
+    {
+        get
+        {
+            var header = httpContextAccessor.HttpContext?.Request.Headers.UserAgent;
+            return header is { Count: > 0 } value ? value.ToString() : null;
+        }
+    }
 }

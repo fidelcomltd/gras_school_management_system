@@ -18,4 +18,15 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
+  <!--
+    TASK-0071 stage 3: the §8.4 fixture data is linked (not project-referenced) from IntegrationTests
+    so its self-check test here (ResultComputationFixtureSelfCheckTests) and the fixture-driven
+    integration test both read the exact same rows — one physical file, no risk of the two drifting
+    apart. The data file itself has no dependency beyond the BCL, so linking it costs nothing here.
+  -->
+  <ItemGroup>
+    <Compile Include="..\SchoolManagement.IntegrationTests\Fixtures\ResultComputationFixtureData.cs"
+             Link="Application\Results\Computation\ResultComputationFixtureData.cs" />
+  </ItemGroup>
+
 </Project>

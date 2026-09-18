@@ -11,4 +11,6 @@ internal sealed class NoOneCurrentUser : ICurrentUser
 {
     public string? UserId => null;
     public bool IsAuthenticated => false;
+    public string? RemoteIpAddress => null;
+    public string? UserAgent => null;
 }

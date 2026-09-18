@@ -7,9 +7,12 @@ using Microsoft.Extensions.Hosting;
 using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Observability;
 using SchoolManagement.Api.Security;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Settings;
+using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.Infrastructure.Persistence.Configurations;
 using Testcontainers.PostgreSql;
 
 namespace SchoolManagement.IntegrationTests.Infrastructure;
@@ -34,7 +37,12 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
     private PostgreSqlContainer? _container;
     private string? _connectionString;
 
-    /// <summary>Whether a database was obtained. When false, every test in the collection skips.</summary>
+    /// <summary>
+    /// Whether a database was obtained. TASK-0065: always true once <see cref="InitializeAsync"/>
+    /// returns — when no database is obtainable, that method THROWS instead, failing every test in the
+    /// collection loudly rather than leaving this false for callers to skip around. Kept (rather than
+    /// removed) as the defensive flag <see cref="IntegrationTestBase"/> already checks.
+    /// </summary>
     public bool IsDatabaseAvailable { get; private set; }
 
     /// <summary>
@@ -47,17 +55,25 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         ?? throw new InvalidOperationException(
             $"{nameof(ConnectionString)} is unavailable — {nameof(IsDatabaseAvailable)} is false.");
 
-    /// <summary>Why the database is unavailable, for the skip message.</summary>
+    /// <summary>
+    /// Why the database is unavailable. TASK-0065: retained for <see cref="IntegrationTestBase"/>'s
+    /// defensive skip path, but in practice <see cref="InitializeAsync"/> now throws before this can be
+    /// observed as non-null — see its remarks.
+    /// </summary>
     public string? SkipReason { get; private set; }
 
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
-        if (DatabaseAvailability.UnavailableReason is { } reason)
+        if (await DatabaseAvailability.UnavailableReasonAsync().ConfigureAwait(false) is { } reason)
         {
+            // TASK-0065: THROW, not skip. A skipped run is invisible — this is the exact defect that
+            // let the Testcontainers fallback go unexercised for months (drift 2026-08-27) because a
+            // set POSTGRES_TEST_CONNECTION always took priority and nothing ever forced this path to
+            // prove itself. Every test in the collection now fails loudly with this actionable message
+            // instead of vanishing from the run as "Skipped".
             SkipReason = reason;
-            IsDatabaseAvailable = false;
-            return;
+            throw new InvalidOperationException(reason);
         }
 
         if (DatabaseAvailability.ExternalConnectionString is { } external)
@@ -68,9 +84,20 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         }
         else
         {
+            // The endpoint was already resolved (and probed) by the UnavailableReasonAsync call above —
+            // ResolvedDockerEndpointAsync is memoized, so this reuses that result rather than probing
+            // again. Passed explicitly via WithDockerEndpoint rather than left to ambient $env:DOCKER_HOST:
+            // TASK-0065 found that variable set to an address that does not work on the reference
+            // machine, so trusting it implicitly would silently undo the resolution above.
+            var dockerEndpoint = await DatabaseAvailability.ResolvedDockerEndpointAsync.ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    "Docker endpoint resolution changed between the availability check and the " +
+                    "container build; this should be unreachable because the result is memoized.");
+
             // Image passed to the constructor: the parameterless overload is obsolete in
             // Testcontainers 4.13 precisely because it hid which image you were about to run.
             _container = new PostgreSqlBuilder(DatabaseAvailability.PostgresImage)
+                .WithDockerEndpoint(dockerEndpoint)
                 .WithDatabase("schoolmanagement_tests")
                 // Credentials for a throwaway container that exists for the length of this test run and
                 // is then destroyed. Not a secret: it is reachable only from this machine, holds only
@@ -207,6 +234,27 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
         // too, and RoleEndpointsTests' system-role 409 tests need the REAL seeded Super Admin row to
         // exist, not only the fixture-built one `CreateSystemRoleDirectlyAsync` still covers.
         await ReseedRolesAsync(context, cancellationToken);
+
+        // TASK-0038: same reasoning, for spec 6.4.2's two seeded sections and nine seeded levels —
+        // ClassLevelEndpointsTests' seeded-chain assertions need the REAL migration-seeded rows.
+        await ReseedClassLevelsAsync(context, cancellationToken);
+
+        // TASK-0069: same reasoning, for spec 6.2.13's nine seeded grading bands and the
+        // gras_default assessment structure — SettingsGradingAssessmentEndpointsTests' fresh-database
+        // assertions need the REAL migration-seeded rows, not an empty table.
+        await ReseedGradingBandsAsync(context, cancellationToken);
+        await ReseedAssessmentComponentsAsync(context, cancellationToken);
+
+        // TASK-0077: same reasoning, for spec 6.2.8's seeded result-rules singleton row —
+        // SettingsResultRulesEndpointsTests' fresh-database assertions need the REAL migration-seeded
+        // row, not an empty table.
+        await ReseedResultRulesAsync(context, cancellationToken);
+
+        // TASK-0070: same reasoning, for spec 6.6.2's 28 seeded subjects — SubjectEndpointsTests'
+        // fresh-database assertions need the REAL migration-seeded rows, not an empty table. TASK-0069
+        // shipped two seeds without this and its fresh-database criterion failed in review; this card
+        // names it as its own acceptance criterion for exactly that reason.
+        await ReseedSubjectsAsync(context, cancellationToken);
     }
 
     /// <summary>Reinserts the <see cref="SchoolProfile"/> singleton row, matching the migration's seed data exactly.</summary>
@@ -215,10 +263,13 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
             $"""
             INSERT INTO school_profile
                 (id, school_name, short_name, abbreviation, address, phone, email, motto,
-                 head_teacher_name, timezone, identity_version_number, abbreviation_version_number)
+                 head_teacher_name, timezone, identity_version_number, abbreviation_version_number,
+                 separator, serial_width, serial_reset, reg_number_version_number)
             VALUES
                 ({SchoolProfile.SingletonId}, '', '', {SchoolProfile.SeededAbbreviation}, '', '', '',
-                 NULL, '', {SchoolProfile.FixedTimezone}, 0, 0)
+                 NULL, '', {SchoolProfile.FixedTimezone}, 0, 0,
+                 {SchoolProfile.DefaultSeparator}, {SchoolProfile.DefaultSerialWidth},
+                 {SchoolProfile.DefaultSerialReset.ToString()}, 0)
             """,
             cancellationToken);
 
@@ -242,6 +293,141 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 VALUES
                     ({role.Id}, {SeededRoles.SeedTimestamp}, NULL, {role.Description}, {role.IsSystem},
                      NULL, NULL, {role.Name}, {nameKey}, {joinedPrivileges}, 'Active', {role.Version})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.4.2's two seeded sections and nine seeded levels, built from the SAME
+    /// <see cref="SeededClassLevels.Sections"/>/<see cref="SeededClassLevels.Levels"/> the
+    /// <c>SeedClassLevels</c> migration itself is generated from, so this can never drift from what
+    /// the migration actually seeds.
+    /// </summary>
+    private static async Task ReseedClassLevelsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        foreach (var section in SeededClassLevels.Sections)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO sections
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key, version)
+                VALUES
+                    ({section.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL,
+                     {section.Name}, {section.Name.ToLowerInvariant()}, {section.Version})
+                """,
+                cancellationToken);
+        }
+
+        // Reverse chain order (graduating level first) — next_level_id is a self-referencing FK, and
+        // an earlier row must already exist before a later row can point at it. Same reasoning as
+        // ClassLevelConfiguration's own seed.
+        foreach (var level in SeededClassLevels.Levels.Reverse())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO class_levels
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key,
+                     section_id, progression_order, next_level_id, status, version)
+                VALUES
+                    ({level.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL, {level.Name},
+                     {level.Name.ToLowerInvariant()}, {level.SectionId}, {level.ProgressionOrder},
+                     {level.NextLevelId}, 'Active', {level.Version})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13's nine seeded grading bands, using the SAME fixed ids
+    /// <see cref="GradingBandConfiguration.SeededIds"/> the migration itself seeds with — reusing the
+    /// migration's own row ids, not freshly generated ones and not some other re-derivation, is what
+    /// makes this prove the MIGRATION's rows rather than merely proving a seed constant equals itself.
+    /// </summary>
+    private static async Task ReseedGradingBandsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var ids = GradingBandConfiguration.SeededIds;
+
+        for (var index = 0; index < GradingScaleSeed.SeededBands.Count; index++)
+        {
+            var band = GradingScaleSeed.SeededBands[index];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO grading_band (id, lower_bound, upper_bound, grade_letter, remark, display_order)
+                VALUES
+                    ({ids[index]}, {band.LowerBound}, {band.UpperBound}, {band.GradeLetter},
+                     {band.Remark}, {index + 1})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.13's three seeded assessment components (the <c>gras_default</c> profile),
+    /// using the SAME fixed ids <see cref="AssessmentComponentConfiguration.SeededIds"/> the migration
+    /// itself seeds with — see <see cref="ReseedGradingBandsAsync"/>'s remarks for why.
+    /// </summary>
+    private static async Task ReseedAssessmentComponentsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var ids = AssessmentComponentConfiguration.SeededIds;
+
+        for (var index = 0; index < AssessmentStructureSeed.GrasDefaultComponents.Count; index++)
+        {
+            var component = AssessmentStructureSeed.GrasDefaultComponents[index];
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO assessment_component (id, name, short_label, max_mark, is_examination, display_order)
+                VALUES
+                    ({ids[index]}, {component.Name}, {component.ShortLabel}, {component.MaxMark},
+                     {component.IsExamination}, {index + 1})
+                """,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Reinserts spec 6.2.8's seeded result-rules singleton row, matching
+    /// <see cref="ResultRulesConfiguration"/>'s <c>HasData</c> exactly (empty <c>core_subject_ids</c> —
+    /// see <see cref="ResultRules"/>'s own remarks for why that is never guessed).
+    /// </summary>
+    private static Task<int> ReseedResultRulesAsync(ApplicationDbContext context, CancellationToken cancellationToken) =>
+        context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO result_rules
+                (id, annual_method, weight_first, weight_second, weight_third, primary_position_scope,
+                 show_level_position, tie_break_rule, pass_mark, promotion_threshold, require_core_pass,
+                 core_subject_ids, min_subjects_for_position)
+            VALUES
+                ({ResultRules.SingletonId}, {ResultRules.DefaultAnnualMethod.ToString()}, NULL, NULL, NULL,
+                 {ResultRules.DefaultPrimaryPositionScope.ToString()}, {ResultRules.DefaultShowLevelPosition},
+                 {ResultRules.DefaultTieBreakRule.ToString()}, {ResultRules.DefaultPassMark},
+                 {ResultRules.DefaultPromotionThreshold}, {ResultRules.DefaultRequireCorePass}, '',
+                 {ResultRules.DefaultMinSubjectsForPosition})
+            """,
+            cancellationToken);
+
+    /// <summary>
+    /// Reinserts spec 6.6.2's 28 seeded subjects, built from the SAME <see cref="SeededSubjects.All"/>
+    /// the <c>AddSubjects</c> migration itself is generated from, so this can never drift from what
+    /// the migration actually seeds. No <c>code</c> is seeded (TASK-0070 delta amendment 1), and no
+    /// <c>subject_mapping</c> row is reinserted — none is ever seeded (AC-3: a mapping needs a
+    /// <c>term_id</c>, and no session or term is seeded either).
+    /// </summary>
+    private static async Task ReseedSubjectsAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        foreach (var subject in SeededSubjects.All)
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO subjects
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key,
+                     code, code_key, description, status, version)
+                VALUES
+                    ({subject.Id}, {SeededSubjects.SeedTimestamp}, NULL, NULL, NULL,
+                     {subject.Name}, {subject.Name.ToLowerInvariant()}, NULL, NULL, NULL, 'Active',
+                     {subject.Version})
                 """,
                 cancellationToken);
         }

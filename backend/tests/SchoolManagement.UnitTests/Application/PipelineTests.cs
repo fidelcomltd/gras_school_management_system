@@ -3,13 +3,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SchoolManagement.Application;
+using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Persistence;
+using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Security;
+using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -62,9 +69,85 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IConfigVersionRepository>());
         services.AddSingleton(Substitute.For<ISystemAuditSink>());
 
+        // TASK-0005c: the reg-number handlers depend on this port too, implemented by Infrastructure —
+        // same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IRegistrationCounterRepository>());
+
+        // TASK-0069: the grading/assessment handlers (plus every other Settings/* handler, since the
+        // snapshot now carries both groups regardless of which one changed) depend on these four
+        // ports, implemented by Infrastructure — same treatment as every other repository stubbed
+        // above.
+        services.AddSingleton(Substitute.For<IGradingBandRepository>());
+        services.AddSingleton(Substitute.For<IAssessmentComponentRepository>());
+        services.AddSingleton(Substitute.For<ISubjectScoreSessionLockLookup>());
+        services.AddSingleton(Substitute.For<IPublishedResultsGate>());
+
+        // TASK-0077: the result-rules handlers (plus every other Settings/* handler, since the
+        // snapshot now carries all three groups regardless of which one changed) depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IResultRulesRepository>());
+
         // TASK-0028 dispatch 2: the Roles/* handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRoleRepository>());
+        services.AddSingleton(Substitute.For<IRoleAssignmentRepository>());
+
+        // TASK-0035: the Sessions/* handlers depend on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAcademicSessionRepository>());
+        services.AddSingleton(Substitute.For<ITermRepository>());
+
+        // TASK-0076 dispatch A: CloseTermHandler depends on this port for spec 6.3.6's result-set
+        // precondition, implemented by Infrastructure — same treatment as every other repository
+        // stubbed above.
+        services.AddSingleton(Substitute.For<IResultSetRepository>());
+
+        // TASK-0076 dispatch B: the score-sheet handlers (Get/Save/Void) depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<ISubjectScoreRepository>());
+
+        // TASK-0071: ComputeResultSetHandler depends on this port for the three computed tables,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IResultComputationRepository>());
+
+        // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<ISectionRepository>());
+        services.AddSingleton(Substitute.For<IClassLevelRepository>());
+
+        // TASK-0039: the Arms/* handlers (plus UpdateSessionHandler/GetSessionHandler's new arm-count
+        // read) depend on this port, implemented by Infrastructure — same treatment as every other
+        // repository stubbed above.
+        services.AddSingleton(Substitute.For<IArmRepository>());
+
+        // TASK-0050: the Pupils/* handlers depend on this port, implemented by Infrastructure — same
+        // treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IPupilRepository>());
+
+        // TASK-0062: CreatePupilHandler and UpdateAdmissionRecordHandler depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAdmissionRecordRepository>());
+
+        // TASK-0051: ApproveAdmissionCommandHandler depends on these two ports, implemented by
+        // Infrastructure — same treatment as every other repository/port stubbed above.
+        services.AddSingleton(Substitute.For<IEnrolmentRepository>());
+        services.AddSingleton(Substitute.For<IPersistenceErrorTranslator>());
+
+        // TASK-0063: CorrectRegistrationNumberHandler depends on this port, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IPupilRegNumberHistoryRepository>());
+
+        // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAuditEventQueryRepository>());
+
+        // TASK-0070: the Subjects/* handlers depend on these four ports, implemented by
+        // Infrastructure — same treatment as every other repository stubbed above.
+        // ISubjectMappingMarkLookup is the spec 6.6.6 mark check's seam, not a repository.
+        services.AddSingleton(Substitute.For<ISubjectRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingExceptionRepository>());
+        services.AddSingleton(Substitute.For<ISubjectMappingMarkLookup>());
 
         services.AddOptions<PipelineOptions>();
 

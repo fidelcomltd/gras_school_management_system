@@ -8,6 +8,16 @@
 export const paths = {
   root: '/',
   signIn: '/sign-in',
+  settings: '/settings',
+  sessions: '/sessions',
+  sessionDetail: (id: string) => `/sessions/${id}`,
+  classes: '/classes',
+  admins: '/admins',
+  adminDetail: (id: string) => `/admins/${id}`,
+  roles: '/roles',
+  arms: '/arms',
+  armDetail: (id: string) => `/arms/${id}`,
+  admissions: '/admissions',
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

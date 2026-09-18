@@ -9,6 +9,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
@@ -673,10 +674,17 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
     }
 }
 
-/// <summary>Records every call for <see cref="AdminAccountEndpointsTests"/>'s rule-4 audit-event proof.</summary>
+/// <summary>
+/// Records every call for the various rule/rejection audit-event proofs across this assembly —
+/// used wherever a test needs to assert WHICH action code was recorded without depending on real
+/// persistence (TASK-0048's own Postgres-backed durability proofs live alongside the real
+/// endpoints instead — see <c>AssignmentEndpointsTests</c>).
+/// </summary>
 internal sealed class RecordingSystemAuditSink : ISystemAuditSink
 {
-    public List<(string Action, string? EntityType, string? EntityId, string? ActorAdminId)> Records { get; } = [];
+    public List<(string Action, string? EntityType, string? EntityId, string? ActorAdminId, AuditOutcome Outcome,
+        IReadOnlyDictionary<string, object?>? Metadata, IReadOnlyDictionary<string, object?>? BeforeMetadata)> Records
+    { get; } = [];
 
     public Task RecordAsync(
         string action,
@@ -684,9 +692,24 @@ internal sealed class RecordingSystemAuditSink : ISystemAuditSink
         string? entityId,
         IReadOnlyDictionary<string, object?>? metadata,
         string? actorAdminId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null)
     {
-        Records.Add((action, entityType, entityId, actorAdminId));
+        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Success, metadata, beforeMetadata));
+        return Task.CompletedTask;
+    }
+
+    public Task RecordRejectionAsync(
+        string action,
+        string? entityType,
+        string? entityId,
+        IReadOnlyDictionary<string, object?>? metadata,
+        string? actorAdminId,
+        CancellationToken cancellationToken,
+        string? reason = null)
+    {
+        Records.Add((action, entityType, entityId, actorAdminId, AuditOutcome.Rejected, metadata, null));
         return Task.CompletedTask;
     }
 }

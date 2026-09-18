@@ -1,15 +1,24 @@
 using System.Text.Json.Nodes;
 using SchoolManagement.Api.Endpoints;
+using SchoolManagement.Application.Admissions;
+using SchoolManagement.Application.Audit;
 using SchoolManagement.Application.Auth;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
+using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Results;
+using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
+using SchoolManagement.Application.Sessions;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Application.Subjects;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
 
@@ -46,6 +55,27 @@ internal static class OpenApiExamples
 
     /// <summary>An example identifier, shaped like the version 7 GUIDs this service generates.</summary>
     private const string ExampleId = "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40";
+
+    /// <summary>Example identifiers for the role-assignment examples, each a distinct entity.</summary>
+    private const string ExampleAssignmentId = "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51";
+    private const string ExampleAdminAccountId = "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62";
+    private const string ExampleSessionId = "0192f0c4-af61-7d4e-c250-6e1b8d9f4073";
+    private const string ExampleArmId = "0192f0c4-c072-7e5f-d361-7f2c9e0a5184";
+    private const string ExampleGrantedById = "0192f0c4-d183-7f60-e472-8030af1b6295";
+
+    /// <summary>Example identifiers for the TASK-0070 subject/mapping examples, each a distinct entity.</summary>
+    private const string ExampleSubjectId = "0192f0c4-e294-7061-f583-9141c02d7306";
+    private const string ExampleSecondSubjectId = "0192f0c4-f3a5-7162-0694-a252d13e8417";
+    private const string ExampleLevelId = "0192f0c4-04b6-7263-1705-b363e24f9528";
+    private const string ExampleTermId = "0192f0c4-15c7-7364-2816-c474f3608639";
+    private const string ExampleSubjectExceptionId = "0192f0c4-26d8-7465-3927-d585047719a0";
+
+    /// <summary>Example identifiers for the TASK-0076 score-sheet examples, each a distinct entity.</summary>
+    private const string ExampleResultSetId = "0192f0c4-37e9-7566-4a38-e6960588b1b0";
+    private const string ExamplePupilId = "0192f0c4-48fa-7667-5b49-f7a71699c2c1";
+    private const string ExampleSecondPupilId = "0192f0c4-590b-7768-6c5a-08b827aad3d2";
+    private const string ExampleComponentId = "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3";
+    private const string ExampleExaminationComponentId = "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4";
 
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
@@ -138,7 +168,226 @@ internal static class OpenApiExamples
                 "headTeacherName": "Chisom Maxwell",
                 "timezone": "Africa/Lagos",
                 "versionNumber": 3
+              },
+              "abbreviation": {
+                "abbreviation": "GRAS",
+                "issuedCount": null,
+                "versionNumber": 0
+              },
+              "regNumber": {
+                "separator": "/",
+                "serialWidth": 4,
+                "serialReset": "PerYear",
+                "yearSource": "AdmissionYear",
+                "versionNumber": 0
+              },
+              "grading": {
+                "bands": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001", "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent", "displayOrder": 1 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002", "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent", "displayOrder": 2 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003", "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good", "displayOrder": 3 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004", "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good", "displayOrder": 4 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005", "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average", "displayOrder": 5 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006", "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair", "displayOrder": 6 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007", "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort", "displayOrder": 7 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008", "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now", "displayOrder": 8 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009", "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail", "displayOrder": 9 }
+                ],
+                "versionNumber": 0
+              },
+              "assessment": {
+                "components": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false, "displayOrder": 1 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false, "displayOrder": 2 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true, "displayOrder": 3 }
+                ],
+                "versionNumber": 0
               }
+            }
+            """,
+
+        [typeof(GradingBandDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent",
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SettingsGradingGroupDto)] = """
+            {
+              "bands": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001", "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent", "displayOrder": 1 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002", "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent", "displayOrder": 2 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003", "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good", "displayOrder": 3 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004", "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good", "displayOrder": 4 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005", "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average", "displayOrder": 5 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006", "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair", "displayOrder": 6 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007", "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort", "displayOrder": 7 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008", "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now", "displayOrder": 8 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009", "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail", "displayOrder": 9 }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(GradingBandInput)] = """
+            {
+              "lowerBound": 90,
+              "upperBound": 100,
+              "gradeLetter": "A+",
+              "remark": "Very excellent"
+            }
+            """,
+
+        [typeof(UpdateGradingCommand)] = """
+            {
+              "bands": [
+                { "lowerBound": 90, "upperBound": 100, "gradeLetter": "A+", "remark": "Very excellent" },
+                { "lowerBound": 85, "upperBound": 89, "gradeLetter": "A", "remark": "Excellent" },
+                { "lowerBound": 75, "upperBound": 84, "gradeLetter": "B", "remark": "Very good" },
+                { "lowerBound": 70, "upperBound": 74, "gradeLetter": "B-", "remark": "Good" },
+                { "lowerBound": 60, "upperBound": 69, "gradeLetter": "C+", "remark": "Average" },
+                { "lowerBound": 50, "upperBound": 59, "gradeLetter": "C", "remark": "Fair" },
+                { "lowerBound": 40, "upperBound": 49, "gradeLetter": "D", "remark": "More effort" },
+                { "lowerBound": 20, "upperBound": 39, "gradeLetter": "E", "remark": "Not Now" },
+                { "lowerBound": 0, "upperBound": 19, "gradeLetter": "F", "remark": "Fail" }
+              ],
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(ResetGradingCommand)] = """
+            {
+              "expectedVersion": 3,
+              "reason": null
+            }
+            """,
+
+        [typeof(AssessmentComponentDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false,
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SettingsAssessmentGroupDto)] = """
+            {
+              "components": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false, "displayOrder": 1 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false, "displayOrder": 2 },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true, "displayOrder": 3 }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(AssessmentComponentSaveRequest)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+              "name": "1st CA",
+              "shortLabel": "CA1",
+              "maxMark": 20,
+              "isExamination": false
+            }
+            """,
+
+        [typeof(UpdateAssessmentCommand)] = """
+            {
+              "components": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101", "name": "1st CA", "shortLabel": "CA1", "maxMark": 20, "isExamination": false },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102", "name": "2nd CA", "shortLabel": "CA2", "maxMark": 20, "isExamination": false },
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103", "name": "Exam", "shortLabel": "EXAM", "maxMark": 60, "isExamination": true }
+              ],
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(ResultRulesDto)] = """
+            {
+              "annualMethod": "SimpleAverage",
+              "weightFirst": null,
+              "weightSecond": null,
+              "weightThird": null,
+              "primaryPositionScope": "Arm",
+              "showLevelPosition": true,
+              "tieBreakRule": "SharedPosition",
+              "passMark": 40,
+              "promotionThreshold": 40,
+              "requireCorePass": true,
+              "coreSubjectIds": [],
+              "minSubjectsForPosition": 1,
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateResultRulesCommand)] = """
+            {
+              "annualMethod": "SimpleAverage",
+              "weightFirst": null,
+              "weightSecond": null,
+              "weightThird": null,
+              "primaryPositionScope": "Arm",
+              "showLevelPosition": true,
+              "tieBreakRule": "SharedPosition",
+              "passMark": 40,
+              "promotionThreshold": 40,
+              "requireCorePass": true,
+              "coreSubjectIds": [],
+              "minSubjectsForPosition": 1,
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(SettingsAbbreviationGroupDto)] = """
+            {
+              "abbreviation": "GRAS",
+              "issuedCount": null,
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateAbbreviationCommand)] = """
+            {
+              "abbreviation": "GRA",
+              "confirmationToken": "CHANGE",
+              "reason": "The school shortened its registered trading name.",
+              "expectedVersion": 0
+            }
+            """,
+
+        [typeof(SettingsRegNumberGroupDto)] = """
+            {
+              "separator": "/",
+              "serialWidth": 4,
+              "serialReset": "PerYear",
+              "yearSource": "AdmissionYear",
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(UpdateRegNumberCommand)] = """
+            {
+              "separator": "/",
+              "serialWidth": 4,
+              "serialReset": "PerYear",
+              "expectedVersion": 0
+            }
+            """,
+
+        [typeof(RegNumberPreviewDto)] = """
+            {
+              "preview": "GRAS/2026/0040"
             }
             """,
 
@@ -427,6 +676,30 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(CreateRoleAssignmentCommand)] = $$"""
+            {
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "roleId": "{{ExampleId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "scopeType": "ArmList",
+              "armIds": ["{{ExampleArmId}}"]
+            }
+            """,
+
+        [typeof(RoleAssignmentDto)] = $$"""
+            {
+              "id": "{{ExampleAssignmentId}}",
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "roleId": "{{ExampleId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "scopeType": "ArmList",
+              "armIds": ["{{ExampleArmId}}"],
+              "grantedBy": "{{ExampleGrantedById}}",
+              "status": "Active",
+              "createdAtUtc": "{{CanonicalTimestamp}}"
+            }
+            """,
+
         // The error contract matters more to a client author than any success shape: it is what they
         // have to handle and cannot easily provoke on demand. Both framework types are given examples
         // showing the extension members this API adds — errorCode and traceId — which a consumer would
@@ -460,6 +733,920 @@ internal static class OpenApiExamples
                   "PageSize must be at most 100."
                 ]
               }
+            }
+            """,
+
+        [typeof(CreateSessionTermInput)] = """
+            {
+              "startDate": "2026-09-14",
+              "endDate": "2026-12-18",
+              "nextResumptionDate": "2027-01-05"
+            }
+            """,
+
+        [typeof(CreateSessionCommand)] = """
+            {
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "term1": { "startDate": "2026-09-14", "endDate": "2026-12-18", "nextResumptionDate": "2027-01-05" },
+              "term2": { "startDate": "2027-01-05", "endDate": "2027-04-02", "nextResumptionDate": "2027-04-20" },
+              "term3": { "startDate": "2027-04-20", "endDate": "2027-07-25", "nextResumptionDate": null }
+            }
+            """,
+
+        [typeof(TermDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "sessionId": "{{ExampleId}}",
+              "ordinal": 1,
+              "name": "First Term",
+              "startDate": "2026-09-14",
+              "endDate": "2026-12-18",
+              "timesSchoolOpened": null,
+              "nextResumptionDate": "2027-01-05",
+              "state": "Upcoming",
+              "closedAtUtc": null,
+              "closedBy": null
+            }
+            """,
+
+        [typeof(SessionDto)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "state": "Upcoming",
+              "armCount": 0
+            }
+            """,
+
+        [typeof(SessionDetailDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "name": "2026/2027",
+              "startDate": "2026-09-14",
+              "endDate": "2027-07-25",
+              "state": "Active",
+              "armCount": 24,
+              "terms": [
+                {
+                  "id": "{{ExampleId}}",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 1,
+                  "name": "First Term",
+                  "startDate": "2026-09-14",
+                  "endDate": "2026-12-18",
+                  "timesSchoolOpened": 62,
+                  "nextResumptionDate": "2027-01-05",
+                  "state": "Closed",
+                  "closedAtUtc": "{{CanonicalTimestamp}}",
+                  "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+                },
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 2,
+                  "name": "Second Term",
+                  "startDate": "2027-01-05",
+                  "endDate": "2027-04-02",
+                  "timesSchoolOpened": null,
+                  "nextResumptionDate": "2027-04-20",
+                  "state": "Active",
+                  "closedAtUtc": null,
+                  "closedBy": null
+                },
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "ordinal": 3,
+                  "name": "Third Term",
+                  "startDate": "2027-04-20",
+                  "endDate": "2027-07-25",
+                  "timesSchoolOpened": null,
+                  "nextResumptionDate": null,
+                  "state": "Upcoming",
+                  "closedAtUtc": null,
+                  "closedBy": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(CursorPage<SessionDto>)] = """
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "name": "2026/2027",
+                  "startDate": "2026-09-14",
+                  "endDate": "2027-07-25",
+                  "state": "Active",
+                  "armCount": 24
+                }
+              ],
+              "nextCursor": "MjAyNi8yMDI3"
+            }
+            """,
+
+        [typeof(UpdateSessionCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "2026/2027",
+              "startDate": null,
+              "endDate": null
+            }
+            """,
+
+        [typeof(UpdateTermCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": null,
+              "startDate": null,
+              "endDate": null,
+              "timesSchoolOpened": 118,
+              "nextResumptionDate": "2027-01-05"
+            }
+            """,
+
+        [typeof(ReopenTermCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "reason": "A mark was entered against the wrong subject and discovered after publication."
+            }
+            """,
+
+        [typeof(CreateSectionCommand)] = """
+            {
+              "name": "Secondary"
+            }
+            """,
+
+        [typeof(UpdateSectionCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Secondary"
+            }
+            """,
+
+        [typeof(SectionDto)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": "Primary"
+            }
+            """,
+
+        [typeof(SectionListResponse)] = $$"""
+            {
+              "sections": [
+                { "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45", "name": "Nursery" },
+                { "id": "{{ExampleId}}", "name": "Primary" }
+              ]
+            }
+            """,
+
+        [typeof(CreateLevelCommand)] = $$"""
+            {
+              "name": "Reception",
+              "sectionId": "{{ExampleId}}",
+              "progressionOrder": null,
+              "nextLevelId": null,
+              "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+            }
+            """,
+
+        [typeof(LevelDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+              "name": "Primary 1",
+              "sectionId": "{{ExampleId}}",
+              "section": "Primary",
+              "progressionOrder": 4,
+              "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+              "isEntryLevel": false,
+              "isGraduatingLevel": false,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<LevelDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+                  "name": "Primary 1",
+                  "sectionId": "{{ExampleId}}",
+                  "section": "Primary",
+                  "progressionOrder": 4,
+                  "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+                  "isEntryLevel": false,
+                  "isGraduatingLevel": false,
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+            }
+            """,
+
+        [typeof(UpdateLevelCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "name": null,
+              "sectionId": null,
+              "nextLevelId": null,
+              "progressionOrder": null,
+              "status": null
+            }
+            """,
+
+        [typeof(ReorderLevelsCommand)] = $$"""
+            {
+              "orderedLevelIds": [
+                "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+                "{{ExampleId}}"
+              ]
+            }
+            """,
+
+        [typeof(CreateArmCommand)] = $$"""
+            {
+              "classLevelId": "{{ExampleId}}",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "C",
+              "capacity": 22,
+              "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+            }
+            """,
+
+        [typeof(ArmDto)] = $$"""
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+              "classLevelId": "{{ExampleId}}",
+              "classLevel": "Primary 2",
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "label": "C",
+              "displayName": "Primary 2C",
+              "capacity": 22,
+              "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+              "status": "Active"
+            }
+            """,
+
+        [typeof(CursorPage<ArmDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                  "classLevelId": "{{ExampleId}}",
+                  "classLevel": "Primary 2",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "label": "C",
+                  "displayName": "Primary 2C",
+                  "capacity": 22,
+                  "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+                  "status": "Active"
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(NextArmLabelResponse)] = """
+            {
+              "label": "C"
+            }
+            """,
+
+        [typeof(UpdateArmCommand)] = $$"""
+            {
+              "id": "{{ExampleId}}",
+              "label": null,
+              "capacity": 25,
+              "formTeacherAdminId": null,
+              "status": null
+            }
+            """,
+
+        [typeof(BulkCreateArmsLevelEntry)] = $$"""
+            {
+              "levelId": "{{ExampleId}}",
+              "armCount": 3,
+              "capacity": 30
+            }
+            """,
+
+        [typeof(BulkCreateArmsCommand)] = $$"""
+            {
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "levels": [
+                { "levelId": "{{ExampleId}}", "armCount": 3, "capacity": 30 }
+              ],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(BulkCreateArmsResponse)] = $$"""
+            {
+              "created": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+                  "classLevelId": "{{ExampleId}}",
+                  "classLevel": "Primary 2",
+                  "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                  "label": "A",
+                  "displayName": "Primary 2A",
+                  "capacity": 30,
+                  "formTeacherAdminId": null,
+                  "status": "Active"
+                }
+              ]
+            }
+            """,
+
+        [typeof(SubjectDto)] = $$"""
+            {
+              "id": "{{ExampleSubjectId}}",
+              "name": "Mathematics",
+              "code": null,
+              "description": null,
+              "status": "Active",
+              "mappedLevelCount": 6,
+              "armExceptionCount": 1,
+              "pupilsTakingCount": 182
+            }
+            """,
+
+        [typeof(CursorPage<SubjectDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "{{ExampleSubjectId}}",
+                  "name": "Mathematics",
+                  "code": null,
+                  "description": null,
+                  "status": "Active",
+                  "mappedLevelCount": 6,
+                  "armExceptionCount": 1,
+                  "pupilsTakingCount": 182
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(CreateSubjectCommand)] = """
+            {
+              "name": "Mathematics",
+              "code": null,
+              "description": null
+            }
+            """,
+
+        [typeof(UpdateSubjectCommand)] = $$"""
+            {
+              "id": "{{ExampleSubjectId}}",
+              "name": null,
+              "code": null,
+              "description": null,
+              "status": null
+            }
+            """,
+
+        [typeof(SubjectMappingGridLevelDto)] = $$"""
+            {
+              "classLevelId": "{{ExampleLevelId}}",
+              "classLevelName": "Primary 2",
+              "progressionOrder": 5
+            }
+            """,
+
+        [typeof(SubjectMappingGridCellDto)] = $$"""
+            {
+              "classLevelId": "{{ExampleLevelId}}",
+              "mapped": true,
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SubjectMappingGridSubjectRowDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "subjectCode": null,
+              "cells": [
+                { "classLevelId": "{{ExampleLevelId}}", "mapped": true, "displayOrder": 1 }
+              ]
+            }
+            """,
+
+        [typeof(SubjectMappingGridArmExceptionSummaryDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "armDisplayName": "Primary 2C",
+              "includeCount": 1,
+              "excludeCount": 0
+            }
+            """,
+
+        [typeof(SubjectMappingGridDto)] = $$"""
+            {
+              "levels": [
+                { "classLevelId": "{{ExampleLevelId}}", "classLevelName": "Primary 2", "progressionOrder": 5 }
+              ],
+              "subjects": [
+                {
+                  "subjectId": "{{ExampleSubjectId}}",
+                  "subjectName": "Mathematics",
+                  "subjectCode": null,
+                  "cells": [
+                    { "classLevelId": "{{ExampleLevelId}}", "mapped": true, "displayOrder": 1 }
+                  ]
+                }
+              ],
+              "armExceptions": [
+                { "armId": "{{ExampleArmId}}", "armDisplayName": "Primary 2C", "includeCount": 1, "excludeCount": 0 }
+              ]
+            }
+            """,
+
+        [typeof(SubjectMappingGridEntryInput)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "classLevelId": "{{ExampleLevelId}}",
+              "displayOrder": 1
+            }
+            """,
+
+        [typeof(SaveSubjectMappingGridCommand)] = $$"""
+            {
+              "termId": "{{ExampleTermId}}",
+              "entries": [
+                { "subjectId": "{{ExampleSubjectId}}", "classLevelId": "{{ExampleLevelId}}", "displayOrder": 1 }
+              ],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(SubjectMappingChangeDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "classLevelId": "{{ExampleLevelId}}",
+              "classLevelName": "Primary 2"
+            }
+            """,
+
+        [typeof(SaveSubjectMappingGridResponse)] = $$"""
+            {
+              "additions": [
+                { "subjectId": "{{ExampleSubjectId}}", "subjectName": "Mathematics", "classLevelId": "{{ExampleLevelId}}", "classLevelName": "Primary 2" }
+              ],
+              "endings": [],
+              "dryRun": false
+            }
+            """,
+
+        [typeof(CopySubjectMappingsCommand)] = $$"""
+            {
+              "sourceTermId": "{{ExampleTermId}}",
+              "destinationTermId": "0192f0c4-37e9-7566-4a38-e696158802b1",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(PrefillSubjectMappingsCommand)] = $$"""
+            {
+              "termId": "{{ExampleTermId}}",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(ArmSubjectDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "subjectName": "Mathematics",
+              "subjectCode": null,
+              "displayOrder": 1,
+              "source": "LevelInherited"
+            }
+            """,
+
+        [typeof(CreateSubjectExceptionCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSecondSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "mode": "Include",
+              "reason": "This arm runs a French club this term."
+            }
+            """,
+
+        [typeof(SubjectExceptionDto)] = $$"""
+            {
+              "id": "{{ExampleSubjectExceptionId}}",
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSecondSubjectId}}",
+              "subjectName": "French",
+              "termId": "{{ExampleTermId}}",
+              "mode": "Include",
+              "reason": "This arm runs a French club this term."
+            }
+            """,
+
+        [typeof(CreatePupilCommand)] = """
+            {
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": "Ngozi",
+              "sex": "Female",
+              "dateOfBirth": "2020-05-03",
+              "nationality": "Nigerian",
+              "stateOfOrigin": "Anambra",
+              "lga": "Awka South",
+              "homeAddress": "14 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "otherInformation": null,
+              "admission": {
+                "sessionId": null,
+                "dateApplicationReceived": "2026-08-01",
+                "dateAdmitted": null,
+                "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+                "admissionType": "New",
+                "admissionTypeNote": null,
+                "assessmentRequired": false
+              }
+            }
+            """,
+
+        [typeof(AdmissionRecordDto)] = """
+            {
+              "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+              "dateApplicationReceived": "2026-08-01",
+              "dateAdmitted": "2026-09-08",
+              "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+              "classAdmittedIntoName": "Primary 2",
+              "admissionType": "New",
+              "admissionTypeNote": null,
+              "assessmentRequired": false,
+              "assessmentResultRemarks": null,
+              "assignedClassTeacher": null,
+              "declarationName": "Chinwe Okafor",
+              "declarationSigned": true,
+              "declarationDate": "2026-09-08",
+              "approvedBy": null,
+              "approvedAt": null,
+              "headOfSchoolConfirmed": false,
+              "headOfSchoolName": null
+            }
+            """,
+
+        [typeof(UpdateAdmissionRecordCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "sessionId": null,
+              "dateApplicationReceived": null,
+              "dateAdmitted": null,
+              "classAdmittedInto": null,
+              "admissionType": null,
+              "admissionTypeNote": null,
+              "assessmentRequired": null,
+              "assessmentResultRemarks": null,
+              "assignedClassTeacher": null,
+              "declarationName": "Chinwe Okafor",
+              "declarationSigned": true,
+              "declarationDate": "2026-09-08",
+              "headOfSchoolConfirmed": null,
+              "headOfSchoolName": null
+            }
+            """,
+
+        [typeof(ApproveAdmissionCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
+              "assessmentResultRemarks": "Passed the entrance assessment.",
+              "headOfSchoolConfirmed": true,
+              "headOfSchoolName": null
+            }
+            """,
+
+        [typeof(DeclineAdmissionCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "reason": "Family relocated before the intake began."
+            }
+            """,
+
+        [typeof(PupilDto)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "registrationNumber": null,
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": "Ngozi",
+              "sex": "Female",
+              "dateOfBirth": "2020-05-03",
+              "ageYears": 6,
+              "nationality": "Nigerian",
+              "stateOfOrigin": "Anambra",
+              "lga": "Awka South",
+              "homeAddress": "14 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "status": "Pending",
+              "otherInformation": null,
+              "matchedField": null,
+              "createdAtUtc": "2026-08-03T09:30:00+00:00",
+              "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "admission": {
+                "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+                "dateApplicationReceived": "2026-08-01",
+                "dateAdmitted": "2026-09-08",
+                "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+                "classAdmittedIntoName": "Primary 2",
+                "admissionType": "New",
+                "admissionTypeNote": null,
+                "assessmentRequired": false,
+                "assessmentResultRemarks": null,
+                "assignedClassTeacher": null,
+                "declarationName": "Chinwe Okafor",
+                "declarationSigned": true,
+                "declarationDate": "2026-09-08",
+                "approvedBy": null,
+                "approvedAt": null,
+                "headOfSchoolConfirmed": false,
+                "headOfSchoolName": null
+              },
+              "levelAppliedFor": "Primary 2",
+              "dateApplicationReceived": "2026-08-01",
+              "missing": [
+                "Declaration (Section I)"
+              ]
+            }
+            """,
+
+        [typeof(CursorPage<PupilDto>)] = """
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+                  "registrationNumber": null,
+                  "surname": "Okafor",
+                  "firstName": "Chidera",
+                  "middleName": "Ngozi",
+                  "sex": "Female",
+                  "dateOfBirth": "2020-05-03",
+                  "ageYears": 6,
+                  "nationality": "Nigerian",
+                  "stateOfOrigin": "Anambra",
+                  "lga": "Awka South",
+                  "homeAddress": "14 Zik Avenue, Awka",
+                  "previousSchool": null,
+                  "previousClass": null,
+                  "status": "Pending",
+                  "otherInformation": null,
+                  "matchedField": null,
+                  "createdAtUtc": "2026-08-03T09:30:00+00:00",
+                  "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                  "admission": null,
+                  "levelAppliedFor": "Primary 2",
+                  "dateApplicationReceived": "2026-08-01",
+                  "missing": [
+                    "Declaration (Section I)"
+                  ]
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(UpdatePupilBiographicalCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": null,
+              "sex": null,
+              "dateOfBirth": null,
+              "nationality": null,
+              "stateOfOrigin": null,
+              "lga": null,
+              "homeAddress": "22 Zik Avenue, Awka",
+              "previousSchool": null,
+              "previousClass": null,
+              "otherInformation": null,
+              "registrationNumber": null
+            }
+            """,
+
+        [typeof(CorrectRegistrationNumberCommand)] = """
+            {
+              "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+              "registrationNumber": "GRAS/2026/0041",
+              "reason": "Wrong admission year was entered at approval; corrected to 2026."
+            }
+            """,
+
+        [typeof(AuditEventDto)] = $$"""
+            {
+              "id": "48213",
+              "occurredAtUtc": "{{CanonicalTimestamp}}",
+              "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+              "action": "settings.grading.update",
+              "entityType": "grading_band",
+              "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+              "outcome": "Success",
+              "beforeJson": null,
+              "afterJson": null,
+              "reason": null,
+              "sourceIp": "197.210.64.0/24",
+              "userAgent": "Mozilla/5.0"
+            }
+            """,
+
+        [typeof(CursorPage<AuditEventDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "48213",
+                  "occurredAtUtc": "{{CanonicalTimestamp}}",
+                  "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                  "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+                  "action": "settings.grading.update",
+                  "entityType": "grading_band",
+                  "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+                  "outcome": "Success",
+                  "beforeJson": null,
+                  "afterJson": null,
+                  "reason": null,
+                  "sourceIp": "197.210.64.0/24",
+                  "userAgent": "Mozilla/5.0"
+                }
+              ],
+              "nextCursor": null
+            }
+            """,
+
+        [typeof(ScoreSheetComponentDto)] = $$"""
+            {
+              "id": "{{ExampleComponentId}}",
+              "label": "CA1",
+              "maxMark": 20
+            }
+            """,
+
+        [typeof(ResultSetSummaryDto)] = $$"""
+            {
+              "id": "{{ExampleResultSetId}}",
+              "state": "Draft",
+              "needsRecompute": true
+            }
+            """,
+
+        [typeof(ScoreSheetRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "componentMarks": {
+                "{{ExampleComponentId}}": 18
+              },
+              "examMark": 55,
+              "examAbsent": false,
+              "caTotal": 18,
+              "subjectTotal": 73
+            }
+            """,
+
+        [typeof(ScoreSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": true
+              },
+              "components": [
+                {
+                  "id": "{{ExampleComponentId}}",
+                  "label": "CA1",
+                  "maxMark": 20
+                }
+              ],
+              "examination": {
+                "id": "{{ExampleExaminationComponentId}}",
+                "label": "Exam",
+                "maxMark": 60
+              },
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": 18
+                  },
+                  "examMark": 55,
+                  "examAbsent": false,
+                  "caTotal": 18,
+                  "subjectTotal": 73
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": null
+                  },
+                  "examMark": null,
+                  "examAbsent": false,
+                  "caTotal": null,
+                  "subjectTotal": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(SaveScoreSheetRowInput)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "componentMarks": {
+                "{{ExampleComponentId}}": 18
+              },
+              "examMark": 55,
+              "examAbsent": false
+            }
+            """,
+
+        [typeof(SaveScoreSheetCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": 18
+                  },
+                  "examMark": 55,
+                  "examAbsent": false
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "componentMarks": {
+                    "{{ExampleComponentId}}": null
+                  },
+                  "examMark": null,
+                  "examAbsent": false
+                }
+              ]
+            }
+            """,
+
+        [typeof(VoidScoreSheetCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "subjectId": "{{ExampleSubjectId}}",
+              "termId": "{{ExampleTermId}}",
+              "reason": "Whole class re-marked after a transcription error in the mark book."
+            }
+            """,
+
+        [typeof(VoidScoreSheetResponse)] = """
+            {
+              "voidedCount": 27
+            }
+            """,
+
+        [typeof(ComputeResultSetResponse)] = $$"""
+            {
+              "resultSetId": "{{ExampleResultSetId}}",
+              "computedAt": "2026-12-18T09:30:00Z",
+              "pupilCount": 28,
+              "subjectCount": 9,
+              "flags": [
+                {
+                  "code": "absent_all_examinations",
+                  "subjectId": null,
+                  "pupilId": "{{ExamplePupilId}}"
+                }
+              ]
+            }
+            """,
+
+        [typeof(ComputeResultSetFlagDto)] = $$"""
+            {
+              "code": "no_examination_sat",
+              "subjectId": "{{ExampleSubjectId}}",
+              "pupilId": null
             }
             """,
     };

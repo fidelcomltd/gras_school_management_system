@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -19,6 +20,7 @@ namespace SchoolManagement.Application.Auth.AdminAccounts;
 internal sealed class ChangeAdminAccountStatusCommandHandler(
     IAdminAccountRepository accounts,
     IAdminSessionRepository sessions,
+    IRoleAssignmentRepository assignments,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -153,9 +155,20 @@ internal sealed class ChangeAdminAccountStatusCommandHandler(
             }
         }
 
-        // TODO(TASK-0028): deactivation must additionally revoke every active role_assignment (spec
-        // 6.1.10) — no role_assignment table exists yet (approved delta B3). Left as an obvious seam
-        // rather than silently completed: this card revokes sessions only.
+        // Spec 6.1.10: "All active assignments are revoked as part of the transition" — deactivation
+        // only. Reactivation (the Deactivated -> Active branch above) deliberately does NOT restore
+        // them: "they are reassigned deliberately" (spec 6.1.10) — the seam TASK-0027 left, closed here.
+        if (request.Status == AdminAccountStatus.Deactivated)
+        {
+            var activeAssignments = await assignments
+                .ListActiveForAccountTrackedAsync(target.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var assignment in activeAssignments)
+            {
+                assignment.Revoke();
+            }
+        }
 
         await auditSink.RecordAsync(
             requiredPrivilege,
@@ -163,7 +176,10 @@ internal sealed class ChangeAdminAccountStatusCommandHandler(
             target.Id.ToString("D", CultureInfo.InvariantCulture),
             metadata: null,
             actorAdminId: currentUser.UserId,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            // Spec 6.1.12: "A reason is mandatory on: ... admin deactivation." Null for every other
+            // transition — the validator only requires it when request.Status is Deactivated.
+            reason: request.Reason).ConfigureAwait(false);
 
         return Result.Success(AdminAccountMapper.ToDetailDto(target));
     }

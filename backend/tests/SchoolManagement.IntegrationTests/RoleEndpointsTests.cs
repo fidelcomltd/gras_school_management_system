@@ -30,10 +30,11 @@ namespace SchoolManagement.IntegrationTests;
 /// <see cref="IEffectivePrivilegeProvider"/> for a controllable fake — same technique as
 /// <c>PrivilegeAuthorizationTests</c>, but layered UNDER the real cookie-session authentication
 /// (unlike that class's test-only scheme), because these routes need genuine CSRF/session mechanics.
-/// Today's flag-only <c>SuperAdminFlagEffectivePrivilegeProvider</c> can only produce "holds
-/// everything" or "holds nothing," so rule 2 (an account holding <c>role.update</c> but not
-/// <c>settings.grading.update</c>) cannot be proven with a real signed-in caller otherwise — the
-/// exact gap the task card's live drift entry names, left for TASK-0030's provider graduation.
+/// TASK-0030 graduated <c>IEffectivePrivilegeProvider</c> to resolve real <c>role_assignment</c> rows,
+/// but rule 2 itself and dropping this substitute for a genuinely role-derived caller are explicitly
+/// TASK-0030's card's OUT OF SCOPE (rule 2 belongs with the role EDIT surface, TASK-0046) — so this
+/// fake still stands in here, proving rule 2's pure logic end-to-end over HTTP without depending on
+/// TASK-0046's assignment-driven role-edit caller existing yet.
 /// </para>
 /// <para>
 /// TASK-0028 dispatch 3 seeded the real six roles into every test's database (spec 4.5,

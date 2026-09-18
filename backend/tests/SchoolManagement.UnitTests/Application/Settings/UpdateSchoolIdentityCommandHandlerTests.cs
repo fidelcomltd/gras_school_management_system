@@ -19,16 +19,35 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
+    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
+
+    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
+        Substitute.For<IAssessmentComponentRepository>();
+
+    private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
-    private UpdateSchoolIdentityCommandHandler CreateHandler() => new(
-        _schoolProfileRepository,
-        _configVersionRepository,
-        _currentUser,
-        _auditSink,
-        _timeProvider);
+    // TASK-0069/TASK-0077: the snapshot now reads the current grading/assessment/result-rules state
+    // even from a save that does not touch any of them — stub all three so SettingsSnapshotBuilder.Build
+    // never sees null.
+    private UpdateSchoolIdentityCommandHandler CreateHandler()
+    {
+        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
+        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
+        _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
+
+        return new(
+            _schoolProfileRepository,
+            _configVersionRepository,
+            _gradingBandRepository,
+            _assessmentComponentRepository,
+            _resultRulesRepository,
+            _currentUser,
+            _auditSink,
+            _timeProvider);
+    }
 
     private static UpdateSchoolIdentityCommand ValidCommand(int expectedVersion) => new(
         "Golden Royal Ark School",
@@ -87,7 +106,9 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
 
         await _configVersionRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, TestContext.Current.CancellationToken);
 
-        await _auditSink.Received(1).RecordAsync(
+        // RecordRejectionAsync, not RecordAsync (TASK-0048): this row must survive the ambient
+        // transaction's rollback, which a same-transaction write would not.
+        await _auditSink.Received(1).RecordRejectionAsync(
             "settings.identity.save_rejected_stale_version",
             Arg.Any<string>(),
             Arg.Any<string>(),

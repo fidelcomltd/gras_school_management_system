@@ -15,6 +15,7 @@
       8.  dependency vulnerability scan
       9.  secret scan (skipped with a warning if gitleaks is not installed)
       10. OpenAPI contract drift
+      11. Contract ledger drift (CONTRACT.lock vs. the committed contract vs. .agent/STATE.md)
 
     By default the script stops at the FIRST failing gate: a contributor fixes one thing, pushes,
     and finds out about the next thing rather than waiting through a database round trip to learn a
@@ -23,11 +24,18 @@
     than re-trigger per fix.
 
     POSTGRES_TEST_CONNECTION (needed by gate 6, integration tests) is resolved BY THIS SCRIPT
-    (TASK-0031) before any gate runs: an explicitly set environment variable wins if present,
-    otherwise $HOME/.gras/pg-test.txt is read (BOM-stripped, trimmed) — see
-    lib/postgres-test-connection.ps1. Nothing else needs to be set first; the canonical invocation
-    is exactly `./scripts/ci.ps1 -NoFailFast`, no environment prelude. A missing file is not fatal —
-    the integration-tests gate below still just skips, and says so.
+    before any gate runs — see lib/postgres-test-connection.ps1. TASK-0078 (2026-09-17, human
+    directive): the default is the LOCAL container (Testcontainers; DatabaseAvailability.cs
+    resolves the Docker endpoint independently at test-host start), never the hosted database, by
+    default. $HOME/.gras/pg-test.txt is read ONLY when -UseHostedDb is passed — it no longer
+    "wins" over the container by default, which is exactly what let a run silently cost 45+
+    minutes against hosted Neon on 2026-09-17. An explicitly set POSTGRES_TEST_CONNECTION still
+    wins outright inside CI (its own service container, backend-ci.yml); outside CI, an explicit
+    value pointing at a non-local host is REJECTED (this script exits non-zero) unless
+    -UseHostedDb is also passed — a hosted connection must never arrive by an ambient environment
+    variable either. Nothing else needs to be set first; the canonical invocation is exactly
+    `./scripts/ci.ps1 -NoFailFast`, no environment prelude. A missing hosted file (even with
+    -UseHostedDb) is not fatal — the integration-tests gate below still just skips, and says so.
 
 .PARAMETER Configuration
     Build configuration. Defaults to Release, matching CI.
@@ -46,15 +54,60 @@
     run — only whether a skip fails the SCRIPT changes. Without this switch, a skipped suite is a
     non-zero exit (CLAUDE.md §13: a skipped suite is not a passing suite).
 
+    This is UNCHANGED by -SkipIntegration / -IntegrationFilter below, and answers a different
+    question: -AllowSkipped is about a test that ran and reported itself skipped (e.g. it could not
+    reach Postgres); -SkipIntegration/-IntegrationFilter are about the ORCHESTRATOR choosing not to
+    run (all of, or part of) the integration stage at all. The two must never read alike in the
+    SUMMARY — see TASK-0067.
+
+.PARAMETER SkipIntegration
+    (TASK-0067) Skip the integration-tests gate entirely — gates 1-5 and 8-10 still run in full.
+    The SUMMARY reports it as `SKIP: Integration tests (SKIPPED BY REQUEST ...)`, never as a pass.
+    Because the run is then necessarily partial, the coverage-threshold gate reports its floor as
+    NOT APPLICABLE rather than PASS or FAIL — a partial run's coverage number is meaningless, but
+    that is not the same as the gate failing. Mutually exclusive with -IntegrationFilter. This is
+    the scoped local gate from `.agent/rules/gates.md` §0 — CI (`backend-ci.yml`) always runs the
+    full integration stage and passes neither this nor -IntegrationFilter.
+
+.PARAMETER IntegrationFilter
+    (TASK-0067) Run only the integration tests matching this `dotnet test --filter` expression,
+    leaving every other gate untouched and full. Goes through THIS script's own
+    POSTGRES_TEST_CONNECTION resolution (see above) exactly like the unfiltered run does — a raw,
+    hand-rolled `dotnet test --filter` outside this script does NOT resolve that variable, which is
+    precisely how TASK-0063 got `Passed: 0, Skipped: 1` and exit 0 on a test that never really ran.
+
+    A filter that matches ZERO tests is treated as a FAILURE of this gate, not a clean pass: a
+    typo'd expression reporting green is the same false-green class -SkipIntegration's honest
+    labelling exists to kill. Like -SkipIntegration, this makes the run partial, so the
+    coverage-threshold gate reports NOT APPLICABLE rather than enforcing the floor. Mutually
+    exclusive with -SkipIntegration.
+
 .PARAMETER NoFailFast
     Run every gate even after one fails, then exit non-zero with a summary, instead of stopping at
     the first failure. This is the CI workflow's mode.
+
+.PARAMETER UseHostedDb
+    (TASK-0078, human directive 2026-09-17) Explicit, per-run opt-in to the hosted database
+    ($HOME/.gras/pg-test.txt, Neon). Without it the file is ignored even when present and
+    non-empty, and the integration stage uses the local Testcontainers container instead. Also
+    required to keep an explicitly set POSTGRES_TEST_CONNECTION whose host is not
+    localhost/127.0.0.1/::1 outside CI — without it, that case is a hard failure, not a silent
+    fallback. Does not carry over between runs; pass it again next time if still needed.
 
 .EXAMPLE
     ./scripts/ci.ps1
 
 .EXAMPLE
     ./scripts/ci.ps1 -NoFailFast -AllowSkipped
+
+.EXAMPLE
+    ./scripts/ci.ps1 -SkipIntegration
+
+.EXAMPLE
+    ./scripts/ci.ps1 -IntegrationFilter 'FullyQualifiedName~AdmissionApproval'
+
+.EXAMPLE
+    ./scripts/ci.ps1 -UseHostedDb
 #>
 [CmdletBinding()]
 param(
@@ -68,8 +121,24 @@ param(
 
     [switch]$AllowSkipped,
 
-    [switch]$NoFailFast
+    [switch]$NoFailFast,
+
+    # TASK-0067: the scoped local gate. Neither flag changes which gates exist, their order, or
+    # their thresholds -- they change whether/how much of gate 6 runs, and gate 7 (coverage) reacts
+    # by reporting N/A instead of enforcing a floor against a partial run. See the PARAMETER blocks
+    # above for the full rationale.
+    [switch]$SkipIntegration,
+
+    [string]$IntegrationFilter,
+
+    # TASK-0078: explicit, per-run opt-in to the hosted database. See the PARAMETER block above.
+    [switch]$UseHostedDb
 )
+
+if ($SkipIntegration -and $IntegrationFilter) {
+    Write-Host 'ERROR: -SkipIntegration and -IntegrationFilter are mutually exclusive -- pick one.' -ForegroundColor Red
+    exit 1
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
@@ -82,17 +151,65 @@ Push-Location $backendRoot
 . (Join-Path $PSScriptRoot 'lib/gate-summary.ps1')
 
 # Same pattern: one implementation of "how POSTGRES_TEST_CONNECTION is resolved", shared with
-# backend/scripts/tests/postgres-test-connection.tests.ps1 (TASK-0031). Resolving it here, once,
-# before any gate runs, is what lets every dispatch invoke this whole script as
-# `./backend/scripts/ci.ps1 -NoFailFast` with no environment prelude — see STATE.md ## Gate
-# commands for why that matters.
+# backend/scripts/tests/postgres-test-connection.tests.ps1 (TASK-0031, extended by TASK-0078).
+# Resolving it here, once, before any gate runs, is what lets every dispatch invoke this whole
+# script as `./backend/scripts/ci.ps1 -NoFailFast` with no environment prelude — see STATE.md
+# ## Gate commands for why that matters.
 . (Join-Path $PSScriptRoot 'lib/postgres-test-connection.ps1')
-Initialize-PostgresTestConnection -HomeDirectory $HOME
+
+# TASK-0078: -SkipIntegration needs no database and no pre-flight -- resolution (and the non-local
+# env-var rejection below) is skipped entirely rather than possibly failing a run that was never
+# going to touch a database anyway.
+if ($SkipIntegration) {
+    Write-Host 'Integration database: not applicable (-SkipIntegration)' -ForegroundColor DarkGray
+}
+else {
+    # -IsCi mirrors GitHub Actions' own ambient signal (backend-ci.yml sets
+    # $env:GITHUB_ACTIONS=true on every runner) -- never something a local invocation sets itself,
+    # so a human cannot accidentally get the CI carve-out by exporting it.
+    try {
+        $script:postgresResolution = Initialize-PostgresTestConnection -HomeDirectory $HOME `
+            -UseHostedDb:$UseHostedDb -IsCi:([bool]$env:GITHUB_ACTIONS)
+    }
+    catch {
+        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    # The first line of every run names the database source -- never the connection string, on any
+    # path (postgres-test-connection.ps1's own contract). TASK-0078 (orchestrator ruling,
+    # 2026-09-17): the 'Unset' (local-container) branch names no endpoint -- DatabaseAvailability.cs
+    # resolves the Docker endpoint itself, independently, when the test fixture starts, and THROWS
+    # (never skips) if nothing answers, per its own TASK-0065 contract. That is the safety property;
+    # this line is purely informational. If the integration stage then fails, the OnFailure hook on
+    # the 'Integration tests' gate below prints Get-IntegrationFailureGuidance's text for this
+    # source, steering a human away from silently falling back to the hosted database.
+    switch ($script:postgresResolution.Source) {
+        'ExplicitCi' { Write-Host 'Integration database: explicit POSTGRES_TEST_CONNECTION (CI)' -ForegroundColor Cyan }
+        'ExplicitLocal' { Write-Host 'Integration database: explicit POSTGRES_TEST_CONNECTION (local host, outside CI)' -ForegroundColor Cyan }
+        'ExplicitHosted' { Write-Host 'Integration database: hosted (explicit POSTGRES_TEST_CONNECTION, confirmed via -UseHostedDb)' -ForegroundColor Cyan }
+        'HostedFile' { Write-Host 'Integration database: hosted (from ~/.gras/pg-test.txt, confirmed via -UseHostedDb)' -ForegroundColor Cyan }
+        'Unset' { Write-Host 'Integration database: local container (Docker endpoint resolved by the test fixture at startup)' -ForegroundColor Cyan }
+    }
+}
+
+# Same pattern again: one implementation of "does the ledger match", shared with
+# backend/scripts/tests/contract-ledger.tests.ps1 (TASK-0075).
+. (Join-Path $PSScriptRoot 'lib/contract-ledger.ps1')
 
 $failures = [System.Collections.Generic.List[string]]::new()
 $gateVerdicts = [System.Collections.Generic.List[string]]::new()
 $script:testCountsLine = $null
 $script:coverageLine = $null
+
+# TASK-0067: true the moment ANY part of the integration stage is scoped by request -- whether the
+# whole stage was skipped (-SkipIntegration) or narrowed to a filter (-IntegrationFilter). This is
+# what tells the Coverage threshold gate its floor is not comparable to a partial run and must be
+# reported N/A rather than PASS or FAIL. It is deliberately independent of -AllowSkipped, which
+# answers a different question (see that parameter's doc comment above).
+$script:integrationScoped = [bool]$SkipIntegration -or [bool]$IntegrationFilter
+$script:coverageGateNotApplicable = $false
 
 function Write-FinalSummary {
     # A FIXED block: one line per gate that ran, plus the test and coverage numbers when they were
@@ -123,7 +240,13 @@ function Write-FinalSummary {
 function Invoke-Gate {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][scriptblock]$Action
+        [Parameter(Mandatory)][scriptblock]$Action,
+
+        # TASK-0078: run only when this gate FAILS, after the FAIL line and before -NoFailFast
+        # decides whether to exit now -- so a caller (the Integration tests gate) can print extra
+        # guidance on failure regardless of fail-fast mode, since the plain -NoFailFast:$false path
+        # exits from INSIDE this catch block and never returns control to the call site.
+        [scriptblock]$OnFailure
     )
 
     Write-Host ''
@@ -141,6 +264,10 @@ function Invoke-Gate {
         Write-Host "FAIL: $Name -- $($_.Exception.Message)" -ForegroundColor Red
         $failures.Add($Name)
         $gateVerdicts.Add("FAIL: $Name -- $($_.Exception.Message)")
+
+        if ($OnFailure) {
+            & $OnFailure
+        }
 
         if (-not $NoFailFast) {
             # Cheapest-first ordering only pays off if a failure actually stops the run here. The
@@ -205,22 +332,93 @@ try {
         $global:LASTEXITCODE = $exitCode
     }
 
-    Invoke-Gate 'Integration tests' {
-        # These SKIP when no PostgreSQL is reachable — they never silently pass. POSTGRES_TEST_
-        # CONNECTION was already resolved at the top of this script (an explicit env var, or
-        # $HOME/.gras/pg-test.txt); if neither existed, it is still unset here and this suite skips,
-        # unless a container runtime is available instead. CI must supply one of those, or the suite
-        # it is guarding is much smaller than it looks. A skip now fails the script (see the
-        # Coverage threshold gate below) unless -AllowSkipped is passed.
-        if (-not $env:POSTGRES_TEST_CONNECTION) {
-            Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
-            Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
-        }
+    if ($SkipIntegration) {
+        # TASK-0067: bypass Invoke-Gate entirely, same shape as -SkipContractDrift below -- this is
+        # a stage skipped BY REQUEST, which must never be printed or counted as a pass. It must also
+        # never be conflated with a test reporting itself skipped (e.g. Postgres unreachable), which
+        # is a different thing entirely and still fails the run below regardless of this flag.
+        Write-Host ''
+        Write-Host 'SKIPPED: Integration tests (SKIPPED BY REQUEST via -SkipIntegration)' -ForegroundColor Yellow
+        $gateVerdicts.Add('SKIP: Integration tests (SKIPPED BY REQUEST via -SkipIntegration)')
+    }
+    else {
+        Invoke-Gate 'Integration tests' {
+            # These SKIP when no PostgreSQL is reachable — they never silently pass. POSTGRES_TEST_
+            # CONNECTION was already resolved at the top of this script (an explicit env var, or
+            # $HOME/.gras/pg-test.txt); if neither existed, it is still unset here and this suite skips,
+            # unless a container runtime is available instead. CI must supply one of those, or the suite
+            # it is guarding is much smaller than it looks. A skip now fails the script (see the
+            # Coverage threshold gate below) unless -AllowSkipped is passed.
+            if (-not $env:POSTGRES_TEST_CONNECTION) {
+                Write-Host 'NOTE: POSTGRES_TEST_CONNECTION is not set. Integration tests will be SKIPPED' -ForegroundColor Yellow
+                Write-Host '      unless a container runtime is available. They are NOT passing — they are absent.' -ForegroundColor Yellow
+            }
 
-        dotnet test 'tests/SchoolManagement.IntegrationTests/SchoolManagement.IntegrationTests.csproj' --no-build --configuration $Configuration --nologo `
-            --settings coverlet.runsettings `
-            --results-directory './artifacts/coverage' `
-            --logger 'trx'
+            $filterArgs = @()
+            if ($IntegrationFilter) {
+                # TASK-0067: this dotnet test call is the SAME one the unfiltered run uses, inside
+                # THIS script, after Initialize-PostgresTestConnection already ran at the top -- so
+                # POSTGRES_TEST_CONNECTION resolves exactly as it does for a full run. A raw
+                # `dotnet test --filter` run outside ci.ps1 does not resolve it at all; that gap is
+                # what let TASK-0063 report `Passed: 0, Skipped: 1` and exit 0 on a test that never
+                # really ran.
+                Write-Host "Filtering integration tests: $IntegrationFilter" -ForegroundColor DarkGray
+                $filterArgs = @('--filter', $IntegrationFilter)
+            }
+
+            # Snapshotted BEFORE the run, by full path, not by "newest timestamp": the Unit &
+            # architecture tests gate above always wipes and repopulates './artifacts/coverage', so
+            # by the time this gate runs the directory already contains that suite's own .trx. A
+            # "pick whichever .trx has the latest LastWriteTime" check would silently select THAT
+            # file whenever this run's filter produces none of its own, read its total (the whole
+            # unit suite, never zero), and let a filter that matched nothing read as a pass -- a
+            # review caught exactly this hole. Comparing file identity (which paths are NEW after
+            # this run) rather than timestamps sidesteps clock/resolution questions entirely.
+            $existingTrxPaths = @(
+                Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty FullName
+            )
+
+            dotnet test 'tests/SchoolManagement.IntegrationTests/SchoolManagement.IntegrationTests.csproj' --no-build --configuration $Configuration --nologo `
+                --settings coverlet.runsettings `
+                --results-directory './artifacts/coverage' `
+                --logger 'trx' `
+                @filterArgs
+            $testExitCode = $LASTEXITCODE
+
+            if ($IntegrationFilter) {
+                # TASK-0067: a filter matching ZERO tests is a FAILURE, not a clean pass -- the same
+                # false-green class as the silent skip this card exists to kill. `dotnet test` exits
+                # 0 when a filter selects nothing, so the exit code alone cannot catch this; the trx
+                # this run just wrote (a path that was NOT in the snapshot above) is read directly,
+                # not via the merged coverage-gate summary, which only checks the aggregate and would
+                # not single out an empty suite from the unit suite's already-present total.
+                $newTrx = @(Get-ChildItem './artifacts/coverage' -Filter '*.trx' -ErrorAction SilentlyContinue) |
+                    Where-Object { $existingTrxPaths -notcontains $_.FullName } |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+                if (-not $newTrx) {
+                    throw "Integration test filter '$IntegrationFilter' produced no .trx result file for this run -- it matched zero tests."
+                }
+
+                [xml]$filterResults = Get-Content -LiteralPath $newTrx.FullName -Raw
+                $filterTotal = [int]$filterResults.TestRun.ResultSummary.Counters.total
+                if ($filterTotal -eq 0) {
+                    throw "Integration test filter '$IntegrationFilter' matched ZERO tests. Check the expression -- a typo'd filter reporting green is a false pass."
+                }
+            }
+
+            $global:LASTEXITCODE = $testExitCode
+        } -OnFailure {
+            # TASK-0078: guidance only exists for the local-container source ('Unset') --
+            # Get-IntegrationFailureGuidance returns $null for every other source, so this prints
+            # nothing extra when the failure has nothing to do with the container path (an explicit
+            # or hosted connection that was simply unreachable, a real test regression, etc).
+            $guidance = Get-IntegrationFailureGuidance -Source $script:postgresResolution.Source
+            if ($guidance) {
+                Write-Host $guidance -ForegroundColor Yellow
+            }
+        }
     }
 
     Invoke-Gate "Coverage threshold ($CoverageThreshold%)" {
@@ -291,8 +489,29 @@ try {
             Write-Host $message -ForegroundColor Yellow
         }
 
+        # TASK-0067: a real failure, or a test reporting itself skipped (e.g. Postgres unreachable),
+        # still fails the run in EVERY mode -- -SkipIntegration/-IntegrationFilter only excuses the
+        # FLOOR below from being enforced against a partial number, never this check. This is the
+        # exact distinction the card exists to keep safe: a stage skipped by request is not the same
+        # as a test that ran and skipped itself.
         if (-not $verdict.Passed) {
             throw 'Test run was not clean (failed and/or skipped tests) - see the messages above.'
+        }
+
+        if ($script:integrationScoped) {
+            # TASK-0067: the integration stage was skipped or filtered by request, so this run is
+            # necessarily partial and the coverage number is not comparable to the floor -- it is not
+            # a pass (nothing was proven against the floor) and not a failure (nothing said it had to
+            # be). $script:coverageGateNotApplicable is read right after this Invoke-Gate call below
+            # to correct the single "PASS: Coverage threshold" line Invoke-Gate is about to record,
+            # to N/A, in the SUMMARY block.
+            Write-Host ''
+            Write-Host 'NOT APPLICABLE: integration tests were scoped by request (-SkipIntegration or' -ForegroundColor Yellow
+            Write-Host '-IntegrationFilter), so this run is partial and the coverage floor is not enforced' -ForegroundColor Yellow
+            Write-Host 'against it. This is reported as N/A, not PASS or FAIL, in the final summary.' -ForegroundColor Yellow
+            $script:coverageGateNotApplicable = $true
+            $global:LASTEXITCODE = 0
+            return
         }
 
         # THE THRESHOLD IS A FLOOR, NOT A GOAL. It exists to catch a collapse — someone deleting a test
@@ -316,6 +535,15 @@ try {
             throw ("Line coverage {0:N2}% is below the {1}% floor." -f $lineRate, $CoverageThreshold)
         }
         $global:LASTEXITCODE = 0
+    }
+
+    if ($script:coverageGateNotApplicable) {
+        # TASK-0067: Invoke-Gate above just recorded "PASS: Coverage threshold (...)" (exit code 0,
+        # no exception) and printed it to the console -- correct only the SUMMARY-block entry to N/A
+        # so the pasted evidence cannot be misread as a genuine pass on a partial run's coverage
+        # number. $failures is untouched: this is not a failure, so the run's exit code is unaffected.
+        $lastIndex = $gateVerdicts.Count - 1
+        $gateVerdicts[$lastIndex] = "N/A: Coverage threshold ($CoverageThreshold%) -- integration scoped by request (-SkipIntegration or -IntegrationFilter); floor not enforced against a partial run"
     }
 
     Invoke-Gate 'Vulnerable dependencies' {
@@ -418,6 +646,61 @@ try {
             Write-Host 'The committed contract matches the code.'
             $global:LASTEXITCODE = 0
         }
+    }
+
+    # TASK-0075: the drift gate above proves the CODE and the committed contract agree. It never
+    # reads contracts/CONTRACT.lock or .agent/STATE.md at all, so both were trusted by every agent
+    # and verified by nothing — and STATE.md's `## Contract` block (hash, path count, schema
+    # count, stated in prose) drifted from the real contract three separate times, silently, each
+    # time a closing card updated the archive and not the block. This gate makes that impossible to
+    # miss: file reads only, no database, no build output, so it belongs in the cheap tier.
+    Invoke-Gate 'Contract ledger drift' {
+        $repoRoot = Split-Path -Parent $backendRoot
+        $lockPath = Join-Path $repoRoot 'contracts/CONTRACT.lock'
+        $contractPath = Join-Path $repoRoot 'contracts/openapi.json'
+        $statePath = Join-Path $repoRoot '.agent/STATE.md'
+
+        $result = Test-ContractLedger -LockPath $lockPath -ContractPath $contractPath -StatePath $statePath
+
+        # Checked in this order, and each throws its own distinct message, because "the lock is
+        # wrong" and "the ledger is wrong" are different problems with different owners: a wrong
+        # lock is fixed by regenerating the contract; a wrong ledger can ONLY be fixed by the
+        # orchestrator, since .agent/** is off limits to a dev agent (CLAUDE.md §1).
+        if (-not $result.LockMatches) {
+            Write-Host 'contracts/CONTRACT.lock does not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  CONTRACT.lock records: $($result.LockHash)" -ForegroundColor Red
+            Write-Host "  actual document hash:  $($result.ActualHash)" -ForegroundColor Red
+            Write-Host 'The LOCK is wrong, not the ledger. Fix by regenerating it:' -ForegroundColor Yellow
+            Write-Host '    ./scripts/generate-openapi.ps1 -Promote' -ForegroundColor Yellow
+            throw 'CONTRACT.lock does not match the committed contract.'
+        }
+
+        if (-not $result.StateHashMatches) {
+            Write-Host '.agent/STATE.md ## Contract "Current:" hash does not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  STATE.md states:      $($result.StateHash)" -ForegroundColor Red
+            Write-Host "  actual document hash: $($result.ActualHash)" -ForegroundColor Red
+            Write-Host 'The LEDGER is stale, not the lock. Fix by updating .agent/STATE.md ## Contract' -ForegroundColor Yellow
+            Write-Host "to the actual hash above ($($result.ActualHash))." -ForegroundColor Yellow
+            Write-Host 'The ORCHESTRATOR owns .agent/STATE.md — a dev agent cannot write it. If you are' -ForegroundColor Yellow
+            Write-Host 'a dev agent reading this, STOP and bounce the card; do not guess and do not' -ForegroundColor Yellow
+            Write-Host 'edit .agent/** yourself.' -ForegroundColor Yellow
+            throw '.agent/STATE.md ## Contract "Current:" hash is stale.'
+        }
+
+        if (-not $result.StateCountsMatch) {
+            Write-Host '.agent/STATE.md ## Contract path/schema counts do not match contracts/openapi.json.' -ForegroundColor Red
+            Write-Host "  STATE.md states: $($result.StatePathCount) paths / $($result.StateSchemaCount) schemas" -ForegroundColor Red
+            Write-Host "  actual document: $($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas" -ForegroundColor Red
+            Write-Host 'The LEDGER is stale, not the lock. Fix by updating .agent/STATE.md ## Contract' -ForegroundColor Yellow
+            Write-Host "to the actual counts above ($($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas)." -ForegroundColor Yellow
+            Write-Host 'The ORCHESTRATOR owns .agent/STATE.md — a dev agent cannot write it. If you are' -ForegroundColor Yellow
+            Write-Host 'a dev agent reading this, STOP and bounce the card; do not guess and do not' -ForegroundColor Yellow
+            Write-Host 'edit .agent/** yourself.' -ForegroundColor Yellow
+            throw '.agent/STATE.md ## Contract path/schema counts are stale.'
+        }
+
+        Write-Host "Lock, ledger hash and ledger counts all agree: $($result.ActualHash) / $($result.ActualPathCount) paths / $($result.ActualSchemaCount) schemas." -ForegroundColor Green
+        $global:LASTEXITCODE = 0
     }
 
     Write-FinalSummary

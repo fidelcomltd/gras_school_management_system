@@ -6,13 +6,27 @@ namespace SchoolManagement.Domain.Settings;
 /// a member here is a code-only change — no migration required.
 /// </summary>
 /// <remarks>
-/// Only <see cref="Identity"/> exists as of TASK-0005a. TASK-0005c adds <c>Abbreviation</c> and
-/// <c>RegistrationNumber</c> when it ships their respective <c>PATCH</c> routes; TASK-0005b's uploads
-/// are also identity-group edits (they resave the same <see cref="SchoolProfile"/> row) and reuse
-/// <see cref="Identity"/> rather than adding a member of their own.
+/// TASK-0005b's uploads are also identity-group edits (they resave the same
+/// <see cref="SchoolProfile"/> row) and reuse <see cref="Identity"/> rather than adding a member of
+/// their own.
 /// </remarks>
 public enum ConfigVersionGroup
 {
     /// <summary>A save through <c>PATCH /settings/identity</c>, or a logo/signature upload (TASK-0005b).</summary>
     Identity = 0,
+
+    /// <summary>A save through <c>PATCH /settings/abbreviation</c> (TASK-0005c).</summary>
+    Abbreviation = 1,
+
+    /// <summary>A save through <c>PATCH /settings/reg-number</c> (TASK-0005c).</summary>
+    RegistrationNumber = 2,
+
+    /// <summary>A save through <c>PUT /settings/grading</c> or <c>POST /settings/grading/reset</c> (TASK-0069).</summary>
+    Grading = 3,
+
+    /// <summary>A save through <c>PUT /settings/assessment</c> (TASK-0069).</summary>
+    Assessment = 4,
+
+    /// <summary>A save through <c>PUT /settings/result-rules</c> (TASK-0077).</summary>
+    ResultRules = 5,
 }

@@ -186,9 +186,9 @@ public sealed class RoleEndpoints : IEndpointModule
             .WithName("DeleteRole")
             .WithSummary("Delete a role")
             .WithDescription(
-                "Spec 9.4: hard-deletes unconditionally today, because no `role_assignment` table " +
-                "exists yet, so nothing can ever have referenced a role (TASK-0030 adds the " +
-                "has-ever-been-assigned branch that archives instead). A system role returns 409.")
+                "Spec 9.4: hard-deletes when no assignment has ever referenced the role; archives it " +
+                "instead (still 204) when at least one has, active or revoked. A system role returns " +
+                "409.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

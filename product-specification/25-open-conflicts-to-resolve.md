@@ -74,11 +74,15 @@ Provisional resolution: **all of it is still computed and stored, and none of it
 
 Every day panel on the weekly report sheet ends with `Parent's Comment`. On paper the sheet goes home in the child's bag and the parent writes in it. In this system parents have no accounts, hold only an anonymous pin, and the portal is read-only.
 
-Provisional resolution: **the field exists, is stored, and is filled in by the class teacher transcribing what the parent wrote on the paper copy.** The portal displays it read-only. No parent-facing input is built.
+**RESOLVED by the school.** Option A is confirmed, with two clarifications the school added: the field is **optional**, and it may be entered by **a teacher or an administrator**, not the class teacher alone.
+
+- **Optional means optional.** The field is nullable, never required to save a day panel, never required to publish a weekly sheet, and an empty one prints as an empty line rather than as a placeholder. No validation, no reminder, no completeness percentage counts it. The school expects it to be empty most weeks and that is not a defect.
+- **Who may write it.** No new privilege. The field is written under the existing `weekly.enter`, which the seeded roles give to Class Teacher arm-scoped and to Head Teacher school-wide. School Administrator does **not** hold `weekly.enter` in the seed, so if the school wants its administrators writing these comments it is a role edit on the roles screen, not a code change. Every write is attributed and audited like any other, so the sheet can always answer who typed it.
+- **Still no parent-facing write.** The portal stays read-only and no anonymous write endpoint is built. Option B remains available as its own module later, and the moderation, length-limit, rate-limit and abuse questions below still have to be answered before it is.
 
 | Option | Effect |
 |---|---|
-| A. Teacher transcribes (**chosen**) | No new attack surface. Costs teacher time, and the field will often be empty. |
+| A. Teacher or administrator transcribes, field optional (**chosen**) | No new attack surface. Costs teacher time, and the field will often be empty. |
 | B. Parent submits through the portal inside a viewing session | Genuinely useful, and it makes an unauthenticated anonymous endpoint that writes text into the school's database. Needs length limits, moderation, rate limiting, and an answer to what happens when the comment is abusive. Recommend deferring to a second version. |
 | C. Drop the field | Loses a two-way channel the school clearly uses on paper. |
 | D. Print a blank line on the PDF only | Middle path: parents write on the printout, nothing is stored. Keeps the paper workflow and stores nothing. |
@@ -142,7 +146,7 @@ Provisional resolution: collected, stored, access restricted to a named privileg
 | 1. Grading scale | **Resolved.** Nine bands, F 0-19 added, seeded and editable by the school. |
 | 2. Assessment structure | **Resolved.** 20/20/60 seeded, with a durability requirement so an assignment can be reintroduced by configuration. |
 | 3. No position or class average on the sheets | Provisional, low risk. Computed and stored, printed only on the broadsheet. Reversible as a template change. |
-| 4. Parent's Comment on the weekly sheet | **Still open.** The provisional resolution stands: the class teacher transcribes what the parent wrote on the paper copy, and the portal stays read-only. The alternative that adds a parent-facing write endpoint should not be built without answering the moderation, length-limit and abuse questions above. |
+| 4. Parent's Comment on the weekly sheet | **Resolved.** Optional free-text field, written by a teacher or an administrator under the existing `weekly.enter` privilege. Portal stays read-only; no parent-facing write endpoint. |
 | 5. Next-term fees block | **Resolved.** A notice with entry screens and no logic attached. |
 | 6. Two rating scales | Provisional. Scale-per-block, three seeded scales, all editable. |
 | 7. Nursery has no attendance line | Provisional, low risk. Captured for both sections, printed only for primary. See Appendix B question 20. |
@@ -151,8 +155,9 @@ Provisional resolution: collected, stored, access restricted to a named privileg
 
 Still outstanding, in order of cost of getting it wrong:
 
-1. **The Parent's Comment mechanism, item 4.** The only unresolved item that changes what gets built rather than what gets printed.
-2. The smaller confirmations in `17-appendix-b-open-questions.md` part 2, questions 19 to 27. Question 19's indicator lists are now confirmed by the school; the rest remain.
+1. The smaller confirmations in `17-appendix-b-open-questions.md` part 2, questions 19 to 27. Question 19's indicator lists are now confirmed by the school; the rest remain.
+
+**No item in this file now blocks build.** Items 1, 2, 4 and 5 are settled by the school. Items 3, 6, 7, 8 and 9 remain provisional, all of them reversible as template or seed changes, and all are recorded so that a different answer later is a known cost rather than a surprise.
 
 ## A note on configurability, since it recurs
 

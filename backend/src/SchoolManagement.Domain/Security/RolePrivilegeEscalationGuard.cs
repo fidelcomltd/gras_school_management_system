@@ -28,9 +28,10 @@ namespace SchoolManagement.Domain.Security;
 /// <para>
 /// One consequence spec 6.1.7 states explicitly and this guard does not special-case: "a Super Admin
 /// can always widen a role, because a Super Admin holds everything." A Super Admin's
-/// <c>actorPrivileges</c> already contains the whole register (see
-/// <c>SuperAdminFlagEffectivePrivilegeProvider</c>), so no addition it makes can ever be an offending
-/// one — the general rule already produces that outcome with no special path.
+/// <c>actorPrivileges</c> already contains the whole register (the <c>is_super_admin</c> flag path
+/// every <c>IEffectivePrivilegeProvider</c> implementation has resolved directly since TASK-0003, most
+/// recently <c>RoleAssignmentEffectivePrivilegeProvider</c>), so no addition it makes can ever be an
+/// offending one — the general rule already produces that outcome with no special path.
 /// </para>
 /// </remarks>
 public static class RolePrivilegeEscalationGuard
@@ -90,5 +91,33 @@ public static class RolePrivilegeEscalationGuard
             : $"You do not hold {joined} and cannot add them to a role.";
 
         return Result.Failure(Error.Forbidden("role.privilege_escalation", message));
+    }
+
+    /// <summary>
+    /// Enforces spec 6.1.7 rule 1 at the point a <see cref="RoleAssignment"/> would be created,
+    /// edited or revoked: "No account may create, edit or revoke a role_assignment where
+    /// admin_account_id equals its own id." Placed here rather than in a third guard type, per
+    /// TASK-0030's card — this rule is an escalation control in the same family as rule 2 (both stop
+    /// an account from expanding its own or a colleague's reach through a channel other than a Super
+    /// Admin explicitly choosing to).
+    /// </summary>
+    /// <param name="actingAccountId">The account performing the create/edit/revoke.</param>
+    /// <param name="targetAdminAccountId">The <c>admin_account_id</c> the assignment names or would name.</param>
+    /// <returns>
+    /// A success when the two ids differ; otherwise a <see cref="ErrorType.Forbidden"/> failure
+    /// carrying spec 6.1.7 rule 1's exact message and error code <c>role_assignment.self_assignment_forbidden</c>.
+    /// </returns>
+    public static Result ValidateNotSelfAssignment(Guid actingAccountId, Guid targetAdminAccountId)
+    {
+        if (actingAccountId != targetAdminAccountId)
+        {
+            return Result.Success();
+        }
+
+        // Exact wording from spec 6.1.7 rule 1. Do not rephrase it — see this file's own remarks on
+        // rule 2's message for why a "corrected" message is a silent contract break.
+        return Result.Failure(Error.Forbidden(
+            "role_assignment.self_assignment_forbidden",
+            "You cannot change your own roles. Ask another Super Admin."));
     }
 }

@@ -22,6 +22,211 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SchoolManagement.Domain.Admissions.AdmissionRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdmissionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("admission_type");
+
+                    b.Property<string>("AdmissionTypeNote")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("admission_type_note");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<bool>("AssessmentRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("assessment_required");
+
+                    b.Property<string>("AssessmentResultRemarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("assessment_result_remarks");
+
+                    b.Property<Guid?>("AssignedClassTeacher")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_class_teacher");
+
+                    b.Property<Guid>("ClassAdmittedInto")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_admitted_into");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("DateAdmitted")
+                        .HasColumnType("date")
+                        .HasColumnName("date_admitted");
+
+                    b.Property<DateOnly?>("DateApplicationReceived")
+                        .HasColumnType("date")
+                        .HasColumnName("date_application_received");
+
+                    b.Property<DateOnly?>("DeclarationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("declaration_date");
+
+                    b.Property<string>("DeclarationName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("declaration_name");
+
+                    b.Property<bool>("DeclarationSigned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("declaration_signed");
+
+                    b.Property<bool>("HeadOfSchoolConfirmed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("head_of_school_confirmed");
+
+                    b.Property<string>("HeadOfSchoolName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("head_of_school_name");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_admission_records");
+
+                    b.HasIndex("ClassAdmittedInto")
+                        .HasDatabaseName("ix_admission_records_class_admitted_into");
+
+                    b.HasIndex("PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_admission_records_pupil_id_unique");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_admission_records_session_id");
+
+                    b.ToTable("admission_records", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Audit.AuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_admin_id");
+
+                    b.Property<string>("ActorLabel")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("actor_label");
+
+                    b.Property<string>("AfterJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after_json");
+
+                    b.Property<string>("BeforeJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before_json");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SourceIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("source_ip");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_event");
+
+                    b.HasIndex("ActorAdminId")
+                        .HasDatabaseName("ix_audit_event_actor_admin_id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_audit_event_occurred_at");
+
+                    b.HasIndex("Outcome")
+                        .HasDatabaseName("ix_audit_event_outcome");
+
+                    b.ToTable("audit_event", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Auth.AdminAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,6 +376,399 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("admin_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.Arm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<Guid>("ClassLevelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_level_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("FormTeacherAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_teacher_admin_id");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("LabelKey")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("label_key");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_arms");
+
+                    b.HasIndex("FormTeacherAdminId")
+                        .HasDatabaseName("ix_arms_form_teacher_admin_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_arms_session_id");
+
+                    b.HasIndex("ClassLevelId", "SessionId", "LabelKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_arms_level_session_label_unique");
+
+                    b.ToTable("arms", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.ClassLevel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name_key");
+
+                    b.Property<Guid?>("NextLevelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("next_level_id");
+
+                    b.Property<int>("ProgressionOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("progression_order");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_class_levels");
+
+                    b.HasIndex("NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_class_levels_name_key_unique");
+
+                    b.HasIndex("NextLevelId")
+                        .HasDatabaseName("ix_class_levels_next_level_id");
+
+                    b.HasIndex("ProgressionOrder")
+                        .IsUnique()
+                        .HasDatabaseName("ix_class_levels_progression_order_active_unique")
+                        .HasFilter("status = 'Active'");
+
+                    b.ToTable("class_levels", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000319"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 6",
+                            NameKey = "primary 6",
+                            ProgressionOrder = 9,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000329")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000318"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 5",
+                            NameKey = "primary 5",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000319"),
+                            ProgressionOrder = 8,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000328")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000317"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 4",
+                            NameKey = "primary 4",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000318"),
+                            ProgressionOrder = 7,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000327")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000316"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 3",
+                            NameKey = "primary 3",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000317"),
+                            ProgressionOrder = 6,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000326")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000315"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 2",
+                            NameKey = "primary 2",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000316"),
+                            ProgressionOrder = 5,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000325")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000314"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary 1",
+                            NameKey = "primary 1",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000315"),
+                            ProgressionOrder = 4,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000302"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000324")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000313"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Nursery 3",
+                            NameKey = "nursery 3",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000314"),
+                            ProgressionOrder = 3,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000301"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000323")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000312"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Nursery 2",
+                            NameKey = "nursery 2",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000313"),
+                            ProgressionOrder = 2,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000301"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000322")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000311"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Nursery 1",
+                            NameKey = "nursery 1",
+                            NextLevelId = new Guid("00000000-0000-0000-0000-000000000312"),
+                            ProgressionOrder = 1,
+                            SectionId = new Guid("00000000-0000-0000-0000-000000000301"),
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000321")
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.Section", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name_key");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sections");
+
+                    b.HasIndex("NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sections_name_key_unique");
+
+                    b.ToTable("sections", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000301"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Nursery",
+                            NameKey = "nursery",
+                            Version = new Guid("00000000-0000-0000-0000-000000000303")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000302"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Primary",
+                            NameKey = "primary",
+                            Version = new Guid("00000000-0000-0000-0000-000000000304")
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Enrolments.Enrolment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("arm_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_to");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrolments");
+
+                    b.HasIndex("PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enrolments_pupil_id_open_unique")
+                        .HasFilter("effective_to IS NULL");
+
+                    b.HasIndex("ArmId", "EffectiveTo")
+                        .HasDatabaseName("ix_enrolments_arm_id_effective_to");
+
+                    b.ToTable("enrolments", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Idempotency.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -241,6 +839,168 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Pupils.Pupil", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("DateOfBirth")
+                        .HasColumnType("date")
+                        .HasColumnName("date_of_birth");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("first_name");
+
+                    b.Property<string>("HomeAddress")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("home_address");
+
+                    b.Property<string>("Lga")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("lga");
+
+                    b.Property<string>("MiddleName")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("middle_name");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Nationality")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("nationality");
+
+                    b.Property<string>("OtherInformation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("other_information");
+
+                    b.Property<string>("PreviousClass")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("previous_class");
+
+                    b.Property<string>("PreviousSchool")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("previous_school");
+
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("registration_number");
+
+                    b.Property<string>("Sex")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("sex");
+
+                    b.Property<string>("StateOfOrigin")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("state_of_origin");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Surname")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("surname");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pupils");
+
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pupils_registration_number_unique");
+
+                    b.HasIndex("Surname", "Id")
+                        .HasDatabaseName("ix_pupils_surname_id");
+
+                    b.ToTable("pupils", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pupils.PupilRegNumberHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CorrectedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("corrected_at_utc");
+
+                    b.Property<Guid?>("CorrectedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("corrected_by");
+
+                    b.Property<string>("OldRegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("old_registration_number");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pupil_reg_number_history");
+
+                    b.HasIndex("OldRegistrationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pupil_reg_number_history_old_registration_number_unique");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_pupil_reg_number_history_pupil_id");
+
+                    b.ToTable("pupil_reg_number_history", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Reference.SampleRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -308,6 +1068,416 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("sample_records", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("ArmPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("arm_position");
+
+                    b.Property<bool>("ArmPositionTied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("arm_position_tied");
+
+                    b.Property<int>("ArmPupilCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("arm_pupil_count");
+
+                    b.Property<decimal>("Average")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("average");
+
+                    b.Property<int?>("LevelPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_position");
+
+                    b.Property<bool>("LevelPositionTied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("level_position_tied");
+
+                    b.Property<int?>("LevelPupilCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_pupil_count");
+
+                    b.Property<string>("OverallGrade")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("overall_grade");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<int>("SubjectsTaken")
+                        .HasColumnType("integer")
+                        .HasColumnName("subjects_taken");
+
+                    b.Property<int>("TotalObtainable")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_obtainable");
+
+                    b.Property<int>("TotalObtained")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_obtained");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pupil_term_result");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_pupil_term_result_pupil_id");
+
+                    b.HasIndex("ResultSetId")
+                        .HasDatabaseName("ix_pupil_term_result_result_set_id");
+
+                    b.HasIndex("ResultSetId", "PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pupil_term_result_result_set_id_pupil_id_unique");
+
+                    b.ToTable("pupil_term_result", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("approved_at_utc");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("ArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("arm_id");
+
+                    b.Property<DateTimeOffset?>("ComputedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("computed_at_utc");
+
+                    b.Property<Guid?>("ComputedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("computed_by");
+
+                    b.Property<string>("ConfigSnapshotJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config_snapshot_json");
+
+                    b.Property<Guid?>("ConfigVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("config_version_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<bool>("NeedsRecompute")
+                        .HasColumnType("boolean")
+                        .HasColumnName("needs_recompute");
+
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("published_at_utc");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_by");
+
+                    b.Property<int?>("PupilCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("pupil_count");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("return_reason");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision_number");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset?>("SubmittedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("submitted_at_utc");
+
+                    b.Property<Guid?>("SubmittedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by");
+
+                    b.Property<Guid>("TermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("term_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_set");
+
+                    b.HasIndex("ArmId", "TermId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_result_set_arm_id_term_id_unique");
+
+                    b.HasIndex("TermId", "State")
+                        .HasDatabaseName("ix_result_set_term_id_state");
+
+                    b.ToTable("result_set", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectArmStatistic", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("ClassAverage")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasColumnName("class_average");
+
+                    b.Property<int>("CountedPupils")
+                        .HasColumnType("integer")
+                        .HasColumnName("counted_pupils");
+
+                    b.Property<int?>("HighestScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("highest_score");
+
+                    b.Property<int?>("LowestScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("lowest_score");
+
+                    b.Property<int>("RankedPupils")
+                        .HasColumnType("integer")
+                        .HasColumnName("ranked_pupils");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subject_arm_statistic");
+
+                    b.HasIndex("ResultSetId")
+                        .HasDatabaseName("ix_subject_arm_statistic_result_set_id");
+
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_subject_arm_statistic_subject_id");
+
+                    b.HasIndex("ResultSetId", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subject_arm_statistic_result_set_id_subject_id_unique");
+
+                    b.ToTable("subject_arm_statistic", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectResultLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CaTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ca_total");
+
+                    b.Property<int?>("ExamMark")
+                        .HasColumnType("integer")
+                        .HasColumnName("exam_mark");
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("grade");
+
+                    b.Property<bool>("IsPass")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_pass");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<string>("Remark")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("remark");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int?>("SubjectPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_position");
+
+                    b.Property<bool>("SubjectPositionTied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("subject_position_tied");
+
+                    b.Property<int>("SubjectTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_total");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subject_result_line");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_subject_result_line_pupil_id");
+
+                    b.HasIndex("ResultSetId")
+                        .HasDatabaseName("ix_subject_result_line_result_set_id");
+
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_subject_result_line_subject_id");
+
+                    b.HasIndex("ResultSetId", "PupilId")
+                        .HasDatabaseName("ix_subject_result_line_result_set_id_pupil_id");
+
+                    b.HasIndex("ResultSetId", "SubjectId")
+                        .HasDatabaseName("ix_subject_result_line_result_set_id_subject_id");
+
+                    b.ToTable("subject_result_line", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ComponentMarksJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("component_marks_json");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("ExamAbsent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("exam_absent");
+
+                    b.Property<int?>("ExamMark")
+                        .HasColumnType("integer")
+                        .HasColumnName("exam_mark");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("term_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("void_reason");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("voided_at");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("voided_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subject_score");
+
+                    b.HasIndex("ResultSetId")
+                        .HasDatabaseName("ix_subject_score_result_set_id");
+
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_subject_score_subject_id");
+
+                    b.HasIndex("TermId")
+                        .HasDatabaseName("ix_subject_score_term_id");
+
+                    b.HasIndex("PupilId", "SubjectId", "TermId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subject_score_pupil_subject_term_active_unique")
+                        .HasFilter("voided_at IS NULL");
+
+                    b.ToTable("subject_score", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Security.Role", b =>
@@ -455,6 +1625,304 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Security.RoleAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AdminAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admin_account_id");
+
+                    b.Property<string>("ArmIds")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("arm_ids");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_type");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_role_assignments");
+
+                    b.HasIndex("AdminAccountId")
+                        .HasDatabaseName("ix_role_assignments_admin_account_id");
+
+                    b.HasIndex("GrantedBy")
+                        .HasDatabaseName("ix_role_assignments_granted_by");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_role_assignments_role_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_role_assignments_session_id");
+
+                    b.ToTable("role_assignments", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Sessions.AcademicSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_academic_sessions");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_academic_sessions_name_unique");
+
+                    b.HasIndex("State")
+                        .IsUnique()
+                        .HasDatabaseName("ix_academic_sessions_single_active")
+                        .HasFilter("state = 'Active'");
+
+                    b.ToTable("academic_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Sessions.Term", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("closed_at_utc");
+
+                    b.Property<string>("ClosedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("closed_by");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly?>("NextResumptionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("next_resumption_date");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<int?>("TimesSchoolOpened")
+                        .HasColumnType("integer")
+                        .HasColumnName("times_school_opened");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_terms");
+
+                    b.HasIndex("State")
+                        .IsUnique()
+                        .HasDatabaseName("ix_terms_single_active")
+                        .HasFilter("state = 'Active'");
+
+                    b.HasIndex("SessionId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_terms_session_ordinal_unique");
+
+                    b.ToTable("terms", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.AssessmentComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsExamination")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_examination");
+
+                    b.Property<int>("MaxMark")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_mark");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ShortLabel")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("short_label");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assessment_component");
+
+                    b.ToTable("assessment_component", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000501"),
+                            DisplayOrder = 1,
+                            IsExamination = false,
+                            MaxMark = 20,
+                            Name = "1st CA",
+                            ShortLabel = "CA1"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000502"),
+                            DisplayOrder = 2,
+                            IsExamination = false,
+                            MaxMark = 20,
+                            Name = "2nd CA",
+                            ShortLabel = "CA2"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000503"),
+                            DisplayOrder = 3,
+                            IsExamination = true,
+                            MaxMark = 60,
+                            Name = "Exam",
+                            ShortLabel = "EXAM"
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.ConfigVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -504,6 +1972,224 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("config_versions", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.GradingBand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("GradeLetter")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("grade_letter");
+
+                    b.Property<int>("LowerBound")
+                        .HasColumnType("integer")
+                        .HasColumnName("lower_bound");
+
+                    b.Property<string>("Remark")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("remark");
+
+                    b.Property<int>("UpperBound")
+                        .HasColumnType("integer")
+                        .HasColumnName("upper_bound");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grading_band");
+
+                    b.ToTable("grading_band", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000401"),
+                            DisplayOrder = 1,
+                            GradeLetter = "A+",
+                            LowerBound = 90,
+                            Remark = "Very excellent",
+                            UpperBound = 100
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000402"),
+                            DisplayOrder = 2,
+                            GradeLetter = "A",
+                            LowerBound = 85,
+                            Remark = "Excellent",
+                            UpperBound = 89
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000403"),
+                            DisplayOrder = 3,
+                            GradeLetter = "B",
+                            LowerBound = 75,
+                            Remark = "Very good",
+                            UpperBound = 84
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000404"),
+                            DisplayOrder = 4,
+                            GradeLetter = "B-",
+                            LowerBound = 70,
+                            Remark = "Good",
+                            UpperBound = 74
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000405"),
+                            DisplayOrder = 5,
+                            GradeLetter = "C+",
+                            LowerBound = 60,
+                            Remark = "Average",
+                            UpperBound = 69
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000406"),
+                            DisplayOrder = 6,
+                            GradeLetter = "C",
+                            LowerBound = 50,
+                            Remark = "Fair",
+                            UpperBound = 59
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000407"),
+                            DisplayOrder = 7,
+                            GradeLetter = "D",
+                            LowerBound = 40,
+                            Remark = "More effort",
+                            UpperBound = 49
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000408"),
+                            DisplayOrder = 8,
+                            GradeLetter = "E",
+                            LowerBound = 20,
+                            Remark = "Not Now",
+                            UpperBound = 39
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000409"),
+                            DisplayOrder = 9,
+                            GradeLetter = "F",
+                            LowerBound = 0,
+                            Remark = "Fail",
+                            UpperBound = 19
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.RegistrationCounter", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("counter_key");
+
+                    b.Property<int>("LastSerial")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_serial");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registration_counter");
+
+                    b.ToTable("registration_counter", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.ResultRules", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnnualMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("annual_method");
+
+                    b.Property<string>("CoreSubjectIds")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("core_subject_ids");
+
+                    b.Property<int>("MinSubjectsForPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_subjects_for_position");
+
+                    b.Property<int>("PassMark")
+                        .HasColumnType("integer")
+                        .HasColumnName("pass_mark");
+
+                    b.Property<string>("PrimaryPositionScope")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("primary_position_scope");
+
+                    b.Property<int>("PromotionThreshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("promotion_threshold");
+
+                    b.Property<bool>("RequireCorePass")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_core_pass");
+
+                    b.Property<bool>("ShowLevelPosition")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_level_position");
+
+                    b.Property<string>("TieBreakRule")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tie_break_rule");
+
+                    b.Property<int?>("WeightFirst")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight_first");
+
+                    b.Property<int?>("WeightSecond")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight_second");
+
+                    b.Property<int?>("WeightThird")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight_third");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_rules");
+
+                    b.ToTable("result_rules", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000601"),
+                            AnnualMethod = "SimpleAverage",
+                            CoreSubjectIds = "",
+                            MinSubjectsForPosition = 1,
+                            PassMark = 40,
+                            PrimaryPositionScope = "Arm",
+                            PromotionThreshold = 40,
+                            RequireCorePass = true,
+                            ShowLevelPosition = true,
+                            TieBreakRule = "SharedPosition"
+                        });
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -526,11 +2212,19 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("address");
 
+                    b.Property<int>("AssessmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("assessment_version_number");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
                         .HasColumnName("email");
+
+                    b.Property<int>("GradingVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("grading_version_number");
 
                     b.Property<string>("HeadTeacherName")
                         .IsRequired()
@@ -553,11 +2247,35 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
 
+                    b.Property<int>("RegNumberVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("reg_number_version_number");
+
+                    b.Property<int>("ResultRulesVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_rules_version_number");
+
                     b.Property<string>("SchoolName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
                         .HasColumnName("school_name");
+
+                    b.Property<string>("Separator")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("separator");
+
+                    b.Property<string>("SerialReset")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("serial_reset");
+
+                    b.Property<int>("SerialWidth")
+                        .HasColumnType("integer")
+                        .HasColumnName("serial_width");
 
                     b.Property<string>("ShortName")
                         .IsRequired()
@@ -583,14 +2301,770 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             Abbreviation = "GRAS",
                             AbbreviationVersionNumber = 0,
                             Address = "",
+                            AssessmentVersionNumber = 0,
                             Email = "",
+                            GradingVersionNumber = 0,
                             HeadTeacherName = "",
                             IdentityVersionNumber = 0,
                             Phone = "",
+                            RegNumberVersionNumber = 0,
+                            ResultRulesVersionNumber = 0,
                             SchoolName = "",
+                            Separator = "/",
+                            SerialReset = "PerYear",
+                            SerialWidth = 4,
                             ShortName = "",
                             Timezone = "Africa/Lagos"
                         });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Subjects.Subject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("CodeKey")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("code_key");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subjects");
+
+                    b.HasIndex("CodeKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subjects_code_key_unique")
+                        .HasFilter("code_key IS NOT NULL");
+
+                    b.HasIndex("NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subjects_name_key_unique");
+
+                    b.ToTable("subjects", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000601"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Number work",
+                            NameKey = "number work",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000701")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000602"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Letter work",
+                            NameKey = "letter work",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000702")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000603"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Phonics",
+                            NameKey = "phonics",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000703")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000604"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Pre Science",
+                            NameKey = "pre science",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000704")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000605"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Social habit",
+                            NameKey = "social habit",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000705")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000606"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Health habit",
+                            NameKey = "health habit",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000706")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000607"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Handwriting",
+                            NameKey = "handwriting",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000707")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000608"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Creative skills",
+                            NameKey = "creative skills",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000708")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000609"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Rhyme",
+                            NameKey = "rhyme",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000709")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000610"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Literature",
+                            NameKey = "literature",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000710")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000611"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Computer Science",
+                            NameKey = "computer science",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000711")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000612"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Quantitative Reasoning",
+                            NameKey = "quantitative reasoning",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000712")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000613"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Verbal Reasoning",
+                            NameKey = "verbal reasoning",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000713")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000614"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Christian Religious Knowledge",
+                            NameKey = "christian religious knowledge",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000714")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000615"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Mathematics",
+                            NameKey = "mathematics",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000715")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000616"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "English Language",
+                            NameKey = "english language",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000716")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000617"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Phonics/Diction",
+                            NameKey = "phonics/diction",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000717")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000618"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Hand writing",
+                            NameKey = "hand writing",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000718")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000619"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Basic Science/Tech",
+                            NameKey = "basic science/tech",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000719")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000620"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Social Studies",
+                            NameKey = "social studies",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000720")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000621"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Health Education",
+                            NameKey = "health education",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000721")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000622"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Creative Art",
+                            NameKey = "creative art",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000722")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000623"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Agric Science",
+                            NameKey = "agric science",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000723")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000624"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Home Economics",
+                            NameKey = "home economics",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000724")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000625"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Civic Education",
+                            NameKey = "civic education",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000725")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000626"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "History",
+                            NameKey = "history",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000726")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000627"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "French",
+                            NameKey = "french",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000727")
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000628"),
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "Igbo",
+                            NameKey = "igbo",
+                            Status = "Active",
+                            Version = new Guid("00000000-0000-0000-0000-000000000728")
+                        });
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Subjects.SubjectMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClassLevelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_level_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("term_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subject_mapping");
+
+                    b.HasIndex("ClassLevelId")
+                        .HasDatabaseName("ix_subject_mapping_class_level_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_subject_mapping_session_id");
+
+                    b.HasIndex("TermId")
+                        .HasDatabaseName("ix_subject_mapping_term_id");
+
+                    b.HasIndex("SubjectId", "ClassLevelId", "TermId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subject_mapping_subject_level_term_active_unique")
+                        .HasFilter("status = 'Active'");
+
+                    b.ToTable("subject_mapping", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Subjects.SubjectMappingException", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("arm_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("term_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subject_mapping_exception");
+
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_subject_mapping_exception_subject_id");
+
+                    b.HasIndex("TermId")
+                        .HasDatabaseName("ix_subject_mapping_exception_term_id");
+
+                    b.HasIndex("ArmId", "SubjectId", "TermId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subject_mapping_exception_arm_subject_term_unique");
+
+                    b.ToTable("subject_mapping_exception", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Admissions.AdmissionRecord", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("ClassAdmittedInto")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_admission_records_class_levels_class_admitted_into");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_admission_records_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_admission_records_academic_sessions_session_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.Arm", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("ClassLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_arms_class_levels_class_level_id");
+
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("FormTeacherAdminId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_arms_admin_accounts_form_teacher_admin_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_arms_academic_sessions_session_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Classes.ClassLevel", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("NextLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_class_levels_class_levels_next_level_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Enrolments.Enrolment", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.Arm", null)
+                        .WithMany()
+                        .HasForeignKey("ArmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_enrolments_arms_arm_id");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_enrolments_pupils_pupil_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pupils.PupilRegNumberHistory", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_reg_number_history_pupils_pupil_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_term_result_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_term_result_result_sets_result_set_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultSet", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.Arm", null)
+                        .WithMany()
+                        .HasForeignKey("ArmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_set_arms_arm_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.Term", null)
+                        .WithMany()
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_set_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectArmStatistic", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_arm_statistic_result_set_result_set_id");
+
+                    b.HasOne("SchoolManagement.Domain.Subjects.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_arm_statistic_subjects_subject_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectResultLine", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_result_line_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_result_line_result_set_result_set_id");
+
+                    b.HasOne("SchoolManagement.Domain.Subjects.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_result_line_subjects_subject_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectScore", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_score_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_score_result_set_result_set_id");
+
+                    b.HasOne("SchoolManagement.Domain.Subjects.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_score_subjects_subject_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.Term", null)
+                        .WithMany()
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_score_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Security.RoleAssignment", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AdminAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_admin_accounts_admin_account_id");
+
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_admin_accounts_granted_by");
+
+                    b.HasOne("SchoolManagement.Domain.Security.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_roles_role_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_role_assignments_academic_sessions_session_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Subjects.SubjectMapping", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("ClassLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_class_levels_class_level_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_academic_sessions_session_id");
+
+                    b.HasOne("SchoolManagement.Domain.Subjects.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_subjects_subject_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.Term", null)
+                        .WithMany()
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Subjects.SubjectMappingException", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.Arm", null)
+                        .WithMany()
+                        .HasForeignKey("ArmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_exception_arms_arm_id");
+
+                    b.HasOne("SchoolManagement.Domain.Subjects.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_exception_subjects_subject_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.Term", null)
+                        .WithMany()
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subject_mapping_exception_terms_term_id");
                 });
 #pragma warning restore 612, 618
         }

@@ -5,6 +5,8 @@ Depends on: TASK-0005a
 Contract impact: additive — `POST /settings/identity/{logo,signature}` plus the two privilege-
 checked serving endpoints approved in `decisions/2026-Q3-contract-deltas.md` (TASK-0005 section).
 Status: queued (stub — write in full just before dispatch)
+Reads: `.agent/spec/backend.md` (section 9.6), `.agent/rules/wire.md`, `.agent/rules/contract.md`
+       (additive); the TASK-0005 section of `.agent/decisions/2026-Q3-contract-deltas.md`
 
 Carried here so it is not rediscovered:
 

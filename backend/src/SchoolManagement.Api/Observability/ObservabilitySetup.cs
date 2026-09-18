@@ -47,33 +47,52 @@ public static class ObservabilitySetup
 
     private static void ConfigureSerilog(WebApplicationBuilder builder, ObservabilityOptions options)
     {
-        builder.Services.AddSerilog((services, configuration) =>
-        {
-            configuration
-                // Levels and overrides come from configuration so verbosity is tunable per environment
-                // without a code change.
-                .ReadFrom.Configuration(builder.Configuration)
-                .ReadFrom.Services(services)
-                .Enrich.FromLogContext()
-                .Enrich.WithMachineName()
-                .Enrich.With<TraceContextEnricher>()
-                // MUST be last: enrichers run in order, so redaction has to see the properties every
-                // earlier enricher has already added.
-                .Enrich.With<RedactSensitivePropertiesEnricher>()
-                .WriteTo.Console();
-
-            if (options.IsOtlpExportEnabled)
+        builder.Services.AddSerilog(
+            (services, configuration) =>
             {
-                configuration.WriteTo.OpenTelemetry(sink =>
+                configuration
+                    // Levels and overrides come from configuration so verbosity is tunable per environment
+                    // without a code change.
+                    .ReadFrom.Configuration(builder.Configuration)
+                    .ReadFrom.Services(services)
+                    .Enrich.FromLogContext()
+                    .Enrich.WithMachineName()
+                    .Enrich.With<TraceContextEnricher>()
+                    // MUST be last: enrichers run in order, so redaction has to see the properties every
+                    // earlier enricher has already added.
+                    .Enrich.With<RedactSensitivePropertiesEnricher>()
+                    .WriteTo.Console();
+
+                if (options.IsOtlpExportEnabled)
                 {
-                    sink.Endpoint = options.OtlpEndpoint;
-                    sink.ResourceAttributes = new Dictionary<string, object>(StringComparer.Ordinal)
+                    configuration.WriteTo.OpenTelemetry(sink =>
                     {
-                        ["service.name"] = options.ServiceName,
-                    };
-                });
-            }
-        });
+                        sink.Endpoint = options.OtlpEndpoint;
+                        sink.ResourceAttributes = new Dictionary<string, object>(StringComparer.Ordinal)
+                        {
+                            ["service.name"] = options.ServiceName,
+                        };
+                    });
+                }
+            },
+            // TASK-0073: MUST be true. `AddSerilog`'s default (false) assigns the built logger to the
+            // process-wide static Serilog.Log.Logger, AND builds this host's ILoggerFactory with a
+            // null captured logger so it reads Log.Logger dynamically on every call (Serilog's own
+            // design, so a later reassignment is picked up). That is harmless with exactly one host
+            // per process — production's shape — but a test process builds MANY hosts (every
+            // WebApplicationFactory.WithWebHostBuilder call re-runs this method). Serilog's own
+            // SerilogLoggerFactory.Dispose(), when it holds no captured logger, calls
+            // Log.CloseAndFlush(), which "replaces the static logger with a no-op"
+            // (Serilog.Extensions.Hosting's own comment) — so disposing ANY OTHER host built in the
+            // same process silently disables EVERY OTHER live host's ILogger<T>-based logging,
+            // including this one's, for the rest of the process. preserveStaticLogger: true makes
+            // this host's ILoggerFactory capture ITS OWN logger instance directly instead of the
+            // ambient static, so no other host's lifecycle can affect it. Never touches Log.Logger,
+            // which nothing in this codebase reads directly (everything logs through injected
+            // ILogger<T>) — with exactly one host in the process, as in every deployment, this changes
+            // nothing observable: same sinks, same levels, same enrichers, same output. See
+            // AuthLogRedactionTests and .agent/drift/2026-Q3.md (TASK-0073) for the reproduction.
+            preserveStaticLogger: true);
     }
 
     private static void ConfigureOpenTelemetry(WebApplicationBuilder builder, ObservabilityOptions options)

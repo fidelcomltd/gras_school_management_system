@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Api.Http;
 
@@ -83,6 +84,13 @@ internal static class ResultExtensions
         if (error is LockedError lockedError)
         {
             extensions["lockedUntil"] = lockedError.LockedUntilUtc;
+        }
+
+        // Spec 6.2.12: "Returns 422 with the single first failure and the offending band index" — so
+        // the grading editor can highlight the offending row without re-parsing the message text.
+        if (error is GradingBandValidationError gradingBandError)
+        {
+            extensions["bandIndex"] = gradingBandError.BandIndex;
         }
 
         return TypedResults.Problem(

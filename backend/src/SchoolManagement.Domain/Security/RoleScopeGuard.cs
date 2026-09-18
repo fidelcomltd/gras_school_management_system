@@ -54,4 +54,64 @@ public static class RoleScopeGuard
             $"This role contains privileges that cannot be limited to an arm: {joined}. Remove them " +
             "from the role, or assign the role school-wide."));
     }
+
+    /// <summary>
+    /// Enforces spec 6.1.7 rule 3 at the point a <see cref="RoleAssignment"/> would be created: "No
+    /// account may grant a scope wider than its own." The caller resolves the acting account's OWN
+    /// scope for the assigning privilege it is exercising (<c>role.assign</c> for a school-wide
+    /// target, <c>role.scope.assign</c> for an arm-list target) via
+    /// <c>IEffectivePrivilegeProvider</c> and passes it in as
+    /// <paramref name="actorScopeIsSchoolWide"/>/<paramref name="actorArmIds"/> — this type stays
+    /// pure and persistence-free, matching <see cref="ValidateAssignable"/>'s own shape.
+    /// </summary>
+    /// <remarks>
+    /// Both <c>role.assign</c> and <c>role.scope.assign</c> are themselves non-scopable
+    /// (<see cref="PrivilegeRegistry"/>), so today every actual grant of either is school-wide, and in
+    /// practice this method's arm-list branch never rejects a real caller reached through the live
+    /// assignment endpoint — it activates the moment that registration changes, or against a directly
+    /// seeded assignment in a test, rather than being an always-true stub (the thing this whole card
+    /// exists to stop building more of).
+    /// </remarks>
+    /// <param name="actorScopeIsSchoolWide">
+    /// Whether the acting account holds the relevant assigning privilege through at least one
+    /// school-wide grant — an unbounded own-scope, which always satisfies rule 3.
+    /// </param>
+    /// <param name="actorArmIds">
+    /// The union of arm ids the acting account's OWN grant(s) of the relevant privilege cover, when
+    /// <paramref name="actorScopeIsSchoolWide"/> is <see langword="false"/>. Ignored otherwise.
+    /// </param>
+    /// <param name="requestedScopeType">The scope the new assignment would use.</param>
+    /// <param name="requestedArmIds">The arms the new assignment would name — empty for school-wide.</param>
+    /// <returns>
+    /// A success when the requested scope does not exceed the actor's own; otherwise an
+    /// <see cref="ErrorType.Forbidden"/> failure, error code <c>role_assignment.scope_exceeds_actor</c>.
+    /// </returns>
+    public static Result ValidateGrantWithinActorScope(
+        bool actorScopeIsSchoolWide,
+        IReadOnlySet<Guid> actorArmIds,
+        ScopeType requestedScopeType,
+        IReadOnlyCollection<Guid> requestedArmIds)
+    {
+        ArgumentNullException.ThrowIfNull(actorArmIds);
+        ArgumentNullException.ThrowIfNull(requestedArmIds);
+
+        if (actorScopeIsSchoolWide)
+        {
+            return Result.Success();
+        }
+
+        if (requestedScopeType == ScopeType.SchoolWide)
+        {
+            return Result.Failure(ScopeExceedsActorError);
+        }
+
+        return requestedArmIds.All(actorArmIds.Contains)
+            ? Result.Success()
+            : Result.Failure(ScopeExceedsActorError);
+    }
+
+    private static readonly Error ScopeExceedsActorError = Error.Forbidden(
+        "role_assignment.scope_exceeds_actor",
+        "You cannot grant a scope wider than your own. You may only assign arms that your own " +
+        "assignment already covers.");
 }

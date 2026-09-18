@@ -141,4 +141,28 @@ public sealed class RolePrivilegeEscalationGuardTests
         Should.Throw<ArgumentNullException>(
             () => RolePrivilegeEscalationGuard.ValidateAddition([], [], null!));
     }
+
+    [Fact]
+    public void ValidateNotSelfAssignment_DifferentAccounts_Succeeds()
+    {
+        var result = RolePrivilegeEscalationGuard.ValidateNotSelfAssignment(
+            Guid.CreateVersion7(), Guid.CreateVersion7());
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidateNotSelfAssignment_SameAccount_FailsWithTheExactSpecMessage()
+    {
+        var accountId = Guid.CreateVersion7();
+
+        var result = RolePrivilegeEscalationGuard.ValidateNotSelfAssignment(accountId, accountId);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
+        result.Error.Code.ShouldBe("role_assignment.self_assignment_forbidden");
+
+        // Verbatim spec 6.1.7 rule 1 wording — the acceptance criterion is the literal sentence.
+        result.Error.Description.ShouldBe("You cannot change your own roles. Ask another Super Admin.");
+    }
 }

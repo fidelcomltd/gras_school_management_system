@@ -38,6 +38,14 @@ public sealed class SettingsEndpoints : IEndpointModule
 
         MapGetSettings(settingsGroup);
         MapUpdateIdentity(settingsGroup);
+        MapUpdateRegNumber(settingsGroup);
+        MapGetRegNumberPreview(settingsGroup);
+        MapUpdateAbbreviation(settingsGroup);
+        MapUpdateGrading(settingsGroup);
+        MapResetGrading(settingsGroup);
+        MapUpdateAssessment(settingsGroup);
+        MapGetResultRules(settingsGroup);
+        MapUpdateResultRules(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -87,6 +95,224 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "`GET /settings`) or the save is rejected `409` before anything is written, and BOTH " +
                 "the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).")
             .Produces<SettingsIdentityGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateRegNumber(RouteGroupBuilder group) =>
+        group.MapPatch("/reg-number", async (
+                UpdateRegNumberCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.RegNumberUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateRegNumber")
+            .WithSummary("Update the registration-number pattern")
+            .WithDescription(
+                "Separator, serial width, reset rule (spec 6.2.4). `yearSource` is fixed and not " +
+                "editable here. Reducing `serialWidth` below what the counter partition currently " +
+                "active under the SAVED `serialReset` already needs is rejected `409`, naming the " +
+                "real serial and the minimum width that fits it (spec 6.2.10). `expectedVersion` " +
+                "must match the reg-number group's current `versionNumber` (from `GET /settings`) or " +
+                "the save is rejected `409` before anything is written.")
+            .Produces<SettingsRegNumberGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetRegNumberPreview(RouteGroupBuilder group) =>
+        group.MapGet("/reg-number/preview", async (
+                [FromQuery] string separator,
+                [FromQuery] int serialWidth,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(
+                    new GetRegNumberPreviewQuery(separator, serialWidth),
+                    cancellationToken);
+
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetRegNumberPreview")
+            .WithSummary("Preview the next registration number under unsaved parameters")
+            .WithDescription(
+                "`separator`/`serialWidth` are UNSAVED — supplied as query parameters, not read from " +
+                "settings. The abbreviation and the counter partition (which the currently SAVED " +
+                "`serialReset` selects, spec 6.2.4) both come from saved configuration. Uses the next " +
+                "serial that would actually be issued; with an empty register that is serial 1.")
+            .Produces<RegNumberPreviewDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateAbbreviation(RouteGroupBuilder group) =>
+        group.MapPatch("/abbreviation", async (
+                UpdateAbbreviationCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.AbbreviationUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateAbbreviation")
+            .WithSummary("Change the school's registration-number abbreviation")
+            .WithDescription(
+                "Requires the literal confirmation token `CHANGE` and a reason (spec 6.2.4). " +
+                "Rewrites no issued number — the counter is keyed on admission year alone, never the " +
+                "abbreviation, so a mid-session change neither restarts the serial nor produces two " +
+                "pupils whose numbers differ only by prefix. A value already used historically is " +
+                "allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's " +
+                "current `versionNumber` or the save is rejected `409` before anything is written.")
+            .Produces<SettingsAbbreviationGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateGrading(RouteGroupBuilder group) =>
+        group.MapPut("/grading", async (
+                UpdateGradingCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.GradingUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateGrading")
+            .WithSummary("Replace the grading scale")
+            .WithDescription(
+                "Whole scale as one array, atomic (spec 6.2.5, 6.2.12) — a band omitted from the " +
+                "array is deleted. All ten save-time rules run over the whole submitted scale as one " +
+                "unit; on the first failure nothing is written and the response's `bandIndex` " +
+                "extension names the offending band's position in the submitted array. " +
+                "`expectedVersion` must match the grading group's current `versionNumber` (from " +
+                "`GET /settings`) or the save is rejected `409` before anything is written. `reason` " +
+                "is required, at least ten characters, only when a result set is Published in the " +
+                "active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsGradingGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapResetGrading(RouteGroupBuilder group) =>
+        group.MapPost("/grading/reset", async (
+                ResetGradingCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.ResetDefaults)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("ResetGrading")
+            .WithSummary("Restore the grading scale to its seeded defaults")
+            .WithDescription(
+                "Restores the nine seeded bands (spec 6.2.13). Treated as an ordinary edit under " +
+                "spec 6.2.9/6.2.11 — the same `expectedVersion`/`reason` contract as " +
+                "`PUT /settings/grading` applies.")
+            .Produces<SettingsGradingGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateAssessment(RouteGroupBuilder group) =>
+        group.MapPut("/assessment", async (
+                UpdateAssessmentCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.AssessmentUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateAssessment")
+            .WithSummary("Replace the assessment structure")
+            .WithDescription(
+                "Whole structure as one array, atomic (spec 6.2.6, 6.2.12). A component's `id`, when " +
+                "supplied, must match an existing component — that is how a rename/reorder is told " +
+                "apart from an add or a remove, which matters once the session lock engages. Once a " +
+                "mark has been entered anywhere in the active session, adding, removing, or changing " +
+                "an existing component's `maxMark`/`isExamination` is rejected `409`; renaming and " +
+                "reordering stay allowed (spec 6.2.6). `expectedVersion` must match the assessment " +
+                "group's current `versionNumber` or the save is rejected `409` before anything is " +
+                "written. `reason` is required, at least ten characters, only when a result set is " +
+                "Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsAssessmentGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetResultRules(RouteGroupBuilder group) =>
+        group.MapGet("/result-rules", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetResultRulesQuery(), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetResultRules")
+            .WithSummary("Read the result rules")
+            .WithDescription(
+                "Tie-break, position scope, level position, pass mark and minimum subjects for " +
+                "position the computation engine reads (spec 6.2.8). A fresh database returns 6.2.8's " +
+                "seeded defaults, with `coreSubjectIds` empty until the administrator sets it.")
+            .Produces<ResultRulesDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateResultRules(RouteGroupBuilder group) =>
+        group.MapPut("/result-rules", async (
+                UpdateResultRulesCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.ResultRulesUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateResultRules")
+            .WithSummary("Replace the result rules")
+            .WithDescription(
+                "The whole row as one save (spec 6.2.8). `expectedVersion` must match the result-rules " +
+                "group's current `versionNumber` (from `GET /settings/result-rules`) or the save is " +
+                "rejected `409 settings.resultrules.stale_version` before anything is written. " +
+                "`primaryPositionScope` and `tieBreakRule` are rejected `409 settings.resultrules.locked` " +
+                "once any result set is Published in the active session; `annualMethod` and the three " +
+                "weights are rejected the same way once Third Term is published for any arm (spec " +
+                "6.2.10) — changing a locked field to its current value is not a change and is never " +
+                "refused. `reason` is required, at least ten characters, only when a result set is " +
+                "Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<ResultRulesDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

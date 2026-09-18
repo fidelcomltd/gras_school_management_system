@@ -77,4 +77,83 @@ public sealed class RoleScopeGuardTests
         Should.Throw<ArgumentNullException>(
             () => RoleScopeGuard.ValidateAssignable(null!, ScopeType.ArmList));
     }
+
+    /// <summary>
+    /// Spec 6.1.7 rule 3: "No account may grant a scope wider than its own." A school-wide actor
+    /// scope has no width limit at all — this is how a School Administrator (who always holds
+    /// role.scope.assign school-wide, since it is non-scopable — see <c>ValidateGrantWithinActorScope</c>'s
+    /// own remarks) may assign Class Teacher over any arm.
+    /// </summary>
+    [Fact]
+    public void GrantWithinActorScope_ActorIsSchoolWide_AnyRequestedScopeSucceeds()
+    {
+        var result = RoleScopeGuard.ValidateGrantWithinActorScope(
+            actorScopeIsSchoolWide: true,
+            actorArmIds: new HashSet<Guid>(),
+            requestedScopeType: ScopeType.SchoolWide,
+            requestedArmIds: [Guid.CreateVersion7()]);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GrantWithinActorScope_ActorArmBoundRequestingSchoolWide_Fails()
+    {
+        var armId = Guid.CreateVersion7();
+
+        var result = RoleScopeGuard.ValidateGrantWithinActorScope(
+            actorScopeIsSchoolWide: false,
+            actorArmIds: new HashSet<Guid> { armId },
+            requestedScopeType: ScopeType.SchoolWide,
+            requestedArmIds: []);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
+        result.Error.Code.ShouldBe("role_assignment.scope_exceeds_actor");
+    }
+
+    [Fact]
+    public void GrantWithinActorScope_RequestedArmsAreSubsetOfActorArms_Succeeds()
+    {
+        var armA = Guid.CreateVersion7();
+        var armB = Guid.CreateVersion7();
+
+        var result = RoleScopeGuard.ValidateGrantWithinActorScope(
+            actorScopeIsSchoolWide: false,
+            actorArmIds: new HashSet<Guid> { armA, armB },
+            requestedScopeType: ScopeType.ArmList,
+            requestedArmIds: [armA]);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GrantWithinActorScope_RequestedArmOutsideActorArms_FailsNamingScopeExceeded()
+    {
+        var actorArm = Guid.CreateVersion7();
+        var outsideArm = Guid.CreateVersion7();
+
+        var result = RoleScopeGuard.ValidateGrantWithinActorScope(
+            actorScopeIsSchoolWide: false,
+            actorArmIds: new HashSet<Guid> { actorArm },
+            requestedScopeType: ScopeType.ArmList,
+            requestedArmIds: [actorArm, outsideArm]);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("role_assignment.scope_exceeds_actor");
+    }
+
+    [Fact]
+    public void GrantWithinActorScope_ThrowsForNullActorArmIds()
+    {
+        Should.Throw<ArgumentNullException>(
+            () => RoleScopeGuard.ValidateGrantWithinActorScope(false, null!, ScopeType.ArmList, []));
+    }
+
+    [Fact]
+    public void GrantWithinActorScope_ThrowsForNullRequestedArmIds()
+    {
+        Should.Throw<ArgumentNullException>(
+            () => RoleScopeGuard.ValidateGrantWithinActorScope(false, new HashSet<Guid>(), ScopeType.ArmList, null!));
+    }
 }

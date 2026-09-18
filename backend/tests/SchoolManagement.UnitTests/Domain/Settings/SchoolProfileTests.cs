@@ -75,4 +75,50 @@ public sealed class SchoolProfileTests
         profile.Timezone.ShouldBe(SchoolProfile.FixedTimezone);
         profile.AbbreviationVersionNumber.ShouldBe(7);
     }
+
+    [Fact]
+    public void UpdateAbbreviation_TrimsAndIncrementsOnlyTheAbbreviationVersionNumber()
+    {
+        var profile = SchoolProfile.CreateForTesting(
+            Guid.CreateVersion7(),
+            abbreviationVersionNumber: 2,
+            identityVersionNumber: 9);
+
+        profile.UpdateAbbreviation("  GRA  ");
+
+        profile.Abbreviation.ShouldBe("GRA");
+        profile.AbbreviationVersionNumber.ShouldBe(3);
+        profile.IdentityVersionNumber.ShouldBe(9); // Untouched — independent pointers.
+    }
+
+    [Fact]
+    public void UpdateAbbreviation_AllowsAValueAlreadyUsedHistorically()
+    {
+        // Spec 6.2.11: "Allowed. Abbreviations are not unique over time..." — this domain method has
+        // no uniqueness check to bypass; proven by simply reusing the same value twice in a row.
+        var profile = SchoolProfile.CreateForTesting(Guid.CreateVersion7(), abbreviation: "GRAS");
+
+        profile.UpdateAbbreviation("GRA");
+        profile.UpdateAbbreviation("GRAS"); // Back to the original value.
+
+        profile.Abbreviation.ShouldBe("GRAS");
+        profile.AbbreviationVersionNumber.ShouldBe(2);
+    }
+
+    [Fact]
+    public void UpdateRegNumber_SetsAllThreeFieldsAndIncrementsOnlyItsOwnVersionNumber()
+    {
+        var profile = SchoolProfile.CreateForTesting(
+            Guid.CreateVersion7(),
+            regNumberVersionNumber: 1,
+            abbreviationVersionNumber: 5);
+
+        profile.UpdateRegNumber("-", 6, RegNumberSerialReset.Continuous);
+
+        profile.Separator.ShouldBe("-");
+        profile.SerialWidth.ShouldBe(6);
+        profile.SerialReset.ShouldBe(RegNumberSerialReset.Continuous);
+        profile.RegNumberVersionNumber.ShouldBe(2);
+        profile.AbbreviationVersionNumber.ShouldBe(5); // Untouched — independent pointers.
+    }
 }

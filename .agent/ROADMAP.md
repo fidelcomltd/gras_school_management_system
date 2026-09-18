@@ -25,7 +25,7 @@ Legend: **BE** backend-dev · **FE** frontend-dev · **RV** reviewer · **CG** c
 | TASK-0004 | OpenAPI client generator + typed API layer | FE | CLAUDE.md §3, §7 | **done** |
 | TASK-0006 | Regenerate the frontend client after a contract move | FE | CLAUDE.md §4.3 | **done** |
 | TASK-0029 | Regenerate the client, complete the typed wrapper surface | FE | CLAUDE.md §3, §4.3, §4.4 | **done** |
-| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | queued — §4.4 check 2 is RED until it lands |
+| TASK-0033 | Regenerate the client for roles + the privilege register | FE | CLAUDE.md §3, §4.3, §4.4 | **done** 2026-09-07 |
 
 ### Phase 0b — toolchain hygiene, all discovered by doing Phase 0
 
@@ -50,6 +50,9 @@ inherits whatever these leave broken.
 | TASK-0018 | Make `local-env.template.ps1` pass switches to the gate script | BE | TASK-0016 added the two switches a local developer most needs (`-NoFailFast`, `-AllowSkipped`) and the only sanctioned wrapper could not pass either: an array splat binds positionally. A gate option nobody can reach is a gate option nobody uses. | **done** |
 | TASK-0015 | Backend scaffold conformance fixes from the §6 audit | BE | TASK-0001 S1-S3. `/health/ready` is an unthrottled anonymous DB round trip; Api depends on Infrastructure at runtime unenforced; the relocated document tests pass against a stale artefact. | **done** |
 
+| TASK-0034 | Make the generated OpenAPI document byte-reproducible across platforms | BE | Roslyn writes XML doc files with `Environment.NewLine`, so a Windows-promoted contract carried 93 escaped `\r\n` and every `ubuntu-latest` run of the same commit failed gate 10 on content that means nothing. A byte-exact gate is only as good as the bytes being reproducible. | **done** 2026-09-07 |
+| — | Root `.gitattributes` | orchestrator | `backend/.gitattributes` normalised `backend/**` only, so the three generated artefacts the drift gates hash byte-for-byte had no attribute at all. A fresh Windows clone would have handed them out as CRLF and failed both gates locally while CI stayed green. Same class as TASK-0034, one layer out. | **done** 2026-09-07 |
+
 **The through-line, worth remembering when the next card is tempting to rush:** every one of these
 was a way for a green result to mean nothing. Skipped tests reported as passes, a coverage floor
 that stands down when the suite is incomplete, a secret scan that passes without running, a
@@ -64,16 +67,24 @@ failures were in whether they actually executed.
 | — | Grading scale editor + assessment structure | BE | 04 §6.2.5, 6.2.6, **6.2.13** | Seed = nine bands incl. `F 0-19`; 20/20/60. Component count must never be assumed anywhere |
 | — | Rating scales, trait lists, development domains and indicators | BE | 04 §6.2.7, 6.2.13 | Scale is a property of the rating block, not school-wide (conflict item 6) |
 | — | Fee notice configuration and entry screens | BE+FE | 04 §6.2.13 | Notice only. No arithmetic beyond the printed total, and no result is ever withheld |
-| — | Audit log | BE | 03 §6.1.12, 14 §9.3 | Same transaction as the change; DB role holds no UPDATE/DELETE |
-| — | Sessions and terms | BE | 05 §6.3 | Term dates derive weekly-report weeks |
-| — | Class levels, arms, progression chain | BE | 06 §6.4 | `section` drives result-sheet routing — load-bearing, not descriptive |
-| — | Back-office shell, navigation, settings screens | FE | 04, 06 | First real screens; delete `scaffold-status/` here |
+| TASK-0048 | Audit log — `audit_event` persistence, append-only | BE | 03 §6.1.12, 14 §9.3 | **in-progress** 2026-09-09. Same transaction as the change; DB role holds no UPDATE/DELETE. Retires both `TODO(TASK-0002)` logging seams. Two human-signed rulings: rejected events on a separate connection (they would otherwise roll back), append-only at both layers |
+| TASK-0049 | Audit log — read surface, five filters, CSV export | BE | 03 §6.1.12 | **queued** 2026-09-09, behind 0048. Export is itself an audit event |
+| TASK-0035 | Sessions and terms | BE | 05 §6.3 | **done** 2026-09-07. Term dates derive weekly-report weeks |
+| TASK-0038 | Sections, class levels, progression chain | BE | 06 §6.4.1-2, 6.4.7-9 | `section` drives result-sheet routing — load-bearing, not descriptive. Eight chain rules are the substance |
+| TASK-0039 | Arms: per-session rooms, capacity, display name | BE | 06 §6.4.3, 6.4.5-8 | Split from TASK-0038 on 2026-09-07: one card could not hold §6.4 under §1's ~400-line dispatch rule. Owns both TASK-0035 drifts; last blocker on TASK-0030 |
+| TASK-0041 | Back-office shell, protected routing, School Settings | FE | 04 | **done** 2026-09-14 |
+| TASK-0042 | Academic structure screens: sessions/terms, levels/sections | FE | 05, 06 | **done** 2026-09-14 |
+| TASK-0043 | Admin accounts and roles screens | FE | 03 | **done** 2026-09-14. Spec 6.1.2 self-edit carve-out still unbuilt — see `STATE.md ## Known drift` |
+| TASK-0045 | Arms screens: rooms per session, bulk creation, capacity | FE | 06 §6.4.3/6.4.5-8 | **done** 2026-09-14 — was implemented while the ledger read `queued` |
 
 ## Phase 2 — the register
 
 | Task | Title | Owner | Spec | Notes |
 |---|---|---|---|---|
-| — | Pupil entity, `pending` status, registration number issue | BE | 07 §6.5.4, 6.5.10, 6.5.14 | Every pupil query except the admissions queue filters `pending` out |
+| TASK-0050 | Pupil entity, `pending`-exclusion invariant, register read surface | BE | 07 §6.5.4, 6.5.15 | **queued** 2026-09-09. Every pupil query except the admissions queue filters `pending` out — built as a structural default, not a per-query filter |
+| TASK-0062 | `admission_record` — sections A, I, J | BE | 07 §6.5.9, 6.5.11 | **done** 2026-09-15. Full green gate. Contract delta was breaking, not additive; signed off after the fact |
+| TASK-0051 | Registration number issue + admission approval | BE | 07 §6.5.10, 6.5.14 | **queued** 2026-09-15, unblocked by 0062. Written in full, narrowed to approve/decline/issue. Counter is a row lock, never `MAX+1` |
+| TASK-0063 | Reg-number correction + history alias | BE | 07 §6.5.10 | **blocked on 0051** 2026-09-15. Written in full |
 | — | Contacts, health, pickup/barred persons, document checklist | BE | 07 §6.5.5–6.5.9 | Health and barred data behind `pupil.safeguarding.view`, audited on read |
 | — | Nine-step resumable admission flow | BE+FE | 07 §6.5.11, 6.5.12 | Largest single flow in the product; split if the card exceeds ~400 lines |
 | — | Bulk import | BE | 07 §6.5.13 | Background job with progress; 5000 rows max |
@@ -85,17 +96,21 @@ Largest module. `index.md` says split it; expect five or more cards.
 
 | Task | Title | Owner | Spec |
 |---|---|---|---|
-| — | Result set state machine + score entry + completeness gate | BE | 09 §6.7.3–6.7.5 |
-| — | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
+| TASK-0076 | Result set + subject score persistence + score sheet (completeness gate moved to the submission card) | BE | 09 §6.7.3–6.7.4 |
+| TASK-0077 | Result rules settings | BE | 04 §6.2.8 |
+| TASK-0071 | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
+| — | Readiness, completeness gate, submission (needs non-academic input) | BE | 09 §6.7.5, 6.7.11 |
 | — | Non-academic input, section-specific | BE | 09 §6.7.7, 6.7.12 |
-| — | Approval, publication, config snapshot | BE | 09 §6.7.8, 6.7.9 |
+| — | Approval, publication, config snapshot (must re-check sibling level positions, TASK-0071 ruling; Third Term publish refuses `requireCorePass` with no core subjects, 2026-09-18 ruling) | BE | 09 §6.7.8, 6.7.9 |
 | — | Annual cumulative result | BE | 09 §6.7.10 |
 | — | Score entry grid with offline resilience | FE | 09 §6.7.4, 14 §9.8.2 |
+| — | Result rules settings screen (first save requires core subjects, pre-selecting English + Mathematics for confirmation, 2026-09-18 ruling) | FE | 04 §6.2.8, 6.2.9 |
 | — | Nursery + primary result sheet renderers | BE+FE | 21, 22, 18 §C |
 
 `13-result-computation-rules.md` is not a build task — it is the spec the engine satisfies, and
-its worked example is a regression fixture. Its numbers assume the superseded assessment
-structure and grading scale and must be restated before use.
+its worked example is a regression fixture. **Restated 2026-09-16** against the resolved 20/20/60
+structure and nine-band scale; the corrected tables are reproduced in TASK-0071 so that card is
+self-contained.
 
 ## Phase 4 — weekly reports (parallel with Phase 3)
 

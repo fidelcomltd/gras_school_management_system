@@ -2,12 +2,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Persistence;
+using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Secrets;
 using SchoolManagement.Application.Abstractions.Security;
+using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Settings;
@@ -18,6 +25,7 @@ using SchoolManagement.Infrastructure.Idempotency;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
+using SchoolManagement.Infrastructure.Results;
 using SchoolManagement.Infrastructure.Secrets;
 
 namespace SchoolManagement.Infrastructure;
@@ -110,13 +118,20 @@ public static class InfrastructureDependencyInjection
 
         services.AddScoped<ISecretProvider, ConfigurationSecretProvider>();
 
-        // TASK-0003: real (super-admin-flag-only) implementation, replacing
-        // NullEffectivePrivilegeProvider — see the class remarks. TASK-0019 replaces this again once
-        // real role/assignment persistence exists for non-super-admin accounts.
-        services.AddScoped<IEffectivePrivilegeProvider, SuperAdminFlagEffectivePrivilegeProvider>();
-        services.AddScoped<IAuthorizationAuditSink, LoggingAuthorizationAuditSink>();
-        services.AddScoped<IPupilArmOfRecordLookup, NotYetImplementedPupilArmOfRecordLookup>();
-        services.AddScoped<IResultSetArmLookup, NotYetImplementedResultSetArmLookup>();
+        // TASK-0030: the graduated implementation, resolving real role_assignment rows for every
+        // non-super-admin account — replaces SuperAdminFlagEffectivePrivilegeProvider (TASK-0003),
+        // DELETED, not left registered behind a flag. See the class remarks.
+        services.AddScoped<IEffectivePrivilegeProvider, RoleAssignmentEffectivePrivilegeProvider>();
+        services.AddScoped<IAuthorizationAuditSink, AuthorizationAuditSink>();
+        // TASK-0059: the real implementation, resolving a pupil's arm from their open enrolment —
+        // replaces NotYetImplementedPupilArmOfRecordLookup (DELETED, not left registered behind a
+        // flag, same convention TASK-0030 used for SuperAdminFlagEffectivePrivilegeProvider).
+        services.AddScoped<IPupilArmOfRecordLookup, PupilArmOfRecordLookup>();
+        // TASK-0076 dispatch A: the real implementation, resolving a result set's arm with a direct
+        // query against result_set — replaces NotYetImplementedResultSetArmLookup (DELETED, not left
+        // registered behind a flag, same convention TASK-0059 used above for
+        // NotYetImplementedPupilArmOfRecordLookup).
+        services.AddScoped<IResultSetArmLookup, ResultSetArmLookup>();
 
         // TASK-0003: authentication and session management (spec 6.1.11, spec 9.1). Bound the same
         // way DatabaseOptions is above — the Api project's AddValidatedOptions helper is off-limits
@@ -138,21 +153,87 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();
 
         // TASK-0019: the idempotency substrate. IIdempotencyStore is called once, from the API
-        // layer's RequireIdempotencyKey() endpoint filter — never per-endpoint. ISystemAuditSink is
-        // the same log-only seam IAuthorizationAuditSink already is, until real audit_event
-        // persistence exists. The hosted service runs the retention purge (§9.9) on a schedule; a
-        // test that needs a deterministic run resolves IdempotencyPurgeJob directly instead.
+        // layer's RequireIdempotencyKey() endpoint filter — never per-endpoint. The hosted service
+        // runs the retention purge (§9.9) on a schedule; a test that needs a deterministic run
+        // resolves IdempotencyPurgeJob directly instead.
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
-        services.AddScoped<ISystemAuditSink, LoggingSystemAuditSink>();
         services.AddScoped<IdempotencyPurgeJob>();
         services.AddHostedService<IdempotencyPurgeBackgroundService>();
+
+        // TASK-0048: the real, persisted audit_event trail (spec 6.1.12, spec 14 §9.3), replacing
+        // both LoggingSystemAuditSink and LoggingAuthorizationAuditSink (DELETED) together — see
+        // ISystemAuditSink's own remarks for why a rejection needs its own writer.
+        services.AddScoped<IAuditEventRepository, AuditEventRepository>();
+        services.AddScoped<AuditEventFactory>();
+        services.AddScoped<RejectedAuditEventWriter>();
+        services.AddScoped<ISystemAuditSink, SystemAuditSink>();
+
+        // TASK-0049: the read surface — filters, cursor paging, CSV export. Deliberately a SEPARATE
+        // port from IAuditEventRepository, which stays ADD-ONLY (see its own remarks).
+        services.AddScoped<IAuditEventQueryRepository, AuditEventQueryRepository>();
 
         // TASK-0005a: school identity and the append-only config_version ledger.
         services.AddScoped<ISchoolProfileRepository, SchoolProfileRepository>();
         services.AddScoped<IConfigVersionRepository, ConfigVersionRepository>();
 
+        // TASK-0005c: registration-number counter, read paths only — see the port's own remarks.
+        services.AddScoped<IRegistrationCounterRepository, RegistrationCounterRepository>();
+
+        // TASK-0069: grading scale and assessment structure.
+        services.AddScoped<IGradingBandRepository, GradingBandRepository>();
+        services.AddScoped<IAssessmentComponentRepository, AssessmentComponentRepository>();
+
+        // TASK-0077: result rules.
+        services.AddScoped<IResultRulesRepository, ResultRulesRepository>();
+
+        // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
+        // honestly-empty TASK-0069 stand-ins now that the tables exist.
+        services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();
+        services.AddScoped<IPublishedResultsGate, PublishedResultsGate>();
+        services.AddScoped<IResultSetRepository, ResultSetRepository>();
+
+        // TASK-0076 dispatch B: the score-sheet endpoints' own mark persistence.
+        services.AddScoped<ISubjectScoreRepository, SubjectScoreRepository>();
+
+        // TASK-0071: the computation engine's own persistence for the three computed tables.
+        services.AddScoped<IResultComputationRepository, ResultComputationRepository>();
+
         // TASK-0028 dispatch 2: role persistence and CRUD.
         services.AddScoped<IRoleRepository, RoleRepository>();
+
+        // TASK-0030: role assignments — the graduated provider above depends on this.
+        services.AddScoped<IRoleAssignmentRepository, RoleAssignmentRepository>();
+
+        // TASK-0035: academic sessions and terms.
+        services.AddScoped<IAcademicSessionRepository, AcademicSessionRepository>();
+        services.AddScoped<ITermRepository, TermRepository>();
+
+        // TASK-0038: sections and class levels.
+        services.AddScoped<ISectionRepository, SectionRepository>();
+        services.AddScoped<IClassLevelRepository, ClassLevelRepository>();
+
+        // TASK-0039: arms.
+        services.AddScoped<IArmRepository, ArmRepository>();
+
+        services.AddScoped<IPupilRepository, PupilRepository>();
+
+        // TASK-0059: enrolment — dated membership of a pupil in an arm (spec 02 §5.2).
+        services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
+
+        // TASK-0062: admission_record — sections A, I and J of the admission form (spec 6.5.9).
+        services.AddScoped<IAdmissionRecordRepository, AdmissionRecordRepository>();
+
+        // TASK-0063: the permanent registration-number history alias (spec 6.5.10).
+        services.AddScoped<IPupilRegNumberHistoryRepository, PupilRegNumberHistoryRepository>();
+
+        // TASK-0070: subjects, level mappings and per-arm exceptions (spec 6.6).
+        services.AddScoped<ISubjectRepository, SubjectRepository>();
+        services.AddScoped<ISubjectMappingRepository, SubjectMappingRepository>();
+        services.AddScoped<ISubjectMappingExceptionRepository, SubjectMappingExceptionRepository>();
+
+        // TASK-0076 dispatch A: a real query against subject_score, replacing the honestly-empty
+        // TASK-0070 stand-in now that the table exists.
+        services.AddScoped<ISubjectMappingMarkLookup, SubjectMappingMarkLookup>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

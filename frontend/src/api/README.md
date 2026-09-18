@@ -7,7 +7,7 @@ Two files, two different rules.
 | [`schema.d.ts`](./schema.d.ts) | **Generated.** `openapi-typescript` against the committed `contracts/openapi.json`. | Never hand-edit. Carries a `// GENERATED — DO NOT EDIT` header; §4.4's drift check enforces this. |
 | [`client.ts`](./client.ts) | **Hand-written.** | Reviewed like any other source file. |
 | [`client-types.ts`](./client-types.ts) | **Hand-written.** | The type-level derivation behind `client.ts`'s verb helpers, split into its own file to stay under CONVENTIONS.md §3's 180-line cap. |
-| [`client.test.ts`](./client.test.ts) / [`client-roles.test.ts`](./client-roles.test.ts) | **Hand-written.** | Colocated tests for `client.ts`'s generic verb helpers, split across two files (reference/admins operations, then privileges/roles — TASK-0033) to stay under the same 180-line cap. |
+| [`client.test.ts`](./client.test.ts) / [`client-roles.test.ts`](./client-roles.test.ts) / [`client-sessions.test.ts`](./client-sessions.test.ts) / [`client-terms.test.ts`](./client-terms.test.ts) / [`client-sections.test.ts`](./client-sections.test.ts) / [`client-levels.test.ts`](./client-levels.test.ts) / [`client-arms.test.ts`](./client-arms.test.ts) / [`client-arms-detail.test.ts`](./client-arms-detail.test.ts) / [`client-assignments.test.ts`](./client-assignments.test.ts) / [`client-reg-number.test.ts`](./client-reg-number.test.ts) / [`client-pupils.test.ts`](./client-pupils.test.ts) / [`client-pupils-detail.test.ts`](./client-pupils-detail.test.ts) / [`client-audit-events.test.ts`](./client-audit-events.test.ts) / [`client-audit-events-export.test.ts`](./client-audit-events-export.test.ts) / [`client-admissions.test.ts`](./client-admissions.test.ts) / [`client-score-sheets.test.ts`](./client-score-sheets.test.ts) | **Hand-written.** | Colocated tests for `client.ts`'s generic verb helpers, split across sixteen files (reference/admins, then privileges/roles — TASK-0033, then sessions and terms — TASK-0037, then sections and levels — TASK-0040, then arms — TASK-0044, then role assignments — TASK-0047, then reg-number settings and pupils — TASK-0052, then the audit log read surface — TASK-0054, then the admission record's own PATCH — TASK-0062, then `apiPut` and the score-sheet `PUT` — TASK-0079) to stay under the same 180-line cap. |
 
 This mirrors what `frontend/HANDOFF.md` decision 3 originally set out: the generated layer
 supplies *types*, the hand-written layer supplies *transport*. `client.ts` is the thin seam
@@ -47,10 +47,36 @@ this from the **committed** document only — never point the generator at a liv
 **A new operation on an existing method (GET/POST/PATCH/DELETE) needs no new code in
 `client.ts`.** `apiGet`/`apiPost`/`apiPatch`/`apiDelete` are generic over every path
 `schema.d.ts` declares for that method, so regenerating the schema is what makes the new
-path callable — TASK-0033 (`/privileges`, `/roles`, `/roles/{id}`) added zero lines to
-`client.ts`/`client-types.ts`, only regenerated `schema.d.ts` and added the new operations'
-tests (`client-roles.test.ts`). A new *method* the contract has never used before (`PUT`
-still has no operation anywhere) is the one case that needs a new verb helper.
+path callable — TASK-0033 (`/privileges`, `/roles`, `/roles/{id}`), TASK-0037
+(`/sessions`, `/sessions/{id}`, `/terms/{id}`, `/terms/{id}/open`, `/terms/{id}/close`,
+`/terms/{id}/reopen`), TASK-0040 (`/sections`, `/sections/{id}`, `/levels`,
+`/levels/{id}`, `/levels/reorder`), TASK-0044 (`/arms`, `/arms/bulk`,
+`/arms/next-label`, `/arms/{id}`), TASK-0047 (`/admins/{id}/assignments`,
+`/assignments/{id}`), TASK-0052 (`/settings/reg-number`,
+`/settings/reg-number/preview`, `/settings/abbreviation`, `/pupils`,
+`/pupils/{id}`, `/pupils/duplicates`, `/admissions`) and the `ListAuditEvents`
+half of TASK-0054 (`/audit-events`) each added zero lines to
+`client.ts`/`client-types.ts`, only regenerated `schema.d.ts` and added the new
+operations' tests (`client-roles.test.ts`, `client-sessions.test.ts`,
+`client-terms.test.ts`, `client-sections.test.ts`, `client-levels.test.ts`,
+`client-arms.test.ts`, `client-arms-detail.test.ts`, `client-assignments.test.ts`,
+`client-reg-number.test.ts`, `client-pupils.test.ts`,
+`client-pupils-detail.test.ts`, `client-audit-events.test.ts`). A new *method* the
+contract has never used before is one case that needs new code here — **`PUT` was
+that case until TASK-0079**, which added `apiPut` (mirroring `apiPatch` exactly) for
+`SaveScoreSheet` (`PUT /arms/{armId}/score-sheets`), the contract's first `PUT`
+operation; **TASK-0054's `ExportAuditEvents` (`/audit-events/export`)
+is the other** — same method (`GET`), but its `200` response is the contract's first
+non-`application/json` body (`text/csv`). `SuccessBody` in `client-types.ts` only
+ever matched an `application/json` content key, so it resolved this operation's body
+to `never` rather than `string` — a real mistype, not a hypothetical one, confirmed by
+assigning a string literal to it and getting `error TS2322: ... not assignable to type
+'never'`. Fixed narrowly with a new `ResponseBodyOf<Content>` helper that falls
+through to a response's own single content-type value when it isn't
+`application/json`; `RequestBodyOf` (request bodies) is untouched, since every request
+body in this contract remains JSON. Full rationale and the MSW override this forced
+(the contract-derived default handler only ever reads `application/json` content, so
+it answers empty for this route): `client-audit-events-export.test.ts`.
 
 ## `client.ts` — why a typed helper and not a second HTTP stack
 
@@ -76,9 +102,8 @@ declare for that path, is a compile error. This is the mechanism that makes "the
 cannot call the backend without guessing across the boundary" (CLAUDE.md §3) enforced by the
 type checker rather than by convention.
 
-`apiGet`, `apiPost`, `apiPatch` and `apiDelete` (TASK-0029) cover every method the contract
-declares (`PUT` has no operation anywhere yet, so `apiPut` doesn't exist until one does — add
-it the same way when a feature needs it).
+`apiGet`, `apiPost`, `apiPatch`, `apiDelete` (TASK-0029) and `apiPut` (TASK-0079) cover every
+method the contract declares.
 
 **Path parameters** (`/admins/{id}`) are threaded through a `pathParams` field on the trailing
 options argument, type-driven from `operations[...]["parameters"]["path"]` — never a string

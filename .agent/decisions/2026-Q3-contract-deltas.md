@@ -674,3 +674,197 @@ as live drift, not left to be rediscovered.
 ### 5. Breaking vs additive
 
 Every item above is a new path or a new schema. Nothing existing changes shape. Additive.
+
+
+## TASK-0070 — Subjects, mappings and per-arm exceptions — APPROVED WITH FIVE AMENDMENTS (orchestrator, 2026-09-16)
+
+Proposed by `backend-dev` on dispatch 1 of 2, which produced the delta and no code — the delta-first
+split this card was given precisely because TASK-0069 shipped 5,791 lines alongside its own proposal.
+The proposal is sound and is approved subject to the amendments below. **Classification confirmed
+additive**: eight new paths (seven proposed, plus Amendment 5's), ~20 new schemas, no existing path or schema changed, no new required
+field on an existing request. No human sign-off needed on the classification itself.
+
+The agent found **no privilege gap** — `Privileges.Subject.{View,Create,Update,Deactivate,Delete,
+Map,MapArm,Unmap}` already cover §6.6.9, and `SeededRoles.cs` grants School Administrator all but
+`Delete`. Nothing was invented. Verified independently by the orchestrator against
+`Domain/Security/Privileges.cs:280-306`.
+
+### Amendment 1 — `code` is nullable and unseeded (supersedes the proposal's required `Code`)
+
+The proposal has `Code` required on `CreateSubjectCommand`, validated `^[A-Z0-9]+$`, with a
+`409 subject.code_duplicate`. **Human ruling 2026-09-16 reverses this.** `code` is nullable, seeded
+NULL, and optional on `POST /subjects`. Uniqueness still applies where a value IS supplied, so
+`subject.code_duplicate` survives as a 409 on a supplied duplicate; it can never fire on the seed.
+Full reasoning in `drift/2026-Q3.md` — the short form is that nothing prints a code today, the arm
+broadsheet that would is unbuilt, the school's own two sheets carry no code, and
+`18-appendix-c-result-sheet-contract.md:47` declares `subject_code` **optional** while its
+`subject_name` neighbour does not. §6.6.2's `Req: Yes` is the outlier and is in the same section
+already proven to carry superseded text. `SubjectDto.Code`, `SubjectMappingGridSubjectRowDto
+.SubjectCode` and `ArmSubjectDto.SubjectCode` all become nullable.
+
+### Amendment 2 — the privilege split is wrong; `Unmap` gates endings, `MapArm` gates exception delete
+
+The proposal gates the whole `PUT /subject-mappings` grid save under `Subject.Map` and puts
+`Subject.Unmap` on `DELETE /subject-exceptions/{id}`. The agent flagged this as inference from the
+doc comments rather than a spec statement, which was the right call — and the doc comments actually
+say the opposite:
+
+```
+Map     = "Map a subject to a level for a session and term."
+Unmap   = "End a mapping."
+MapArm  = "Create a per-arm exception to a level mapping."
+```
+
+`Unmap` means ending a level mapping, which is exactly what the grid save's **endings** are. So:
+
+- `PUT /subject-mappings?term_id=` requires `Subject.Map` when the computed diff contains additions
+  and `Subject.Unmap` when it contains endings — **both when it contains both**. This is the
+  data-dependent privilege shape the proposal itself cites from `UpdateArmHandler`, applied to the
+  diff rather than to the request body. A dry run is evaluated against the same rule, so a caller
+  cannot discover the ending set without holding the privilege to perform it.
+- `DELETE /subject-exceptions/{id}` requires `Subject.MapArm`, the same privilege as its create.
+  Exception create and delete are one pair; deleting an exception is not "ending a mapping".
+
+As proposed, a holder of `Map` alone could end every mapping in a term. That is the shape of
+escalation `6.1.7` rule 2 exists to prevent, and it would have shipped inside an otherwise clean
+delta.
+
+### Amendment 3 — `GET /subjects` does not guess a term; absent `termId` yields null counts
+
+The proposal resolves an omitted `termId` against "the session's currently active term" and flags
+that it needs an `ICurrentTermLookup`-shaped seam. **No such seam exists** — verified, nothing in
+`backend/src` matches `ICurrentTerm`/`ActiveTerm`/`CurrentTerm`. Rather than build one inside a card
+that does not need it, `termId` stays optional and the three term-scoped counts on `SubjectDto`
+(`MappedLevelCount`, `ArmExceptionCount`, `PupilsTakingCount`) are **nullable, and null when
+`termId` is absent**. A null count reads as "not asked", which is true; a count silently resolved
+against a guessed term is a wrong number that looks right. §6.6.7 lists term as a filter, not as a
+required parameter, so this matches the spec rather than bending it.
+
+### Amendment 4 — the two invented rejection messages are provisional and recorded as such
+
+`subject_exception.arm_session_closed` and `subject_exception.redundant_exclude` have no
+spec-supplied wording; §6.6.8 says only "Rejected" and "rejected the same way". The proposal's
+mirrored sentences are reasonable and are accepted **as provisional copy**, on the same footing as
+any other product string the school has not seen. They are not to be quoted anywhere as spec text.
+Every other message in the delta IS spec-quoted and must stay verbatim, including the §6.6.6
+marks-recorded sentence and the §6.6.4 redundant-include sentence.
+
+### Amendment 5 — an eighth path, `POST /subject-mappings/prefill` (human ruling 2026-09-16)
+
+Not in the proposal, and not in §6.6.9 — added because the card's seed criterion turned out to be
+impossible as written. `subject_mapping` requires a `term_id`; **no session and no term is seeded**
+(verified: neither `AcademicSessionConfiguration` nor `TermConfiguration` carries `HasData`), and
+both are administrator-created, so there is no term at migration time to map against. The 14/19
+split therefore cannot ship with the migration. A full grid is 156 rows (14 nursery x 3 levels + 19
+primary x 6), which the human declined to impose by hand; applying it automatically on term creation
+was also declined, as it puts §6.6 behaviour inside §6.3 and creates 156 rows with no click.
+
+- `POST /subject-mappings/prefill` — `Privileges.Subject.Map` ONLY. It can never end a mapping, so
+  `Unmap` is not required and must not be demanded. **`Idempotency-Key` REQUIRED** (retry-duplicable
+  creation, same as `copy`).
+- Request `PrefillSubjectMappingsCommand(TermId, DryRun)`.
+- Response `200 SaveSubjectMappingGridResponse` — the same envelope as the grid save and copy.
+  `Endings` is ALWAYS empty: prefill is additive only.
+- **Never duplicates.** A prefill against a term that already holds some of the mappings adds only
+  the missing ones; a second prefill of the same term adds nothing. Same semantics as `copy`'s
+  "shows 11 additions and 0 endings, and does not duplicate the 3".
+- Errors: `422` (validation), `404 term.not_found`, `409 subject_mapping.term_closed`, `401`, `403`,
+  `429`. The closed-term refusal applies to `DryRun` too, as on the grid save.
+- The standard list is a **backend constant**, not a new table and not stored configuration. It is a
+  starting point the administrator then edits through the ordinary grid. Subjects resolve to levels
+  by the level's `SectionId`.
+- **`display_order` is written from the per-section SHEET order**, which is neither the seed table's
+  grouped order nor a single global order — both ordered lists are in the card. `display_order`
+  belongs to the mapping precisely because one subject can sit at a different row on each section's
+  sheet. The five shared subjects happen to occupy identical positions in both of today's lists
+  (4, 5, 6, 11, 12); that is a property of these lists, not a rule, and must not be used as a
+  shortcut.
+
+Classification unchanged: a new path and one new schema. Additive.
+
+### Confirmed as proposed, no change
+
+- **`Idempotency-Key` on `POST /arms/{id}/subject-exceptions`**, beyond the two the card names. The
+  standing obligation is explicit that 9.8.2's four operations are examples, not the list. The agent
+  gap-filled and flagged it instead of adding it silently, which is the behaviour the obligation
+  wants.
+- **Active-uniqueness on `(arm_id, subject_id, term_id)` regardless of mode.** One constraint
+  satisfies the card's AC 4 (include + exclude on one triple is rejected, not order-resolved) and
+  the same-mode duplicate case together, mirroring `subject_mapping`'s partial unique index and the
+  `enrolment` precedent from TASK-0059.
+- **`DisplayOrder` on `ArmSubjectDto`**, additive beyond §6.6.9's literal text. §6.6.1 makes this
+  endpoint's output the rows of the result sheet, and TASK-0071 needs a deterministic order without
+  a second query. Justified.
+- **Unwrapped array on `GET /arms/{id}/subjects`**, per the `ReorderLevels` precedent — bounded list,
+  no pagination.
+- **PascalCase wire enums** (`Active`/`Inactive`, `LevelInherited`/`ArmException`,
+  `Include`/`Exclude`) matching `ArmStatus`, and `<entity>.<reason>` snake_case error codes matching
+  `level.name_duplicate` / `arm.label_duplicate`. Both verified against existing code by the agent.
+- **No closed-session 409 on exception delete.** The agent declined to extend a creation-only rule to
+  deletion and noted the asymmetry rather than resolving it silently. Correct; §6.6.8 states the rule
+  for creation only.
+
+### Correction 2026-09-17 — `subject_mapping.copy_same_term` does not exist, and this record did not transcribe the proposal
+
+Two findings from dispatch 4, recorded together because the second is what let the first survive.
+
+**1. The error code was never built, and should not be.** The dispatch-1 proposal listed
+`422 subject_mapping.copy_same_term` for source-equals-destination on `POST /subject-mappings/copy`,
+and the orchestrator approved it. **No source file names it and the promoted contract names it zero
+times.** The rejection is enforced by `CopySubjectMappingsCommandValidator` (FluentValidation),
+which `ValidationBehavior` turns into the house-wide generic `request.validation_failed`
+(`Error.ValidationErrorCode`) before the handler runs — the same mechanism every other endpoint in
+this solution uses for a malformed request. So the document and the implementation agree with each
+other; **it was the approved delta that was wrong.** `backend-dev` tested the real mechanism and
+flagged the discrepancy rather than inventing a code to match the paperwork, which is exactly the
+call `rules/contract.md` §5 asks for. No code change — this record is the fix. A bespoke 422 here
+would be a behaviour change and needs its own card.
+
+**2. This archive entry never contained the delta it approved.** It recorded five amendments and a
+"confirmed as proposed" list, and pointed at a proposal that exists only in the dispatch
+conversation. `STATE.md`'s own index describes this file as the place to read "an approved contract
+delta verbatim" — so a reader following the index would not have found the error code at all, in
+either direction. That is why the phantom code went unnoticed at approval: the orchestrator approved
+a list of endpoint error codes by reference and never wrote them down. **Fix for the next delta:
+transcribe the proposal into the archive, then amend it in place — never approve by reference to a
+message.**
+
+### Breaking vs additive
+
+Additive. Amendment 1 makes a proposed-required field optional before it ever ships, which is not a
+narrowing of anything live. Amendment 3 makes three proposed fields nullable, likewise pre-ship.
+Amendment 2 changes authorisation, not shape.
+
+## TASK-0076 / TASK-0077 / TASK-0071 — results Phase 3 opening deltas — APPROVED (orchestrator, 2026-09-17)
+
+Orchestrator-authored, not agent-proposed. The tables in each card's `## Contract delta` are the
+verbatim delta; this entry records approval and classification, and does not duplicate them. An
+implementing agent that finds a delta unbuildable must bounce it, not amend it silently.
+
+- **TASK-0076** — `GET` + `PUT /api/v1/arms/{armId}/score-sheets`, `POST .../score-sheets/void`.
+  Three new operations, new schemas only. **Deliberate departure from §6.7.13's query-string
+  form** (`/score-sheets?arm_id=`): scope resolution reads route values only
+  (`PrivilegeAuthorizationHandler.cs:91`). `Idempotency-Key` accepted, not required, on PUT and void.
+- **TASK-0077** — `GET` + `PUT /api/v1/settings/result-rules`. One new path, new schemas only.
+- **TASK-0071** — `POST /api/v1/result-sets/{resultSetId}/compute`, ResultSet scope. One new path.
+  No computed-row read endpoint; reads belong to the broadsheet / pupil-result cards.
+
+**Classification: additive, all three.** New paths and schemas only; no existing request gains a
+field, no existing schema changes. The close-time mechanical diff (every `required` array, every
+property type vs the previous document) is still mandatory. TASK-0062 and TASK-0069 both show why
+a card's header is not evidence.
+
+### 2026-09-18 amendment — TASK-0071 error codes (orchestrator, before dispatch)
+
+The 2026-09-17 approval above named TASK-0071's problem codes unprefixed. Renamed to the codebase's dotted
+convention before any code exists: `result_set.published` (409), `result_set.no_active_pupils`,
+`result_set.no_subjects_in_effect`, `result_set.no_complete_scores`, `result_set.grading_band_not_found`
+(422). The `flags[].code` values (`no_examination_sat`, `absent_all_examinations`) are response-body data
+and are unchanged. Still additive; nothing consumes the endpoint. Same defect class as TASK-0077's
+`result_rules_locked`, caught at dispatch this time rather than in review.
+
+### 2026-09-18 amendment 2 — TASK-0071: no documented 404 (human ruling)
+
+`POST /api/v1/result-sets/{resultSetId}/compute` documents **403** for an unknown or unresolvable id, and no
+404. The scope layer fails closed before the handler; the 404 was unreachable. Unreleased endpoint, not
+breaking. See `decisions/2026-Q3.md` 2026-09-18.

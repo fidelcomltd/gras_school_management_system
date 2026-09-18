@@ -8,38 +8,98 @@ namespace SchoolManagement.Application.Settings;
 /// stores in <see cref="ConfigVersion.SnapshotJson"/>.
 /// </summary>
 /// <remarks>
-/// Only <see cref="SchoolProfile"/> exists as of TASK-0005a, so the snapshot has exactly one section.
-/// TASK-0005b/0005c extend this same shape additively (a new section per group they add) rather than
-/// replacing it — every future save's snapshot must still be able to reconstruct the FULL
-/// configuration as of that moment, not just the group that changed.
+/// TASK-0069 adds the grading and assessment sections — <see cref="Build"/> now takes the current
+/// bands and components explicitly, EVEN FROM a caller that did not itself change them (spec 6.2.9:
+/// "the whole serialised configuration", every group, not only the one that changed). Every existing
+/// caller (identity, abbreviation, reg-number saves) was updated to read the other group's CURRENT
+/// state and pass it through, rather than continuing to snapshot only <see cref="SchoolProfile"/>.
+/// TASK-0077 adds the result-rules section the same way — every caller now also reads the CURRENT
+/// <see cref="ResultRules"/> row and passes it through.
 /// </remarks>
 internal static class SettingsSnapshotBuilder
 {
     // camelCase, matching the wire format every other DTO in this API serialises with.
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Serialises the current, in-memory state of <paramref name="profile"/> into a snapshot document.</summary>
-    public static string Build(SchoolProfile profile)
+    /// <summary>
+    /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>,
+    /// <paramref name="components"/> and <paramref name="resultRules"/> into a snapshot document — the
+    /// WHOLE configuration as of this save, regardless of which group actually changed.
+    /// </summary>
+    public static string Build(
+        SchoolProfile profile,
+        IReadOnlyList<GradingBand> bands,
+        IReadOnlyList<AssessmentComponent> components,
+        ResultRules resultRules)
     {
         ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(bands);
+        ArgumentNullException.ThrowIfNull(components);
+        ArgumentNullException.ThrowIfNull(resultRules);
 
-        var snapshot = new SettingsSnapshot(new SchoolProfileSnapshot(
-            profile.SchoolName,
-            profile.ShortName,
-            profile.Abbreviation,
-            profile.Address,
-            profile.Phone,
-            profile.Email,
-            profile.Motto,
-            profile.HeadTeacherName,
-            profile.Timezone,
-            profile.IdentityVersionNumber,
-            profile.AbbreviationVersionNumber));
+        var snapshot = new SettingsSnapshot(
+            new SchoolProfileSnapshot(
+                profile.SchoolName,
+                profile.ShortName,
+                profile.Abbreviation,
+                profile.Address,
+                profile.Phone,
+                profile.Email,
+                profile.Motto,
+                profile.HeadTeacherName,
+                profile.Timezone,
+                profile.IdentityVersionNumber,
+                profile.AbbreviationVersionNumber,
+                profile.Separator,
+                profile.SerialWidth,
+                profile.SerialReset,
+                profile.RegNumberVersionNumber),
+            bands
+                .OrderBy(band => band.DisplayOrder)
+                .Select(band => new GradingBandSnapshot(
+                    band.LowerBound,
+                    band.UpperBound,
+                    band.GradeLetter,
+                    band.Remark,
+                    band.DisplayOrder))
+                .ToList(),
+            profile.GradingVersionNumber,
+            components
+                .OrderBy(component => component.DisplayOrder)
+                .Select(component => new AssessmentComponentSnapshot(
+                    component.Name,
+                    component.ShortLabel,
+                    component.MaxMark,
+                    component.IsExamination,
+                    component.DisplayOrder))
+                .ToList(),
+            profile.AssessmentVersionNumber,
+            new ResultRulesSnapshot(
+                resultRules.AnnualMethod,
+                resultRules.WeightFirst,
+                resultRules.WeightSecond,
+                resultRules.WeightThird,
+                resultRules.PrimaryPositionScope,
+                resultRules.ShowLevelPosition,
+                resultRules.TieBreakRule,
+                resultRules.PassMark,
+                resultRules.PromotionThreshold,
+                resultRules.RequireCorePass,
+                resultRules.CoreSubjectIds,
+                resultRules.MinSubjectsForPosition),
+            profile.ResultRulesVersionNumber);
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
 
-    private sealed record SettingsSnapshot(SchoolProfileSnapshot SchoolProfile);
+    private sealed record SettingsSnapshot(
+        SchoolProfileSnapshot SchoolProfile,
+        IReadOnlyList<GradingBandSnapshot> GradingBands,
+        int GradingVersionNumber,
+        IReadOnlyList<AssessmentComponentSnapshot> AssessmentComponents,
+        int AssessmentVersionNumber,
+        ResultRulesSnapshot ResultRules,
+        int ResultRulesVersionNumber);
 
     private sealed record SchoolProfileSnapshot(
         string SchoolName,
@@ -52,5 +112,37 @@ internal static class SettingsSnapshotBuilder
         string HeadTeacherName,
         string Timezone,
         int IdentityVersionNumber,
-        int AbbreviationVersionNumber);
+        int AbbreviationVersionNumber,
+        string Separator,
+        int SerialWidth,
+        RegNumberSerialReset SerialReset,
+        int RegNumberVersionNumber);
+
+    private sealed record GradingBandSnapshot(
+        int LowerBound,
+        int UpperBound,
+        string GradeLetter,
+        string Remark,
+        int DisplayOrder);
+
+    private sealed record AssessmentComponentSnapshot(
+        string Name,
+        string ShortLabel,
+        int MaxMark,
+        bool IsExamination,
+        int DisplayOrder);
+
+    private sealed record ResultRulesSnapshot(
+        AnnualMethod AnnualMethod,
+        int? WeightFirst,
+        int? WeightSecond,
+        int? WeightThird,
+        PrimaryPositionScope PrimaryPositionScope,
+        bool ShowLevelPosition,
+        TieBreakRule TieBreakRule,
+        int PassMark,
+        int PromotionThreshold,
+        bool RequireCorePass,
+        IReadOnlyList<Guid> CoreSubjectIds,
+        int MinSubjectsForPosition);
 }

@@ -115,6 +115,266 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the admissions queue
+         * @description Spec 6.5.14: "A pending pupil is excluded from every arm roster... It exists in the admissions queue and nowhere else." This IS that queue — every pending pupil, unconditionally. Each row additionally carries `levelAppliedFor`, `dateApplicationReceived` and `missing` (TASK-0062; spec 6.5.15) — `missing` covers only what sections A and I's stored fields can check today (the assessment result and the declaration): steps 2 to 8 have no entity yet, so a gap there never appears. SCHOOL-WIDE `pupil.view` only: a pending record has no arm yet, so an arm-scoped grant has no meaningful reach here (unlike `GET /pupils`, which still admits an arm-scoped caller to an honest empty page). Cursor-paginated per spec 9.5.
+         */
+        get: operations["ListAdmissionsQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one admission record
+         * @description TASK-0066: `id` is the PUPIL id, the same one `PATCH /admissions/{id}` and the admissions queue already use. Returns the same `AdmissionRecordDto` shape `PATCH` returns — one mapper, one shape, no second definition. Carries the opaque `sessionId` and `classAdmittedInto` ids an arm selector needs, which the queue row's own `levelAppliedFor` display name cannot supply. 404 when `id` does not name a PENDING pupil (approved, declined or unknown pupils are not reachable through this route) — the same rule `PATCH /admissions/{id}` already enforces. `pupil.view`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped grant cannot reach a pending record — it has no arm yet). No write: no audit row, no mutation.
+         */
+        get: operations["GetAdmissionRecord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit an admission record's sections A, I and J
+         * @description Spec 6.5.9, 6.5.11: `id` is the PUPIL id, the same one `POST /pupils` returned and the admissions queue lists rows by. Steps 2 to 8's own screens are a later card — this endpoint only ever touches sections A, I and J. A HALF-FINISHED STEP STILL SAVES: every field is independently optional, absent fields are left unchanged, and an empty string clears an optional string field. `assessmentResultRemarks` is NOT required to save even when `assessmentRequired` is true — only admission APPROVAL (a later card) enforces that. 404 when `id` does not name a PENDING pupil (approved, declined or unknown pupils are not reachable through this route). Issues no registration number and approves nothing — `pupil.update`, SCHOOL-WIDE only (see `ListAdmissionsQueue`'s own description for why an arm-scoped grant cannot reach a pending record).
+         */
+        patch: operations["UpdateAdmissionRecord"];
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a pending admission
+         * @description Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved).
+         */
+        post: operations["ApproveAdmission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a pending admission
+         * @description Spec 6.5.14: pending -> withdrawn. Requires a reason. Issues no registration number and leaves the counter's last_serial untouched — no serial is ever consumed by a decline. 404 when `id` does not name a pending pupil.
+         */
+        post: operations["DeclineAdmission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List arms
+         * @description Spec 6.4.5: filtered by session, level, label (substring match against the composed display name), status and form teacher. Sorted by the owning level's chain order, then label collated naturally — not alphabetical. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListArms"];
+        put?: never;
+        /**
+         * Create an arm
+         * @description Spec 6.4.3, 6.4.4: the level must be active and the session upcoming or active. Label must be unique within the level and session, case-insensitive. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateArm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/next-label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest the next unused arm label
+         * @description Spec 6.4.3: A if the level has no arm this session, B if it has A, and so on. Pre-filled and editable, not reserved.
+         */
+        get: operations["GetNextArmLabel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create arms for a session, level by level
+         * @description Spec 6.4.3: "Create arms for session" — one level entry per row, each carrying an arm count and a capacity. Labels continue from each level's highest existing label. Levels given zero arms are skipped. `dryRun` returns the preview without writing. The whole run is one transaction. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["BulkCreateArms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm
+         * @description Roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are out of scope — those need pupils, enrolments, subject mappings and results.
+         */
+        get: operations["GetArm"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete an arm
+         * @description Spec 6.4.7: permitted only where no enrolment has ever existed.
+         */
+        delete: operations["DeleteArm"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit an arm
+         * @description Spec 6.4.3, 6.4.7: label, capacity, form teacher, status. Every field is independently optional; an absent field is left unchanged. Rejected outright against a closed arm. Setting `formTeacherAdminId` ADDITIONALLY requires `arm.formteacher.assign`, beyond the `arm.update` this route requires.
+         */
+        patch: operations["UpdateArm"];
+        trace?: never;
+    };
+    "/api/v1/admins/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an account's role assignments
+         * @description Spec 6.1.5: every assignment for this account, active and revoked, with role, scope type, scope ids and session. Not paginated — assignment counts per account are admin-configuration-sized.
+         */
+        get: operations["ListRoleAssignments"];
+        put?: never;
+        /**
+         * Grant a role to an account
+         * @description Spec 6.1.5: role, session and either school-wide or a non-empty arm list; every arm must belong to the named session. Requires `role.assign` for a school-wide grant, or `role.scope.assign` for an arm-scoped one. Escalation rule 1 (spec 6.1.7): rejects an attempt to assign a role to yourself — `You cannot change your own roles. Ask another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for the privilege it is exercising. Both rejections write an audit event. The seeded Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateRoleAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a role assignment
+         * @description Spec 6.1.14. Requires `role.assign`. Escalation rule 1 (spec 6.1.7): rejects revoking your own assignment, with an audit event on rejection. Always `204`.
+         */
+        delete: operations["RevokeRoleAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audit events
+         * @description Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-events/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a filtered audit log to CSV
+         * @description Spec 6.1.12: "Export to CSV requires audit.export and is itself an audit event." Same filters as the list endpoint, no paging — the whole matching set is streamed, never buffered in memory. Before any row is written to the response, this call writes its OWN `audit_event` row (action `audit.export`) recording the filters used, so a later read of the log can answer "who exported what." Columns are exactly spec 6.1.12's thirteen; `sourceIp` stays truncated as stored.
+         */
+        get: operations["ExportAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -235,6 +495,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List class levels
+         * @description Spec 6.4.9: active by default, ordered by progressionOrder; `?status=all` also returns inactive levels. Cursor-paginated per spec 9.5. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListLevels"];
+        put?: never;
+        /**
+         * Create a class level
+         * @description Spec 6.4.2: give `insertAfterLevelId` and the server rewires the chain and reorders in one transaction (the worked case), or give `progressionOrder` directly. Reruns the eight chain rules before committing. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateLevel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/levels/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reorder every active class level
+         * @description Spec 6.4.2, 6.4.9: whole ordered array of active level ids. Atomic — rewrites progressionOrder and infers nextLevelId from adjacency. Used by the drag-and-drop list.
+         */
+        post: operations["ReorderLevels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/levels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one class level
+         * @description No arm counts — that needs Arm, TASK-0039.
+         */
+        get: operations["GetLevel"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a class level
+         * @description Spec 6.4.2: permitted only where nothing has ever referenced the level. Checks the two references this codebase can see today (another level's nextLevelId, and any arm under this level); enrolment, subject-mapping and result references remain DEFERRED — those tables do not exist yet.
+         */
+        delete: operations["DeleteLevel"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a class level
+         * @description Spec 6.4.2: name, section, next level, order, status. Every field is independently optional; an absent field is left unchanged. An empty string for `nextLevelId` clears it (graduating candidate). Reruns the eight chain rules before committing. Changing `status` ADDITIONALLY requires `level.deactivate`, beyond the `level.update` this whole route requires.
+         */
+        patch: operations["UpdateLevel"];
+        trace?: never;
+    };
     "/api/v1/privileges": {
         parameters: {
             query?: never;
@@ -249,6 +581,94 @@ export interface paths {
         get: operations["GetPrivilegeRegister"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pupils
+         * @description Spec 6.5.15. Cursor-paginated per spec 9.5, page size 50 by default. Sorted by surname ascending then id (spec 6.5.15's own default additionally orders by class progression, which no pupil in this card can carry — see backend/docs/ASSUMPTIONS.md §2.27). EXCLUDES pending unless `status=Pending` is passed explicitly (the pending-exclusion invariant, spec 6.5.14) — `GET /admissions` is the queue that always shows it. `search` matches surname, first name, middle name or the registration number (in full, or its trailing serial — spec 6.5.15's own worked example, "41" finding "GRAS/2026/0041", is satisfied by ordinary substring matching); contact-phone and authorised-pickup-person search are the NEXT card's, once `pupil_contact` exists. `pupil.view` is arm-scoped for a Class Teacher: no pupil carries an arm reference until enrolment exists, so an arm-scoped caller sees an empty page today rather than a 403 — a real answer, not a placeholder.
+         */
+        get: operations["ListPupils"];
+        put?: never;
+        /**
+         * Register a new pupil
+         * @description Spec 6.5.4: always creates a PENDING record with no registration number — nothing reaches active until admission approval (a later card) issues one. `pupil.create` is not arm-scoped. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreatePupil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find pupil records that may be duplicates
+         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
+         */
+        get: operations["FindPupilDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil
+         * @description Renders only what exists after this card — no contacts, health, documents or enrolment-history blocks yet. Reachable for a PENDING record (finding it again to edit it is this card's own goal), unlike the list. `pupil.view` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.
+         */
+        get: operations["GetPupil"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a pupil's biographical fields
+         * @description Spec 6.5.10: `registrationNumber` in the payload is REJECTED with 409 — it is issued once at admission approval and never edited afterwards, "no ordinary edit path exists." Every other field is independently optional; an absent field is left unchanged, an empty string clears an optional one. `pupil.update` is arm-scoped for a Class Teacher; see `ListPupils`'s description for why an arm-scoped caller cannot reach any pupil yet.
+         */
+        patch: operations["UpdatePupilBiographical"];
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}/registration-number": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct a wrongly issued registration number
+         * @description Spec 6.5.10, "Immutability and correction". Super Admin only (`pupil.regnumber.correct` is excluded from every other seeded role). The administrator TYPES the replacement number in full — nothing here composes one from settings, unlike admission approval's issuance. The new number must be unique against both the live `registrationNumber` column and every historical alias ever recorded (409 on either collision). The counter is NOT touched — a correction consumes no serial. The old number is written to a permanent history row with the reason, the actor and the timestamp, and is never deleted: a parent holding a pin slip printed with the old number still reaches this pupil (the portal lookup that reads it is a later card). Already-published result snapshots are not rewritten. `Idempotency-Key` is REQUIRED — a retry must not append a second, redundant history row. 404 when `id` names no pupil. 409 when this pupil has no registration number yet (still pending — approve the admission first).
+         */
+        post: operations["CorrectPupilRegistrationNumber"];
         delete?: never;
         options?: never;
         head?: never;
@@ -319,6 +739,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/result-sets/{resultSetId}/compute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute a result set
+         * @description Spec 8.2: deletes and rewrites subject_result_line, subject_arm_statistic and pupil_term_result from the arm's current marks. Idempotent — running it twice on unchanged inputs produces identical rows, and never changes the result set's state. Permitted in Draft, Awaiting Approval, Approved and Returned for Correction; refused 409 once Published or Withdrawn, because a published set renders from its fixed snapshot and is never recomputed. `Idempotency-Key` is ACCEPTED, not required — computation has no side effect a retry could duplicate.
+         */
+        post: operations["ComputeResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -359,7 +799,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a role
-         * @description Spec 9.4: hard-deletes unconditionally today, because no `role_assignment` table exists yet, so nothing can ever have referenced a role (TASK-0030 adds the has-ever-been-assigned branch that archives instead). A system role returns 409.
+         * @description Spec 9.4: hard-deletes when no assignment has ever referenced the role; archives it instead (still 204) when at least one has, active or revoked. A system role returns 409.
          */
         delete: operations["DeleteRole"];
         options?: never;
@@ -369,6 +809,142 @@ export interface paths {
          * @description Every field is independently optional; an absent field is left unchanged (spec 6.1.4, 6.1.9). A system role (the seeded Super Admin) rejects the whole request with 409, regardless of which fields it touches. A `privileges` array REPLACES the whole set; spec 6.1.7 rule 2 applies only to codes newly present that were not already on the role — removal is unrestricted. `Idempotency-Key` is accepted, not required.
          */
         patch: operations["UpdateRole"];
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/score-sheets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's score sheet for a subject and term
+         * @description Spec 6.7.4: every active pupil in the arm as a row, including one with no marks entered at all. `version` is null before any row exists; send it back unchanged on `PUT` to detect a concurrent edit.
+         */
+        get: operations["GetScoreSheet"];
+        /**
+         * Save a whole score sheet
+         * @description Spec 6.7.4: whole-sheet save, one transaction; a single invalid cell rejects the whole save. The first save for an arm and term creates its result set (Draft). A row with every cell blank and not absent is not stored, and deletes an existing row. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.
+         */
+        put: operations["SaveScoreSheet"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/score-sheets/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void every mark for a subject, arm and term
+         * @description Spec 6.7.4: a reason of at least ten characters is required. Voided rows are kept, excluded from computation, and vanish from `GET`. `Idempotency-Key` is ACCEPTED, not required.
+         */
+        post: operations["VoidScoreSheet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sections
+         * @description Spec 6.4.9: "a two-row seeded list a school extends rarely." Not paged.
+         */
+        get: operations["ListSections"];
+        put?: never;
+        /**
+         * Create a section
+         * @description Spec 6.4.2: 2..40 characters, unique, case-insensitive. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename a section
+         * @description Spec 6.4.9: name only.
+         */
+        patch: operations["UpdateSection"];
+        trace?: never;
+    };
+    "/api/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sessions
+         * @description Cursor-paginated per spec 9.5, always sorted `name` descending — newest first (spec 6.3.8). `state` is the only filter. `pageSize` defaults to 25 and is capped at 100.
+         */
+        get: operations["ListSessions"];
+        put?: never;
+        /**
+         * Create a session
+         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
+         */
+        post: operations["CreateSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one session with its terms
+         * @description Arms grouped by level, enrolment counts and the publication position (spec 6.3.8) are not yet in this response — they need Arm/Pupil/result sets, which do not exist in this codebase yet.
+         */
+        get: operations["GetSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a session's name and dates
+         * @description Spec 6.3.10: name and dates, while `upcoming` or `active` — a `closed` session returns 409. Every field is independently optional; an absent field is left unchanged. `Idempotency-Key` is accepted, not required.
+         */
+        patch: operations["UpdateSession"];
         trace?: never;
     };
     "/api/v1/settings": {
@@ -411,6 +987,150 @@ export interface paths {
         patch: operations["UpdateSchoolIdentity"];
         trace?: never;
     };
+    "/api/v1/settings/reg-number": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the registration-number pattern
+         * @description Separator, serial width, reset rule (spec 6.2.4). `yearSource` is fixed and not editable here. Reducing `serialWidth` below what the counter partition currently active under the SAVED `serialReset` already needs is rejected `409`, naming the real serial and the minimum width that fits it (spec 6.2.10). `expectedVersion` must match the reg-number group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written.
+         */
+        patch: operations["UpdateRegNumber"];
+        trace?: never;
+    };
+    "/api/v1/settings/reg-number/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the next registration number under unsaved parameters
+         * @description `separator`/`serialWidth` are UNSAVED — supplied as query parameters, not read from settings. The abbreviation and the counter partition (which the currently SAVED `serialReset` selects, spec 6.2.4) both come from saved configuration. Uses the next serial that would actually be issued; with an empty register that is serial 1.
+         */
+        get: operations["GetRegNumberPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/abbreviation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the school's registration-number abbreviation
+         * @description Requires the literal confirmation token `CHANGE` and a reason (spec 6.2.4). Rewrites no issued number — the counter is keyed on admission year alone, never the abbreviation, so a mid-session change neither restarts the serial nor produces two pupils whose numbers differ only by prefix. A value already used historically is allowed (spec 6.2.11). `expectedVersion` must match the abbreviation group's current `versionNumber` or the save is rejected `409` before anything is written.
+         */
+        patch: operations["UpdateAbbreviation"];
+        trace?: never;
+    };
+    "/api/v1/settings/grading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the grading scale
+         * @description Whole scale as one array, atomic (spec 6.2.5, 6.2.12) — a band omitted from the array is deleted. All ten save-time rules run over the whole submitted scale as one unit; on the first failure nothing is written and the response's `bandIndex` extension names the offending band's position in the submitted array. `expectedVersion` must match the grading group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateGrading"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/grading/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore the grading scale to its seeded defaults
+         * @description Restores the nine seeded bands (spec 6.2.13). Treated as an ordinary edit under spec 6.2.9/6.2.11 — the same `expectedVersion`/`reason` contract as `PUT /settings/grading` applies.
+         */
+        post: operations["ResetGrading"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the assessment structure
+         * @description Whole structure as one array, atomic (spec 6.2.6, 6.2.12). A component's `id`, when supplied, must match an existing component — that is how a rename/reorder is told apart from an add or a remove, which matters once the session lock engages. Once a mark has been entered anywhere in the active session, adding, removing, or changing an existing component's `maxMark`/`isExamination` is rejected `409`; renaming and reordering stay allowed (spec 6.2.6). `expectedVersion` must match the assessment group's current `versionNumber` or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateAssessment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/result-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the result rules
+         * @description Tie-break, position scope, level position, pass mark and minimum subjects for position the computation engine reads (spec 6.2.8). A fresh database returns 6.2.8's seeded defaults, with `coreSubjectIds` empty until the administrator sets it.
+         */
+        get: operations["GetResultRules"];
+        /**
+         * Replace the result rules
+         * @description The whole row as one save (spec 6.2.8). `expectedVersion` must match the result-rules group's current `versionNumber` (from `GET /settings/result-rules`) or the save is rejected `409 settings.resultrules.stale_version` before anything is written. `primaryPositionScope` and `tieBreakRule` are rejected `409 settings.resultrules.locked` once any result set is Published in the active session; `annualMethod` and the three weights are rejected the same way once Third Term is published for any arm (spec 6.2.10) — changing a locked field to its current value is not a change and is never refused. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         */
+        put: operations["UpdateResultRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-versions": {
         parameters: {
             query?: never;
@@ -445,6 +1165,258 @@ export interface paths {
         get: operations["GetConfigVersion"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List subjects
+         * @description Spec 6.6.7: name, code, status, and — only when `termId` is supplied — the number of levels mapped, arm exceptions and pupils currently taking it this term. This endpoint never guesses a term: with `termId` absent, those three counts are null rather than resolved against a guessed term. Default sort by name ascending, cursor-paginated per spec 9.5.
+         */
+        get: operations["ListSubjects"];
+        put?: never;
+        /**
+         * Create a subject
+         * @description Spec 6.6.2. `code` is OPTIONAL (TASK-0070 delta amendment 1) — nullable, unseeded, uppercase letters and digits when supplied. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSubject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subjects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a subject
+         * @description Spec 6.6.8: permitted only where it has never been mapped and never scored. Otherwise deactivate.
+         */
+        delete: operations["DeleteSubject"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a subject
+         * @description Spec 6.6.2. Every field is independently optional; an absent field is left unchanged; an empty string clears `code`/`description`. Changing `status` ADDITIONALLY requires `subject.deactivate`, beyond the `subject.update` this route requires.
+         */
+        patch: operations["UpdateSubject"];
+        trace?: never;
+    };
+    "/api/v1/subject-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the subject mapping grid for a term
+         * @description Spec 6.6.5, 6.6.9: levels, subjects, ticks, and the per-arm exception summary.
+         */
+        get: operations["GetSubjectMappingGrid"];
+        /**
+         * Save the whole subject mapping grid for a term
+         * @description Spec 6.6.5, 6.6.9: whole-grid save, atomic. `dryRun` returns the additions/endings preview without writing. TASK-0070 delta amendment 2: requires `subject.map` when the computed diff has additions and `subject.unmap` when it has endings — both when it has both — evaluated identically under `dryRun`. Rejected outright against a closed term; an ending is rejected when marks exist for that subject in any arm under the level (spec 6.6.6).
+         */
+        put: operations["SaveSubjectMappingGrid"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-mappings/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy a term's subject mappings into another term
+         * @description Spec 6.6.5, 6.6.9. Additive only — never ends a destination mapping the source does not have, and never duplicates one already active in the destination. Requires `subject.map` only. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CopySubjectMappings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-mappings/prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply the school's standard subject list to a term
+         * @description TASK-0070 delta amendment 5 (human-ruled 2026-09-16; not in spec 6.6.9's own list) — the 14/19 standard nursery/primary list, `display_order` from the school's own result-sheet order. Additive only: can never end a mapping and never duplicates an existing active one. Requires `subject.map` only. `Idempotency-Key` is REQUIRED. Rejected outright against a closed term, `dryRun` included.
+         */
+        post: operations["PrefillSubjectMappings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subject-exceptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a per-arm subject exception
+         * @description Spec 6.6.4, 6.6.9. TASK-0070 delta amendment 2: requires `subject.map.arm`, the same privilege as its create — NOT `subject.unmap`. No closed-session 409: spec 6.6.8's closed-session rejection applies to creation only.
+         */
+        delete: operations["DeleteSubjectException"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's resolved subject set
+         * @description Spec 6.6.1, 6.6.4, 6.6.9: level mappings for the term, plus the arm's include exceptions, minus its exclude exceptions — each row flagged level-inherited or arm exception. The endpoint the score entry screen and the result renderer both call. Unwrapped array, no pagination.
+         */
+        get: operations["GetArmSubjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{id}/subject-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a per-arm subject exception
+         * @description Spec 6.6.4, 6.6.9. `include` adds a subject the level does not take; `exclude` removes one the level does take. Rejected as redundant when the mode already matches the level's own mapping, and when the arm's session is closed. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CreateSubjectException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a term's schedule
+         * @description Spec 6.3.10: dates, label, times school opened, next resumption date. Every field is independently optional; an absent field is left unchanged. Times school opened is rejected once the term is `closed` (spec 6.3.6: printed on results already issued). `Idempotency-Key` is accepted, not required.
+         */
+        patch: operations["UpdateTerm"];
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a term
+         * @description Spec 6.3.6: moves `upcoming` to `active`. Blocked unless the previous term in the session is closed (or this is ordinal 1 and no term anywhere is currently active). The rejection names the reason. Opening ordinal 1 also moves this session to `active` and the previously active session (if any) to `closed` (spec 6.3.5). The "at least one arm exists" precondition (spec 6.3.6) is NOT checked — Arm does not exist in this codebase yet, so `open` is more permissive than spec until that card lands.
+         */
+        post: operations["OpenTerm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a term
+         * @description Spec 6.3.6, 6.3.9: moves `active` to `closed`, writing `closedAtUtc`/`closedBy`. Rejected if `timesSchoolOpened` is blank, naming the term. The result-set precondition (spec 6.3.6: blocked by Draft/Awaiting Approval/Approved sets) is NOT checked — result sets do not exist in this codebase yet, so `close` is more permissive than spec until that card lands.
+         */
+        post: operations["CloseTerm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a closed term
+         * @description Spec 6.3.6: `term.close` PLUS `isSuperAdmin` (checked in the handler — not a privilege code), a reason of at least 10 characters, and refused outright if the following term has already been opened.
+         */
+        post: operations["ReopenTerm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -589,6 +1561,444 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description Sections A, I and J of the admission form (spec 6.5.9) — nested inside `PupilDto.Admission`
+         *     on `POST /pupils`'s response, and returned directly by `PATCH /admissions/{id}`.
+         * @example {
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "dateAdmitted": "2026-09-08",
+         *       "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *       "classAdmittedIntoName": "Primary 2",
+         *       "admissionType": "New",
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": false,
+         *       "assessmentResultRemarks": null,
+         *       "assignedClassTeacher": null,
+         *       "declarationName": "Chinwe Okafor",
+         *       "declarationSigned": true,
+         *       "declarationDate": "2026-09-08",
+         *       "approvedBy": null,
+         *       "approvedAt": null,
+         *       "headOfSchoolConfirmed": false,
+         *       "headOfSchoolName": null
+         *     }
+         */
+        AdmissionRecordDto: {
+            /**
+             * @description Opaque to the client. The session admitted into.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * Format: date
+             * @description `null` when not supplied.
+             * @example 2026-08-01
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description Not in the future. The registration number's year comes from this (spec 6.5.10).
+             * @example 2026-09-08
+             */
+            dateAdmitted: string;
+            /**
+             * @description Opaque to the client. A class level id.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30
+             */
+            classAdmittedInto: string;
+            /**
+             * @description The level's display name, for a client that has no other lookup handy.
+             * @example Primary 2
+             */
+            classAdmittedIntoName: null | string;
+            /** @description New or returning. */
+            admissionType: components["schemas"]["AdmissionType"];
+            /** @description `null` when not supplied. */
+            admissionTypeNote: null | string;
+            /**
+             * @description Whether an entrance assessment is required.
+             * @example false
+             */
+            assessmentRequired: boolean;
+            /** @description `null` when not yet recorded — NOT required to save (spec 6.5.9). */
+            assessmentResultRemarks: null | string;
+            /** @description Opaque admin-account id, or `null`. Informational only at this stage. */
+            assignedClassTeacher: null | string;
+            /**
+             * @description `null` when not yet supplied.
+             * @example Chinwe Okafor
+             */
+            declarationName: null | string;
+            /**
+             * @description Section I: whether the signed paper form exists.
+             * @example true
+             */
+            declarationSigned: boolean;
+            /**
+             * Format: date
+             * @description `null` unless DeclarationSigned is `true`.
+             * @example 2026-09-08
+             */
+            declarationDate: null | string;
+            /** @description Opaque admin-account id. Written only by admission approval (TASK-0051) — always `null` today. */
+            approvedBy: null | string;
+            /**
+             * Format: date-time
+             * @description Written only by admission approval (TASK-0051) — always `null` today.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            approvedAt: null | string;
+            /**
+             * @description Section J's second signature block. Defaults `false`.
+             * @example false
+             */
+            headOfSchoolConfirmed: boolean;
+            /** @description `null` when not supplied. */
+            headOfSchoolName: null | string;
+        };
+        /**
+         * @description An AdmissionRecord's section A "New / Returning" tick (spec 6.5.9).
+         * @example New
+         * @enum {unknown}
+         */
+        AdmissionType: "New" | "Returning";
+        /**
+         * @description How the annual average is computed from the three terminal averages (spec 6.2.8). Stored as a
+         *     string (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`), so a future member is a
+         *     code-only change, matching RegNumberSerialReset's convention.
+         * @example SimpleAverage
+         * @enum {unknown}
+         */
+        AnnualMethod: "SimpleAverage" | "Weighted";
+        /**
+         * @description `POST /api/v1/admissions/{id}/approve` (spec 6.5.10, 6.5.11 step 9, 6.5.14). Id is the PUPIL id, the same identity `PATCH /admissions/{id}` already uses. The
+         *             only route into `PupilStatus.Active` for a new record: in ONE transaction, issues the
+         *             registration number (spec 6.5.10), writes section J, and opens the first enrolment in string ApproveAdmissionCommand.ArmId. `Idempotency-Key` is REQUIRED on this route (spec 6.5.17) — see
+         *             `AdmissionEndpoints.MapApprove`.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
+         *       "assessmentResultRemarks": "Passed the entrance assessment.",
+         *       "headOfSchoolConfirmed": true,
+         *       "headOfSchoolName": null
+         *     }
+         */
+        ApproveAdmissionCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil whose pending admission is being approved. Supplied from the route, not the body.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /**
+             * @description Opaque id. Must reference an arm for the record's `class_admitted_into` level, in the
+             *     currently active session (spec 6.5.11 step 9: "The selector lists the level's arms for the active
+             *     session"). Over capacity is a WARNING (spec 6.4.6), not a rejection, for a caller holding
+             *     `arm.capacity.override`.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70
+             */
+            armId: string;
+            /**
+             * @description The assessment outcome (spec 6.5.11 step 9). Required — and checked against the record's OWN
+             *     `assessment_required` flag, not this command's shape — where an assessment was required;
+             *     `null` otherwise leaves whatever the record already stored unchanged.
+             * @example Passed the entrance assessment.
+             */
+            assessmentResultRemarks: null | string;
+            /**
+             * @description Section J's second signature block (appendix B question 26: "one approving account plus a
+             *     confirmation tick for the head of school, both required at approval"). Must be `true` — `false` blocks approval outright.
+             * @example true
+             */
+            headOfSchoolConfirmed: boolean;
+            /**
+             * @description Section J. Omitted defaults to `settings.head_teacher_name` (spec 6.5.9: "Defaults from
+             *     settings" — the orchestrator's ruling on the source field, drift 2026-09-15). A supplied value
+             *     always wins over the default.
+             */
+            headOfSchoolName: null | string;
+        };
+        /**
+         * @description The wire shape of an Arm (spec 6.4.3, 6.4.9). One shape for the list item and the
+         *     detail read — roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are
+         *     out of scope until pupils, enrolments, subject mappings and results exist.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *       "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "classLevel": "Primary 2",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "label": "C",
+         *       "displayName": "Primary 2C",
+         *       "capacity": 22,
+         *       "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+         *       "status": "Active"
+         *     }
+         */
+        ArmDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48
+             */
+            id: string;
+            /**
+             * @description Opaque identifier of the owning level — supply this back on a write.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            classLevelId: string;
+            /**
+             * @description The level's CURRENT name, denormalised for display, same convention as `LevelDto.Section`.
+             * @example Primary 2
+             */
+            classLevel: string;
+            /**
+             * @description Opaque identifier of the owning session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description 1..16 characters, as stored (already normalised on save).
+             * @example C
+             */
+            label: string;
+            /**
+             * @description Composed by ArmDisplayName at read time — never stored (spec 6.4.3).
+             * @example Primary 2C
+             */
+            displayName: string;
+            /**
+             * Format: int32
+             * @description 1..100, a soft limit (spec 6.4.6).
+             * @example 22
+             */
+            capacity: number | string;
+            /**
+             * @description `null` when unassigned.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42
+             */
+            formTeacherAdminId: null | string;
+            /** @description active, inactive or closed. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["ArmStatus"];
+        };
+        /**
+         * @description An Arm's status (spec 6.4.3). Defaults ArmStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        ArmStatus: "Active" | "Inactive" | "Closed";
+        /**
+         * @description One row of an arm's resolved subject set (spec 6.6.1, 6.6.9: "the resolved set in effect for one
+         *     arm, with each row flagged as level-inherited or arm exception").
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "subjectCode": null,
+         *       "displayOrder": 1,
+         *       "source": "LevelInherited"
+         *     }
+         */
+        ArmSubjectDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The subject's name.
+             * @example Mathematics
+             */
+            subjectName: string;
+            /** @description `null` when the subject carries none. */
+            subjectCode: null | string;
+            /**
+             * Format: int32
+             * @description The row order of the result sheet (spec 6.6.1, 6.6.3) — additive beyond §6.6.9's literal text,
+             *     needed by the result renderer (TASK-0071) for a deterministic order without a second query.
+             * @example 1
+             */
+            displayOrder: number | string;
+            /** @description Whether this row reached the arm through its level's mapping or its own exception. */
+            source: components["schemas"]["SubjectSourceKind"];
+        };
+        /**
+         * @description One component, both inside SettingsAssessmentGroupDto and inside
+         *     SettingsDto's envelope. An element of an ORDERED ARRAY (6.2.13's durability
+         *     requirement) — never a named field like `firstCa`/`secondCa`; a client that reads by
+         *     name breaks the moment a school adds a component.
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+         *       "name": "1st CA",
+         *       "shortLabel": "CA1",
+         *       "maxMark": 20,
+         *       "isExamination": false,
+         *       "displayOrder": 1
+         *     }
+         */
+        AssessmentComponentDto: {
+            /**
+             * @description Opaque id — the key marks are stored against (spec 6.2.6).
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101
+             */
+            id: string;
+            /**
+             * @description For example "1st CA", "2nd CA", "Exam".
+             * @example 1st CA
+             */
+            name: string;
+            /**
+             * @description Used as the column header where space is tight.
+             * @example CA1
+             */
+            shortLabel: string;
+            /**
+             * Format: int32
+             * @description 1 to 100.
+             * @example 20
+             */
+            maxMark: number | string;
+            /**
+             * @description Exactly one component in the structure has this `true`.
+             * @example false
+             */
+            isExamination: boolean;
+            /**
+             * Format: int32
+             * @description Column order. The examination component is always last.
+             * @example 1
+             */
+            displayOrder: number | string;
+        };
+        /**
+         * @description One submitted component on the wire (spec 6.2.6/6.2.13). string? AssessmentComponentSaveRequest.Id is opaque (CLAUDE.md
+         *     §8) — `null` for a new component; when it matches an existing component's id it is
+         *     an edit to that same row, never a delete-and-recreate (see `AssessmentComponent`'s remarks).
+         *     `displayOrder` is deliberately absent — it is system-maintained from array position (spec
+         *     6.2.6: "System-maintained from the drag order"), with the examination forced last regardless of
+         *     where it sits in this array.
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+         *       "name": "1st CA",
+         *       "shortLabel": "CA1",
+         *       "maxMark": 20,
+         *       "isExamination": false
+         *     }
+         */
+        AssessmentComponentSaveRequest: {
+            /**
+             * @description An existing component's opaque id, or `null` for a new one.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101
+             */
+            id: null | string;
+            /**
+             * @description Up to 40 characters. Unique, case-insensitive.
+             * @example 1st CA
+             */
+            name: string;
+            /**
+             * @description Up to 12 characters. Unique, case-insensitive.
+             * @example CA1
+             */
+            shortLabel: string;
+            /**
+             * Format: int32
+             * @description 1 to 100.
+             * @example 20
+             */
+            maxMark: number | string;
+            /**
+             * @description Exactly one submitted component must set this `true`.
+             * @example false
+             */
+            isExamination: boolean;
+        };
+        /**
+         * @description One row of the audit trail (spec 6.1.12), rendered for the read surface. Carries every column
+         *     the spec's table defines and no more — `source_ip` is already truncated as stored (root
+         *     `CLAUDE.md` §8, PII), never widened here.
+         * @example {
+         *       "id": "48213",
+         *       "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+         *       "action": "settings.grading.update",
+         *       "entityType": "grading_band",
+         *       "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "outcome": "Success",
+         *       "beforeJson": null,
+         *       "afterJson": null,
+         *       "reason": null,
+         *       "sourceIp": "197.210.64.0/24",
+         *       "userAgent": "Mozilla/5.0"
+         *     }
+         */
+        AuditEventDto: {
+            /**
+             * @description Opaque to the frontend (root CLAUDE.md §8) — the underlying BIGSERIAL is an Application/Infrastructure concern only.
+             * @example 48213
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description Stored UTC; the UI converts to WAT for display (spec 6.1.12).
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            occurredAtUtc: string;
+            /**
+             * @description Null for a system-initiated action.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            actorAdminId: null | string;
+            /**
+             * @description Staff name and email captured at write time (spec 6.1.12).
+             * @example Chisom Maxwell <chisom.maxwell@example.com>
+             */
+            actorLabel: string;
+            /**
+             * @description The privilege string of the operation, or a fixed system code.
+             * @example settings.grading.update
+             */
+            action: string;
+            /**
+             * @description For example `grading_band`, `result_set`, `pupil`.
+             * @example grading_band
+             */
+            entityType: string;
+            /**
+             * @description Null for a bulk action, which carries a batch id in AfterJson instead.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            entityId: null | string;
+            /** @description Either `Success` or `Rejected`; crosses the wire as a string (root CLAUDE.md §8) via the global enum converter. */
+            outcome: components["schemas"]["AuditOutcome"];
+            /**
+             * @description The prior state of changed fields only, or null on create. Raw JSON text, not a parsed
+             *     JsonElement — TASK-0049 keeps it a plain string deliberately, so a
+             *     second/third use of `JsonElement` alongside `ConfigVersionDetailDto.Snapshot` never
+             *     forces the OpenAPI generator to hoist a shared, description-less component schema for it.
+             */
+            beforeJson: null | string;
+            /** @description The new state of changed fields only, or null on delete. Same raw-text shape as string? AuditEventDto.BeforeJson. */
+            afterJson: null | string;
+            /** @description Present only for the actions spec 6.1.12 mandates a reason for. */
+            reason: null | string;
+            /**
+             * @description Already truncated to /24 (IPv4) or /48 (IPv6) at write time.
+             * @example 197.210.64.0/24
+             */
+            sourceIp: null | string;
+            /**
+             * @description Already truncated to 300 characters at write time.
+             * @example Mozilla/5.0
+             */
+            userAgent: null | string;
+        };
+        /**
+         * @description Spec 6.1.12's `outcome` column: "success or rejected. Rejected entries are written for
+         *     privilege failures and for escalation attempts."
+         * @example Success
+         * @enum {unknown}
+         */
+        AuditOutcome: "Success" | "Rejected";
+        /**
          * @description Shared response shape returned by `sign-in`, `me`, `refresh` and `password`
          *     (approved contract delta §0), so the frontend never needs a second round trip to learn its own
          *     state after any of the four.
@@ -636,8 +2046,10 @@ export interface components {
              */
             mustChangePassword: boolean;
             /**
-             * @description The caller's resolved effective privilege set. For this card, populated only via the
-             *     bool AuthSessionResponse.IsSuperAdmin flag path — see `SuperAdminFlagEffectivePrivilegeProvider`.
+             * @description The caller's resolved effective privilege set, from whatever `IEffectivePrivilegeProvider` is
+             *     registered — the bool AuthSessionResponse.IsSuperAdmin flag path for a super admin, or (since TASK-0030's
+             *     provider graduation) the union of a non-super-admin's own active `role_assignment` grants.
+             *     This endpoint's SHAPE is unchanged by TASK-0030; only the data behind it improved.
              * @example [
              *       {
              *         "privilege": "admin.view",
@@ -659,6 +2071,111 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             sessionAbsoluteExpiresAt: string;
+        };
+        /**
+         * @description `POST /api/v1/arms/bulk` (spec 6.4.3, 6.4.9): "Create arms for session" — an administrator
+         *             opening a new session creates every level's rooms in one action instead of one form per level.
+         *             Labels continue from each level's highest existing label (spec 6.4.8, same rule as
+         *             `GET /arms/next-label`). Levels given zero arms are skipped. The whole run is one transaction;
+         *             bool BulkCreateArmsCommand.DryRun returns the preview without writing anything.
+         * @example {
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "levels": [
+         *         {
+         *           "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "armCount": 3,
+         *           "capacity": 30
+         *         }
+         *       ],
+         *       "dryRun": false
+         *     }
+         */
+        BulkCreateArmsCommand: {
+            /**
+             * @description Must reference an upcoming or active session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description One entry per level to size. A level omitted from this list gets no arms.
+             * @example [
+             *       {
+             *         "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "armCount": 3,
+             *         "capacity": 30
+             *       }
+             *     ]
+             */
+            levels: components["schemas"]["BulkCreateArmsLevelEntry"][];
+            /**
+             * @description When `true`, computes and returns the preview but adds nothing.
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description One level's row in a BulkCreateArmsCommand request.
+         * @example {
+         *       "levelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "armCount": 3,
+         *       "capacity": 30
+         *     }
+         */
+        BulkCreateArmsLevelEntry: {
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            levelId: string;
+            /**
+             * Format: int32
+             * @description 0 skips the level entirely (spec 6.4.3).
+             * @example 3
+             */
+            armCount: number | string;
+            /**
+             * Format: int32
+             * @description `null` defaults to int Arm.DefaultCapacity for every new arm at this level.
+             * @example 30
+             */
+            capacity: null | number | string;
+        };
+        /**
+         * @description The response to BulkCreateArmsCommand.
+         * @example {
+         *       "created": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *           "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "classLevel": "Primary 2",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "label": "A",
+         *           "displayName": "Primary 2A",
+         *           "capacity": 30,
+         *           "formTeacherAdminId": null,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        BulkCreateArmsResponse: {
+            /**
+             * @description The arms created (or, for a bool BulkCreateArmsCommand.DryRun, previewed).
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+             *         "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "classLevel": "Primary 2",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "label": "A",
+             *         "displayName": "Primary 2A",
+             *         "capacity": 30,
+             *         "formTeacherAdminId": null,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            created: components["schemas"]["ArmDto"][];
         };
         /**
          * @description `POST /api/v1/admins/{id}/status` (spec 6.1.10, 6.1.14). The privilege required is
@@ -711,6 +2228,80 @@ export interface components {
              * @example another horse battery staple 4
              */
             newPassword: string;
+        };
+        /**
+         * @description One computation flag (contract delta's `flags[]`) — response-body data, NOT a problem code, so its string ComputeResultSetFlagDto.Code is not dotted.
+         * @example {
+         *       "code": "no_examination_sat",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "pupilId": null
+         *     }
+         */
+        ComputeResultSetFlagDto: {
+            /**
+             * @description `no_examination_sat` or `absent_all_examinations`.
+             * @example no_examination_sat
+             */
+            code: string;
+            /**
+             * @description Set for `no_examination_sat`.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: null | string;
+            /** @description Set for `absent_all_examinations`. */
+            pupilId: null | string;
+        };
+        /**
+         * @description The 200 response (contract delta).
+         * @example {
+         *       "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "computedAt": "2026-12-18T09:30:00Z",
+         *       "pupilCount": 28,
+         *       "subjectCount": 9,
+         *       "flags": [
+         *         {
+         *           "code": "absent_all_examinations",
+         *           "subjectId": null,
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+         *         }
+         *       ]
+         *     }
+         */
+        ComputeResultSetResponse: {
+            /**
+             * @description The result set that was computed.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            resultSetId: string;
+            /**
+             * Format: date-time
+             * @description When this computation ran.
+             * @example 2026-12-18T09:30:00Z
+             */
+            computedAt: string;
+            /**
+             * Format: int32
+             * @description Pupils ranked (eligible for arm position) — the denominator the sheet prints.
+             * @example 28
+             */
+            pupilCount: number | string;
+            /**
+             * Format: int32
+             * @description Subjects in effect for the arm this term.
+             * @example 9
+             */
+            subjectCount: number | string;
+            /**
+             * @description Spec 6.7.12/6.7.4's computation-time flags.
+             * @example [
+             *       {
+             *         "code": "absent_all_examinations",
+             *         "subjectId": null,
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+             *       }
+             *     ]
+             */
+            flags: components["schemas"]["ComputeResultSetFlagDto"][];
         };
         /**
          * @description The full body of `GET /api/v1/config-versions/{id}`.
@@ -818,6 +2409,66 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description `POST /api/v1/subject-mappings/copy` (spec 6.6.5, 6.6.9): "Body carries source term and
+         *             destination term." Additive only — this card's own judgement call (see the handler's remarks):
+         *             the one worked example spec 6.6.8 gives ("a term with 14 mappings into a term that already has 3 →
+         *             11 additions, 0 endings, does not duplicate the 3") never shows an ending, so copy never ends a
+         *             destination mapping the source term does not have. Requires `subject.map` only.
+         * @example {
+         *       "sourceTermId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "destinationTermId": "0192f0c4-37e9-7566-4a38-e696158802b1",
+         *       "dryRun": true
+         *     }
+         */
+        CopySubjectMappingsCommand: {
+            /**
+             * @description Copy FROM this term's currently active mappings.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            sourceTermId: string;
+            /**
+             * @description Copy INTO this term.
+             * @example 0192f0c4-37e9-7566-4a38-e696158802b1
+             */
+            destinationTermId: string;
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing.
+             * @example true
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description `POST /api/v1/pupils/{id}/registration-number` (spec 6.5.10, "Immutability and
+         *             correction"). `pupil.regnumber.correct`, Super Admin only — the privilege is excluded from
+         *             every seeded non-Super-Admin role (`SeededRoles.cs`). Unlike admission approval's issuance,
+         *             NOTHING here is generated: the administrator types the whole replacement number, because a
+         *             correction is usually fixing a wrong admission year and the corrected serial should be chosen
+         *             deliberately, never composed from settings.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "reason": "Wrong admission year was entered at approval; corrected to 2026."
+         *     }
+         */
+        CorrectRegistrationNumberCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil whose number is being corrected. Supplied from the route, not the body.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /**
+             * @description The new number, typed in full. Must be well-formed and unique against both the live table and the history table.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: string;
+            /**
+             * @description At least ten characters (spec 6.5.10). Written to the history row and to the audit event.
+             * @example Wrong admission year was entered at approval; corrected to 2026.
+             */
+            reason: string;
+        };
+        /**
          * @description `POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14): "Step one takes staff name, email and
          *             phone and creates the account." Role assignment (step two) is TASK-0028 — an account with zero
          *             assignments can exist and sign in, per spec 6.1.9's own text.
@@ -902,6 +2553,243 @@ export interface components {
             temporaryPassword: null | string;
         };
         /**
+         * @description Section A of the admission form, as captured at pupil creation (spec 6.5.9). Sections I and J are
+         *     filled in later, through `PATCH /admissions/{id}` (TASK-0062).
+         * @example {
+         *       "sessionId": null,
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "dateAdmitted": null,
+         *       "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *       "admissionType": "New",
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": false
+         *     }
+         */
+        CreateAdmissionInput: {
+            /** @description Opaque id. `null` defaults to the active session. */
+            sessionId: null | string;
+            /**
+             * Format: date
+             * @description Optional; not in the future.
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description `null` defaults to today; not in the future.
+             */
+            dateAdmitted: null | string;
+            /** @description Opaque id. Must reference an existing, active class level. */
+            classAdmittedInto: string;
+            /** @description New or returning. */
+            admissionType: components["schemas"]["AdmissionType"];
+            /** @description Optional. */
+            admissionTypeNote: null | string;
+            /** @description Explicit yes or no. */
+            assessmentRequired: boolean;
+        };
+        /**
+         * @description `POST /api/v1/arms` (spec 6.4.3, 6.4.9). Single-arm creation — the flow spec 6.4.4 exists for:
+         *             opening a new room mid-term under an active level, permitted with no privilege beyond
+         *             `arm.create`.
+         * @example {
+         *       "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "label": "C",
+         *       "capacity": 22,
+         *       "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+         *     }
+         */
+        CreateArmCommand: {
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            classLevelId: string;
+            /**
+             * @description Must reference an upcoming or active session.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            sessionId: string;
+            /**
+             * @description 1..16 characters, letters/digits/single internal spaces. Unique within the level and session, case-insensitive.
+             * @example C
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description `null` defaults to int Arm.DefaultCapacity. 1..100.
+             * @example 22
+             */
+            capacity: null | number | string;
+            /**
+             * @description Optional. Must reference an active admin account when given.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42
+             */
+            formTeacherAdminId: null | string;
+        };
+        /**
+         * @description `POST /api/v1/levels` (spec 6.4.2, 6.4.9). Two mutually exclusive ways to place the new level
+         *             in the chain: give string? CreateLevelCommand.InsertAfterLevelId and the server rewires everything (spec 6.4.2's
+         *             worked case), OR give int? CreateLevelCommand.ProgressionOrder directly (spec 6.4.2: "editable directly for
+         *             the administrator who prefers typing") with an optional string? CreateLevelCommand.NextLevelId.
+         * @example {
+         *       "name": "Reception",
+         *       "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "progressionOrder": null,
+         *       "nextLevelId": null,
+         *       "insertAfterLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46"
+         *     }
+         */
+        CreateLevelCommand: {
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Reception
+             */
+            name: string;
+            /**
+             * @description Must reference an existing section.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sectionId: string;
+            /**
+             * Format: int32
+             * @description Required when string? CreateLevelCommand.InsertAfterLevelId is absent; must be omitted when it is present.
+             */
+            progressionOrder: null | number | string;
+            /** @description `null` for a graduating candidate. Must be omitted when string? CreateLevelCommand.InsertAfterLevelId is present. */
+            nextLevelId: null | string;
+            /**
+             * @description When given, must reference an active level; the server sets order and both neighbours'
+             *     `nextLevelId` in one transaction, shifting every later active level's order up by one.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46
+             */
+            insertAfterLevelId: null | string;
+        };
+        /**
+         * @description `POST /api/v1/pupils` (spec 6.5.4, 6.5.9). Always creates a PupilStatus.Pending
+         *             record with a `null` registration number — see the task card's own goal: "Nothing
+         *             can reach active yet." Admission is section A of the paper form, saved as the
+         *             pupil's `admission_record` row in the SAME transaction (TASK-0062) — a pupil with no
+         *             admission record is a state this handler cannot produce.
+         * @example {
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": "Ngozi",
+         *       "sex": "Female",
+         *       "dateOfBirth": "2020-05-03",
+         *       "nationality": "Nigerian",
+         *       "stateOfOrigin": "Anambra",
+         *       "lga": "Awka South",
+         *       "homeAddress": "14 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "otherInformation": null,
+         *       "admission": {
+         *         "sessionId": null,
+         *         "dateApplicationReceived": "2026-08-01",
+         *         "dateAdmitted": null,
+         *         "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *         "admissionType": "New",
+         *         "admissionTypeNote": null,
+         *         "assessmentRequired": false
+         *       }
+         *     }
+         */
+        CreatePupilCommand: {
+            /**
+             * @description 1..60 characters, letters/spaces/hyphens/apostrophes.
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description Same rule as Surname.
+             * @example Chidera
+             */
+            firstName: string;
+            /**
+             * @description Optional. Same rule as Surname when supplied.
+             * @example Ngozi
+             */
+            middleName: null | string;
+            /** @description Male or female. */
+            sex: components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description In the past; must give an age between 2 and 20.
+             * @example 2020-05-03
+             */
+            dateOfBirth: string;
+            /**
+             * @description `null` defaults to `Nigerian`.
+             * @example Nigerian
+             */
+            nationality: null | string;
+            /**
+             * @description One of the 36 states or the Federal Capital Territory — free text is rejected.
+             * @example Anambra
+             */
+            stateOfOrigin: string;
+            /**
+             * @description Must belong to StateOfOrigin — free text is rejected.
+             * @example Awka South
+             */
+            lga: string;
+            /**
+             * @description The child's own address. Multi-line permitted.
+             * @example 14 Zik Avenue, Awka
+             */
+            homeAddress: string;
+            /** @description Optional. */
+            previousSchool: null | string;
+            /** @description Optional. */
+            previousClass: null | string;
+            /** @description Optional, section G free text. */
+            otherInformation: null | string;
+            /** @description Section A. Required — every pupil gets an admission record at creation. */
+            admission: components["schemas"]["CreateAdmissionInput"];
+        };
+        /**
+         * @description `POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a
+         *             school-wide grant or `role.scope.assign` for an arm-scoped grant — data-dependent on
+         *             ScopeType CreateRoleAssignmentCommand.ScopeType, so the handler resolves and enforces it rather than a route-declarative
+         *             privilege. Subject to escalation rules 1 and 3 (spec 6.1.7).
+         * @example {
+         *       "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "scopeType": "ArmList",
+         *       "armIds": [
+         *         "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+         *       ]
+         *     }
+         */
+        CreateRoleAssignmentCommand: {
+            /**
+             * @description The account receiving the role — bound from the route, not the body.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            adminAccountId: string;
+            /**
+             * @description Must reference an active role, not the seeded Super Admin role.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            roleId: string;
+            /**
+             * @description Must reference an existing session. Every arm in IReadOnlyList&lt;string&gt;? CreateRoleAssignmentCommand.ArmIds must belong to it.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /** @description School-wide or arm-list. */
+            scopeType: components["schemas"]["ScopeType"];
+            /**
+             * @description Required and non-empty when ScopeType CreateRoleAssignmentCommand.ScopeType is arm-list; otherwise must be empty or omitted.
+             * @example [
+             *       "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+             *     ]
+             */
+            armIds: null | string[];
+        };
+        /**
          * @description `POST /api/v1/roles` (spec 6.1.4; approved delta
          *             `.agent/decisions/2026-Q3-contract-deltas.md` entry `TASK-0028` §2). Rejects the reserved
          *             name `Super Admin`, case-insensitive, and an unknown privilege code naming the offender.
@@ -971,6 +2859,160 @@ export interface components {
             id: string;
         };
         /**
+         * @description `POST /api/v1/sections` (spec 6.4.9).
+         * @example {
+         *       "name": "Secondary"
+         *     }
+         */
+        CreateSectionCommand: {
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Secondary
+             */
+            name: string;
+        };
+        /**
+         * @description `POST /api/v1/sessions` (spec 6.3.5). Creates the session AND its three terms in one
+         *             transaction — spec 6.3.5: "There is no route that creates a session without terms, because a
+         *             session with two terms is not a state the school ever wants." CreateSessionHandler
+         *             is the only place in this codebase that adds a row to the sessions table.
+         * @example {
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "term1": {
+         *         "startDate": "2026-09-14",
+         *         "endDate": "2026-12-18",
+         *         "nextResumptionDate": "2027-01-05"
+         *       },
+         *       "term2": {
+         *         "startDate": "2027-01-05",
+         *         "endDate": "2027-04-02",
+         *         "nextResumptionDate": "2027-04-20"
+         *       },
+         *       "term3": {
+         *         "startDate": "2027-04-20",
+         *         "endDate": "2027-07-25",
+         *         "nextResumptionDate": null
+         *       }
+         *     }
+         */
+        CreateSessionCommand: {
+            /**
+             * @description Format `YYYY/YYYY`; the second year must be exactly the first plus one. Unique.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Must fall inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Must fall inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description First Term's dates. */
+            term1: components["schemas"]["CreateSessionTermInput"];
+            /** @description Second Term's dates. */
+            term2: components["schemas"]["CreateSessionTermInput"];
+            /** @description Third Term's dates. */
+            term3: components["schemas"]["CreateSessionTermInput"];
+        };
+        /**
+         * @description One term's dates as supplied at session creation (spec 6.3.5: "The form takes the session name,
+         *     then three rows of start date, end date and next resumption date"). The term's `name` is
+         *     never taken from the client here — it defaults to "First/Second/Third Term" by ordinal and is
+         *     editable afterwards via `PATCH /api/v1/terms/{id}` (spec 6.3.4).
+         * @example {
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2026-12-18",
+         *       "nextResumptionDate": "2027-01-05"
+         *     }
+         */
+        CreateSessionTermInput: {
+            /**
+             * Format: date
+             * @description Inside the session's range; later than the previous term's end date.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Later than StartDate; earlier than the next term's start date.
+             * @example 2026-12-18
+             */
+            endDate: string;
+            /**
+             * Format: date
+             * @description May be left blank (spec 6.3.4: required only to publish, which does not exist yet).
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
+        };
+        /**
+         * @description `POST /api/v1/subjects` (spec 6.6.2, 6.6.9).
+         * @example {
+         *       "name": "Mathematics",
+         *       "code": null,
+         *       "description": null
+         *     }
+         */
+        CreateSubjectCommand: {
+            /**
+             * @description 1..80 characters. Unique, case-insensitive.
+             * @example Mathematics
+             */
+            name: string;
+            /**
+             * @description `null` or empty for none — TASK-0070 delta amendment 1 makes this OPTIONAL,
+             *             departing from spec 6.6.2's `Req: Yes` (see the card's "Why code is optional"). Uppercase
+             *             letters and digits only when supplied; unique where supplied.
+             */
+            code: null | string;
+            /** @description Optional, up to 300 characters. Never printed. */
+            description: null | string;
+        };
+        /**
+         * @description `POST /api/v1/arms/{id}/subject-exceptions` (spec 6.6.4, 6.6.9). Requires `subject.map.arm`.
+         *             `Idempotency-Key` is REQUIRED (standing obligation: every retry-duplicable mutation declares
+         *             one — TASK-0070's own flagged gap beyond the card's original four examples).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "mode": "Include",
+         *       "reason": "This arm runs a French club this term."
+         *     }
+         */
+        CreateSubjectExceptionCommand: {
+            /**
+             * @description Bound from the route. The one arm this exception applies to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Must reference an active subject.
+             * @example 0192f0c4-f3a5-7162-0694-a252d13e8417
+             */
+            subjectId: string;
+            /**
+             * @description Must belong to the arm's session.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /** @description include or exclude. */
+            mode: components["schemas"]["SubjectExceptionMode"];
+            /**
+             * @description 1..200 characters. Required.
+             * @example This arm runs a French club this term.
+             */
+            reason: string;
+        };
+        /**
          * @description Response to `GET /api/v1/auth/csrf`.
          * @example {
          *       "csrfToken": "CfDJ8N-example-opaque-csrf-token-value"
@@ -1036,6 +3078,98 @@ export interface components {
          * @example {
          *       "items": [
          *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+         *           "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "classLevel": "Primary 2",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "label": "C",
+         *           "displayName": "Primary 2C",
+         *           "capacity": 22,
+         *           "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfArmDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d48",
+             *         "classLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "classLevel": "Primary 2",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "label": "C",
+             *         "displayName": "Primary 2C",
+             *         "capacity": 22,
+             *         "formTeacherAdminId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42",
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["ArmDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "48213",
+         *           "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+         *           "action": "settings.grading.update",
+         *           "entityType": "grading_band",
+         *           "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "outcome": "Success",
+         *           "beforeJson": null,
+         *           "afterJson": null,
+         *           "reason": null,
+         *           "sourceIp": "197.210.64.0/24",
+         *           "userAgent": "Mozilla/5.0"
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfAuditEventDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "48213",
+             *         "occurredAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "actorAdminId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "actorLabel": "Chisom Maxwell <chisom.maxwell@example.com>",
+             *         "action": "settings.grading.update",
+             *         "entityType": "grading_band",
+             *         "entityId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "outcome": "Success",
+             *         "beforeJson": null,
+             *         "afterJson": null,
+             *         "reason": null,
+             *         "sourceIp": "197.210.64.0/24",
+             *         "userAgent": "Mozilla/5.0"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["AuditEventDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
          *           "versionNumber": 3,
          *           "changedGroup": "Identity",
@@ -1064,6 +3198,125 @@ export interface components {
              * @description `null` when this is the last page.
              * @example MQ==
              */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *           "name": "Primary 1",
+         *           "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "section": "Primary",
+         *           "progressionOrder": 4,
+         *           "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+         *           "isEntryLevel": false,
+         *           "isGraduatingLevel": false,
+         *           "status": "Active"
+         *         }
+         *       ],
+         *       "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
+         *     }
+         */
+        CursorPageOfLevelDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+             *         "name": "Primary 1",
+             *         "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "section": "Primary",
+             *         "progressionOrder": 4,
+             *         "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+             *         "isEntryLevel": false,
+             *         "isGraduatingLevel": false,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["LevelDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *           "registrationNumber": null,
+         *           "surname": "Okafor",
+         *           "firstName": "Chidera",
+         *           "middleName": "Ngozi",
+         *           "sex": "Female",
+         *           "dateOfBirth": "2020-05-03",
+         *           "ageYears": 6,
+         *           "nationality": "Nigerian",
+         *           "stateOfOrigin": "Anambra",
+         *           "lga": "Awka South",
+         *           "homeAddress": "14 Zik Avenue, Awka",
+         *           "previousSchool": null,
+         *           "previousClass": null,
+         *           "status": "Pending",
+         *           "otherInformation": null,
+         *           "matchedField": null,
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "admission": null,
+         *           "levelAppliedFor": "Primary 2",
+         *           "dateApplicationReceived": "2026-08-01",
+         *           "missing": [
+         *             "Declaration (Section I)"
+         *           ]
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfPupilDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+             *         "registrationNumber": null,
+             *         "surname": "Okafor",
+             *         "firstName": "Chidera",
+             *         "middleName": "Ngozi",
+             *         "sex": "Female",
+             *         "dateOfBirth": "2020-05-03",
+             *         "ageYears": 6,
+             *         "nationality": "Nigerian",
+             *         "stateOfOrigin": "Anambra",
+             *         "lga": "Awka South",
+             *         "homeAddress": "14 Zik Avenue, Awka",
+             *         "previousSchool": null,
+             *         "previousClass": null,
+             *         "status": "Pending",
+             *         "otherInformation": null,
+             *         "matchedField": null,
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "admission": null,
+             *         "levelAppliedFor": "Primary 2",
+             *         "dateApplicationReceived": "2026-08-01",
+             *         "missing": [
+             *           "Declaration (Section I)"
+             *         ]
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PupilDto"][];
+            /** @description `null` when this is the last page. */
             nextCursor: null | string;
         };
         /**
@@ -1112,6 +3365,106 @@ export interface components {
             nextCursor: null | string;
         };
         /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "name": "2026/2027",
+         *           "startDate": "2026-09-14",
+         *           "endDate": "2027-07-25",
+         *           "state": "Active",
+         *           "armCount": 24
+         *         }
+         *       ],
+         *       "nextCursor": "MjAyNi8yMDI3"
+         *     }
+         */
+        CursorPageOfSessionDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "name": "2026/2027",
+             *         "startDate": "2026-09-14",
+             *         "endDate": "2027-07-25",
+             *         "state": "Active",
+             *         "armCount": 24
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["SessionDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example MjAyNi8yMDI3
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "name": "Mathematics",
+         *           "code": null,
+         *           "description": null,
+         *           "status": "Active",
+         *           "mappedLevelCount": 6,
+         *           "armExceptionCount": 1,
+         *           "pupilsTakingCount": 182
+         *         }
+         *       ],
+         *       "nextCursor": null
+         *     }
+         */
+        CursorPageOfSubjectDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "name": "Mathematics",
+             *         "code": null,
+             *         "description": null,
+             *         "status": "Active",
+             *         "mappedLevelCount": 6,
+             *         "armExceptionCount": 1,
+             *         "pupilsTakingCount": 182
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["SubjectDto"][];
+            /** @description `null` when this is the last page. */
+            nextCursor: null | string;
+        };
+        /**
+         * @description `POST /api/v1/admissions/{id}/decline` (spec 6.5.14: pending -&gt; withdrawn). Id is the PUPIL id. Issues no registration number and leaves the counter's
+         *             `last_serial` untouched — this command never calls the counter at all.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "reason": "Family relocated before the intake began."
+         *     }
+         */
+        DeclineAdmissionCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil whose pending admission is being declined. Supplied from the route, not the body.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /**
+             * @description Required (spec 6.5.14: "Requires a reason").
+             * @example Family relocated before the intake began.
+             */
+            reason: string;
+        };
+        /**
          * @description One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant
          *                 minus its session id — that field is server-internal and never crosses the wire.
          * @example {
@@ -1133,6 +3486,88 @@ export interface components {
              * @example []
              */
             armIds: string[];
+        };
+        /**
+         * @description One band, both inside SettingsGradingGroupDto and inside SettingsDto's
+         *     envelope. An element of an ORDERED ARRAY (6.2.13's durability requirement) — never a named field —
+         *     sorted by `displayOrder` for printing; grade RESOLUTION sorts by `lowerBound` internally
+         *     (6.2.11), a concern the wire shape does not need to express.
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+         *       "lowerBound": 90,
+         *       "upperBound": 100,
+         *       "gradeLetter": "A+",
+         *       "remark": "Very excellent",
+         *       "displayOrder": 1
+         *     }
+         */
+        GradingBandDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description 0 to 100 inclusive.
+             * @example 90
+             */
+            lowerBound: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100 inclusive, greater than or equal to LowerBound.
+             * @example 100
+             */
+            upperBound: number | string;
+            /**
+             * @description Up to 3 characters — widened by 6.2.13 to hold `A+` and `B-`.
+             * @example A+
+             */
+            gradeLetter: string;
+            /**
+             * @description Printed in the Remark column of the result sheet.
+             * @example Very excellent
+             */
+            remark: string;
+            /**
+             * Format: int32
+             * @description Printing order of the grading key.
+             * @example 1
+             */
+            displayOrder: number | string;
+        };
+        /**
+         * @description One submitted band, before persistence (no id — `PUT /settings/grading` replaces the whole set; see GradingBand's remarks).
+         * @example {
+         *       "lowerBound": 90,
+         *       "upperBound": 100,
+         *       "gradeLetter": "A+",
+         *       "remark": "Very excellent"
+         *     }
+         */
+        GradingBandInput: {
+            /**
+             * Format: int32
+             * @description 0 to 100 inclusive.
+             * @example 90
+             */
+            lowerBound: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100 inclusive, greater than or equal to LowerBound.
+             * @example 100
+             */
+            upperBound: number | string;
+            /**
+             * @description Up to int GradingBand.GradeLetterMaxLength characters. Unique, case-insensitive.
+             * @example A+
+             */
+            gradeLetter: string;
+            /**
+             * @description At least int GradingBand.RemarkMinLength characters.
+             * @example Very excellent
+             */
+            remark: string;
         };
         /**
          * @description An RFC 9457 problem response for a validation failure, returned with status 422. Extends the standard problem shape with `errors`: an object keyed by request property name, whose values are the messages for that property, suitable for attaching to form fields. A 400 (rather than 422) means the request itself could not be parsed.
@@ -1205,6 +3640,88 @@ export interface components {
          *     }
          */
         JsonElement: unknown;
+        /**
+         * @description The wire shape of a ClassLevel (spec 6.4.2, 6.4.9). One shape for both the list item
+         *     and the detail read — spec 6.4.9's `GET /levels/{id}` adds no field beyond what the list
+         *     already carries (no arm counts: that is TASK-0039).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *       "name": "Primary 1",
+         *       "sectionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "section": "Primary",
+         *       "progressionOrder": 4,
+         *       "nextLevelId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47",
+         *       "isEntryLevel": false,
+         *       "isGraduatingLevel": false,
+         *       "status": "Active"
+         *     }
+         */
+        LevelDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46
+             */
+            id: string;
+            /**
+             * @description 2..40 characters.
+             * @example Primary 1
+             */
+            name: string;
+            /**
+             * @description Opaque identifier of the owning section — supply this back on a write.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sectionId: string;
+            /**
+             * @description The section's CURRENT name, denormalised for display (spec 6.4.2's own field is a plain FK; this
+             *     is a read convenience so a level list does not force N+1 lookups against a two-row admin-editable
+             *     register). Cross the wire as a string (§8): admin-editable, open-ended, tolerate any value.
+             * @example Primary
+             */
+            section: string;
+            /**
+             * Format: int32
+             * @description 1 upward, unique across active levels.
+             * @example 4
+             */
+            progressionOrder: number | string;
+            /**
+             * @description `null` only on the graduating level.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d47
+             */
+            nextLevelId: null | string;
+            /**
+             * @description Derived, never stored (spec 6.4.2) — computed over the active set at read time.
+             * @example false
+             */
+            isEntryLevel: boolean;
+            /**
+             * @description Derived, never stored (spec 6.4.2) — computed over the active set at read time.
+             * @example false
+             */
+            isGraduatingLevel: boolean;
+            /** @description active or inactive. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["LevelStatus"];
+        };
+        /**
+         * @description A ClassLevel's status (spec 6.4.2). Defaults LevelStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        LevelStatus: "Active" | "Inactive";
+        /**
+         * @description The response to NextArmLabelQuery.
+         * @example {
+         *       "label": "C"
+         *     }
+         */
+        NextArmLabelResponse: {
+            /**
+             * @description The suggested next label. Pre-filled and editable — not reserved by asking.
+             * @example C
+             */
+            label: string;
+        };
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
          *     frontend write a single generic paging hook instead of one per endpoint.
@@ -1306,6 +3823,37 @@ export interface components {
              */
             apiVersion: string;
         };
+        /**
+         * @description `POST /api/v1/subject-mappings/prefill` (TASK-0070 delta amendment 5, human-ruled
+         *             2026-09-16 — not in spec 6.6.9's own endpoint list). Applies the school's standard 14/19 subject
+         *             list to a named term using the per-section sheet order (spec appendices E and F) as
+         *             `display_order`. Additive only — can never end a mapping — and never duplicates an existing
+         *             active one. Requires `subject.map` only; `subject.unmap` is never demanded because this
+         *             action cannot end anything.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "dryRun": true
+         *     }
+         */
+        PrefillSubjectMappingsCommand: {
+            /**
+             * @description The term to prefill.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing. The closed-term refusal applies here too.
+             * @example true
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description Which position is printed as "Position in Class" (spec 6.2.8). Stored as a string
+         *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
+         * @example Arm
+         * @enum {unknown}
+         */
+        PrimaryPositionScope: "Arm" | "Level";
         /**
          * @description One row of the privilege register (spec 4.4).
          * @example {
@@ -1447,6 +3995,242 @@ export interface components {
             lockedUntil?: string;
         };
         /**
+         * @description The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates
+         *     all use this one DTO — 6.5.15's extra detail-view sections (contacts, health, enrolment history)
+         *     and list-view completeness column do not exist yet (see the task card's own out-of-scope list),
+         *     so there is nothing today that would make a Summary/Detail split carry different fields.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "registrationNumber": null,
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": "Ngozi",
+         *       "sex": "Female",
+         *       "dateOfBirth": "2020-05-03",
+         *       "ageYears": 6,
+         *       "nationality": "Nigerian",
+         *       "stateOfOrigin": "Anambra",
+         *       "lga": "Awka South",
+         *       "homeAddress": "14 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "status": "Pending",
+         *       "otherInformation": null,
+         *       "matchedField": null,
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "createdBy": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "admission": {
+         *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *         "dateApplicationReceived": "2026-08-01",
+         *         "dateAdmitted": "2026-09-08",
+         *         "classAdmittedInto": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d30",
+         *         "classAdmittedIntoName": "Primary 2",
+         *         "admissionType": "New",
+         *         "admissionTypeNote": null,
+         *         "assessmentRequired": false,
+         *         "assessmentResultRemarks": null,
+         *         "assignedClassTeacher": null,
+         *         "declarationName": "Chinwe Okafor",
+         *         "declarationSigned": true,
+         *         "declarationDate": "2026-09-08",
+         *         "approvedBy": null,
+         *         "approvedAt": null,
+         *         "headOfSchoolConfirmed": false,
+         *         "headOfSchoolName": null
+         *       },
+         *       "levelAppliedFor": "Primary 2",
+         *       "dateApplicationReceived": "2026-08-01",
+         *       "missing": [
+         *         "Declaration (Section I)"
+         *       ]
+         *     }
+         */
+        PupilDto: {
+            /**
+             * @description Opaque to the client.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /** @description `null` while pending — always null within this card. */
+            registrationNumber: null | string;
+            /**
+             * @description As typed (spec 6.5.4: displayed uppercase only on the result sheet, out of scope here).
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description As typed.
+             * @example Chidera
+             */
+            firstName: string;
+            /**
+             * @description `null` when not supplied.
+             * @example Ngozi
+             */
+            middleName: null | string;
+            /** @description Male or female. */
+            sex: components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description ISO-8601 date.
+             * @example 2020-05-03
+             */
+            dateOfBirth: string;
+            /**
+             * Format: int32
+             * @description Derived, not stored — whole years as of today (spec 6.5.4's term-end computation is result-sheet-specific and out of scope; see `backend/docs/ASSUMPTIONS.md` §2.27).
+             * @example 6
+             */
+            ageYears: number | string;
+            /**
+             * @description Free text; defaults `Nigerian`.
+             * @example Nigerian
+             */
+            nationality: string;
+            /**
+             * @description One of the 36 states or the FCT.
+             * @example Anambra
+             */
+            stateOfOrigin: string;
+            /**
+             * @description One of string PupilDto.StateOfOrigin's Local Government Areas.
+             * @example Awka South
+             */
+            lga: string;
+            /**
+             * @description The child's own address.
+             * @example 14 Zik Avenue, Awka
+             */
+            homeAddress: string;
+            /** @description `null` when not supplied. */
+            previousSchool: null | string;
+            /** @description `null` when not supplied. */
+            previousClass: null | string;
+            /** @description Pending for every record this card creates; the other members exist for the column's shape only. */
+            status: components["schemas"]["PupilStatus"];
+            /** @description `null` when not supplied. */
+            otherInformation: null | string;
+            /**
+             * @description Which field a search term matched (`"Surname"`, `"FirstName"`, `"MiddleName"` or
+             *     `"RegistrationNumber"`), or `null` when no search term was given. Contact and
+             *     authorised-pickup-person search (spec 6.5.15) are the NEXT card's — never a value here.
+             */
+            matchedField: null | string;
+            /**
+             * Format: date-time
+             * @description System.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+            /**
+             * @description The admin account id that created the record, or `null`.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            createdBy: null | string;
+            admission?: null | components["schemas"]["AdmissionRecordDto"];
+            /**
+             * @description The admission record's `class_admitted_into` display name. Populated ONLY by the admissions
+             *     queue (TASK-0062; spec 6.5.15's queue column) — `null` everywhere else.
+             * @example Primary 2
+             */
+            levelAppliedFor?: null | string;
+            /**
+             * Format: date
+             * @description The admission record's own field, lifted onto the row for the admissions queue (TASK-0062; spec
+             *     6.5.15). Populated ONLY by the admissions queue — `null` everywhere else.
+             * @example 2026-08-01
+             */
+            dateApplicationReceived?: null | string;
+            /**
+             * @description The admissions queue's own "what is missing" column (TASK-0062; spec 6.5.11 step 9, 6.5.15).
+             *     Restricted to what sections A and I's stored fields can check today: steps 2 to 8 (contacts,
+             *     health, barred persons, pickup persons, documents) have no entity yet, so a gap there can never
+             *     appear here — a known, recorded limitation, not a claim of completeness. Populated ONLY by the
+             *     admissions queue — `null` everywhere else.
+             * @example [
+             *       "Declaration (Section I)"
+             *     ]
+             */
+            missing?: null | string[];
+        };
+        /**
+         * @description A Pupil's sex (spec 6.5.4). Required, no default.
+         * @example Female
+         * @enum {unknown}
+         */
+        PupilSex: "Male" | "Female";
+        /**
+         * @description A Pupil's status (spec 6.5.4, 6.5.14). Defaults PupilStatus.Pending.
+         * @example Pending
+         * @enum {unknown}
+         */
+        PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
+        /**
+         * @description The response body of GetRegNumberPreviewQuery.
+         * @example {
+         *       "preview": "GRAS/2026/0040"
+         *     }
+         */
+        RegNumberPreviewDto: {
+            /**
+             * @description The full registration number that would be issued right now under the supplied unsaved
+             *     parameters, for example `GRAS/2026/0041`. Uses the next serial that would actually be
+             *     issued — with an empty register that is serial 1.
+             * @example GRAS/2026/0040
+             */
+            preview: string;
+        };
+        /**
+         * @description How the registration-number serial resets (spec 6.2.4, 6.5.10). Stored as a string
+         *     (`SchoolProfileConfiguration.HasConversion&lt;string&gt;()`), so a future member is a
+         *     code-only change.
+         * @example PerYear
+         * @enum {unknown}
+         */
+        RegNumberSerialReset: "PerYear" | "Continuous";
+        /**
+         * @description `POST /api/v1/terms/{id}/reopen` (spec 6.3.6): Super Admin only, a reason of at least
+         *             int Term.ReopenReasonMinLength characters, refused outright if the following term has
+         *             already been opened.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "reason": "A mark was entered against the wrong subject and discovered after publication."
+         *     }
+         */
+        ReopenTermCommand: {
+            /**
+             * Format: uuid
+             * @description The closed term being reopened.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description At least 10 characters — spec 6.3.6's audit trail for why marks moved after close.
+             * @example A mark was entered against the wrong subject and discovered after publication.
+             */
+            reason: string;
+        };
+        /**
+         * @description `POST /api/v1/levels/reorder` (spec 6.4.2, 6.4.9): "Whole ordered array of level ids. Atomic.
+         *             Rewrites progressionOrder and infers nextLevelId from adjacency." Used by the drag-and-drop list.
+         * @example {
+         *       "orderedLevelIds": [
+         *         "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+         *         "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+         *       ]
+         *     }
+         */
+        ReorderLevelsCommand: {
+            /**
+             * @description Every currently ACTIVE level's id, in the new order. No duplicates.
+             * @example [
+             *       "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d46",
+             *       "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+             *     ]
+             */
+            orderedLevelIds: string[];
+        };
+        /**
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -1466,6 +4250,210 @@ export interface components {
              */
             temporaryPassword: null | string;
         };
+        /**
+         * @description `POST /api/v1/settings/grading/reset` (spec 6.2.5: "a Reset to defaults action requiring
+         *             `settings.reset.defaults`... restores the six [now nine, 6.2.13] seeded bands. The reset confirms
+         *             first, naming what will be lost, and writes an audit event."). The confirmation dialogue itself is
+         *             frontend scope; this endpoint is what it calls once the administrator confirms.
+         * @example {
+         *       "expectedVersion": 3,
+         *       "reason": null
+         *     }
+         */
+        ResetGradingCommand: {
+            /**
+             * Format: int32
+             * @description The grading group's current `versionNumber`, as last read from `GET /settings`. A stale
+             *     value is rejected `409 settings.grading.stale_version` before anything is written.
+             * @example 3
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9 — 6.2.11: "Reset to defaults while results are published: Allowed, treated as an
+             *     ordinary edit under 6.2.9"); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks.
+             */
+            reason: null | string;
+        };
+        /**
+         * @description The result-rules wire shape (spec 6.2.8) — both `GET /api/v1/settings/result-rules`'s
+         *     success body and `PUT /api/v1/settings/result-rules`'s success body.
+         * @example {
+         *       "annualMethod": "SimpleAverage",
+         *       "weightFirst": null,
+         *       "weightSecond": null,
+         *       "weightThird": null,
+         *       "primaryPositionScope": "Arm",
+         *       "showLevelPosition": true,
+         *       "tieBreakRule": "SharedPosition",
+         *       "passMark": 40,
+         *       "promotionThreshold": 40,
+         *       "requireCorePass": true,
+         *       "coreSubjectIds": [],
+         *       "minSubjectsForPosition": 1,
+         *       "versionNumber": 0
+         *     }
+         */
+        ResultRulesDto: {
+            /** @description Simple average or weighted. */
+            annualMethod: components["schemas"]["AnnualMethod"];
+            /**
+             * Format: int32
+             * @description Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100.
+             */
+            weightFirst: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightSecond: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightThird: null | number | string;
+            /** @description Which position prints as Position in Class: arm or level. */
+            primaryPositionScope: components["schemas"]["PrimaryPositionScope"];
+            /**
+             * @description Whether a second, level-wide position line prints alongside the arm position.
+             * @example true
+             */
+            showLevelPosition: boolean;
+            /** @description How a tied position is broken. */
+            tieBreakRule: components["schemas"]["TieBreakRule"];
+            /**
+             * Format: int32
+             * @description 0 to 100. A subject total at or above this is a pass.
+             * @example 40
+             */
+            passMark: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100. Annual average at or above this proposes promotion.
+             * @example 40
+             */
+            promotionThreshold: number | string;
+            /**
+             * @description When true, promotion also requires a pass in every core subject.
+             * @example true
+             */
+            requireCorePass: boolean;
+            /**
+             * @description Required non-empty when RequireCorePass is true. Every id an existing active subject.
+             * @example []
+             */
+            coreSubjectIds: string[];
+            /**
+             * Format: int32
+             * @description A pupil with fewer scored subjects than this is excluded from position ranking.
+             * @example 1
+             */
+            minSubjectsForPosition: number | string;
+            /**
+             * Format: int32
+             * @description The result-rules group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description A ResultSet's lifecycle state (spec 09 §6.7.11). A result set that does not exist
+         *     yet is shown in the interface as "Not started" — the absence of a row, not a member of this enum.
+         * @example Draft
+         * @enum {unknown}
+         */
+        ResultSetState: "Draft" | "AwaitingApproval" | "Approved" | "Published" | "ReturnedForCorrection" | "Withdrawn";
+        /**
+         * @description The arm's result set as it stands, or `null` when none exists yet ("Not started").
+         * @example {
+         *       "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "state": "Draft",
+         *       "needsRecompute": true
+         *     }
+         */
+        ResultSetSummaryDto: {
+            /**
+             * @description The result set's id.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            id: string;
+            /** @description Spec 6.7.11's six-member state machine. */
+            state: components["schemas"]["ResultSetState"];
+            /**
+             * @description Whether the computed rows are stale.
+             * @example true
+             */
+            needsRecompute: boolean;
+        };
+        /**
+         * @description Wire shape of a RoleAssignment (spec 6.1.5).
+         * @example {
+         *       "id": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+         *       "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "roleId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "scopeType": "ArmList",
+         *       "armIds": [
+         *         "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+         *       ],
+         *       "grantedBy": "0192f0c4-d183-7f60-e472-8030af1b6295",
+         *       "status": "Active",
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        RoleAssignmentDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51
+             */
+            id: string;
+            /**
+             * @description The account this assignment grants a role to.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            adminAccountId: string;
+            /**
+             * @description The role granted.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            roleId: string;
+            /**
+             * @description The session this assignment applies to, or `null` only for the sessionless Super
+             *     Admin assignment — TASK-0030 never actually produces that case (see RoleAssignment's
+             *     remarks) but the wire shape stays honest to the entity rather than asserting non-null.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: null | string;
+            /** @description Either `SchoolWide` or `ArmList`. */
+            scopeType: components["schemas"]["ScopeType"];
+            /**
+             * @description Non-empty only when ScopeType is `ArmList`.
+             * @example [
+             *       "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+             *     ]
+             */
+            armIds: string[];
+            /**
+             * @description The acting account that created this assignment.
+             * @example 0192f0c4-d183-7f60-e472-8030af1b6295
+             */
+            grantedBy: string;
+            /** @description Either `Active` or `Revoked`. */
+            status: components["schemas"]["RoleAssignmentStatus"];
+            /**
+             * Format: date-time
+             * @description When this assignment was created.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            createdAtUtc: string;
+        };
+        /**
+         * @description Lifecycle of a RoleAssignment (spec 6.1.5).
+         * @example Active
+         * @enum {unknown}
+         */
+        RoleAssignmentStatus: "Active" | "Revoked";
         /**
          * @description The wire shape of a role (spec 6.1.4; approved delta `.agent/decisions/2026-Q3-contract-deltas.md`
          *     entry `TASK-0028` §2). Returned by every role endpoint — create, get, list (as the item
@@ -1569,12 +4557,470 @@ export interface components {
             modifiedAtUtc: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/score-sheets` (spec 6.7.4; TASK-0076's approved contract delta) —
+         *             whole-sheet save, one transaction. The first save for an arm/term creates the result set (Draft).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *           },
+         *           "examMark": 55,
+         *           "examAbsent": false
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+         *           },
+         *           "examMark": null,
+         *           "examAbsent": false
+         *         }
+         *       ]
+         *     }
+         */
+        SaveScoreSheetCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject this sheet is for.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The sheet's version as last read, or `null` for a sheet with no rows yet. A
+             *     mismatch against the server's current version is a 409 `score_sheet.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A row not present here is left untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *         },
+             *         "examMark": 55,
+             *         "examAbsent": false
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+             *         },
+             *         "examMark": null,
+             *         "examAbsent": false
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveScoreSheetRowInput"][];
+        };
+        /**
+         * @description One submitted row of SaveScoreSheetCommand (spec 6.7.4).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "componentMarks": {
+         *         "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *       },
+         *       "examMark": 55,
+         *       "examAbsent": false
+         *     }
+         */
+        SaveScoreSheetRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Every non-examination component id in the current assessment structure must be a key. A present
+             *     key with a `null` value is a blank cell — never an implicit zero. A missing key is
+             *     rejected (`component_missing`).
+             * @example {
+             *       "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *     }
+             */
+            componentMarks: null | {
+                [key: string]: null | number | string;
+            };
+            /**
+             * Format: int32
+             * @description `null` for a blank cell, or when ExamAbsent is true.
+             * @example 55
+             */
+            examMark: null | number | string;
+            /**
+             * @description True means the pupil did not sit the examination.
+             * @example false
+             */
+            examAbsent: boolean;
+        };
+        /**
+         * @description `PUT /api/v1/subject-mappings?term_id=` (spec 6.6.5, 6.6.9): "Whole-grid save. Atomic. Supports
+         *             dry_run returning the additions and endings summary." TASK-0070 delta amendment 2: requires
+         *             `Subject.Map` when the computed diff contains additions and `Subject.Unmap` when it
+         *             contains endings — both when it contains both, checked in the handler because it is data-dependent.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "entries": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "displayOrder": 1
+         *         }
+         *       ],
+         *       "dryRun": false
+         *     }
+         */
+        SaveSubjectMappingGridCommand: {
+            /**
+             * @description Bound from the `term_id` query string, not the body.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The FULL desired grid for this term — every entry not currently active becomes an addition; every currently active pair absent from this list becomes an ending.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "displayOrder": 1
+             *       }
+             *     ]
+             */
+            entries: components["schemas"]["SubjectMappingGridEntryInput"][];
+            /**
+             * @description When `true`, computes and returns the preview but writes nothing. Evaluated against the SAME privilege rule as a real save (delta amendment 2).
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
+         * @description The shared response envelope for `PUT /subject-mappings`, `POST /subject-mappings/copy`
+         *     and `POST /subject-mappings/prefill` (TASK-0070 delta amendment 5: "the same
+         *     `SaveSubjectMappingGridResponse` envelope as the grid save and copy") — spec 6.6.5's preview,
+         *     "This will add 12 mappings and end 2 mappings."
+         * @example {
+         *       "additions": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "subjectName": "Mathematics",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "classLevelName": "Primary 2"
+         *         }
+         *       ],
+         *       "endings": [],
+         *       "dryRun": false
+         *     }
+         */
+        SaveSubjectMappingGridResponse: {
+            /**
+             * @description Mappings added (or, under bool SaveSubjectMappingGridResponse.DryRun, previewed).
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "subjectName": "Mathematics",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "classLevelName": "Primary 2"
+             *       }
+             *     ]
+             */
+            additions: components["schemas"]["SubjectMappingChangeDto"][];
+            /**
+             * @description Mappings ended (or previewed). Always empty for `copy` and `prefill`.
+             * @example []
+             */
+            endings: components["schemas"]["SubjectMappingChangeDto"][];
+            /**
+             * @description Echoes the request's `dryRun` — `true` means nothing was written.
+             * @example false
+             */
+            dryRun: boolean;
+        };
+        /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
          *     or a list of specific arms in a specific session."
-         * @example SchoolWide
+         * @example ArmList
          * @enum {unknown}
          */
         ScopeType: "SchoolWide" | "ArmList";
+        /**
+         * @description One assessment-structure column on the sheet (spec 6.7.4): a non-examination component, or the examination itself.
+         * @example {
+         *       "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+         *       "label": "CA1",
+         *       "maxMark": 20
+         *     }
+         */
+        ScoreSheetComponentDto: {
+            /**
+             * @description The assessment component's id — also the key IReadOnlyDictionary&lt;string, int?&gt; ScoreSheetRowDto.ComponentMarks uses.
+             * @example 0192f0c4-6a1c-7869-7d6b-19c938bbe4e3
+             */
+            id: string;
+            /**
+             * @description The component's short label, for a tight column header (for example "CA1").
+             * @example CA1
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description The component's maximum mark, from settings. Never a literal.
+             * @example 20
+             */
+            maxMark: number | string;
+        };
+        /**
+         * @description One arm's score sheet for one subject and term (spec 6.7.4; TASK-0076's approved contract delta).
+         *     Departs from spec 6.7.13's `?arm_id=` query form — see the endpoint's own remarks.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "components": [
+         *         {
+         *           "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+         *           "label": "CA1",
+         *           "maxMark": 20
+         *         }
+         *       ],
+         *       "examination": {
+         *         "id": "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4",
+         *         "label": "Exam",
+         *         "maxMark": 60
+         *       },
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *           },
+         *           "examMark": 55,
+         *           "examAbsent": false,
+         *           "caTotal": 18,
+         *           "subjectTotal": 73
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "componentMarks": {
+         *             "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+         *           },
+         *           "examMark": null,
+         *           "examAbsent": false,
+         *           "caTotal": null,
+         *           "subjectTotal": null
+         *         }
+         *       ]
+         *     }
+         */
+        ScoreSheetDto: {
+            /**
+             * @description The arm this sheet belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject this sheet is for.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the rows the sheet covers (see `ScoreSheetVersion`).
+             *     `null` before any row exists. Send back unchanged on `PUT` to detect a
+             *     concurrent edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description Non-examination components only, in settings order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3",
+             *         "label": "CA1",
+             *         "maxMark": 20
+             *       }
+             *     ]
+             */
+            components: components["schemas"]["ScoreSheetComponentDto"][];
+            /** @description The examination column — always last, never in Components. */
+            examination: components["schemas"]["ScoreSheetComponentDto"];
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by marks.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *         },
+             *         "examMark": 55,
+             *         "examAbsent": false,
+             *         "caTotal": 18,
+             *         "subjectTotal": 73
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "componentMarks": {
+             *           "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": null
+             *         },
+             *         "examMark": null,
+             *         "examAbsent": false,
+             *         "caTotal": null,
+             *         "subjectTotal": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["ScoreSheetRowDto"][];
+        };
+        /**
+         * @description One pupil's row on the sheet (spec 6.7.4) — every active pupil in the arm, including one with no marks entered at all.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "componentMarks": {
+         *         "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+         *       },
+         *       "examMark": 55,
+         *       "examAbsent": false,
+         *       "caTotal": 18,
+         *       "subjectTotal": 73
+         *     }
+         */
+        ScoreSheetRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", for the row identity alongside RegistrationNumber.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description Component id to mark, `null` for a blank cell — never an implicit zero.
+             * @example {
+             *       "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3": 18
+             *     }
+             */
+            componentMarks: {
+                [key: string]: null | number | string;
+            };
+            /**
+             * Format: int32
+             * @description `null` when blank or when ExamAbsent is true.
+             * @example 55
+             */
+            examMark: null | number | string;
+            /**
+             * @description True when the pupil did not sit the examination.
+             * @example false
+             */
+            examAbsent: boolean;
+            /**
+             * Format: int32
+             * @description Sum of the non-examination components. `null` unless every one of them is filled.
+             * @example 18
+             */
+            caTotal: null | number | string;
+            /**
+             * Format: int32
+             * @description CaTotal plus the exam mark (or CaTotal alone if absent). `null` unless the row is complete.
+             * @example 73
+             */
+            subjectTotal: null | number | string;
+        };
+        /**
+         * @description The wire shape of a Section (spec 6.4.2, 6.4.9).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Primary"
+         *     }
+         */
+        SectionDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description 2..40 characters.
+             * @example Primary
+             */
+            name: string;
+        };
+        /**
+         * @description `GET /api/v1/sections`'s response (spec 6.4.9): "Not paged — a two-row seeded list a school
+         *             extends rarely," so this is a plain wrapped list, not a CursorPage&lt;TItem&gt; —
+         *             the same shape `PrivilegeRegisterResponse` uses for the other fixed, small register in this API.
+         * @example {
+         *       "sections": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+         *           "name": "Nursery"
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "name": "Primary"
+         *         }
+         *       ]
+         *     }
+         */
+        SectionListResponse: {
+            /**
+             * @description Every section, ordered by name.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
+             *         "name": "Nursery"
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "name": "Primary"
+             *       }
+             *     ]
+             */
+            sections: components["schemas"]["SectionDto"][];
+        };
         /**
          * @description The arm-scoped resource `GetSecureArm` returns once the privilege check passes.
          * @example {
@@ -1590,10 +5036,299 @@ export interface components {
             armId: string;
         };
         /**
-         * @description The response body of `GET /api/v1/settings`. Only SettingsIdentityGroupDto SettingsDto.Identity exists as of
-         *     TASK-0005a; TASK-0005b and TASK-0005c extend this same envelope additively with sibling groups
-         *     (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving endpoints rather
-         *     than a new top-level field, and registration-number/abbreviation get their own group here).
+         * @description The detail shape of a session (spec 6.3.8, 6.3.10): its own fields plus its three terms.
+         *     int SessionDetailDto.ArmCount was added by TASK-0039; arms grouped by level, enrolment counts and the
+         *     publication position stay deferred for the same reason as SessionDto — the promotion
+         *     panel is all of TASK-0036.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "state": "Active",
+         *       "armCount": 24,
+         *       "terms": [
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 1,
+         *           "name": "First Term",
+         *           "startDate": "2026-09-14",
+         *           "endDate": "2026-12-18",
+         *           "timesSchoolOpened": 62,
+         *           "nextResumptionDate": "2027-01-05",
+         *           "state": "Closed",
+         *           "closedAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 2,
+         *           "name": "Second Term",
+         *           "startDate": "2027-01-05",
+         *           "endDate": "2027-04-02",
+         *           "timesSchoolOpened": null,
+         *           "nextResumptionDate": "2027-04-20",
+         *           "state": "Active",
+         *           "closedAtUtc": null,
+         *           "closedBy": null
+         *         },
+         *         {
+         *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+         *           "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *           "ordinal": 3,
+         *           "name": "Third Term",
+         *           "startDate": "2027-04-20",
+         *           "endDate": "2027-07-25",
+         *           "timesSchoolOpened": null,
+         *           "nextResumptionDate": null,
+         *           "state": "Upcoming",
+         *           "closedAtUtc": null,
+         *           "closedBy": null
+         *         }
+         *       ]
+         *     }
+         */
+        SessionDetailDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            id: string;
+            /**
+             * @description `YYYY/YYYY`.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["SessionState"];
+            /**
+             * @description Exactly three, ordered by ordinal — a session is never created without them.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 1,
+             *         "name": "First Term",
+             *         "startDate": "2026-09-14",
+             *         "endDate": "2026-12-18",
+             *         "timesSchoolOpened": 62,
+             *         "nextResumptionDate": "2027-01-05",
+             *         "state": "Closed",
+             *         "closedAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "closedBy": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d42"
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d43",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 2,
+             *         "name": "Second Term",
+             *         "startDate": "2027-01-05",
+             *         "endDate": "2027-04-02",
+             *         "timesSchoolOpened": null,
+             *         "nextResumptionDate": "2027-04-20",
+             *         "state": "Active",
+             *         "closedAtUtc": null,
+             *         "closedBy": null
+             *       },
+             *       {
+             *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d44",
+             *         "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+             *         "ordinal": 3,
+             *         "name": "Third Term",
+             *         "startDate": "2027-04-20",
+             *         "endDate": "2027-07-25",
+             *         "timesSchoolOpened": null,
+             *         "nextResumptionDate": null,
+             *         "state": "Upcoming",
+             *         "closedAtUtc": null,
+             *         "closedBy": null
+             *       }
+             *     ]
+             */
+            terms: components["schemas"]["TermDto"][];
+            /**
+             * Format: int32
+             * @description The number of arms (any status) that exist for this session (spec 6.3.8).
+             * @example 24
+             */
+            armCount: number | string;
+        };
+        /**
+         * @description The list-item shape of a session (spec 6.3.8). int SessionDto.ArmCount was added by TASK-0039, now
+         *     that `Arm` exists; enrolled-pupil and publication counts stay absent — spec 6.3.8 asks for
+         *     them too, but Pupil and result sets do not exist in this codebase yet, and this module ships
+         *     nothing it cannot populate honestly (never a fabricated `0`). See TASK-0035's Log for the
+         *     original deferral and TASK-0039's Log for the arm half landing.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-25",
+         *       "state": "Upcoming",
+         *       "armCount": 0
+         *     }
+         */
+        SessionDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d41
+             */
+            id: string;
+            /**
+             * @description `YYYY/YYYY`.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the first named year.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Inside the second named year.
+             * @example 2027-07-25
+             */
+            endDate: string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["SessionState"];
+            /**
+             * Format: int32
+             * @description The number of arms (any status) that exist for this session (spec 6.3.8).
+             * @example 0
+             */
+            armCount: number | string;
+        };
+        /**
+         * @description Lifecycle of an AcademicSession (spec 6.3.3). Only one session system-wide may be
+         *     SessionState.Active — enforced by a partial unique index (spec 6.3.9), not application code.
+         * @example Active
+         * @enum {unknown}
+         */
+        SessionState: "Upcoming" | "Active" | "Closed";
+        /**
+         * @description The abbreviation group, both inside SettingsDto and as
+         *     `PATCH /api/v1/settings/abbreviation`'s own success body (spec 6.2.4).
+         * @example {
+         *       "abbreviation": "GRAS",
+         *       "issuedCount": null,
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsAbbreviationGroupDto: {
+            /**
+             * @description 2 to 8 characters. Frozen into every registration number issued from now on.
+             * @example GRAS
+             */
+            abbreviation: string;
+            /**
+             * Format: int32
+             * @description How many issued registration numbers currently begin with string SettingsAbbreviationGroupDto.Abbreviation — the count
+             *     spec 6.2.4's confirmation dialogue names before an admin types `CHANGE`. A real, live count
+             *     as of TASK-0051 (wired from `IPupilRepository.CountByRegistrationNumberPrefixAsync`); genuinely
+             *     `0` now means zero pupils hold it, not "uncounted". Kept nullable for wire compatibility with
+             *     TASK-0005c's shape, though no code path produces `null` any more.
+             */
+            issuedCount: null | number | string;
+            /**
+             * Format: int32
+             * @description The abbreviation group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next `PATCH`.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description The assessment-structure group, both inside SettingsDto and as
+         *     `PUT /api/v1/settings/assessment`'s own success body (spec 6.2.6).
+         * @example {
+         *       "components": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+         *           "name": "1st CA",
+         *           "shortLabel": "CA1",
+         *           "maxMark": 20,
+         *           "isExamination": false,
+         *           "displayOrder": 1
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+         *           "name": "2nd CA",
+         *           "shortLabel": "CA2",
+         *           "maxMark": 20,
+         *           "isExamination": false,
+         *           "displayOrder": 2
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+         *           "name": "Exam",
+         *           "shortLabel": "EXAM",
+         *           "maxMark": 60,
+         *           "isExamination": true,
+         *           "displayOrder": 3
+         *         }
+         *       ],
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsAssessmentGroupDto: {
+            /**
+             * @description Every component, ordered by `displayOrder` (examination last).
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+             *         "name": "1st CA",
+             *         "shortLabel": "CA1",
+             *         "maxMark": 20,
+             *         "isExamination": false,
+             *         "displayOrder": 1
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+             *         "name": "2nd CA",
+             *         "shortLabel": "CA2",
+             *         "maxMark": 20,
+             *         "isExamination": false,
+             *         "displayOrder": 2
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+             *         "name": "Exam",
+             *         "shortLabel": "EXAM",
+             *         "maxMark": 60,
+             *         "isExamination": true,
+             *         "displayOrder": 3
+             *       }
+             *     ]
+             */
+            components: components["schemas"]["AssessmentComponentDto"][];
+            /**
+             * Format: int32
+             * @description The assessment group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
+         * @description The response body of `GET /api/v1/settings`. TASK-0005b extends this same envelope
+         *     additively (logo/signature are read through SettingsIdentityGroupDto SettingsDto.Identity's own follow-up serving
+         *     endpoints rather than a new top-level field here).
          * @example {
          *       "identity": {
          *         "schoolName": "Golden Royal Ark School",
@@ -1605,12 +5340,307 @@ export interface components {
          *         "headTeacherName": "Chisom Maxwell",
          *         "timezone": "Africa/Lagos",
          *         "versionNumber": 3
+         *       },
+         *       "abbreviation": {
+         *         "abbreviation": "GRAS",
+         *         "issuedCount": null,
+         *         "versionNumber": 0
+         *       },
+         *       "regNumber": {
+         *         "separator": "/",
+         *         "serialWidth": 4,
+         *         "serialReset": "PerYear",
+         *         "yearSource": "AdmissionYear",
+         *         "versionNumber": 0
+         *       },
+         *       "grading": {
+         *         "bands": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+         *             "lowerBound": 90,
+         *             "upperBound": 100,
+         *             "gradeLetter": "A+",
+         *             "remark": "Very excellent",
+         *             "displayOrder": 1
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+         *             "lowerBound": 85,
+         *             "upperBound": 89,
+         *             "gradeLetter": "A",
+         *             "remark": "Excellent",
+         *             "displayOrder": 2
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+         *             "lowerBound": 75,
+         *             "upperBound": 84,
+         *             "gradeLetter": "B",
+         *             "remark": "Very good",
+         *             "displayOrder": 3
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+         *             "lowerBound": 70,
+         *             "upperBound": 74,
+         *             "gradeLetter": "B-",
+         *             "remark": "Good",
+         *             "displayOrder": 4
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+         *             "lowerBound": 60,
+         *             "upperBound": 69,
+         *             "gradeLetter": "C+",
+         *             "remark": "Average",
+         *             "displayOrder": 5
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+         *             "lowerBound": 50,
+         *             "upperBound": 59,
+         *             "gradeLetter": "C",
+         *             "remark": "Fair",
+         *             "displayOrder": 6
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+         *             "lowerBound": 40,
+         *             "upperBound": 49,
+         *             "gradeLetter": "D",
+         *             "remark": "More effort",
+         *             "displayOrder": 7
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+         *             "lowerBound": 20,
+         *             "upperBound": 39,
+         *             "gradeLetter": "E",
+         *             "remark": "Not Now",
+         *             "displayOrder": 8
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+         *             "lowerBound": 0,
+         *             "upperBound": 19,
+         *             "gradeLetter": "F",
+         *             "remark": "Fail",
+         *             "displayOrder": 9
+         *           }
+         *         ],
+         *         "versionNumber": 0
+         *       },
+         *       "assessment": {
+         *         "components": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+         *             "name": "1st CA",
+         *             "shortLabel": "CA1",
+         *             "maxMark": 20,
+         *             "isExamination": false,
+         *             "displayOrder": 1
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+         *             "name": "2nd CA",
+         *             "shortLabel": "CA2",
+         *             "maxMark": 20,
+         *             "isExamination": false,
+         *             "displayOrder": 2
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+         *             "name": "Exam",
+         *             "shortLabel": "EXAM",
+         *             "maxMark": 60,
+         *             "isExamination": true,
+         *             "displayOrder": 3
+         *           }
+         *         ],
+         *         "versionNumber": 0
          *       }
          *     }
          */
         SettingsDto: {
             /** @description The school identity group. */
             identity: components["schemas"]["SettingsIdentityGroupDto"];
+            /** @description The registration-number abbreviation group. */
+            abbreviation: components["schemas"]["SettingsAbbreviationGroupDto"];
+            /** @description The registration-number pattern group. */
+            regNumber: components["schemas"]["SettingsRegNumberGroupDto"];
+            /** @description The grading-scale group (TASK-0069). */
+            grading: components["schemas"]["SettingsGradingGroupDto"];
+            /** @description The assessment-structure group (TASK-0069). */
+            assessment: components["schemas"]["SettingsAssessmentGroupDto"];
+        };
+        /**
+         * @description The grading-scale group, both inside SettingsDto and as
+         *     `PUT /api/v1/settings/grading`'s / `POST /api/v1/settings/grading/reset`'s own success
+         *     body (spec 6.2.5).
+         * @example {
+         *       "bands": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+         *           "lowerBound": 90,
+         *           "upperBound": 100,
+         *           "gradeLetter": "A+",
+         *           "remark": "Very excellent",
+         *           "displayOrder": 1
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+         *           "lowerBound": 85,
+         *           "upperBound": 89,
+         *           "gradeLetter": "A",
+         *           "remark": "Excellent",
+         *           "displayOrder": 2
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+         *           "lowerBound": 75,
+         *           "upperBound": 84,
+         *           "gradeLetter": "B",
+         *           "remark": "Very good",
+         *           "displayOrder": 3
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+         *           "lowerBound": 70,
+         *           "upperBound": 74,
+         *           "gradeLetter": "B-",
+         *           "remark": "Good",
+         *           "displayOrder": 4
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+         *           "lowerBound": 60,
+         *           "upperBound": 69,
+         *           "gradeLetter": "C+",
+         *           "remark": "Average",
+         *           "displayOrder": 5
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+         *           "lowerBound": 50,
+         *           "upperBound": 59,
+         *           "gradeLetter": "C",
+         *           "remark": "Fair",
+         *           "displayOrder": 6
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+         *           "lowerBound": 40,
+         *           "upperBound": 49,
+         *           "gradeLetter": "D",
+         *           "remark": "More effort",
+         *           "displayOrder": 7
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+         *           "lowerBound": 20,
+         *           "upperBound": 39,
+         *           "gradeLetter": "E",
+         *           "remark": "Not Now",
+         *           "displayOrder": 8
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+         *           "lowerBound": 0,
+         *           "upperBound": 19,
+         *           "gradeLetter": "F",
+         *           "remark": "Fail",
+         *           "displayOrder": 9
+         *         }
+         *       ],
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsGradingGroupDto: {
+            /**
+             * @description Every band, ordered by `displayOrder`.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6001",
+             *         "lowerBound": 90,
+             *         "upperBound": 100,
+             *         "gradeLetter": "A+",
+             *         "remark": "Very excellent",
+             *         "displayOrder": 1
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6002",
+             *         "lowerBound": 85,
+             *         "upperBound": 89,
+             *         "gradeLetter": "A",
+             *         "remark": "Excellent",
+             *         "displayOrder": 2
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6003",
+             *         "lowerBound": 75,
+             *         "upperBound": 84,
+             *         "gradeLetter": "B",
+             *         "remark": "Very good",
+             *         "displayOrder": 3
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6004",
+             *         "lowerBound": 70,
+             *         "upperBound": 74,
+             *         "gradeLetter": "B-",
+             *         "remark": "Good",
+             *         "displayOrder": 4
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6005",
+             *         "lowerBound": 60,
+             *         "upperBound": 69,
+             *         "gradeLetter": "C+",
+             *         "remark": "Average",
+             *         "displayOrder": 5
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6006",
+             *         "lowerBound": 50,
+             *         "upperBound": 59,
+             *         "gradeLetter": "C",
+             *         "remark": "Fair",
+             *         "displayOrder": 6
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6007",
+             *         "lowerBound": 40,
+             *         "upperBound": 49,
+             *         "gradeLetter": "D",
+             *         "remark": "More effort",
+             *         "displayOrder": 7
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6008",
+             *         "lowerBound": 20,
+             *         "upperBound": 39,
+             *         "gradeLetter": "E",
+             *         "remark": "Not Now",
+             *         "displayOrder": 8
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6009",
+             *         "lowerBound": 0,
+             *         "upperBound": 19,
+             *         "gradeLetter": "F",
+             *         "remark": "Fail",
+             *         "displayOrder": 9
+             *       }
+             *     ]
+             */
+            bands: components["schemas"]["GradingBandDto"][];
+            /**
+             * Format: int32
+             * @description The grading group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next save.
+             * @example 0
+             */
+            versionNumber: number | string;
         };
         /**
          * @description The school identity group, both inside SettingsDto and as
@@ -1677,6 +5707,45 @@ export interface components {
             versionNumber: number | string;
         };
         /**
+         * @description The registration-number pattern group, both inside SettingsDto and as
+         *     `PATCH /api/v1/settings/reg-number`'s own success body (spec 6.2.4).
+         * @example {
+         *       "separator": "/",
+         *       "serialWidth": 4,
+         *       "serialReset": "PerYear",
+         *       "yearSource": "AdmissionYear",
+         *       "versionNumber": 0
+         *     }
+         */
+        SettingsRegNumberGroupDto: {
+            /**
+             * @description One of `/`, `-`, `.`.
+             * @example /
+             */
+            separator: string;
+            /**
+             * Format: int32
+             * @description 3 to 6. Serials are zero-padded to this width.
+             * @example 4
+             */
+            serialWidth: number | string;
+            /** @description Whether the serial restarts each admission year or runs continuously. */
+            serialReset: components["schemas"]["RegNumberSerialReset"];
+            /**
+             * @description Always `AdmissionYear` — fixed, spec 6.2.4: "a number that changes meaning with the calendar
+             *     is not an identifier." No `PATCH` can change it.
+             * @example AdmissionYear
+             */
+            yearSource: string;
+            /**
+             * Format: int32
+             * @description The reg-number group's current optimistic-concurrency pointer. Echo this back as
+             *     `expectedVersion` on the next `PATCH`.
+             * @example 0
+             */
+            versionNumber: number | string;
+        };
+        /**
          * @description Signs an administrator in (spec 6.1.11, spec 9.1). Approved contract delta:
          *     `POST /api/v1/auth/sign-in`.
          * @example {
@@ -1701,6 +5770,451 @@ export interface components {
              * @example correct horse battery staple 9
              */
             password: string;
+        };
+        /**
+         * @description The wire shape of a Subject (spec 6.6.2, 6.6.7, 6.6.9).
+         * @example {
+         *       "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": "Mathematics",
+         *       "code": null,
+         *       "description": null,
+         *       "status": "Active",
+         *       "mappedLevelCount": 6,
+         *       "armExceptionCount": 1,
+         *       "pupilsTakingCount": 182
+         *     }
+         */
+        SubjectDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            id: string;
+            /**
+             * @description Unique, case-insensitive.
+             * @example Mathematics
+             */
+            name: string;
+            /** @description `null` when not supplied (the seed's own state — TASK-0070 delta amendment 1). */
+            code: null | string;
+            /** @description Free text, for the administrator's benefit only. Never printed. */
+            description: null | string;
+            /** @description active or inactive. The client tolerates an unknown member (§8). */
+            status: components["schemas"]["SubjectStatus"];
+            /**
+             * Format: int32
+             * @description Number of levels this subject is actively mapped to in the requested term. `null`
+             *     when the request carried no `termId` — TASK-0070 delta amendment 3: this endpoint never
+             *     guesses a term.
+             * @example 6
+             */
+            mappedLevelCount: null | number | string;
+            /**
+             * Format: int32
+             * @description `null` under the same condition as MappedLevelCount.
+             * @example 1
+             */
+            armExceptionCount: null | number | string;
+            /**
+             * Format: int32
+             * @description `null` under the same condition as MappedLevelCount.
+             * @example 182
+             */
+            pupilsTakingCount: null | number | string;
+        };
+        /**
+         * @description The wire shape of a SubjectMappingException (spec 6.6.4, 6.6.9).
+         * @example {
+         *       "id": "0192f0c4-26d8-7465-3927-d585047719a0",
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-f3a5-7162-0694-a252d13e8417",
+         *       "subjectName": "French",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "mode": "Include",
+         *       "reason": "This arm runs a French club this term."
+         *     }
+         */
+        SubjectExceptionDto: {
+            /** @example 0192f0c4-26d8-7465-3927-d585047719a0 */
+            id: string;
+            /** @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184 */
+            armId: string;
+            /** @example 0192f0c4-f3a5-7162-0694-a252d13e8417 */
+            subjectId: string;
+            /** @example French */
+            subjectName: string;
+            /** @example 0192f0c4-15c7-7364-2816-c474f3608639 */
+            termId: string;
+            mode: components["schemas"]["SubjectExceptionMode"];
+            /** @example This arm runs a French club this term. */
+            reason: string;
+        };
+        /**
+         * @description A SubjectMappingException's mode (spec 6.6.4).
+         * @example Include
+         * @enum {unknown}
+         */
+        SubjectExceptionMode: "Include" | "Exclude";
+        /**
+         * @description One changed (subject, level) pair in a SaveSubjectMappingGridResponse preview or result.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "classLevelName": "Primary 2"
+         *     }
+         */
+        SubjectMappingChangeDto: {
+            /** @example 0192f0c4-e294-7061-f583-9141c02d7306 */
+            subjectId: string;
+            /** @example Mathematics */
+            subjectName: string;
+            /** @example 0192f0c4-04b6-7263-1705-b363e24f9528 */
+            classLevelId: string;
+            /** @example Primary 2 */
+            classLevelName: string;
+        };
+        /**
+         * @description Spec 6.6.5's "warning panel" row — one arm whose subject set diverges from its level, with the
+         *     exception counts driving it.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armDisplayName": "Primary 2C",
+         *       "includeCount": 1,
+         *       "excludeCount": 0
+         *     }
+         */
+        SubjectMappingGridArmExceptionSummaryDto: {
+            /** @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184 */
+            armId: string;
+            /** @example Primary 2C */
+            armDisplayName: string;
+            /**
+             * Format: int32
+             * @example 1
+             */
+            includeCount: number | string;
+            /**
+             * Format: int32
+             * @example 0
+             */
+            excludeCount: number | string;
+        };
+        /**
+         * @description One ticked (or untickable) cell of the grid, for one level under one subject row.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "mapped": true,
+         *       "displayOrder": 1
+         *     }
+         */
+        SubjectMappingGridCellDto: {
+            /**
+             * @description The column.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * @description Whether an active mapping exists for this (subject, level) pair in the requested term.
+             * @example true
+             */
+            mapped: boolean;
+            /**
+             * Format: int32
+             * @description `null` when bool SubjectMappingGridCellDto.Mapped is `false`.
+             * @example 1
+             */
+            displayOrder: null | number | string;
+        };
+        /**
+         * @description `GET /subject-mappings?term_id=`'s response (spec 6.6.5, 6.6.9): "the whole grid for a term:
+         *             levels, subjects, ticks, and the arm exception summary."
+         * @example {
+         *       "levels": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "classLevelName": "Primary 2",
+         *           "progressionOrder": 5
+         *         }
+         *       ],
+         *       "subjects": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "subjectName": "Mathematics",
+         *           "subjectCode": null,
+         *           "cells": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "mapped": true,
+         *               "displayOrder": 1
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "armExceptions": [
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armDisplayName": "Primary 2C",
+         *           "includeCount": 1,
+         *           "excludeCount": 0
+         *         }
+         *       ]
+         *     }
+         */
+        SubjectMappingGridDto: {
+            /**
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "classLevelName": "Primary 2",
+             *         "progressionOrder": 5
+             *       }
+             *     ]
+             */
+            levels: components["schemas"]["SubjectMappingGridLevelDto"][];
+            /**
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "subjectName": "Mathematics",
+             *         "subjectCode": null,
+             *         "cells": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "mapped": true,
+             *             "displayOrder": 1
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            subjects: components["schemas"]["SubjectMappingGridSubjectRowDto"][];
+            /**
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armDisplayName": "Primary 2C",
+             *         "includeCount": 1,
+             *         "excludeCount": 0
+             *       }
+             *     ]
+             */
+            armExceptions: components["schemas"]["SubjectMappingGridArmExceptionSummaryDto"][];
+        };
+        /**
+         * @description One ticked cell submitted to SaveSubjectMappingGridCommand.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "displayOrder": 1
+         *     }
+         */
+        SubjectMappingGridEntryInput: {
+            /**
+             * @description Must reference an active subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description Must reference an active level.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Row order of the subject on this level's result sheet (spec 6.6.3).
+             * @example 1
+             */
+            displayOrder: number | string;
+        };
+        /**
+         * @description One column header of the grid.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "classLevelName": "Primary 2",
+         *       "progressionOrder": 5
+         *     }
+         */
+        SubjectMappingGridLevelDto: {
+            /** @example 0192f0c4-04b6-7263-1705-b363e24f9528 */
+            classLevelId: string;
+            /** @example Primary 2 */
+            classLevelName: string;
+            /**
+             * Format: int32
+             * @example 5
+             */
+            progressionOrder: number | string;
+        };
+        /**
+         * @description One row of the grid — a subject and its tick against every active level.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "subjectName": "Mathematics",
+         *       "subjectCode": null,
+         *       "cells": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "mapped": true,
+         *           "displayOrder": 1
+         *         }
+         *       ]
+         *     }
+         */
+        SubjectMappingGridSubjectRowDto: {
+            /** @example 0192f0c4-e294-7061-f583-9141c02d7306 */
+            subjectId: string;
+            /** @example Mathematics */
+            subjectName: string;
+            subjectCode: null | string;
+            /**
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "mapped": true,
+             *         "displayOrder": 1
+             *       }
+             *     ]
+             */
+            cells: components["schemas"]["SubjectMappingGridCellDto"][];
+        };
+        /**
+         * @description How a subject reached an arm's resolved set (spec 6.6.4, `GET /arms/{id}/subjects`) — "each
+         *     row flagged as level-inherited or arm exception."
+         * @example LevelInherited
+         * @enum {unknown}
+         */
+        SubjectSourceKind: "LevelInherited" | "ArmException";
+        /**
+         * @description A Subject's status (spec 6.6.2). Defaults SubjectStatus.Active.
+         * @example Active
+         * @enum {unknown}
+         */
+        SubjectStatus: "Active" | "Inactive";
+        /**
+         * @description The wire shape of a term (spec 6.3.4), shared by every term-facing endpoint and nested inside
+         *     SessionDetailDto.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "sessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "ordinal": 1,
+         *       "name": "First Term",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2026-12-18",
+         *       "timesSchoolOpened": null,
+         *       "nextResumptionDate": "2027-01-05",
+         *       "state": "Upcoming",
+         *       "closedAtUtc": null,
+         *       "closedBy": null
+         *     }
+         */
+        TermDto: {
+            /**
+             * @description Opaque identifier.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description The owning session's id.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            sessionId: string;
+            /**
+             * Format: int32
+             * @description 1, 2 or 3. Immutable.
+             * @example 1
+             */
+            ordinal: number | string;
+            /**
+             * @description Editable label; logic keys off Ordinal, never this.
+             * @example First Term
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description Inside the session's range.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Later than StartDate.
+             * @example 2026-12-18
+             */
+            endDate: string;
+            /**
+             * Format: int32
+             * @description `null` while blank; 1..200 once set; immutable once closed.
+             */
+            timesSchoolOpened: null | number | string;
+            /**
+             * Format: date
+             * @description `null` until filled in.
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
+            /** @description upcoming, active or closed. The client tolerates an unknown member (§8). */
+            state: components["schemas"]["TermState"];
+            /**
+             * Format: date-time
+             * @description `null` unless State is closed.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            closedAtUtc: null | string;
+            /** @description The admin who closed it, or `null`. */
+            closedBy: null | string;
+        };
+        /**
+         * @description Lifecycle of a Term (spec 6.3.4, 6.3.6). Only one term system-wide may be
+         *     TermState.Active — enforced by a partial unique index (spec 6.3.9), not application code.
+         * @example Upcoming
+         * @enum {unknown}
+         */
+        TermState: "Upcoming" | "Active" | "Closed";
+        /**
+         * @description How a tied subject/annual total is broken for position ranking (spec 6.2.8). Stored as a string
+         *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
+         * @example SharedPosition
+         * @enum {unknown}
+         */
+        TieBreakRule: "SharedPosition" | "ExamThenCa" | "ExamThenAlphabetical";
+        /**
+         * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
+         *             string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: "the
+         *             save writes an audit event with a mandatory reason") — deliberately NO 10-character floor, unlike
+         *             6.2.9's grading/assessment/traits/trait-scale/result-rules family: 6.2.10 confirms the abbreviation
+         *             is never locked and never triggers that warning (approved delta, confirmed as proposed).
+         * @example {
+         *       "abbreviation": "GRA",
+         *       "confirmationToken": "CHANGE",
+         *       "reason": "The school shortened its registered trading name.",
+         *       "expectedVersion": 0
+         *     }
+         */
+        UpdateAbbreviationCommand: {
+            /**
+             * @description 2 to 8 characters. A value already used historically is allowed (spec 6.2.11).
+             * @example GRA
+             */
+            abbreviation: string;
+            /**
+             * @description Must equal the literal string `CHANGE`, typed by the administrator.
+             * @example CHANGE
+             */
+            confirmationToken: string;
+            /**
+             * @description Non-empty once trimmed. Capped but not floored — see `backend/docs/ASSUMPTIONS.md` for both
+             *     authored choices.
+             * @example The school shortened its registered trading name.
+             */
+            reason: string;
+            /**
+             * Format: int32
+             * @description The abbreviation group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.abbreviation.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
         };
         /**
          * @description `PATCH /api/v1/admins/{id}` (spec 6.1.9, 6.1.14, 6.1.7 rule 4). Two authorisation shapes
@@ -1745,6 +6259,567 @@ export interface components {
              *             event even though the request as a whole still fails.
              */
             isSuperAdmin: null | boolean;
+        };
+        /**
+         * @description `PATCH /api/v1/admissions/{id}` (spec 6.5.9, 6.5.11 steps 1 and 8-9's section A/I fields, and
+         *             section J). Id is the PUPIL id — the same identity `POST /pupils` (spec
+         *             6.5.17's step 1, built as `POST /pupils` under TASK-0050) returned, and the one the admissions
+         *             queue already lists rows by.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "sessionId": null,
+         *       "dateApplicationReceived": null,
+         *       "dateAdmitted": null,
+         *       "classAdmittedInto": null,
+         *       "admissionType": null,
+         *       "admissionTypeNote": null,
+         *       "assessmentRequired": null,
+         *       "assessmentResultRemarks": null,
+         *       "assignedClassTeacher": null,
+         *       "declarationName": "Chinwe Okafor",
+         *       "declarationSigned": true,
+         *       "declarationDate": "2026-09-08",
+         *       "headOfSchoolConfirmed": null,
+         *       "headOfSchoolName": null
+         *     }
+         */
+        UpdateAdmissionRecordCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil whose admission record is being edited. Supplied from the route, not the body.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /** @description Opaque id. Must reference an existing session. */
+            sessionId: null | string;
+            /**
+             * Format: date
+             * @description Not in the future.
+             */
+            dateApplicationReceived: null | string;
+            /**
+             * Format: date
+             * @description Not in the future.
+             */
+            dateAdmitted: null | string;
+            /** @description Opaque id. Must reference an existing, active class level. */
+            classAdmittedInto: null | string;
+            admissionType: null | components["schemas"]["AdmissionType"];
+            /** @description An empty string clears it. */
+            admissionTypeNote: null | string;
+            /** @description Whether an entrance assessment is required. */
+            assessmentRequired: null | boolean;
+            /** @description An empty string clears it. NOT required to save, even when AssessmentRequired is true (spec 6.5.9) — see Result AdmissionRecord.EnsureAssessmentResultRecordedIfRequired(). */
+            assessmentResultRemarks: null | string;
+            /** @description Opaque admin-account id as text; an empty string clears it. */
+            assignedClassTeacher: null | string;
+            /**
+             * @description An empty string clears it.
+             * @example Chinwe Okafor
+             */
+            declarationName: null | string;
+            /**
+             * @description Section I's tick. Setting this `false` also clears the record's declaration date.
+             * @example true
+             */
+            declarationSigned: null | boolean;
+            /**
+             * Format: date
+             * @description Required for the record to end up with bool? UpdateAdmissionRecordCommand.DeclarationSigned true; rejected while it is false.
+             * @example 2026-09-08
+             */
+            declarationDate: null | string;
+            /** @description Section J's second signature block. */
+            headOfSchoolConfirmed: null | boolean;
+            /** @description An empty string clears it. */
+            headOfSchoolName: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/arms/{id}` (spec 6.4.3, 6.4.9): "Label, capacity, form teacher, status." Every
+         *             field is independently optional — `null` leaves it unchanged, the same convention
+         *             `UpdateLevelCommand` established. Rejected outright against a closed arm (spec 6.4.7).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "label": null,
+         *       "capacity": 25,
+         *       "formTeacherAdminId": null,
+         *       "status": null
+         *     }
+         */
+        UpdateArmCommand: {
+            /**
+             * Format: uuid
+             * @description The arm being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. Must stay unique within the level and session. */
+            label: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged. 1..100.
+             * @example 25
+             */
+            capacity: null | number | string;
+            /**
+             * @description `null` to leave unchanged; an EMPTY string clears it. Setting this ADDITIONALLY
+             *             requires `arm.formteacher.assign`, beyond the `arm.update` this route requires.
+             */
+            formTeacherAdminId: null | string;
+            status: null | components["schemas"]["ArmStatus"];
+        };
+        /**
+         * @description `PUT /api/v1/settings/assessment` (spec 6.2.6, 6.2.12: "Whole structure as one array. Atomic.
+         *             Returns 409 when locked for the session."). A REPLACE with per-row IDENTITY preserved by
+         *             string? AssessmentComponentSaveRequest.Id — see that type's remarks for why this differs
+         *             from UpdateGradingCommand's blind replace.
+         * @example {
+         *       "components": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+         *           "name": "1st CA",
+         *           "shortLabel": "CA1",
+         *           "maxMark": 20,
+         *           "isExamination": false
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+         *           "name": "2nd CA",
+         *           "shortLabel": "CA2",
+         *           "maxMark": 20,
+         *           "isExamination": false
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+         *           "name": "Exam",
+         *           "shortLabel": "EXAM",
+         *           "maxMark": 60,
+         *           "isExamination": true
+         *         }
+         *       ],
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateAssessmentCommand: {
+            /**
+             * @description The whole structure, in the order it should print (examination forced last regardless of position — spec 6.2.6).
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6101",
+             *         "name": "1st CA",
+             *         "shortLabel": "CA1",
+             *         "maxMark": 20,
+             *         "isExamination": false
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6102",
+             *         "name": "2nd CA",
+             *         "shortLabel": "CA2",
+             *         "maxMark": 20,
+             *         "isExamination": false
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6103",
+             *         "name": "Exam",
+             *         "shortLabel": "EXAM",
+             *         "maxMark": 60,
+             *         "isExamination": true
+             *       }
+             *     ]
+             */
+            components: components["schemas"]["AssessmentComponentSaveRequest"][];
+            /**
+             * Format: int32
+             * @description The assessment group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.assessment.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks.
+             */
+            reason: null | string;
+        };
+        /**
+         * @description `PUT /api/v1/settings/grading` (spec 6.2.5, 6.2.12: "Whole scale as one array. Atomic.").
+         *             Every band in the new scale — this is a REPLACE, not a patch; omitting a currently-seeded band
+         *             deletes it.
+         * @example {
+         *       "bands": [
+         *         {
+         *           "lowerBound": 90,
+         *           "upperBound": 100,
+         *           "gradeLetter": "A+",
+         *           "remark": "Very excellent"
+         *         },
+         *         {
+         *           "lowerBound": 85,
+         *           "upperBound": 89,
+         *           "gradeLetter": "A",
+         *           "remark": "Excellent"
+         *         },
+         *         {
+         *           "lowerBound": 75,
+         *           "upperBound": 84,
+         *           "gradeLetter": "B",
+         *           "remark": "Very good"
+         *         },
+         *         {
+         *           "lowerBound": 70,
+         *           "upperBound": 74,
+         *           "gradeLetter": "B-",
+         *           "remark": "Good"
+         *         },
+         *         {
+         *           "lowerBound": 60,
+         *           "upperBound": 69,
+         *           "gradeLetter": "C+",
+         *           "remark": "Average"
+         *         },
+         *         {
+         *           "lowerBound": 50,
+         *           "upperBound": 59,
+         *           "gradeLetter": "C",
+         *           "remark": "Fair"
+         *         },
+         *         {
+         *           "lowerBound": 40,
+         *           "upperBound": 49,
+         *           "gradeLetter": "D",
+         *           "remark": "More effort"
+         *         },
+         *         {
+         *           "lowerBound": 20,
+         *           "upperBound": 39,
+         *           "gradeLetter": "E",
+         *           "remark": "Not Now"
+         *         },
+         *         {
+         *           "lowerBound": 0,
+         *           "upperBound": 19,
+         *           "gradeLetter": "F",
+         *           "remark": "Fail"
+         *         }
+         *       ],
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateGradingCommand: {
+            /**
+             * @description The whole scale, in the order it should print. See GradingScaleRules for the ten save-time rules.
+             * @example [
+             *       {
+             *         "lowerBound": 90,
+             *         "upperBound": 100,
+             *         "gradeLetter": "A+",
+             *         "remark": "Very excellent"
+             *       },
+             *       {
+             *         "lowerBound": 85,
+             *         "upperBound": 89,
+             *         "gradeLetter": "A",
+             *         "remark": "Excellent"
+             *       },
+             *       {
+             *         "lowerBound": 75,
+             *         "upperBound": 84,
+             *         "gradeLetter": "B",
+             *         "remark": "Very good"
+             *       },
+             *       {
+             *         "lowerBound": 70,
+             *         "upperBound": 74,
+             *         "gradeLetter": "B-",
+             *         "remark": "Good"
+             *       },
+             *       {
+             *         "lowerBound": 60,
+             *         "upperBound": 69,
+             *         "gradeLetter": "C+",
+             *         "remark": "Average"
+             *       },
+             *       {
+             *         "lowerBound": 50,
+             *         "upperBound": 59,
+             *         "gradeLetter": "C",
+             *         "remark": "Fair"
+             *       },
+             *       {
+             *         "lowerBound": 40,
+             *         "upperBound": 49,
+             *         "gradeLetter": "D",
+             *         "remark": "More effort"
+             *       },
+             *       {
+             *         "lowerBound": 20,
+             *         "upperBound": 39,
+             *         "gradeLetter": "E",
+             *         "remark": "Not Now"
+             *       },
+             *       {
+             *         "lowerBound": 0,
+             *         "upperBound": 19,
+             *         "gradeLetter": "F",
+             *         "remark": "Fail"
+             *       }
+             *     ]
+             */
+            bands: components["schemas"]["GradingBandInput"][];
+            /**
+             * Format: int32
+             * @description The grading group's current `versionNumber`, as last read from `GET /settings`. A stale
+             *     value is rejected `409 settings.grading.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise. See UpdateGradingCommandHandler's remarks — the
+             *     check that decides which applies is honestly always "no publications" today, no results module
+             *     existing yet.
+             */
+            reason: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/levels/{id}` (spec 6.4.2, 6.4.9): "Name, section, next level, order, status.
+         *             Reruns the eight chain rules." Every field is independently optional — `null`
+         *             leaves it unchanged, the same convention `UpdateRoleCommand` established.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": null,
+         *       "sectionId": null,
+         *       "nextLevelId": null,
+         *       "progressionOrder": null,
+         *       "status": null
+         *     }
+         */
+        UpdateLevelCommand: {
+            /**
+             * Format: uuid
+             * @description The level being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. */
+            name: null | string;
+            /** @description `null` to leave unchanged. Must reference an existing section. */
+            sectionId: null | string;
+            /**
+             * @description `null` to leave unchanged; an EMPTY string clears it (the level becomes a
+             *             graduating candidate) — `null` here is indistinguishable from "not provided,"
+             *             exactly like `UpdateRoleCommand.Description`'s null-means-unchanged convention.
+             */
+            nextLevelId: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged.
+             */
+            progressionOrder: null | number | string;
+            status: null | components["schemas"]["LevelStatus"];
+        };
+        /**
+         * @description `PATCH /api/v1/pupils/{id}` (spec 6.5.4, 6.5.10). Biographical fields only. Every field is
+         *             independently optional — `null` leaves it unchanged, the same convention
+         *             `UpdateArmCommand` established; an empty string clears an optional field
+         *             (MiddleName, PreviousSchool, PreviousClass,
+         *             OtherInformation).
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": null,
+         *       "sex": null,
+         *       "dateOfBirth": null,
+         *       "nationality": null,
+         *       "stateOfOrigin": null,
+         *       "lga": null,
+         *       "homeAddress": "22 Zik Avenue, Awka",
+         *       "previousSchool": null,
+         *       "previousClass": null,
+         *       "otherInformation": null,
+         *       "registrationNumber": null
+         *     }
+         */
+        UpdatePupilBiographicalCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /**
+             * @description 1..60 characters, letters/spaces/hyphens/apostrophes.
+             * @example Okafor
+             */
+            surname: null | string;
+            /**
+             * @description Same rule as Surname.
+             * @example Chidera
+             */
+            firstName: null | string;
+            /** @description An empty string clears it. */
+            middleName: null | string;
+            sex: null | components["schemas"]["PupilSex"];
+            /**
+             * Format: date
+             * @description In the past; must give an age between 2 and 20.
+             */
+            dateOfBirth: null | string;
+            /** @description An empty string resets it to the default (`Nigerian`). */
+            nationality: null | string;
+            /** @description Must resolve to one of the 36 states or the Federal Capital Territory. */
+            stateOfOrigin: null | string;
+            /** @description Must resolve to one of StateOfOrigin's LGAs (the record's current state when StateOfOrigin is not also supplied). */
+            lga: null | string;
+            /**
+             * @description The child's own address.
+             * @example 22 Zik Avenue, Awka
+             */
+            homeAddress: null | string;
+            /** @description An empty string clears it. */
+            previousSchool: null | string;
+            /** @description An empty string clears it. */
+            previousClass: null | string;
+            /** @description An empty string clears it. */
+            otherInformation: null | string;
+            /**
+             * @description DECLARED ONLY SO ITS PRESENCE CAN BE DETECTED AND REJECTED — spec 6.5.10: "the number is
+             *     immutable and no ordinary edit path exists." Any non-null value here, including one identical to
+             *     the pupil's current number, is a 409. Never written.
+             */
+            registrationNumber: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/settings/reg-number` (spec 6.2.4). `yearSource` is deliberately absent
+         *             from this body — it is fixed (admission year) and never editable.
+         * @example {
+         *       "separator": "/",
+         *       "serialWidth": 4,
+         *       "serialReset": "PerYear",
+         *       "expectedVersion": 0
+         *     }
+         */
+        UpdateRegNumberCommand: {
+            /**
+             * @description One of `/`, `-`, `.`.
+             * @example /
+             */
+            separator: string;
+            /**
+             * Format: int32
+             * @description 3 to 6. Serials are zero-padded to this width.
+             * @example 4
+             */
+            serialWidth: number | string;
+            /**
+             * @description Whether the serial restarts each admission year (RegNumberSerialReset.PerYear) or
+             *     runs continuously (RegNumberSerialReset.Continuous) — approved delta amendment 1: the
+             *     counter itself carries a partition per mode, so this genuinely changes which numbers get issued
+             *     next, not merely a stored-but-inert flag.
+             */
+            serialReset: components["schemas"]["RegNumberSerialReset"];
+            /**
+             * Format: int32
+             * @description The reg-number group's current `versionNumber`, as last read from `GET /settings`. A
+             *     stale value is rejected `409 settings.regnumber.stale_version` before anything is written.
+             * @example 0
+             */
+            expectedVersion: number | string;
+        };
+        /**
+         * @description `PUT /api/v1/settings/result-rules` (spec 6.2.8). A REPLACE of the whole singleton row — there
+         *             is no partial edit, matching UpdateGradingCommand's blind-replace shape rather than
+         *             UpdateAssessmentCommand's per-row identity (this row has no children to preserve
+         *             identity for).
+         * @example {
+         *       "annualMethod": "SimpleAverage",
+         *       "weightFirst": null,
+         *       "weightSecond": null,
+         *       "weightThird": null,
+         *       "primaryPositionScope": "Arm",
+         *       "showLevelPosition": true,
+         *       "tieBreakRule": "SharedPosition",
+         *       "passMark": 40,
+         *       "promotionThreshold": 40,
+         *       "requireCorePass": true,
+         *       "coreSubjectIds": [],
+         *       "minSubjectsForPosition": 1,
+         *       "expectedVersion": 0,
+         *       "reason": null
+         *     }
+         */
+        UpdateResultRulesCommand: {
+            /** @description Simple average or weighted. Locked once Third Term is published for any arm (spec 6.2.10). */
+            annualMethod: components["schemas"]["AnnualMethod"];
+            /**
+             * Format: int32
+             * @description Required when AnnualMethod is AnnualMethod.Weighted. 0 to 100. Locked with AnnualMethod.
+             */
+            weightFirst: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightSecond: null | number | string;
+            /**
+             * Format: int32
+             * @description See WeightFirst.
+             */
+            weightThird: null | number | string;
+            /** @description Arm or level. Locked once anything is published in the active session (spec 6.2.10). */
+            primaryPositionScope: components["schemas"]["PrimaryPositionScope"];
+            /**
+             * @description Whether a second, level-wide position line prints alongside the arm position.
+             * @example true
+             */
+            showLevelPosition: boolean;
+            /** @description How a tied position is broken. Locked once anything is published in the active session (spec 6.2.10). */
+            tieBreakRule: components["schemas"]["TieBreakRule"];
+            /**
+             * Format: int32
+             * @description 0 to 100. A subject total at or above this is a pass.
+             * @example 40
+             */
+            passMark: number | string;
+            /**
+             * Format: int32
+             * @description 0 to 100. Annual average at or above this proposes promotion.
+             * @example 40
+             */
+            promotionThreshold: number | string;
+            /**
+             * @description When true, promotion also requires a pass in every core subject.
+             * @example true
+             */
+            requireCorePass: boolean;
+            /**
+             * @description Required non-empty when RequireCorePass is true. Every id must be an existing active subject.
+             * @example []
+             */
+            coreSubjectIds: string[];
+            /**
+             * Format: int32
+             * @description At least 1. A pupil with fewer scored subjects than this is excluded from position ranking.
+             * @example 1
+             */
+            minSubjectsForPosition: number | string;
+            /**
+             * Format: int32
+             * @description The result-rules group's current `versionNumber`, as last read from
+             *     `GET /settings/result-rules`. A stale value is rejected
+             *     `409 settings.resultrules.stale_version` before anything is written, checked BEFORE the 6.2.9
+             *     reason gate — matches `UpdateAssessmentCommandHandler`'s documented ORDER OF CHECKS.
+             * @example 0
+             */
+            expectedVersion: number | string;
+            /**
+             * @description Required, at least ten characters, ONLY when a result set is Published in the active session
+             *     (spec 6.2.9); ignored otherwise. See `UpdateGradingCommandHandler`'s remarks.
+             */
+            reason: null | string;
         };
         /**
          * @description `PATCH /api/v1/roles/{id}` (spec 6.1.4, 6.1.9; approved delta entry `TASK-0028` §2):
@@ -1840,6 +6915,182 @@ export interface components {
              * @example 2
              */
             expectedVersion: number | string;
+        };
+        /**
+         * @description `PATCH /api/v1/sections/{id}` (spec 6.4.9). Name only.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "Secondary"
+         *     }
+         */
+        UpdateSectionCommand: {
+            /**
+             * Format: uuid
+             * @description The section being renamed.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description 2..40 characters, trimmed. Unique, case-insensitive.
+             * @example Secondary
+             */
+            name: string;
+        };
+        /**
+         * @description `PATCH /api/v1/sessions/{id}` (spec 6.3.10): "Name and dates, while upcoming or active."
+         *             Every field is independently optional; an absent field is left unchanged — the same convention
+         *             `UpdateRoleCommand` established.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": "2026/2027",
+         *       "startDate": null,
+         *       "endDate": null
+         *     }
+         */
+        UpdateSessionCommand: {
+            /**
+             * Format: uuid
+             * @description The session being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /**
+             * @description `null` to leave unchanged.
+             * @example 2026/2027
+             */
+            name: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            startDate: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            endDate: null | string;
+        };
+        /**
+         * @description `PATCH /api/v1/subjects/{id}` (spec 6.6.2, 6.6.9). Every field is independently optional —
+         *             `null` leaves it unchanged, the same convention `UpdateArmCommand` and
+         *             `UpdateLevelCommand` established. Changing SubjectStatus? UpdateSubjectCommand.Status ADDITIONALLY requires
+         *             `subject.deactivate`, beyond the `subject.update` this route requires.
+         * @example {
+         *       "id": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": null,
+         *       "code": null,
+         *       "description": null,
+         *       "status": null
+         *     }
+         */
+        UpdateSubjectCommand: {
+            /**
+             * Format: uuid
+             * @description The subject being edited.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            id: string;
+            /** @description `null` to leave unchanged. Must stay unique. */
+            name: null | string;
+            /** @description `null` to leave unchanged; an EMPTY string clears it. */
+            code: null | string;
+            /** @description `null` to leave unchanged; an EMPTY string clears it. */
+            description: null | string;
+            status: null | components["schemas"]["SubjectStatus"];
+        };
+        /**
+         * @description `PATCH /api/v1/terms/{id}` (spec 6.3.10): "Dates, label, times school opened, next
+         *             resumption date." Every field is independently optional; an absent field is left unchanged.
+         *             int? UpdateTermCommand.TimesSchoolOpened cannot be CLEARED back to blank through this command — spec never
+         *             asks for that operation, only for filling it in once and (implicitly, spec 6.3.6) never touching
+         *             it again after close.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "name": null,
+         *       "startDate": null,
+         *       "endDate": null,
+         *       "timesSchoolOpened": 118,
+         *       "nextResumptionDate": "2027-01-05"
+         *     }
+         */
+        UpdateTermCommand: {
+            /**
+             * Format: uuid
+             * @description The term being edited.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            id: string;
+            /** @description `null` to leave unchanged. */
+            name: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            startDate: null | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             */
+            endDate: null | string;
+            /**
+             * Format: int32
+             * @description `null` to leave unchanged; rejected once the term is closed.
+             * @example 118
+             */
+            timesSchoolOpened: null | number | string;
+            /**
+             * Format: date
+             * @description `null` to leave unchanged.
+             * @example 2027-01-05
+             */
+            nextResumptionDate: null | string;
+        };
+        /**
+         * @description `POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved
+         *             contract delta) — voids every non-voided mark for one arm, subject and term. Super Admin only,
+         *             reason required. Used only to unwind an error.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "reason": "Whole class re-marked after a transcription error in the mark book."
+         *     }
+         */
+        VoidScoreSheetCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The subject to void.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The term to void.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Required, spec's ten-to-five-hundred-character reason floor.
+             * @example Whole class re-marked after a transcription error in the mark book.
+             */
+            reason: string;
+        };
+        /**
+         * @description The count of marks voided by VoidScoreSheetCommand.
+         * @example {
+         *       "voidedCount": 27
+         *     }
+         */
+        VoidScoreSheetResponse: {
+            /**
+             * Format: int32
+             * @description How many non-voided marks were voided. Zero when none existed.
+             * @example 27
+             */
+            voidedCount: number | string;
         };
     };
     responses: never;
@@ -2396,6 +7647,1299 @@ export interface operations {
             };
         };
     };
+    ListAdmissionsQueue: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfPupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionRecordDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAdmissionRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdmissionRecordCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionRecordDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveAdmission: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveAdmissionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeclineAdmission: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineAdmissionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListArms: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                sessionId?: string;
+                levelId?: string;
+                label?: string;
+                status?: components["schemas"]["ArmStatus"];
+                formTeacherAdminId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateArmCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetNextArmLabel: {
+        parameters: {
+            query: {
+                levelId: string;
+                sessionId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextArmLabelResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BulkCreateArms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCreateArmsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkCreateArmsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetArm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateArm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateArmCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRoleAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignmentDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateRoleAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleAssignmentCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignmentDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RevokeRoleAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAuditEvents: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                fromUtc?: string;
+                toUtc?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                entityId?: string;
+                outcome?: components["schemas"]["AuditOutcome"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfAuditEventDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportAuditEvents: {
+        parameters: {
+            query?: {
+                fromUtc?: string;
+                toUtc?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                entityId?: string;
+                outcome?: components["schemas"]["AuditOutcome"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetCsrfToken: {
         parameters: {
             query?: never;
@@ -2687,6 +9231,466 @@ export interface operations {
             };
         };
     };
+    ListLevels: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfLevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLevelCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReorderLevels: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderLevelsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateLevel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLevelCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetPrivilegeRegister: {
         parameters: {
             query?: never;
@@ -2726,6 +9730,458 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPupils: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["PupilStatus"];
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfPupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreatePupil: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePupilCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FindPupilDuplicates: {
+        parameters: {
+            query: {
+                surname: string;
+                firstName: string;
+                dateOfBirth: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdatePupilBiographical: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePupilBiographicalCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CorrectPupilRegistrationNumber: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectRegistrationNumberCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2934,6 +10390,90 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ComputeResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputeResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3341,6 +10881,820 @@ export interface operations {
             };
         };
     };
+    GetScoreSheet: {
+        parameters: {
+            query: {
+                subjectId: string;
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveScoreSheet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveScoreSheetCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidScoreSheet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidScoreSheetCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoidScoreSheetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSectionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSectionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSessions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                state?: components["schemas"]["SessionState"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfSessionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetSettings: {
         parameters: {
             query?: never;
@@ -3415,6 +11769,628 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsIdentityGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateRegNumber: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRegNumberCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsRegNumberGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRegNumberPreview: {
+        parameters: {
+            query: {
+                separator: string;
+                serialWidth: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegNumberPreviewDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAbbreviation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAbbreviationCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsAbbreviationGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateGrading: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGradingCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsGradingGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ResetGrading: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetGradingCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsGradingGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateAssessment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssessmentCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsAssessmentGroupDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetResultRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultRulesDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateResultRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateResultRulesCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultRulesDto"];
                 };
             };
             /** @description Unauthorized */
@@ -3583,6 +12559,1311 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSubjects: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                pageSize?: number | string;
+                status?: components["schemas"]["SubjectStatus"];
+                levelId?: string;
+                termId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfSubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubjectCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSubject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSubjectCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSubjectMappingGrid: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectMappingGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveSubjectMappingGrid: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSubjectMappingGridCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CopySubjectMappings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopySubjectMappingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrefillSubjectMappings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefillSubjectMappingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveSubjectMappingGridResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteSubjectException: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetArmSubjects: {
+        parameters: {
+            query: {
+                term_id: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArmSubjectDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateSubjectException: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubjectExceptionCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectExceptionDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTermCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    OpenTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CloseTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReopenTerm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenTermCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {

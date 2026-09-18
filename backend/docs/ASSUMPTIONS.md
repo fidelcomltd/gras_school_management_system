@@ -628,7 +628,575 @@ suite rather than assumed clean:
   is untouched and still fully proven independent of any database state by
   `RoleTests.Create_WithTheReservedNameCaseInsensitive_Rejects`.
 
+### 2.22 TASK-0035 — academic sessions and terms
+
+**"The following term" for reopening Third Term has no direct FK, so it is read off the session's
+own `state` instead.** Spec 6.3.6 refuses to reopen a closed term "if the following term has already
+been opened." For ordinal 1 or 2 this is a plain sibling lookup (`Ordinal + 1` in the same session).
+For ordinal 3 the "following term" is First Term of a session that does not exist yet when this term
+was created, and this codebase has no FK from one `academic_session` to "the next one." Resolved by
+reading `AcademicSession.State` instead: `AcademicSession.Close()` is called (by `OpenTermHandler`)
+ONLY as a side effect of a successor session's First Term opening (spec 6.3.5), so
+`SessionState.Closed` on Third Term's own session is exactly "a following term opened," with no new
+column and no FK. This also turns out to be load-bearing for the one-active-term partial unique
+index, not just a wording nicety: without it, reopening a term whose true successor is active would
+attempt to mark two terms active at once, which the database would then reject anyway —
+`ReopenTermHandler`'s remarks and `TermTransitionGuardTests.CanReopen_WhenFollowingTermAlreadyOpened_Rejects`
+record the reasoning and the test, respectively. Flagged here rather than asked about up front because
+it is fully determined by the two already-approved spec paragraphs (6.3.5's side-effect description
+and 6.3.6's refusal rule) and is disclosed, not guessed silently.
+
+**Session `state` is derived, not a field an endpoint sets directly — also spec 6.3.5, also worth
+flagging.** `PATCH /sessions/{id}` never accepts a `state` value: `Upcoming` -> `Active` happens only
+when the session's own First Term opens, and `Active` -> `Closed` happens only as the side effect
+above, on the PREVIOUSLY active session, triggered by a DIFFERENT session's First Term opening. A
+session can therefore sit at `Active` with all three of its own terms `Closed` for a while (the
+school plans next year in June while Third Term still runs, per 6.3.5's own example) — this is
+intentional, not a bug, and is exercised by
+`TermEndpointsTests.Open_OrdinalOne_ClosesThePreviouslyActiveSession`.
+
+**Three spec 6.3.6 preconditions deferred on a hard entity dependency, not on effort — visible in
+code, not silent:** `open`'s "at least one arm exists for the session" (spec 06 §6.4's `Arm`, no task
+card yet), `close`'s result-set precondition (spec 09 §6.7's result sets, no task card yet), and
+spec 6.3.8's arm/pupil/publication counts on the list and detail views. Each is a doc-comment on the
+relevant handler or DTO, not a literal `TODO` — `SourceConventionTests` requires a real `TASK-####`
+on every `TODO`/`FIXME`/`HACK`, and none of the three has a card number yet (unlike promotion, which
+does: TASK-0036). The orchestrator's own dispatch named this tension explicitly and asked for it to
+be surfaced rather than papered over with a fabricated task number or a silently-passing check.
+Concretely: `open` and `close` are both MORE PERMISSIVE than spec until their respective cards land —
+`OpenTermHandler`/`CloseTermHandler`'s remarks and `TermEndpoints`' route descriptions say so, and
+`SessionDto`/`SessionDetailDto` simply omit the count fields rather than emit a fabricated `0`.
+
+**List/detail counts deferred as a WHOLE, including one that is honestly computable
+(`termsClosedCount`), for scope discipline.** Spec 6.3.8 lists "number of terms closed" alongside the
+arm/pupil counts that genuinely need entities this codebase does not have yet. Unlike those, a
+session's own three terms are always loaded already, so a closed-count is answerable today — it was
+left out anyway, to keep this already-large card's list/detail DTOs to one shape (all-or-nothing on
+"counts are TASK-0036/arms-card territory") rather than half-populating spec 6.3.8's row. Cheap to add
+later; recorded here so it reads as a choice, not an oversight.
+
+**The session list's cursor carries the session's OWN `name`, not a name+id composite the way
+`RoleListCursor` does.** Spec 6.3.3 makes the name unique, and the list has exactly one server-fixed
+sort (`name` descending, spec 6.3.8 — no caller-chosen sort the way `GET /roles` allows), so the name
+alone is already a sufficient, self-tie-breaking keyset value. `SessionListCursor` is deliberately
+simpler than `RoleListCursor` for this reason, not because the tie-break case was missed.
+
+**No `AcademicSession.PromotionBatchId`/`ArchivedAt` columns yet**, though spec 6.3.3's field table
+names both. Both are meaningless until TASK-0036 (promotion) and spec 9.8 (the archive job) exist —
+adding an always-null column now would be speculative, and a later migration adding it is additive by
+construction. Same reasoning as the counts above: nothing is emitted that cannot be populated
+honestly.
+
+### 2.23 TASK-0038 — sections, class levels and the progression chain
+
+**Sections and levels are gated under `level.*` privileges — no `section.*` register row invented.**
+The card's own ruling: a section is a property of a level, and the fixed 93-row register has no
+`section.*` code. `GET/POST /sections` gated by `level.view`/`level.create`; `PATCH /sections/{id}` by
+`level.update`. Flagged in the endpoint doc comments, not silently done.
+
+**Section's own `name` field has no spec-stated length/uniqueness rule.** Spec 6.4.2 gives `name`'s
+length/uniqueness only for a *level*; the section list itself is described only as "admin-editable."
+`Section.NameMaxLength = 40` and case-insensitive uniqueness (no status carve-out) mirror
+`ClassLevel.Name`/`Role.Name`'s own equivalent rules — a reasonable default, not a spec derivation.
+Nothing in spec 6.4 suggests a section name would ever need to be longer than a level's own.
+
+**`DELETE /levels/{id}`'s reference check is PARTIAL, by design, and the missing part is DEFERRED —
+not an always-true bypass.** Spec 6.4.2: "nothing has ever referenced it" spans arms, enrolments,
+subject mappings and results. None of those tables exist in this codebase yet (arms: TASK-0039;
+enrolments/subject mappings/results: later Phase 2/3 cards). `DeleteLevelHandler` checks the ONE
+reference that DOES exist today — another level's own `next_level_id` (the `class_levels` table
+being created in this very card) — via `IClassLevelRepository.FindReferencingNextLevelAsync`, backed
+by a real `RESTRICT` self-referencing foreign key (`ClassLevelConfiguration`) as a database backstop,
+the same "friendly check plus DB backstop" shape `TermConfiguration`'s single-active-term index has
+for `OpenTermHandler`. The arm/enrolment/mapping/result checks are marked `DEFERRED` in
+`DeleteLevelHandler`'s own remarks, naming this card and the missing tables, rather than answered with
+an always-true probe — the project already regrets exactly one such bypass
+(`SuperAdminFlagEffectivePrivilegeProvider`) and this card was explicitly told not to add a second.
+**Trigger: TASK-0039 (arms) and the later Phase 2/3 cards (enrolments, subject mappings, results) must
+each add their own branch to this same check, not a parallel one.**
+
+**A dedicated `ProgressionChainGuard.CanDeactivate` precondition exists ALONGSIDE `Validate`, not
+folded into it — a real design finding, not a stylistic choice.** Spec 6.4.2's own worked deactivation
+example ("Deactivating Primary 3 would leave Primary 4 unreachable...") and its own worked
+multiple-entry example ("Two levels have nothing leading into them: Nursery 1 and Reception...") are,
+from a pure graph-structure standpoint, THE SAME invalid shape: two disjoint components, each rooted
+at a node nothing points at. A single deterministic `Validate(activeLevels)` — which must return ONE
+answer for a GIVEN snapshot regardless of caller, the same discipline `TermTransitionGuard` and
+`RolePrivilegeEscalationGuard` already hold to — cannot distinguish "this level was just deactivated,
+stranding its successor" from "this level was just created as a second root" from the resulting state
+alone, because they are not structurally distinguishable. Proven, not asserted:
+`ProgressionChainGuardTests.Rule5And6_UnreachableAndPointsToInactive_AreImpliedByRule3` reconstructs
+spec's own deactivation scenario against `Validate` directly and shows it returns rule 3's message,
+not rule 5's. `ProgressionChainGuard.CanDeactivate` is therefore a SEPARATE, narrower, action-specific
+check — "does this specific level sit between a real predecessor and a successor with no other active
+predecessor" — run by `UpdateLevelHandler` immediately before a status change to `Inactive`, BEFORE
+the generic `Validate` re-run. It reproduces spec 6.4.2's exact wording
+(`CanDeactivate_MidChainLevel_RejectsNamingPredecessorAndSuccessor`) and correctly stays silent for
+the explicitly-allowed sequential-front-deactivation case (deactivating Nursery 1, 2, 3 in turn —
+`CanDeactivate_TheEntryLevel_Succeeds`).
+
+**Corollary, proven the same way: rules 4 (the PLURAL "multiple graduating levels" case), 5 and 6 are
+ALSO mathematically implied by rule 3, and cannot be isolated as a standalone `Validate` failure.** A
+counting argument (full derivation in `ProgressionChainGuardTests`' class remarks): with `k` graduating
+levels among `N` total, exactly `N-k` levels emit an outgoing pointer; covering all `N-1` non-entry
+levels with at least one incoming pointer each needs `N-k >= N-1`, i.e. `k <= 1` — so two or more
+graduating levels always leaves at least one level uncovered, which becomes a second entry candidate,
+and rule 3 (checked first, per spec 6.4.2's own rule order) always wins. The same backward-chain
+argument used for rule 5/6 applies. Every rule still runs in `Validate` (defense-in-depth, and spec
+6.4.2's literal enumeration), and `ValidChain_WithNoViolations_Succeeds` proves none of the three ever
+falsely rejects a genuinely valid chain; three dedicated tests
+(`Rule4_MultipleGraduatingLevels_IsImpliedByRule3`,
+`Rule5And6_UnreachableAndPointsToInactive_AreImpliedByRule3`) construct the natural real-world attempt
+at each and show rule 3 firing instead, rather than silently asserting the finding without evidence.
+Rule 4b (the SINGULAR "no graduating level" case, `k = 0`) is NOT subject to this proof — with zero
+graduating levels there is a SURPLUS of edges (all `N` emit one), so one can safely point outside the
+active set without leaving anything uncovered; `Rule4b_NoGraduatingLevel_Rejected` demonstrates this,
+genuinely isolated.
+
+**The partial unique index on `progression_order` is NOT deferrable, and a batch reassignment
+(reorder, or the insert-after shift) WILL hit it if written straight to final values — found by
+running the reorder endpoint for real against the hosted database, not by reasoning about it.**
+PostgreSQL has no deferrable PARTIAL constraint (deferrable applies only to table constraints; a
+partial rule needs an index), so `ix_class_levels_progression_order_active_unique` is checked
+immediately, per row, as each row is written — confirmed by a throwaway probe against the real
+database showing that even a SINGLE multi-row `UPDATE ... FROM (VALUES ...)` statement fails with a
+genuine `23505` unique violation when it swaps two rows' unique values, exactly like two separate
+single-row `UPDATE`s do. `IClassLevelRepository.NegateProgressionOrdersAsync` fixes this with a
+two-phase write: a raw SQL statement (executed immediately, inside the SAME ambient transaction
+`UnitOfWorkBehavior` already opened, NOT through change tracking) flips every affected row's
+`progression_order` to its negative — a value nothing else in the table can hold — before the normal
+tracked entity mutations write the real final values via the ordinary `SaveChangesAsync` at the end of
+the request. Both `ReorderLevelsHandler` and `CreateLevelHandler`'s insert-after shift call it before
+reassigning. This is the first raw, immediately-executed WRITE (as opposed to a raw *read*, which
+`RoleRepository`/`AcademicSessionRepository` already do for keyset pagination) in this codebase's
+Application-facing handler code; it is deliberately still a repository method, not inline SQL in the
+handler, to keep the "handlers describe intent, repositories own persistence mechanics" boundary
+`AGENTS.md` §4 draws.
+
+**`LevelDto.section` denormalises the section's current NAME for display, while `sectionId` carries
+the opaque id for writes — a read/write asymmetry, disclosed as an interpretation of the card's own
+"section... cross the wire as strings" line, not a certainty.** The card table says "`section` and
+`status` cross the wire as strings; the client tolerates unknown members" without fully specifying the
+DTO shape. Since sections are genuinely admin-editable (not a fixed enum — spec 6.4.9 gives them real
+CRUD), a level's read-side `section` value is treated the same way `status`'s enum values are: an
+open-ended string the client must tolerate, but resolved to the section's NAME (not its id) so a level
+list renders "Nursery"/"Primary" without forcing N+1 lookups against a two-row register — the same
+reasoning `RoleDto` never applies (it has no comparable denormalised foreign field). `sectionId` is
+additionally exposed alongside it purely for round-tripping into `PATCH`. Flagged for the orchestrator
+to confirm or overrule, since it is the one place this card interpreted rather than found an
+unambiguous instruction.
+
+### 2.24 TASK-0030 — role assignments, escalation rules 1 and 3, the provider graduation
+
+**`SuperAdminFlagEffectivePrivilegeProvider` is DELETED**, replaced by
+`RoleAssignmentEffectivePrivilegeProvider`, which resolves a non-super-admin's grants from real
+`role_assignment` rows and still resolves a super admin's grants directly from the `is_super_admin`
+flag (unchanged — spec 6.1.7 rule 4). No flag or config switch keeps the old class reachable.
+
+**Rule 3's "own scope" is interpreted as the actor's own grant of the SAME assigning privilege it is
+exercising (`role.assign` for a school-wide target, `role.scope.assign` for an arm-list target), not
+as some other aggregate notion of the actor's overall reach.** Spec 6.1.7 says "An arm-scoped holder
+of `role.scope.assign` may only assign over arms inside its own scope," but `role.scope.assign` is
+itself non-scopable in the register (`PrivilegeRegistry`), and `RoleScopeGuard.ValidateAssignable`
+already rejects assigning ANY role containing a non-scopable privilege with `ArmList` scope — so
+under the current registry, no assignment can ever grant `role.scope.assign` itself with anything but
+`SchoolWide` scope, and the rule's own worked scenario ("an arm-scoped holder of `role.scope.assign`")
+cannot be produced through the live endpoint. The interpretation shipped here
+(`RoleScopeGuard.ValidateGrantWithinActorScope`) is real, tested logic — not an always-true stub — and
+activates correctly the moment a future card makes `role.scope.assign` scopable, or against a
+directly-seeded assignment in a test (`AssignmentEndpointsTests`'s two rule-3 tests do exactly this,
+the same accepted "seed the otherwise-unreachable prerequisite state directly" technique
+`RoleEndpointsTests.CreateRoleDirectlyAsync` already uses). Flagged for the orchestrator to confirm or
+correct, since it is the one place this card's guard shape is inference rather than an unambiguous
+spec sentence.
+
+**The seeded Super Admin role cannot be assigned through `POST /admins/{id}/assignments` at all** —
+rejected with `role_assignment.super_admin_not_assignable`. Spec 4.2.2 describes a sessionless,
+permanent Super Admin assignment as though it is a normal (if special-cased) row, but TASK-0003's
+human ruling (2026-09-05, recorded above `AdminAccount`'s remarks) already settled that
+`is_super_admin` is a flag bypass, not a role assignment, specifically because "spec 6.1.7 rule 4
+governs over 4.2.2's looser wording." Letting the seeded Super Admin role be granted through this new
+table would open a second, unaudited path to full privileges that bypasses rule 4's `SetSuperAdmin`
+gate and the last-active-Super-Admin invariant entirely — the opposite of what a card this
+security-sensitive should ship. `RoleAssignment.Create` still accepts an `isSuperAdminAssignment` flag
+so the schema (`session_id` nullable) already matches spec 6.1.5's literal field table without a later
+migration, but no code path in this card ever passes `true` for it.
+
+**Audit events for rules 1 and 3 stay LOG-ONLY, via the existing `ISystemAuditSink` seam** — the same
+mechanism §2.16 already disclosed for TASK-0027's rule-4 rejection, not the transactional,
+persisted `audit_event` table spec 6.1.12 describes (that table does not exist anywhere in this
+codebase yet; see STATE.md's live-drift entry naming the future card that must build it). The
+`ISystemAuditSink.RecordAsync` signature also has no `outcome` field — outcome is encoded in the
+action code (`role_assignment.self_assignment_forbidden`, `role_assignment.scope_exceeds_actor`)
+rather than a literal `success`/`rejected` value, following rule 2's and rule 4's own precedent exactly
+rather than inventing a third convention for the same gap. Tests assert against `RecordingSystemAuditSink.Records`
+(the established test double), which is what "assert the row exists" means today, absent a real table.
+
+**Spec 6.1.13's closed-session and archived-role create-time rejections are NOT implemented** — the
+task card's own out-of-scope list groups "closed session, archived role, arm deleted under an
+assignment, form teacher reassigned mid-term" together as "6.1.13's lifecycle cascades," deferred to
+TASK-0046. `CreateRoleAssignmentHandler` therefore accepts an assignment against a closed session or
+an archived role today; spec 6.1.5's OTHER field-table validations (arm-belongs-to-session, target not
+deactivated, role exists) are enforced, since those are basic field rules, not 6.1.13 edge cases.
+
+**`DELETE /roles/{id}`'s has-ever-been-assigned archive branch is added in this card**, per its own
+live-drift trigger (§2.20's sibling entry in STATE.md): a role with any assignment (active or revoked)
+now archives instead of hard-deleting, still returning 204.
+
 ---
+
+### 2.25 TASK-0048 — `audit_event` persistence and the append-only guarantee
+
+**Two methods on `ISystemAuditSink`, one per outcome, rather than an `outcome` parameter on one.**
+`RecordAsync` (unchanged shape and behaviour for every pre-existing SUCCESS call site) joins the
+ambient `DbContext`'s change tracker with no `SaveChangesAsync` of its own, committed by
+`UnitOfWorkBehavior` alongside the change it records. A NEW `RecordRejectionAsync` — same parameter
+shape — writes through `RejectedAuditEventWriter` on its own short-lived connection and commits
+immediately, so it survives the ambient transaction's rollback. The seven existing call sites that
+were actually recording a REJECTION (not a success) were switched from `RecordAsync` to
+`RecordRejectionAsync` by renaming the method at the call site — no parameter list changed at any of
+them: `CreateRoleCommandHandler` and `UpdateRoleCommandHandler` (rule 2, `role.privilege_escalation`),
+`CreateRoleAssignmentCommandHandler` (rule 1 and rule 3), `RevokeRoleAssignmentCommandHandler` (rule
+1 on revoke), `UpdateAdminAccountCommandHandler` (`admin.super_admin_grant_denied`), and
+`UpdateSchoolIdentityCommandHandler` (`settings.identity.save_rejected_stale_version` — see below).
+The remaining ~29 call sites are untouched.
+
+**`settings.identity.save_rejected_stale_version` also moved to `RecordRejectionAsync`, beyond the
+task card's two NAMED criteria (escalation rule 1 and rule 3).** It precedes a `return Result.Failure`
+exactly like the escalation rejections do, so a same-transaction write would have silently dropped it
+too — the card's own reasoning applied consistently rather than left as a second, undocumented gap
+the moment real persistence replaced the log-only seam. Not spec 6.1.12's "privilege failure or
+escalation attempt" by category, but leaving it on `RecordAsync` would have been a silent regression
+from the log-only seam's behaviour (which never lost anything, since a log line isn't transactional).
+
+**`reason` is a NEW, trailing, optional parameter on both `ISystemAuditSink` methods — placed AFTER
+`CancellationToken`, not before it.** Every existing call site passes `cancellationToken` as the last
+POSITIONAL argument; inserting an optional parameter between it and the method's other arguments
+would have silently rebound that positional `cancellationToken` value onto the new parameter instead.
+Placing `reason` after it is the only additive-safe position. Threaded for exactly one call site
+(`ChangeAdminAccountStatusCommandHandler`, spec 6.1.12's admin-deactivation reason) — the other seven
+actions in spec 6.1.12's reason list have no module yet (card's own out-of-scope list).
+
+**`entity_type` stays `string?` on the interface (unchanged) even though spec 6.1.12 marks the
+database column required.** Every real call site already supplies a non-null value except
+`IAuthorizationAuditSink.RecordRejectionAsync` (a rejected privilege check has no natural entity) —
+`AuthorizationAuditSink` supplies the fixed literal `"privilege_check"` for that one case, and
+`SystemAuditSink`'s shared `AuditEventFactory` falls back to `"unspecified"` defensively should a
+future caller ever pass null. The column itself is `NOT NULL`.
+
+**`actor_label` resolution**: `null` actor id → the literal `"System"`; a non-null id that no longer
+resolves to an `AdminAccount` (should not happen in practice, since it only ever comes from
+`ICurrentUser.UserId`/an authenticated caller) → `"(unknown account)"`, rather than throwing. Resolved
+via the existing `IAdminAccountRepository.FindReadOnlyByIdAsync` — a plain read against whichever
+`DbContext` scope is ambient, safe even when the eventual write goes through a different connection
+(`RejectedAuditEventWriter`'s own), because reading a pre-existing row inside a transaction that later
+rolls back is unaffected by that rollback.
+
+**`ICurrentUser` gained two members — `RemoteIpAddress`, `UserAgent`** — rather than giving
+Infrastructure a new `Microsoft.AspNetCore.Http.Abstractions` package reference for
+`IHttpContextAccessor` directly. `ICurrentUser`'s own remarks already state its purpose: "so the
+Application and Infrastructure layers can record who did this without taking a dependency on ASP.NET
+Core." `HttpCurrentUser` (Api layer, already holds `IHttpContextAccessor`) implements both;
+`NoOneCurrentUser` and every test double return `null`. `RemoteIpAddress` reads
+`HttpContext.Connection.RemoteIpAddress`, never an `X-Forwarded-For` header — trusting a
+client-suppliable header for an audit column would let a caller forge the value spec 9.3 exists to
+keep honest. Revisit once a reverse-proxy deployment target is chosen (Open question 5).
+
+**The rejection writer builds a second `ApplicationDbContext` from a fresh `DbContextOptionsBuilder`
+(same `DatabaseOptions`: connection string, retry policy, command timeout, migrations history table),
+not `IDbContextFactory<ApplicationDbContext>`.** `AddDbContextFactory`'s options-configuration
+delegate runs against the ROOT service provider (the factory is a singleton), so any interceptor
+requiring a SCOPED dependency (`AuditingInterceptor` needs `ICurrentUser`) could not be attached
+correctly there. `AuditEvent` needs no interceptor at all (neither `IAuditableEntity` nor
+`ISoftDeletable`), so the simpler, DI-registration-free option — duplicate the few Npgsql
+configuration lines, read from the same `IOptions<DatabaseOptions>` everything else already reads
+from — avoided the pitfall entirely rather than working around it.
+
+**Migration REVOKE targets `CURRENT_USER`, not a named role**, because no separate "application role"
+distinct from the migrating/connecting role is configured anywhere this migration runs (hosted Neon
+test database, CI's service container both connect as a single owner role — see STATE.md's Known
+drift entry, human-signed 2026-09-09). PostgreSQL revoking a privilege from a table's OWNER is always
+a harmless no-op (ownership rights are not represented as a revocable ACL entry), so this statement is
+a genuine guarantee the moment a deployment provisions a real, separate, non-owner application role,
+and a documented no-op everywhere it does not yet.
+
+**`AuditEvent.Id` is the first `long`/BIGSERIAL-identity primary key in the schema** — every other
+entity assigns its own `Guid` v7 at construction. Spec 6.1.12 requires monotonic ordering unambiguous
+within one millisecond, which a client-generated time-ordered GUID does not guarantee as strictly as
+a database identity sequence does. Left at EF Core's ordinary `ValueGeneratedOnAdd` convention for an
+integer key, stated explicitly in `AuditEventConfiguration` rather than left implicit, since it is the
+first entity where that convention is actually exercised.
+
+**`before_json`/`after_json` columns exist but nothing populates `before_json` yet** — per the card's
+own out-of-scope line, no handler's before/after state is wired in this card. `after_json` DOES carry
+the pre-existing `metadata` argument (JSON-serialized) for the handful of callers that already used
+it (`IdempotencyPurgeJob`'s purge count, `AuthorizationAuditSink`'s captured `routePath`) — the
+closest existing column to "additional structured detail," not a new mechanism.
+
+### 2.26 TASK-0005c — registration-number configuration: the counter's two partitions, and two authored user-facing sentences
+
+**Authored copy, not spec copy (approved delta amendment 3, following §2.15's own precedent for the
+`identity` group).** 6.2.11's stale-save sentence names the grading scale; this card's two groups get
+their own sentences, substituting the group name into the spec's pattern but written by this card, not
+quoted from it:
+
+- `settings.regnumber.stale_version` (409): "The registration number configuration was changed by
+  another administrator while you were editing. Reload and make your change again."
+- `settings.abbreviation.stale_version` (409): "The abbreviation was changed by another administrator
+  while you were editing. Reload and make your change again."
+
+Both await the school's confirmation, exactly as §2.15 flagged for the identity sentence before it.
+
+**The width-reduction rejection (spec 6.2.10) is `409 Conflict`, not `422`, and not audited.** Spec
+6.2.10 names no status code. Chosen `409` over `422` because the check is not a pure function of the
+submitted body — it depends on server-side state (the counter's already-issued serial), the same
+reasoning that makes a stale-version save a `409` rather than a `422` elsewhere in this file. The
+message is spec 6.2.10's own, with the real numbers substituted: `Serial 1043 will not fit in a width
+of 3. Choose 4 or more.` — the suggested minimum width is the exact digit count of the real serial, so
+`9999` (4 digits) suggests 4, not an arbitrary bump. Deliberately NOT run through the audit-rejection
+seam the way a stale-version conflict is: spec 6.2.11's "both attempts appear in the audit log"
+requirement is written specifically for the concurrency case (two administrators racing the same
+save), and nothing in 6.2.10 or 6.2.11 asks for an audit trail on a width that simply does not fit —
+flagged here rather than silently deciding it by omission.
+
+**Confirmation token is an exact, case-sensitive match on the literal string `CHANGE`.** Spec 6.2.4:
+"The confirmation requires the literal word CHANGE typed into a field." Read strictly — `change` or
+`Change` is rejected `422` like any other malformed field, not case-folded before comparing. No spec
+sentence says case-insensitivity is intended; a typed confirmation is exactly the kind of control
+where guessing looser than the letter of the spec would defeat the point of requiring it verbatim.
+
+**Abbreviation-change reason: non-empty (trimmed), capped at 500 characters, no floor.** Card AC and
+the approved delta both confirm no 10-character floor (6.2.9's floor is scoped to
+grading/assessment/traits/trait-scale/result-rules by its own prose, and 6.2.10 confirms the
+abbreviation is never locked). Spec sets no ceiling either; 500 is this card's own authored cap
+(`UpdateAbbreviationCommandValidator.ReasonMaxLength`), chosen for parity with the generous headroom
+`ConfigVersionConfiguration.ReasonMaxLength` (1000) already gives the storage column — well short of
+it, so no future group's longer reason is constrained by this one's choice.
+
+**Amendment 1, concretely: `registration_counter` is `Entity<string>` keyed on the counter itself, not
+a Guid.** Every other entity in this codebase keys on `Guid.CreateVersion7()`; this is the second
+non-Guid key after `ConfigVersion.VersionNumber`'s database identity column, and the first entity
+whose PRIMARY key is a plain business string — spec 6.5.10 defines the table as exactly
+`(counter_key, last_serial)`, so inventing a surrogate Guid id would add a column the spec's own
+schema does not have, for no reader this card has. `RegistrationCounterPartition.Resolve` is the one
+place both this card's reads (preview, width check — called with `TimeProvider`'s current year) and
+TASK-0051's future writes (to be called with the real admission year) must agree on; it is placed in
+`Domain/Settings` specifically so TASK-0051 reuses it rather than re-deriving the same rule.
+
+**The width check and the preview both resolve the partition from the group's CURRENTLY SAVED
+`serialReset` — not a request's incoming value, even for `PATCH /settings/reg-number` itself, which
+receives a new `serialReset` in the same body it is validating against.** Reasoned through in
+`UpdateRegNumberCommandHandler`'s own remarks: the counter partition that could genuinely reject a
+narrower width is the one that has actually been accumulating issued serials up to this moment, which
+is necessarily the one selected by whatever `serialReset` was in effect BEFORE this save — a partition
+the request is switching TO has no issuance history under this card's scope (there is no increment
+path anywhere yet) and so can never itself be too narrow. This is an authored reading of "current
+counter" in spec 6.2.10's own sentence ("if any issued serial in the current counter exceeds the new
+width"), not a literal instruction — the spec does not anticipate `serialReset` and `serialWidth`
+changing in the same request, so this card had to decide which of the two plausible readings applies.
+
+**`abbreviation.issuedCount` ships permanently `null` in this card, exactly as `STATE.md`'s
+2026-09-06 `## Known drift` entry and this file's §2.15 both already anticipated.** Nothing new to
+record beyond confirming the shipped shape matches what was pre-agreed: `SettingsMapper.ToAbbreviationDto`
+takes `issuedCount` as a caller-supplied parameter (never computed inside the mapper), and both call
+sites (`GetSettingsQueryHandler`, `UpdateAbbreviationCommandHandler`) pass `null` explicitly with a
+comment naming amendment 2 — so a future TASK-0051 change need only touch those two call sites, not
+the mapper's shape.
+
+**`RegNumberSerialReset` and the reg-number DTOs' fields cross the wire in PascalCase (`PerYear`,
+`Continuous`), not the spec prose's literal snake_case (`per_year`, `continuous`).** Matches this
+codebase's own established convention for every other enum that crosses the wire (`TermState`,
+`SessionState`, `LevelStatus`, `ArmStatus`, `RoleAssignmentStatus`) — none of them reproduce the
+spec's literal casing either. `YearSource` similarly ships as the fixed string `"AdmissionYear"`
+rather than spec 6.2.4's literal `admission_year` cell text, for the same reason: a stable,
+PascalCase, machine-readable token, not a copy of the spec table's prose.
+
+---
+
+### 2.27 TASK-0050 — pupil entity, the pending-exclusion invariant, arm-scoped `pupil.view`/`pupil.update` with no arm on the entity, and the Nigerian state/LGA reference data
+
+**The central tension this card had to resolve, named up front because it shapes everything below:**
+spec 6.5.3 marks `pupil.view`/`pupil.update` "arm-scoped for a Class Teacher," but spec 6.5.4's own
+entity table carries NO arm reference at all — a pupil's arm comes only from its OPEN ENROLMENT (spec
+07's own line 9: "the dated history of which arm the child sat in"), and this card's own hard boundary
+is "do not model an enrolment." Every pupil this card can create is `Pending`, and a pending pupil is
+by definition not in any arm. The route-declarative scope mechanism TASK-0002 built
+(`RequirePrivilege(privilege, ScopeParameterKind.Pupil, "id")`, resolving via
+`IPupilArmOfRecordLookup`) is therefore UNUSABLE here: with no enrolment, that lookup can only ever
+return `null`, which `ScopeResolver` turns into `ScopeResolution.Unresolvable`, which
+`PrivilegeDecision.IsAuthorized` fails closed for — including a SCHOOL-WIDE holder. Using it would
+make `PATCH /pupils/{id}` permanently unusable for the one thing this card exists to let the office
+do: edit a pending pupil's own biographical fields.
+
+**Resolution, and where the mechanism actually lives.** `GET /pupils`, `GET /pupils/{id}` and
+`PATCH /pupils/{id}` are mapped with `.RequireAuthenticatedCaller()`, not `RequirePrivilege(...)` — the
+same "data-dependent privilege requirement" pattern `UpdateAdminAccountCommandHandler` already
+established for spec 6.1.2's self-edit carve-out. Each handler calls `IEffectivePrivilegeProvider`
+directly (never re-deriving arm resolution, per the card's own instruction) and resolves one of three
+outcomes via a new `PupilAccessGuard`/`PupilAccessScope` (`Application/Pupils/PupilAccessGuard.cs`):
+`Forbidden` (no matching grant at all → 403), `SchoolWide` (unrestricted), or `ArmRestricted` (every
+matching grant is arm-scoped, none school-wide). Because no pupil carries an arm today,
+`ArmRestricted` is handled as: an EMPTY page for `GET /pupils` (a real, non-error answer — the caller
+genuinely holds the privilege, just over arms that currently contain nothing) and a 403 for
+`GET/PATCH /pupils/{id}` (the specific target is never within the caller's granted arms, the same
+"resolved-but-out-of-scope" outcome `PrivilegeDecision` already gives everywhere else). `POST /pupils`
+(create) and `GET /pupils/duplicates` stay on the ordinary declarative `RequirePrivilege(...)` gate,
+because `pupil.create` is NOT scopable (spec 4.4.4, `PrivilegeRegistry`) — no data-dependent handling
+needed. `GET /admissions` is declared `RequirePrivilege(Privileges.Pupil.View, ScopeParameterKind.None)`
+— SCHOOL-WIDE only — on the reasoning that a pending record has no arm for an arm-scoped grant to mean
+anything over, so admissions processing is inherently a school-wide operation; this is an authored
+reading, not a spec sentence, and is disclosed here rather than silently assumed.
+
+**Proven against the REAL `RoleAssignmentEffectivePrivilegeProvider`, not a fake, both directions —
+the card's own second named criterion.** `PupilEndpointsTests.List_ArmScopedCaller_SeesAnEmptyPage_
+SchoolWideCallerSeesTheRecord` and `Get_ArmScopedCaller_Returns403_SchoolWideCallerReturns200` seed a
+regular admin account, a role, and a real `role_assignment` row directly through the DbContext (the
+same accepted technique `AssignmentEndpointsTests.SeedAssignmentAsync` uses), sign in for real over
+HTTP, and assert the divergent outcome — an arm-scoped caller sees nothing / gets 403, a school-wide
+caller sees the same record. Both callers query the SAME seeded `Pending` record via `status=Pending`
+(the ordinary list's own opt-out), so the divergence is genuinely caused by the scope check, not by
+one caller simply having no matching data to find.
+
+**Consequence for `PrivilegeDecision.cs:21`'s `TODO(TASK-0002)` — STATE.md's live drift trigger fired,
+and is RE-POINTED, not resolved.** That TODO is about ignoring `PrivilegeGrant.SessionId` because "no
+session-bearing scope target (pupil, result set) has a real lookup yet." This card does NOT give
+`IPupilArmOfRecordLookup` a real implementation (see above — it remains impossible without enrolment),
+so the pupil half of that TODO is still not resolvable. The trigger is re-pointed here rather than
+closed: the enrolment card (whichever one first opens a real enrolment and can therefore answer "what
+arm is this pupil in, right now") is what makes `IPupilArmOfRecordLookup` implementable for real, and
+only then does filtering matching grants by `SessionId` become meaningful for the pupil scope target.
+`NotYetImplementedPupilArmOfRecordLookup` is untouched by this card — still throws, still registered.
+
+**The pending-exclusion invariant is a model-level EF Core query filter, not a per-query
+`.Where()`.** `PupilConfiguration.Configure` calls `builder.HasQueryFilter(pupil => pupil.Status !=
+PupilStatus.Pending)` — the exact same mechanism (and reviewed precedent) `ApplicationDbContext.
+ApplySoftDeleteQueryFilters` already uses for `ISoftDeletable`, applied here to one named entity
+directly rather than by reflection over an interface (no second pending-shaped entity exists yet). A
+caller that genuinely needs a pending row calls `.IgnoreQueryFilters()` explicitly, at exactly three
+call sites: `FindTrackedByIdAsync`/`FindReadOnlyByIdAsync` (direct-id access is never subject to the
+invariant — editing a pending record before admission is this card's whole point), `ListAsync` when
+`status=Pending` is explicitly requested, and `ListAdmissionsQueueAsync`/`FindDuplicatesAsync`
+(unconditionally, since the queue and duplicate detection both NEED pending rows by design). This is
+deliberately NOT enforced via raw SQL text repeated per query — the card's own named risk
+("`.Where(p => p.Status != Pending)` in more than one place is the wrong shape").
+
+**Raw `Database.SqlQuery<T>` (`AdminAccountRepository`'s own pattern) was deliberately NOT reused for
+`PupilRepository.ListAsync`, and this is why.** `SqlQuery<T>` materialises into an arbitrary POCO with
+no entity-model context, so EF Core's model-level query filter cannot compose onto it — using it here
+would have silently bypassed the very invariant this card exists to build. `ListAsync`/
+`ListAdmissionsQueueAsync` instead query `context.Pupils` (a plain `DbSet<Pupil>` LINQ source) directly,
+so `HasQueryFilter` composes automatically. The composite `(surname, id)` keyset comparison
+`AdminAccountRepository`'s own comment says C# cannot express with a relational operator is instead
+written as `string.Compare(a, b, StringComparison.Ordinal) > 0` / `Guid.CompareTo(...) > 0` inside the
+LINQ predicate, which the Npgsql provider DOES translate to the equivalent SQL comparison — verified
+empirically against real Postgres (not assumed from documentation), by `PupilEndpointsTests`' list and
+search cases actually executing the translated query end-to-end.
+
+**Default sort is surname ascending then id, NOT spec 6.5.15's stated "class in progression order then
+surname ascending."** With no arm/enrolment reference on `Pupil` (see the entity's own remarks), there
+is no class to order by yet — disclosed here and in `PupilListCursor`'s own remarks, not silently
+substituted. **Trigger: the card that gives a pupil a resolvable class (enrolment) widens the cursor's
+key rather than replacing it.** Owner `backend-dev`.
+
+**RESOLVED by TASK-0061 (2026-09-16), for `GET /pupils` only.** Default sort widened to level in
+progression order, then arm, then surname, then id, on `PupilRegisterCursor` (a new type, not
+`PupilListCursor` widened in place — the admissions queue shares that type and stays untouched, spec
+6.5.14 never asking it to sort by class). A pupil with no open enrolment sorts LAST as one flat
+trailing block, ruled by the human 2026-09-15 (`decisions/2026-Q3.md`). See
+`PupilRepository.ListAsync`'s own remarks for a genuine Npgsql/EF Core translation limitation this hit
+along the way (ordinal `string.Compare` cannot coexist with any join/subquery/`Contains` in the same
+compiled query) and the client-side-tie-break workaround it forced.
+
+**Search's "registration number... or its serial alone" requirement (spec 6.5.15, "typing 41 finds
+GRAS/2026/0041") is satisfied by ORDINARY substring matching on the full registration number, with no
+separate serial-extraction step.** `"41"` is literally a substring of `"...0041"`, so
+`EF.Functions.ILike(registrationNumber, "%41%")` already finds it — verified by
+`PupilEndpointsTests.Search_BySerialAlone_FindsTheFullRegistrationNumber` against a real seeded
+registration number. Accepted looseness, disclosed rather than engineered around: a search term that
+happens to match the YEAR segment (e.g. `"26"` against `"GRAS/2026/0041"`) also matches, which a
+strict serial-only implementation would not do. Not treated as a defect — the spec's own worked example
+is satisfied exactly, and over-matching on a free-text search box is a materially smaller cost than
+the SQL complexity a strict serial-only extraction would add (see the ruled-out `regexp_replace`/
+`split_part` approaches this card's own investigation considered and rejected).
+
+**`state_of_origin`/`lga` are validated against a real closed list (`Domain/Pupils/
+NigerianGeography.cs`), never free text — but the 774 LGA names were compiled from general knowledge
+with NO authoritative source (e.g. the NPopC/INEC gazette) available to check against in this
+environment.** The 37 state names are low-risk, well-known and not flagged. The LGA data should be
+diffed against an authoritative source before being relied on for compliance-grade reporting — a
+transcription error would show up as a legitimate LGA being wrongly rejected (a real support
+complaint), not as silently accepting bad data, so the failure mode is at least safe rather than
+silent. **Trigger: before this data is used for anything reported on (spec 6.5.4's own stated reason
+for the closed list existing at all), verify it against an authoritative source.** Owner unassigned.
+
+**`registration_number` gets its unique index NOW (`ix_pupils_registration_number_unique`, nullable +
+unique — Postgres treats every `NULL` as distinct, so any number of `Pending` rows coexist under it),
+per the card's own instruction, so TASK-0051 does not need to alter the `pupils` table.** No counter,
+no issuance path, no status-change endpoint — `Pupil.RegistrationNumber` has no setter anywhere except
+inside the private constructor, proven by
+`PupilTests.UpdateBiographical_WithRegistrationNumberNotOfferedOnTheEntity_HasNoPublicSetter`'s
+reflective check rather than merely an absence of a call site in this file.
+
+**Size: this card measured 2,452 hand-written production lines (Domain + Application + Infrastructure
++ Api, the migration's own 63-line `Up`/`Down`, excluding the auto-generated `Designer.cs`/model
+snapshot) — well past the card's own ~1,000-line stop-and-report threshold, discovered only after the
+work was complete and tested rather than mid-way through.** Breakdown: `NigerianGeography.cs` is 337
+lines, almost entirely the state/LGA reference table itself (data, not branching logic — the lookup
+methods are ~40 of those lines); `Pupil.cs` is 507 lines, carrying two full field-by-field validation
+methods (`Create` and `UpdateBiographical`, each independently handling 12 fields) plus this
+codebase's standing convention of an XML doc comment on every public member (the OpenAPI description
+source). Even excluding the reference-data file as "data, not logic," the remainder is still roughly
+double the guideline. Flagged prominently in this card's own report rather than silently absorbed —
+the orchestrator's call whether a later card of this shape should split the entity-plus-invariant work
+from the CRUD-handler work, the same lesson TASK-0038's own retrospective drew for `Domain/Classes/`.
+
+### 2.28 TASK-0069 — grading scale and assessment structure: the seam pattern for a dependency that doesn't exist yet, and five smaller authored calls
+
+**The central tension:** two of this card's acceptance criteria — the 6.2.6 session lock and the
+6.2.9 published-results reason gate — are keyed on `subject_score` and `result_set` rows, and NEITHER
+table exists anywhere in this codebase. TASK-0071 (computation engine, blocked on this card) READS
+`grading_band`/`assessment_component`; it does not write scores. No results/publish module is carded
+at all. `IResultSetArmLookup`'s 2026-08-26 drift entry and TASK-0063's 2026-09-15 "vacuously
+satisfied" entry are the precedent this card follows, but with one difference worth stating
+explicitly: those two ports are genuinely UNREACHED (no route uses them), so throwing is honest.
+`ISubjectScoreSessionLockLookup`/`IPublishedResultsGate` ARE reached, on every
+`PUT /settings/grading`, `POST /settings/grading/reset` and `PUT /settings/assessment` call — a
+throwing stand-in would break those endpoints in production today. The chosen shape is a real,
+non-throwing Infrastructure implementation that returns `false`/`0` unconditionally, documented as
+honestly correct (not a placeholder) because no code path anywhere can populate either table yet, and
+unit-tested against a fake that DOES report `true`/nonzero, so the locked/published branches are
+proven even though production can't exercise them. Whichever future card first persists a
+`subject_score` or `result_set.Published` row must replace the two Infrastructure classes with real
+queries — filed as drift in `.agent/STATE.md`, full account in `.agent/tasks/TASK-0069.md`'s Log.
+
+Five smaller authored calls, each a genuine judgement call rather than a literal reading of the spec:
+
+1. **Grade-letter character set widened.** 6.2.5's field table says "Letters and digits"; 6.2.13
+   requires seeding `A+` and `B-`, which contain neither. Widened the regex to
+   `^[A-Za-z0-9+-]+$` — the minimum change that makes the required seed data legal against its own
+   field's stated rule.
+2. **`IsExamination` is session-locked alongside `MaxMark`.** 6.2.6's own sentence names only "a
+   maximum" as locked once marks exist. Flipping which existing component id is flagged as the
+   examination, without changing max marks, would silently move already-entered marks between the CA
+   total and the exam total for a component whose id and stored marks did not change — the identical
+   "arithmetic nonsense" 6.2.6 invokes to justify locking maximums at all. Extended the lock to cover
+   it rather than leave a narrow, spec-literal gap.
+3. **Rule 4's ceiling (100) is authored.** 6.2.6's numbered rule states only the floor ("at least 1
+   mark"); the ceiling mirrors the field's own stated `1 to 100` bound from the same section's field
+   table, so a maximum above 100 is rejected with a rule-4-shaped message rather than surfacing later
+   as an arithmetic surprise.
+4. **The 3-component seed's `short_label` values are authored.** 6.2.13's seed table for the
+   replacement structure has four columns (Component/Maximum/Is examination/Display order) — no
+   short-label column. `CA1`/`CA2`/`EXAM` follow 6.2.6's own worked example ("First CA Test 15... for
+   example CA1, EXAM").
+5. **Entity/table name is `grading_band`, not `grade_band`.** `02-data-model.md` lines 16-17 name the
+   entity `grading_band`; 6.2.13's own prose calls the same entity `grade_band` in one place. Followed
+   the data-model document as the naming source of truth, since it is the document every other
+   versioned entity's table name in this codebase is drawn from.
+
+Also, per the card's own contract-impact line, `GET /settings/impact` (6.2.12) was **not** built —
+it depends on the same not-yet-existent `result_set` the seam above stands in for, and the card named
+only `/settings/grading` and `/settings/assessment` as its contract delta.
 
 ## 3. Open — a human must decide or supply
 

@@ -1,0 +1,132 @@
+using System.Globalization;
+using SchoolManagement.Application.Abstractions.Audit;
+using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Sessions;
+
+namespace SchoolManagement.Application.Sessions;
+
+/// <summary>
+/// Handles <see cref="OpenTermCommand"/>.
+/// </summary>
+/// <remarks>
+/// RESOLVED by TASK-0039 (was DEFERRED under TASK-0035, spec 6.3.6, tracked in STATE.md's known
+/// drift): "at least one arm exists for the session" — now that <c>Arm</c> exists, this handler loads
+/// <see cref="IArmRepository.AnyForSessionAsync"/> and passes it to
+/// <see cref="TermTransitionGuard.CanOpen"/>, which now enforces it. The remaining precondition ("the
+/// session has a start and end date") still needs no runtime check — <see cref="AcademicSession.Create"/>
+/// makes both dates mandatory, so it is structurally guaranteed rather than merely tested. TASK-0039
+/// also closes every arm in <c>previouslyActiveSession</c> below, in the same transaction as that
+/// session's own <see cref="AcademicSession.Close"/> (spec 6.4.7: "Status moves to closed
+/// automatically as part of closing the session").
+/// </remarks>
+internal sealed class OpenTermHandler(
+    ITermRepository terms,
+    IAcademicSessionRepository sessions,
+    IArmRepository arms,
+    ICurrentUser currentUser,
+    ISystemAuditSink auditSink)
+    : IRequestHandler<OpenTermCommand, Result<TermDto>>
+{
+    /// <inheritdoc />
+    public async Task<Result<TermDto>> HandleAsync(OpenTermCommand request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var term = await terms.FindTrackedByIdAsync(request.Id, cancellationToken).ConfigureAwait(false);
+
+        if (term is null)
+        {
+            return Result.Failure<TermDto>(Error.NotFound("term.not_found", "No term was found with that id."));
+        }
+
+        var session = await sessions.FindTrackedByIdAsync(term.SessionId, cancellationToken).ConfigureAwait(false);
+
+        if (session is null)
+        {
+            return Result.Failure<TermDto>(Error.Failure("term.orphaned", "This term's session could not be found."));
+        }
+
+        Term? previousTermInSession = null;
+        (string TermName, string SessionName)? activeElsewhere = null;
+
+        // Captured BEFORE any mutation below, so it reflects the state the DB actually holds right
+        // now — not a side effect of this same operation activating `session` in memory.
+        AcademicSession? previouslyActiveSession = null;
+
+        if (term.Ordinal > 1)
+        {
+            previousTermInSession = await terms
+                .FindByOrdinalAsync(session.Id, term.Ordinal - 1, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            var activeTerm = await terms.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+
+            if (activeTerm is not null)
+            {
+                var activeSession = await sessions
+                    .FindReadOnlyByIdAsync(activeTerm.SessionId, cancellationToken)
+                    .ConfigureAwait(false);
+
+                activeElsewhere = (activeTerm.Name, activeSession?.Name ?? "its session");
+            }
+
+            previouslyActiveSession = await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var hasArmsForSession = await arms.AnyForSessionAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        var canOpen = TermTransitionGuard.CanOpen(term, session, previousTermInSession, activeElsewhere, hasArmsForSession);
+
+        if (canOpen.IsFailure)
+        {
+            return Result.Failure<TermDto>(canOpen.Error);
+        }
+
+        var open = term.Open();
+
+        if (open.IsFailure)
+        {
+            return Result.Failure<TermDto>(open.Error);
+        }
+
+        if (term.Ordinal == 1)
+        {
+            session.Activate();
+
+            // Spec 6.3.5: opening First Term "moves the new session to active and the old session to
+            // closed" — the old session's own `state` flag, independent of whether it still has any
+            // term flagged active (the "lame duck" window described on AcademicSession's remarks).
+            if (previouslyActiveSession is not null && previouslyActiveSession.Id != session.Id)
+            {
+                previouslyActiveSession.Close();
+
+                // Spec 6.4.7: "Status moves to closed automatically as part of closing the session" —
+                // every arm in the session that just closed, in this same transaction.
+                var armsToClose = await arms
+                    .ListBySessionTrackedAsync(previouslyActiveSession.Id, cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var arm in armsToClose)
+                {
+                    arm.Close();
+                }
+            }
+        }
+
+        await auditSink.RecordAsync(
+            Privileges.Term.Open,
+            "term",
+            term.Id.ToString("D", CultureInfo.InvariantCulture),
+            metadata: null,
+            actorAdminId: currentUser.UserId,
+            cancellationToken).ConfigureAwait(false);
+
+        return Result.Success(SessionMapper.ToTermDto(term));
+    }
+}

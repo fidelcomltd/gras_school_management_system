@@ -49,6 +49,21 @@ public sealed class SchoolProfile : Entity<Guid>
     /// <summary>6.2.3: <c>abbreviation</c>, String 8 (2 to 8 characters — the floor is TASK-0005c's, this is the ceiling).</summary>
     public const int AbbreviationMaxLength = 8;
 
+    /// <summary>TASK-0005c's own floor for <see cref="Abbreviation"/> — see <see cref="AbbreviationMaxLength"/>'s remark.</summary>
+    public const int AbbreviationMinLength = 2;
+
+    /// <summary>6.2.4: fixed, not editable — "a number that changes meaning with the calendar is not an identifier."</summary>
+    public const string YearSource = "AdmissionYear";
+
+    /// <summary>6.2.4: <c>separator</c> default.</summary>
+    public const string DefaultSeparator = "/";
+
+    /// <summary>6.2.4: <c>serial_width</c> default.</summary>
+    public const int DefaultSerialWidth = 4;
+
+    /// <summary>6.2.4: <c>serial_reset</c> default.</summary>
+    public const RegNumberSerialReset DefaultSerialReset = RegNumberSerialReset.PerYear;
+
     /// <summary>6.2.3: <c>address</c>, String 300.</summary>
     public const int AddressMaxLength = 300;
 
@@ -77,6 +92,7 @@ public sealed class SchoolProfile : Entity<Guid>
         Email = null!;
         HeadTeacherName = null!;
         Timezone = null!;
+        Separator = null!;
     }
 
     private SchoolProfile(
@@ -91,7 +107,14 @@ public sealed class SchoolProfile : Entity<Guid>
         string headTeacherName,
         string timezone,
         int identityVersionNumber,
-        int abbreviationVersionNumber)
+        int abbreviationVersionNumber,
+        string separator,
+        int serialWidth,
+        RegNumberSerialReset serialReset,
+        int regNumberVersionNumber,
+        int gradingVersionNumber,
+        int assessmentVersionNumber,
+        int resultRulesVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -105,6 +128,13 @@ public sealed class SchoolProfile : Entity<Guid>
         Timezone = timezone;
         IdentityVersionNumber = identityVersionNumber;
         AbbreviationVersionNumber = abbreviationVersionNumber;
+        Separator = separator;
+        SerialWidth = serialWidth;
+        SerialReset = serialReset;
+        RegNumberVersionNumber = regNumberVersionNumber;
+        GradingVersionNumber = gradingVersionNumber;
+        AssessmentVersionNumber = assessmentVersionNumber;
+        ResultRulesVersionNumber = resultRulesVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -146,10 +176,47 @@ public sealed class SchoolProfile : Entity<Guid>
     public int IdentityVersionNumber { get; private set; }
 
     /// <summary>
-    /// The abbreviation group's own, independent optimistic-concurrency pointer (TASK-0005c's to
-    /// increment — this card only seeds it at 0 and never touches it again).
+    /// The abbreviation group's own, independent optimistic-concurrency pointer, incremented by
+    /// <see cref="UpdateAbbreviation"/>.
     /// </summary>
     public int AbbreviationVersionNumber { get; private set; }
+
+    /// <summary>6.2.4: <c>separator</c>. One of <c>/</c>, <c>-</c>, <c>.</c>.</summary>
+    public string Separator { get; private set; }
+
+    /// <summary>6.2.4: <c>serial_width</c>. 3 to 6; serials are zero-padded to this width.</summary>
+    public int SerialWidth { get; private set; }
+
+    /// <summary>6.2.4: <c>serial_reset</c>.</summary>
+    public RegNumberSerialReset SerialReset { get; private set; }
+
+    /// <summary>
+    /// The reg-number group's own, independent optimistic-concurrency pointer, incremented by
+    /// <see cref="UpdateRegNumber"/>.
+    /// </summary>
+    public int RegNumberVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The grading-scale group's own, independent optimistic-concurrency pointer (TASK-0069). The
+    /// scale itself lives in the separate <see cref="GradingBand"/> table — this counter has no
+    /// grading fields of its own to guard, only the group's "what did the client last see" pointer,
+    /// matching <see cref="AbbreviationVersionNumber"/>'s reason for existing on this singleton rather
+    /// than a row that is itself replaced wholesale on every save.
+    /// </summary>
+    public int GradingVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The assessment-structure group's own, independent optimistic-concurrency pointer (TASK-0069).
+    /// See <see cref="GradingVersionNumber"/>'s remarks — same reasoning, for <see cref="AssessmentComponent"/>.
+    /// </summary>
+    public int AssessmentVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The result-rules group's own, independent optimistic-concurrency pointer (TASK-0077). The
+    /// rules themselves live in the separate <see cref="ResultRules"/> table — see
+    /// <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
+    /// </summary>
+    public int ResultRulesVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -182,6 +249,62 @@ public sealed class SchoolProfile : Entity<Guid>
     }
 
     /// <summary>
+    /// Applies a <c>PATCH /settings/abbreviation</c> edit (spec 6.2.4) and bumps
+    /// <see cref="AbbreviationVersionNumber"/>. Rewrites nothing else: an already-issued registration
+    /// number is frozen at the moment it was issued (spec 6.2.4, 6.5.10) and this method has no
+    /// reference to any such number to rewrite even in principle — TASK-0051 owns issuance entirely.
+    /// A value already used historically is accepted without complaint (spec 6.2.11): abbreviations
+    /// are not unique over time.
+    /// </summary>
+    /// <remarks>
+    /// Trusts its input, per <see cref="UpdateIdentity"/>'s own convention — FluentValidation has
+    /// already checked length and the confirmation token.
+    /// </remarks>
+    public void UpdateAbbreviation(string abbreviation)
+    {
+        Abbreviation = abbreviation.Trim();
+        AbbreviationVersionNumber++;
+    }
+
+    /// <summary>
+    /// Applies a <c>PATCH /settings/reg-number</c> edit (spec 6.2.4) and bumps
+    /// <see cref="RegNumberVersionNumber"/>. <see cref="YearSource"/> is not a parameter here — it is
+    /// fixed and this method has no way to change it, matching <see cref="Timezone"/>'s own pattern.
+    /// </summary>
+    /// <remarks>
+    /// Trusts its input: the width-reduction check against the counter (spec 6.2.10) runs BEFORE this
+    /// is called, in the handler, because it needs a repository read this domain method has no access
+    /// to — this method only ever sees inputs already cleared to write.
+    /// </remarks>
+    public void UpdateRegNumber(string separator, int serialWidth, RegNumberSerialReset serialReset)
+    {
+        Separator = separator;
+        SerialWidth = serialWidth;
+        SerialReset = serialReset;
+        RegNumberVersionNumber++;
+    }
+
+    /// <summary>
+    /// Bumps <see cref="GradingVersionNumber"/> for a successful <c>PUT /settings/grading</c> or
+    /// <c>POST /settings/grading/reset</c> save (TASK-0069). The bands themselves are written through
+    /// <c>IGradingBandRepository.ReplaceAllAsync</c>, not through this entity — this method only
+    /// advances the group's optimistic-concurrency pointer, in the same transaction.
+    /// </summary>
+    public void IncrementGradingVersion() => GradingVersionNumber++;
+
+    /// <summary>
+    /// Bumps <see cref="AssessmentVersionNumber"/> for a successful <c>PUT /settings/assessment</c>
+    /// save (TASK-0069). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementAssessmentVersion() => AssessmentVersionNumber++;
+
+    /// <summary>
+    /// Bumps <see cref="ResultRulesVersionNumber"/> for a successful <c>PUT /settings/result-rules</c>
+    /// save (TASK-0077). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementResultRulesVersion() => ResultRulesVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -200,7 +323,14 @@ public sealed class SchoolProfile : Entity<Guid>
         string headTeacherName = "",
         string timezone = FixedTimezone,
         int identityVersionNumber = 0,
-        int abbreviationVersionNumber = 0) =>
+        int abbreviationVersionNumber = 0,
+        string separator = DefaultSeparator,
+        int serialWidth = DefaultSerialWidth,
+        RegNumberSerialReset serialReset = DefaultSerialReset,
+        int regNumberVersionNumber = 0,
+        int gradingVersionNumber = 0,
+        int assessmentVersionNumber = 0,
+        int resultRulesVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -213,5 +343,12 @@ public sealed class SchoolProfile : Entity<Guid>
             headTeacherName,
             timezone,
             identityVersionNumber,
-            abbreviationVersionNumber);
+            abbreviationVersionNumber,
+            separator,
+            serialWidth,
+            serialReset,
+            regNumberVersionNumber,
+            gradingVersionNumber,
+            assessmentVersionNumber,
+            resultRulesVersionNumber);
 }

@@ -13,13 +13,25 @@ namespace SchoolManagement.Application.Authorization;
 /// Deliberately a pure function over plain data — no <c>HttpContext</c>, no DI — so every branch is
 /// a fast, exhaustive unit test rather than an HTTP round trip.
 /// <para>
-/// SESSION BOUNDARY — NOT YET ENFORCED HERE. Spec 4.2.1's check is "... in the session the target
-/// belongs to," and <see cref="PrivilegeGrant.SessionId"/> carries that dimension, but nothing in
-/// TASK-0002 can resolve a target's session: no session-bearing scope target (pupil, result set)
-/// has a real lookup yet (see <c>IPupilArmOfRecordLookup</c>/<c>IResultSetArmLookup</c>). This
-/// method therefore ignores <see cref="PrivilegeGrant.SessionId"/> entirely.
-/// TODO(TASK-0002): filter matching grants by the target's session once a session-bearing scope
-/// target exists to resolve one from.
+/// SESSION BOUNDARY — STILL NOT ENFORCED HERE, and TASK-0059 does not change that, though the
+/// original reason it does not (no session-bearing scope target had a real lookup) has partly gone:
+/// <c>IPupilArmOfRecordLookup</c> is real since TASK-0059 (resolving a pupil's arm from their open
+/// enrolment, spec 02 §5.2), which itself resolves to a session via the arm's own <c>SessionId</c>.
+/// What has NOT changed is the routing: pupil routes still never declare
+/// <see cref="SchoolManagement.Application.Abstractions.Authorization.ScopeParameterKind.Pupil"/>
+/// through <c>ScopeResolver</c> — they use the handler-level, data-dependent
+/// <c>SchoolManagement.Application.Pupils.PupilAccessGuard</c> pattern instead (see its own remarks
+/// for why), so this method's <see cref="PrivilegeGrant.SessionId"/> dimension is still never
+/// exercised by any real caller. Implementing the LOOKUP did not resolve the underlying TODO — a
+/// route would have to use the declarative <c>ScopeParameterKind.Pupil</c>/<c>ResultSet</c>
+/// mechanism for that, which is a routing decision outside this card's boundary (§07 arm-scoped
+/// access is closed by <c>PupilAccessGuard</c>, not by this method). This is a genuinely separate,
+/// cross-cutting concern spanning every scoped route, not only pupils, and is carded as
+/// TASK-0060, opened at TASK-0059's closure.
+/// This method therefore still ignores <see cref="PrivilegeGrant.SessionId"/> entirely.
+/// TODO(TASK-0060): filter matching
+/// grants by the target's session once a route actually resolves a target through
+/// <c>ScopeParameterKind.Pupil</c>/<c>ScopeParameterKind.ResultSet</c>.
 /// </para>
 /// </remarks>
 public static class PrivilegeDecision

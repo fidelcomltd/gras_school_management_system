@@ -71,7 +71,9 @@ internal sealed class CreateRoleCommandHandler(
         {
             // Spec 6.1.7 preamble: "producing an audit event on rejection so that an attempt is
             // visible even though it failed." Nothing was persisted, so there is no entity id to name.
-            await auditSink.RecordAsync(
+            // RecordRejectionAsync (not RecordAsync): this row must survive the ambient
+            // transaction's rollback below, which a same-transaction write would not (TASK-0048).
+            await auditSink.RecordRejectionAsync(
                 "role.privilege_escalation",
                 EntityType,
                 entityId: null,

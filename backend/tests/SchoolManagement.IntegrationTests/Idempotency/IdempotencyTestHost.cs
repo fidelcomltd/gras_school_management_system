@@ -12,7 +12,6 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Domain.Reference;
-using SchoolManagement.Infrastructure.Audit;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Interceptors;
 using SchoolManagement.Infrastructure.Persistence.Repositories;
@@ -89,7 +88,12 @@ internal sealed class IdempotencyTestHost : IAsyncDisposable
         // The exact three services RequireIdempotencyKey()'s filter resolves, wired to the REAL
         // implementations — nothing here is a fake.
         builder.Services.AddScoped<IIdempotencyStore, IdempotencyStore>();
-        builder.Services.AddScoped<ISystemAuditSink, LoggingSystemAuditSink>();
+
+        // A no-op stub, not the real TASK-0048 SystemAuditSink: this host is deliberately minimal
+        // (see the class remarks — only the probe route/handler is a stand-in for anything) and
+        // does not register IAdminAccountRepository or IOptions<DatabaseOptions>, which the real
+        // implementation needs. Audit persistence is not what this host proves.
+        builder.Services.AddScoped<ISystemAuditSink, NoOpSystemAuditSink>();
         builder.Services.AddScoped<IdempotencyPurgeJob>();
         builder.Services.Configure<IdempotencyOptions>(_ => { });
 
@@ -172,4 +176,31 @@ internal sealed class TestCallerCurrentUser(IHttpContextAccessor httpContextAcce
         : null;
 
     public bool IsAuthenticated => UserId is not null;
+
+    public string? RemoteIpAddress => null;
+
+    public string? UserAgent => null;
+}
+
+/// <summary>Discards everything. See the registration site's remarks for why.</summary>
+internal sealed class NoOpSystemAuditSink : ISystemAuditSink
+{
+    public Task RecordAsync(
+        string action,
+        string? entityType,
+        string? entityId,
+        IReadOnlyDictionary<string, object?>? metadata,
+        string? actorAdminId,
+        CancellationToken cancellationToken,
+        string? reason = null,
+        IReadOnlyDictionary<string, object?>? beforeMetadata = null) => Task.CompletedTask;
+
+    public Task RecordRejectionAsync(
+        string action,
+        string? entityType,
+        string? entityId,
+        IReadOnlyDictionary<string, object?>? metadata,
+        string? actorAdminId,
+        CancellationToken cancellationToken,
+        string? reason = null) => Task.CompletedTask;
 }
