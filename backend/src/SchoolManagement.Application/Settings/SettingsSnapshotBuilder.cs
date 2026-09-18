@@ -16,26 +16,33 @@ namespace SchoolManagement.Application.Settings;
 /// TASK-0077 adds the result-rules section the same way — every caller now also reads the CURRENT
 /// <see cref="ResultRules"/> row and passes it through.
 /// </remarks>
+/// <remarks>
+/// TASK-0072 STAGE 3A: <see cref="Build"/> now takes ONE bundled <see cref="SettingsSnapshotState"/>
+/// instead of one parameter per group — see that type's remarks for why. The serialised JSON SHAPE is
+/// byte-identical to before this change; only how a caller ASSEMBLES the input moved, pinned by
+/// <c>SettingsSnapshotBuilderTests.Build_ProducesTheSameShapeAsBeforeTheStage3ARefactor</c>.
+/// </remarks>
 internal static class SettingsSnapshotBuilder
 {
     // camelCase, matching the wire format every other DTO in this API serialises with.
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Serialises the current, in-memory state of <paramref name="profile"/>, <paramref name="bands"/>,
-    /// <paramref name="components"/>, <paramref name="resultRules"/>, <paramref name="ratingScales"/>
-    /// and <paramref name="developmentDomains"/> into a snapshot document — the WHOLE configuration as
-    /// of this save, regardless of which group actually changed.
+    /// Serialises the current, in-memory state of <paramref name="profile"/> and every group in
+    /// <paramref name="state"/> into a snapshot document — the WHOLE configuration as of this save,
+    /// regardless of which group actually changed.
     /// </summary>
-    public static string Build(
-        SchoolProfile profile,
-        IReadOnlyList<GradingBand> bands,
-        IReadOnlyList<AssessmentComponent> components,
-        ResultRules resultRules,
-        IReadOnlyList<RatingScale> ratingScales,
-        IReadOnlyList<DevelopmentDomain> developmentDomains)
+    public static string Build(SchoolProfile profile, SettingsSnapshotState state)
     {
         ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var bands = state.GradingBands;
+        var components = state.AssessmentComponents;
+        var resultRules = state.ResultRules;
+        var ratingScales = state.RatingScales;
+        var developmentDomains = state.DevelopmentDomains;
+
         ArgumentNullException.ThrowIfNull(bands);
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(resultRules);

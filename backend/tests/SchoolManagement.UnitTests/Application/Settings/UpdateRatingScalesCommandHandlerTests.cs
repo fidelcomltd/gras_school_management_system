@@ -29,43 +29,36 @@ public sealed class UpdateRatingScalesCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
-    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
-
-    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
-        Substitute.For<IAssessmentComponentRepository>();
-
-    private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly IRatingScaleUsageGate _ratingScaleUsageGate = Substitute.For<IRatingScaleUsageGate>();
-    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
+    private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     public UpdateRatingScalesCommandHandlerTests()
     {
-        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
-        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
-        _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
         _ratingScaleUsageGate.IsInUseAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
+        _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
+            Array.Empty<GradingBand>(),
+            Array.Empty<AssessmentComponent>(),
+            ResultRules.CreateSeed(Guid.CreateVersion7()),
+            Array.Empty<RatingScale>(),
+            Array.Empty<DevelopmentDomain>()));
     }
 
     private UpdateRatingScalesCommandHandler CreateHandler() => new(
         _schoolProfileRepository,
         _ratingScaleRepository,
-        _gradingBandRepository,
-        _assessmentComponentRepository,
-        _resultRulesRepository,
         _configVersionRepository,
         _academicSessionRepository,
         _publishedResultsGate,
         _ratingScaleUsageGate,
-        _developmentDomainRepository,
+        _settingsSnapshotSource,
         _currentUser,
         _auditSink,
         _timeProvider);

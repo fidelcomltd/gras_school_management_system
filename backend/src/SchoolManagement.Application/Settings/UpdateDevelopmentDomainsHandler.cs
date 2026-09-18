@@ -37,10 +37,10 @@ namespace SchoolManagement.Application.Settings;
 /// first ever-rated indicator anywhere in it trips the same refusal.
 /// </para>
 /// <para>
-/// THE SNAPSHOT CARRIES EVERY GROUP, NOT ONLY THE ONE THAT CHANGED (spec 6.2.9) — this handler reads
-/// the CURRENT grading, assessment, result-rules and rating-scales state (unchanged by this save)
-/// purely to hand them to <see cref="SettingsSnapshotBuilder.Build"/>, matching every other settings
-/// handler.
+/// THE SNAPSHOT CARRIES EVERY GROUP, NOT ONLY THE ONE THAT CHANGED (spec 6.2.9) — TASK-0072 stage 3a:
+/// this handler asks <see cref="ISettingsSnapshotSource"/> for every OTHER group's current state in
+/// one call and overrides only the development-domains group with the just-saved, pre-commit
+/// <c>domains</c> before handing the result to <see cref="SettingsSnapshotBuilder.Build"/>.
 /// </para>
 /// </remarks>
 internal sealed class UpdateDevelopmentDomainsCommandHandler(
@@ -48,13 +48,11 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
     IDevelopmentDomainRepository developmentDomainRepository,
     ISectionRepository sectionRepository,
     IRatingScaleRepository ratingScaleRepository,
-    IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository,
-    IResultRulesRepository resultRulesRepository,
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     IDevelopmentIndicatorUsageGate developmentIndicatorUsageGate,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -264,14 +262,11 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
 
         profile.IncrementDevelopmentDomainsVersion();
 
-        var currentBands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var currentComponents = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
-        var currentRatingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, currentBands, currentComponents, resultRules, currentRatingScales, domains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState with { DevelopmentDomains = domains }),
             ConfigVersionGroup.DevelopmentDomains,
             currentUser.UserId,
             reason: reasonCheck.Value,

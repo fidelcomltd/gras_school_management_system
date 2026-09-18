@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -22,13 +23,10 @@ namespace SchoolManagement.Application.Settings;
 internal sealed class ResetGradingCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository,
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
-    IResultRulesRepository resultRulesRepository,
-    IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -95,16 +93,11 @@ internal sealed class ResetGradingCommandHandler(
 
         profile.IncrementGradingVersion();
 
-        var currentComponents = await assessmentComponentRepository
-            .ListReadOnlyOrderedAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
-        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, currentComponents, resultRules, ratingScales, developmentDomains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState with { GradingBands = bands }),
             ConfigVersionGroup.Grading,
             currentUser.UserId,
             reason: reasonCheck.Value,

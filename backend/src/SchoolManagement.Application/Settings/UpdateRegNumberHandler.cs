@@ -2,6 +2,7 @@ using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -35,11 +36,7 @@ internal sealed class UpdateRegNumberCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IRegistrationCounterRepository registrationCounterRepository,
     IConfigVersionRepository configVersionRepository,
-    IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository,
-    IResultRulesRepository resultRulesRepository,
-    IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -108,16 +105,14 @@ internal sealed class UpdateRegNumberCommandHandler(
 
         profile.UpdateRegNumber(request.Separator, request.SerialWidth, request.SerialReset);
 
-        // TASK-0069/TASK-0077: the snapshot carries every group, not only the one this save changed (spec 6.2.9).
-        var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
-        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        // TASK-0069/TASK-0077/TASK-0072 stage 3a: the snapshot carries every group, not only the one
+        // this save changed (spec 6.2.9) — this group has no field of its own in SettingsSnapshotState
+        // (it lives on SchoolProfile itself), so no override is needed.
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, components, resultRules, ratingScales, developmentDomains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState),
             ConfigVersionGroup.RegistrationNumber,
             currentUser.UserId,
             reason: null,

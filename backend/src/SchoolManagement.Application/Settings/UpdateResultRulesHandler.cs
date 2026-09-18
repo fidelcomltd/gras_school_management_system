@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
@@ -43,14 +44,11 @@ namespace SchoolManagement.Application.Settings;
 internal sealed class UpdateResultRulesCommandHandler(
     IResultRulesRepository resultRulesRepository,
     ISchoolProfileRepository schoolProfileRepository,
-    IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository,
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ISubjectRepository subjectRepository,
-    IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -199,14 +197,11 @@ internal sealed class UpdateResultRulesCommandHandler(
 
         var afterMetadata = BuildMetadata(resultRules);
 
-        var bands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var components = await assessmentComponentRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, components, resultRules, ratingScales, developmentDomains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState with { ResultRules = resultRules }),
             ConfigVersionGroup.ResultRules,
             currentUser.UserId,
             reason: reasonCheck.Value,

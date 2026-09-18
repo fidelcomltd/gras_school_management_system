@@ -29,12 +29,6 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
     private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
     private readonly ISectionRepository _sectionRepository = Substitute.For<ISectionRepository>();
     private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
-    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
-
-    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
-        Substitute.For<IAssessmentComponentRepository>();
-
-    private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
@@ -42,21 +36,25 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
     private readonly IDevelopmentIndicatorUsageGate _developmentIndicatorUsageGate =
         Substitute.For<IDevelopmentIndicatorUsageGate>();
 
+    private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     public UpdateDevelopmentDomainsCommandHandlerTests()
     {
-        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
-        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
-        _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(
             [RatingScale.Create(RatingScaleId, "Nursery development", [RatingScalePoint.Create(Guid.CreateVersion7(), RatingScaleId, "E", "Excellent", 1)])]);
         _sectionRepository.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns([Section.Create(SectionId, "Nursery").Value]);
         _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
         _developmentIndicatorUsageGate.HasEverBeenRatedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
+            Array.Empty<GradingBand>(),
+            Array.Empty<AssessmentComponent>(),
+            ResultRules.CreateSeed(Guid.CreateVersion7()),
+            Array.Empty<RatingScale>(),
+            Array.Empty<DevelopmentDomain>()));
     }
 
     private UpdateDevelopmentDomainsCommandHandler CreateHandler() => new(
@@ -64,13 +62,11 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         _developmentDomainRepository,
         _sectionRepository,
         _ratingScaleRepository,
-        _gradingBandRepository,
-        _assessmentComponentRepository,
-        _resultRulesRepository,
         _configVersionRepository,
         _academicSessionRepository,
         _publishedResultsGate,
         _developmentIndicatorUsageGate,
+        _settingsSnapshotSource,
         _currentUser,
         _auditSink,
         _timeProvider);

@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -31,22 +32,20 @@ namespace SchoolManagement.Application.Settings;
 /// — 6.2.5's "a partially valid scale is never saved."
 /// </para>
 /// <para>
-/// THE SNAPSHOT CARRIES EVERY GROUP, NOT ONLY THE ONE THAT CHANGED (spec 6.2.9) — this handler reads
-/// the CURRENT assessment structure (unchanged by this save) purely to hand it to
-/// <see cref="SettingsSnapshotBuilder.Build"/>, matching what <c>UpdateAssessmentCommandHandler</c>
-/// does in the other direction.
+/// THE SNAPSHOT CARRIES EVERY GROUP, NOT ONLY THE ONE THAT CHANGED (spec 6.2.9) — TASK-0072 stage 3a:
+/// this handler asks <see cref="ISettingsSnapshotSource"/> for every OTHER group's current state in
+/// one call rather than injecting one repository per group itself, and overrides only the grading
+/// group with the just-saved, pre-commit <c>bands</c> local before handing the result to
+/// <see cref="SettingsSnapshotBuilder.Build"/>.
 /// </para>
 /// </remarks>
 internal sealed class UpdateGradingCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IGradingBandRepository gradingBandRepository,
-    IAssessmentComponentRepository assessmentComponentRepository,
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
-    IResultRulesRepository resultRulesRepository,
-    IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -119,16 +118,11 @@ internal sealed class UpdateGradingCommandHandler(
 
         profile.IncrementGradingVersion();
 
-        var currentComponents = await assessmentComponentRepository
-            .ListReadOnlyOrderedAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
-        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, bands, currentComponents, resultRules, ratingScales, developmentDomains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState with { GradingBands = bands }),
             ConfigVersionGroup.Grading,
             currentUser.UserId,
             reason: reasonCheck.Value,

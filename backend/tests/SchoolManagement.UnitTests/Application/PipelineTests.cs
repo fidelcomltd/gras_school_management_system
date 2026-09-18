@@ -126,6 +126,11 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IDevelopmentDomainRepository>());
         services.AddSingleton(Substitute.For<IDevelopmentIndicatorUsageGate>());
 
+        // TASK-0072 stage 3a: every Settings/* handler now asks ISettingsSnapshotSource for the whole
+        // config_version snapshot input in one call, instead of injecting one repository per OTHER
+        // group itself — same treatment as every other port stubbed above.
+        services.AddSingleton(Substitute.For<ISettingsSnapshotSource>());
+
         // TASK-0039: the Arms/* handlers (plus UpdateSessionHandler/GetSessionHandler's new arm-count
         // read) depend on this port, implemented by Infrastructure — same treatment as every other
         // repository stubbed above.

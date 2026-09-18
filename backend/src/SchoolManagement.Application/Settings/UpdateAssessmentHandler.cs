@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -43,14 +44,11 @@ namespace SchoolManagement.Application.Settings;
 internal sealed class UpdateAssessmentCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IAssessmentComponentRepository assessmentComponentRepository,
-    IGradingBandRepository gradingBandRepository,
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ISubjectScoreSessionLockLookup subjectScoreSessionLockLookup,
-    IResultRulesRepository resultRulesRepository,
-    IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository,
+    ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -222,14 +220,11 @@ internal sealed class UpdateAssessmentCommandHandler(
 
         profile.IncrementAssessmentVersion();
 
-        var currentBands = await gradingBandRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
-        var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
-        var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshotState = await settingsSnapshotSource.LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var configVersion = ConfigVersion.Create(
             Guid.CreateVersion7(),
-            SettingsSnapshotBuilder.Build(profile, currentBands, savedComponents, resultRules, ratingScales, developmentDomains),
+            SettingsSnapshotBuilder.Build(profile, snapshotState with { AssessmentComponents = savedComponents }),
             ConfigVersionGroup.Assessment,
             currentUser.UserId,
             reason: reasonCheck.Value,

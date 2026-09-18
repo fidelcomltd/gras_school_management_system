@@ -2,6 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Settings;
 
@@ -19,37 +20,27 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
 
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
-    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
-
-    private readonly IAssessmentComponentRepository _assessmentComponentRepository =
-        Substitute.For<IAssessmentComponentRepository>();
-
-    private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
-    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
-    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
+    private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     // TASK-0069/TASK-0077/TASK-0072: the snapshot now reads the current grading/assessment/result-rules/
     // rating-scales/development-domains state even from a save that does not touch any of them — stub
-    // all five so SettingsSnapshotBuilder.Build never sees null.
+    // the bundled source so SettingsSnapshotBuilder.Build never sees null.
     private UpdateSchoolIdentityCommandHandler CreateHandler()
     {
-        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
-        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
-        _resultRulesRepository.GetReadOnlySingletonAsync(Arg.Any<CancellationToken>()).Returns(ResultRules.CreateSeed(Guid.CreateVersion7()));
-        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
-        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
+        _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
+            Array.Empty<GradingBand>(),
+            Array.Empty<AssessmentComponent>(),
+            ResultRules.CreateSeed(Guid.CreateVersion7()),
+            Array.Empty<RatingScale>(),
+            Array.Empty<DevelopmentDomain>()));
 
         return new(
             _schoolProfileRepository,
             _configVersionRepository,
-            _gradingBandRepository,
-            _assessmentComponentRepository,
-            _resultRulesRepository,
-            _ratingScaleRepository,
-            _developmentDomainRepository,
+            _settingsSnapshotSource,
             _currentUser,
             _auditSink,
             _timeProvider);

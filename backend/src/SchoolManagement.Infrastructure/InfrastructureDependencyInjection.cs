@@ -199,6 +199,11 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IDevelopmentDomainRepository, DevelopmentDomainRepository>();
         services.AddScoped<IDevelopmentIndicatorUsageGate, DevelopmentIndicatorUsageGate>();
 
+        // TASK-0072 stage 3a: one seam every settings handler asks for the whole config_version
+        // snapshot input through, replacing the one-repository-per-OTHER-group constructor ripple —
+        // see ISettingsSnapshotSource's own remarks.
+        services.AddScoped<ISettingsSnapshotSource, SettingsSnapshotSource>();
+
         // TASK-0076 dispatch A: real queries against subject_score/result_set, replacing the
         // honestly-empty TASK-0069 stand-ins now that the tables exist.
         services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();

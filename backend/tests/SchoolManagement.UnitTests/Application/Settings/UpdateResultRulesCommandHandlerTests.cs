@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Sessions;
@@ -24,24 +25,23 @@ public sealed class UpdateResultRulesCommandHandlerTests
 
     private readonly IResultRulesRepository _resultRulesRepository = Substitute.For<IResultRulesRepository>();
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
-    private readonly IGradingBandRepository _gradingBandRepository = Substitute.For<IGradingBandRepository>();
-    private readonly IAssessmentComponentRepository _assessmentComponentRepository = Substitute.For<IAssessmentComponentRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly ISubjectRepository _subjectRepository = Substitute.For<ISubjectRepository>();
-    private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
-    private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
+    private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
 
     public UpdateResultRulesCommandHandlerTests()
     {
-        _gradingBandRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<GradingBand>());
-        _assessmentComponentRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<AssessmentComponent>());
-        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
-        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
+        _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
+            Array.Empty<GradingBand>(),
+            Array.Empty<AssessmentComponent>(),
+            ResultRules.CreateSeed(Guid.CreateVersion7()),
+            Array.Empty<RatingScale>(),
+            Array.Empty<DevelopmentDomain>()));
         CreateTrackedProfile();
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
     }
@@ -49,14 +49,11 @@ public sealed class UpdateResultRulesCommandHandlerTests
     private UpdateResultRulesCommandHandler CreateHandler() => new(
         _resultRulesRepository,
         _schoolProfileRepository,
-        _gradingBandRepository,
-        _assessmentComponentRepository,
         _configVersionRepository,
         _academicSessionRepository,
         _publishedResultsGate,
         _subjectRepository,
-        _ratingScaleRepository,
-        _developmentDomainRepository,
+        _settingsSnapshotSource,
         _currentUser,
         _auditSink,
         _timeProvider);
