@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-16 by orchestrator (TASK-0069 closed; conflicts 1/2/4 resolved) · no size cap, see
+Last reconciled: 2026-09-18 by orchestrator (TASK-0079 and TASK-0077 closed; TASK-0080 carded) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,19 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `c5c4d6c6b8d48770fe40f0d2f860f02dc75c818588f2d51ed2dab14a01fe7510`** · **64 paths** ·
-**132 schemas** · api version `v1` · moved 2026-09-17 by TASK-0076 (result sets, subject scores, the
-score sheet). Previous: `57ea95b44bd4…` / 62 paths / 123 schemas, TASK-0070 on 2026-09-17; before that
-`152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
+**Current: `84b46211e9fce7ff68ef8cc615d618702e53260aaa8721ecb832ec8d263b7cd3`** · **65 paths** ·
+**137 schemas** · api version `v1` · moved 2026-09-18 by TASK-0077 (result rules settings, §6.2.8).
+Previous: `c5c4d6c6b8d4…` / 64 paths / 132 schemas, TASK-0076 on 2026-09-17; before that
+`57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
+
+**Additive verified MECHANICALLY at promotion by the orchestrator, not read off the card** — the previous
+document was copied aside before `-Promote` and diffed with `jq` across five separate assertions: paths
+removed, existing paths changed, schemas removed, newly-required properties on existing schemas, removed
+properties and changed property types on existing schemas. **All five came back empty: 1 path added
+(`/api/v1/settings/result-rules`), 5 schemas added (`AnnualMethod`, `PrimaryPositionScope`, `TieBreakRule`,
+`ResultRulesDto`, `UpdateResultRulesCommand`), zero removals, zero new required properties on an existing
+schema, zero type changes.** The ledger gate caught this block stale on the first attempt — the fourth time
+it has done its job since TASK-0075 built it.
 
 **Updated by the closing card at promotion.** Promotion run by the ORCHESTRATOR
 (`generate-openapi.ps1 -Promote`); `CONTRACT.lock` written in the same run. **Additive verified
@@ -147,14 +156,14 @@ trustworthy source and this block is not. A closing card MUST update this block.
 even though TASK-0062 moved the hash to `de4397b4164d…` on 2026-09-14. Closing TASK-0062 updated
 the archive and not this block. Verified against the working tree, not prose.
 
-- `CONTRACT.lock` matches this hash — verified with `sha256sum` 2026-09-16.
-- Frontend client is **CURRENT against this hash** as of 2026-09-17 (TASK-0079). `check:api-drift`
-  re-run by the ORCHESTRATOR, not accepted on report: `No drift`, exit 0 — which also proves
-  `schema.d.ts` carries no hand-edit, since regeneration reproduces it byte-for-byte. `npm run verify`
-  55 files / 381 tests / Skipped 0 / build clean, exit 0. **`apiPut` now exists, so the whole contract
-  surface is reachable** — `UpdateAssessment`, `UpdateGrading`, `ResetGrading` and `SaveScoreSheet` are
-  all callable, though none is called from application code yet. **TASK-0077 will move this hash and
-  restale the client**, needing a regeneration card after it.
+- `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
+  `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
+- Frontend client is **STALE against this hash** — it matches `c5c4d6c6…` (TASK-0079). TASK-0080
+  regenerates it: 1 path / 5 schemas from TASK-0077. **No new wrapper code needed** — the new surface is
+  `GET` + `PUT` on one path and `apiPut` already exists as of TASK-0079, so this is types only.
+- **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
+  `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
+  from application code yet.
 - The additive classification was verified MECHANICALLY (every existing schema's `required` array
   and every property type diffed against HEAD), not read off the card — see `decisions/2026-Q3.md`.
 - `/health/*` is excluded from the document (`ASSUMPTIONS.md` section 2.9); `/reference/*` is
@@ -165,7 +174,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0078, 0079, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -189,8 +198,8 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0077 | Result rules settings (§6.2.8) | backend-dev | **queued 2026-09-17** — after 0076. Found missing while rewriting 0071; the engine reads five of its fields. Delta approved, additive |
-| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **REWRITTEN 2026-09-17, blocked on 0076 + 0077 only**, both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
+| TASK-0080 | Regenerate the typed client against `84b46211…` | frontend-dev | **queued 2026-09-18** — 1 path / 5 schemas from TASK-0077. Types only; no new wrapper code (`apiPut` landed in 0079) |
+| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **DISPATCHABLE 2026-09-18** — 0076 and 0077 both closed; both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -198,6 +207,10 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **TASK-0077 closed — result rules settings exist; contract `84b46211…`, 65 paths, additive verified
+  mechanically.** Three judgment calls surfaced by the agent; **two were errors in the orchestrator's own delta**
+  (snake_case enums, unprefixed error code — third such instance). Optimistic concurrency added by delta amendment.
+  Full gate ALL PASSED, 1267/1267, Skipped 0, local container. → `decisions/2026-Q3.md`
 - 2026-09-17 **TASK-0079 closed — client regenerated against `c5c4d6c6…` and `apiPut` added, ending the
   zero-new-wrapper-code streak exactly where `src/api/README.md` predicted.** CSRF needed no interceptor
   change and the orchestrator VERIFIED why (denylist, not allowlist — an allowlist would have been a silent
@@ -498,6 +511,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-18 **The seeded default result rules cannot be saved back unchanged** — `requireCorePass: true` with empty
+  `coreSubjectIds` fails the PUT validator (422). Tension is in §6.2.8 itself. *Trigger: the result-rules screen card
+  and TASK-0036. Owner: human ruling, then that card.* → `drift/2026-Q3.md`
 - 2026-09-17 **Sibling arms' stored level positions can go stale** (TASK-0071 ruling: compute writes own arm only).
   *Trigger: the approval/publication card. Owner: that card.* → `drift/2026-Q3.md`
 - 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**
