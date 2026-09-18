@@ -196,7 +196,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **in progress 2026-09-18, branch `task-0072`; stages 1, 2a done; 2b (endpoint + stage 1 test fixes) dispatched** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
+| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **in progress 2026-09-18, branch `task-0072`; stages 1, 2a, 2b done; stage 3 (snapshot refactor + traits) dispatched** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -204,6 +204,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **TASK-0072 stage 2b done (`b9ee49f`)** — `PUT /settings/development-domains`; stage 1's 10 unit failures fixed by
+  reason (95 privileges). Unit 972/972 whole project. Snapshot ripple ~1720 lines; stage 3 refactors it first. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 stage 2a done (`fa55845`)** — domain/indicator tables, 4/45 seed, `RatingScaleUsageGate` real. Stage 1's
   unit filter hid 10 failures (privilege counts, `PipelineTests` DI fakes); dev unit runs are now whole-project. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 stage 1 done** — rating scales as records, `PUT /settings/rating-scales` (`db84f56`); review fix
