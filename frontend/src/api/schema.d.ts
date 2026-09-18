@@ -739,6 +739,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/result-sets/{resultSetId}/compute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute a result set
+         * @description Spec 8.2: deletes and rewrites subject_result_line, subject_arm_statistic and pupil_term_result from the arm's current marks. Idempotent — running it twice on unchanged inputs produces identical rows, and never changes the result set's state. Permitted in Draft, Awaiting Approval, Approved and Returned for Correction; refused 409 once Published or Withdrawn, because a published set renders from its fixed snapshot and is never recomputed. `Idempotency-Key` is ACCEPTED, not required — computation has no side effect a retry could duplicate.
+         */
+        post: operations["ComputeResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -2208,6 +2228,80 @@ export interface components {
              * @example another horse battery staple 4
              */
             newPassword: string;
+        };
+        /**
+         * @description One computation flag (contract delta's `flags[]`) — response-body data, NOT a problem code, so its string ComputeResultSetFlagDto.Code is not dotted.
+         * @example {
+         *       "code": "no_examination_sat",
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "pupilId": null
+         *     }
+         */
+        ComputeResultSetFlagDto: {
+            /**
+             * @description `no_examination_sat` or `absent_all_examinations`.
+             * @example no_examination_sat
+             */
+            code: string;
+            /**
+             * @description Set for `no_examination_sat`.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: null | string;
+            /** @description Set for `absent_all_examinations`. */
+            pupilId: null | string;
+        };
+        /**
+         * @description The 200 response (contract delta).
+         * @example {
+         *       "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "computedAt": "2026-12-18T09:30:00Z",
+         *       "pupilCount": 28,
+         *       "subjectCount": 9,
+         *       "flags": [
+         *         {
+         *           "code": "absent_all_examinations",
+         *           "subjectId": null,
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+         *         }
+         *       ]
+         *     }
+         */
+        ComputeResultSetResponse: {
+            /**
+             * @description The result set that was computed.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            resultSetId: string;
+            /**
+             * Format: date-time
+             * @description When this computation ran.
+             * @example 2026-12-18T09:30:00Z
+             */
+            computedAt: string;
+            /**
+             * Format: int32
+             * @description Pupils ranked (eligible for arm position) — the denominator the sheet prints.
+             * @example 28
+             */
+            pupilCount: number | string;
+            /**
+             * Format: int32
+             * @description Subjects in effect for the arm this term.
+             * @example 9
+             */
+            subjectCount: number | string;
+            /**
+             * @description Spec 6.7.12/6.7.4's computation-time flags.
+             * @example [
+             *       {
+             *         "code": "absent_all_examinations",
+             *         "subjectId": null,
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+             *       }
+             *     ]
+             */
+            flags: components["schemas"]["ComputeResultSetFlagDto"][];
         };
         /**
          * @description The full body of `GET /api/v1/config-versions/{id}`.
@@ -10296,6 +10390,90 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ComputeResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputeResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
