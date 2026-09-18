@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-18 by orchestrator (TASK-0079 and TASK-0077 closed; TASK-0080 carded) · no size cap, see
+Last reconciled: 2026-09-18 by orchestrator (TASK-0071 closed; contract `0ebca075…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,19 +115,18 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `84b46211e9fce7ff68ef8cc615d618702e53260aaa8721ecb832ec8d263b7cd3`** · **65 paths** ·
-**137 schemas** · api version `v1` · moved 2026-09-18 by TASK-0077 (result rules settings, §6.2.8).
-Previous: `c5c4d6c6b8d4…` / 64 paths / 132 schemas, TASK-0076 on 2026-09-17; before that
-`57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
+**Current: `0ebca075110efcf2f6aeaf740842fba519f0fdc4bcc515b8642b4a9c3d834265`** · **66 paths** ·
+**139 schemas** · api version `v1` · moved 2026-09-18 by TASK-0071 (result computation, §8.2).
+Previous: `84b46211e9fc…` / 65 paths / 137 schemas, TASK-0077 on 2026-09-18; before that
+`c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
 
-**Additive verified MECHANICALLY at promotion by the orchestrator, not read off the card** — the previous
-document was copied aside before `-Promote` and diffed with `jq` across five separate assertions: paths
-removed, existing paths changed, schemas removed, newly-required properties on existing schemas, removed
-properties and changed property types on existing schemas. **All five came back empty: 1 path added
-(`/api/v1/settings/result-rules`), 5 schemas added (`AnnualMethod`, `PrimaryPositionScope`, `TieBreakRule`,
-`ResultRulesDto`, `UpdateResultRulesCommand`), zero removals, zero new required properties on an existing
-schema, zero type changes.** The ledger gate caught this block stale on the first attempt — the fourth time
-it has done its job since TASK-0075 built it.
+**Additive verified MECHANICALLY at promotion by the orchestrator, not read off the card**: the previous
+document was copied aside before `-Promote` and diffed with `jq`. Paths removed, existing paths changed,
+schemas removed and existing schemas changed in any way **all came back empty**. Added: 1 path
+(`POST /api/v1/result-sets/{resultSetId}/compute`) and 2 schemas (`ComputeResultSetResponse`,
+`ComputeResultSetFlagDto`). Responses 200/401/403/409/422/429 and **no 404**, per the 2026-09-18 ruling. The ledger
+gate caught this block stale on the first attempt again, the fifth time since TASK-0075 built it. (TASK-0077's
+promotion paragraph, which this replaces: `decisions/2026-Q3.md`, TASK-0077 closure.)
 
 **Updated by the closing card at promotion.** Promotion run by the ORCHESTRATOR
 (`generate-openapi.ps1 -Promote`); `CONTRACT.lock` written in the same run. **Additive verified
@@ -158,9 +157,9 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-18 (TASK-0080). `check:api-drift` re-run by
-  the orchestrator: `No drift`, exit 0; `npm run verify` 55 files / 381 tests / build clean, exit 0. Types only,
-  zero new wrapper code.
+- Frontend client is **STALE against this hash** as of 2026-09-18: it is current against `84b46211…`
+  (TASK-0080) and lacks the one compute path and its 2 schemas. A regeneration card is next; nothing in the
+  frontend calls compute yet, so nothing is broken.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
   from application code yet.
@@ -174,7 +173,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -198,7 +197,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
 | TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **queued, now dispatchable 2026-09-17** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
-| TASK-0071 | Result computation engine + §8.4 regression fixture | backend-dev | **IN PROGRESS 2026-09-18** — stages 1–2 built and green (engine, tables, endpoint); stage 3 fixture dispatched fresh. Both pre-promotion questions ruled 2026-09-18 (band threshold semantics; 403, no documented 404). Earlier: both human rulings received (level position from live marks, own arm written only; literal §8.3 for incomplete Draft rows). Annual cumulative moved to §6.7.10's card. Subject set via `SubjectsInEffectResolver` in-process |
+| TASK-0081 | Regenerate the typed client against `0ebca075…` (compute path + 2 schemas) | frontend-dev | **NOT YET CARDED 2026-09-18.** Opened by TASK-0071's promotion. Same shape as TASK-0080: types only, no caller yet |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -206,6 +205,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **TASK-0071 closed: result computation engine + §8.4 regression fixture.** Contract `0ebca075…`, 66 paths,
+  additive verified mechanically. Survived a hung session: stages 1–2 checkpointed, stage 3 re-dispatched on the partial
+  files, where the agent fixed two build breaks. Full gate 1330/1330, Skipped 0, local container. → `decisions/2026-Q3.md`
 - 2026-09-18 **HUMAN RULINGS on TASK-0071:** a fractional average is banded by threshold (84.60 is B, 85.00 is A),
   like `passMark`; an unknown result-set id is 403 and the contract drops the unreachable 404. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0080 closed — client current against `84b46211…`**, one generated file, zero wrapper code. Drift and
@@ -743,6 +745,9 @@ One decision clears all four.
 
 ### Live — build and tooling
 
+- 2026-09-18 **A UnitTests namespace segment named `Results` shadows `Microsoft.AspNetCore.Http.Results`** (and
+  `Pupils` under `.Application` shadows a static field), breaking unrelated tests with CS0234. *Trigger: a new UnitTests
+  folder/namespace named `Results` or `Pupils` at those levels. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-05 **`Microsoft.Testing.Platform.MSBuild` is an unpinned transitive floor, and
   `backend/` has NO NuGet lock file.** Pinning it broke restore. *Trigger: the next `xunit.v3`
   upgrade. Owner: `backend-dev`.*
