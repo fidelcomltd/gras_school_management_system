@@ -204,8 +204,10 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
-- 2026-09-18 **TASK-0072 stage 2a done (`fa55845`)** — domain/indicator tables, 4/45 seed, `RatingScaleUsageGate` real. Stage 1's`n  unit filter hid 10 failures (privilege counts, `PipelineTests` DI fakes); dev unit runs are now whole-project. → `decisions/2026-Q3.md`
-- 2026-09-18 **TASK-0072 stage 1 done** — rating scales as records, `PUT /settings/rating-scales` (`db84f56`); review fix`n  `d63231b` makes scale/point ids stable across saves (was: new ids every save). ~1840 hand-written lines vs ~400 budget. → `decisions/2026-Q3.md`
+- 2026-09-18 **TASK-0072 stage 2a done (`fa55845`)** — domain/indicator tables, 4/45 seed, `RatingScaleUsageGate` real. Stage 1's
+  unit filter hid 10 failures (privilege counts, `PipelineTests` DI fakes); dev unit runs are now whole-project. → `decisions/2026-Q3.md`
+- 2026-09-18 **TASK-0072 stage 1 done** — rating scales as records, `PUT /settings/rating-scales` (`db84f56`); review fix
+  `d63231b` makes scale/point ids stable across saves (was: new ids every save). ~1840 hand-written lines vs ~400 budget. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 contract delta approved by the human** — 3 additive PUT /settings/* routes, per-block scale ids,
   3 stages, promote once at stage 3; open questions 1-4 settled as recommended. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0081 closed — client current against `0ebca075…`**, one generated file, zero wrapper code. Carded after
