@@ -2102,6 +2102,138 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(AttendanceRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "timesPresent": 58,
+              "timesAbsent": 4
+            }
+            """,
+
+        [typeof(AttendanceSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": true
+              },
+              "timesSchoolOpened": 62,
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "timesPresent": 58,
+                  "timesAbsent": 4
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "timesPresent": null,
+                  "timesAbsent": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(SaveAttendanceRowInput)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "timesPresent": 58
+            }
+            """,
+
+        [typeof(SaveAttendanceCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                { "pupilId": "{{ExamplePupilId}}", "timesPresent": 58 },
+                { "pupilId": "{{ExampleSecondPupilId}}", "timesPresent": null }
+              ]
+            }
+            """,
+
+        [typeof(RemarkRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "remark": "A diligent and attentive pupil this term.",
+              "writtenByName": "Mrs Adeyemi",
+              "writtenAt": "2026-12-12T09:30:00+01:00"
+            }
+            """,
+
+        [typeof(RemarkSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": true
+              },
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "remark": "A diligent and attentive pupil this term.",
+                  "writtenByName": "Mrs Adeyemi",
+                  "writtenAt": "2026-12-12T09:30:00+01:00"
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "remark": null,
+                  "writtenByName": null,
+                  "writtenAt": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(SaveRemarkRowInput)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "remark": "A diligent and attentive pupil this term."
+            }
+            """,
+
+        [typeof(SaveClassTeacherRemarksCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                { "pupilId": "{{ExamplePupilId}}", "remark": "A diligent and attentive pupil this term." },
+                { "pupilId": "{{ExampleSecondPupilId}}", "remark": null }
+              ]
+            }
+            """,
+
+        [typeof(SaveHeadTeacherRemarksCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                { "pupilId": "{{ExamplePupilId}}", "remark": "A pleasure to have in school." }
+              ],
+              "fillEmpty": "Keep up the good work."
+            }
+            """,
+
         [typeof(VoidScoreSheetCommand)] = $$"""
             {
               "armId": "{{ExampleArmId}}",

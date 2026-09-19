@@ -119,6 +119,12 @@ public sealed class PipelineTests
         // implemented by Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IDevelopmentRatingRepository>());
 
+        // TASK-0086 stage A: the attendance handlers (Get/Save) AND UpdateTermHandler (delta item 5)
+        // depend on this port; the two remark-sheet handler families depend on the other — both
+        // implemented by Infrastructure, same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IAttendanceEntryRepository>());
+        services.AddSingleton(Substitute.For<IPupilRemarkRepository>());
+
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());
