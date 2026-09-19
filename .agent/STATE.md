@@ -115,12 +115,17 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `9c2f8d55fe3a1d9994dd31bb160bc8841292f280e35957c4bab4c6fd3b82267f`** · **71 paths** ·
-**170 schemas** · api version `v1` · moved 2026-09-19 by TASK-0083 (trait and development rating entry, §6.7.7 / §6.7.12).
-Previous: `8e3087d93f02…` / 69 paths / 159 schemas, TASK-0072 on 2026-09-18; before that `0ebca075110e…` (TASK-0071),
+**Current: `42d8e3b52ba4e97dc8b4d0282f1f07e2195df7435e74181b1d9dd80176c068f5`** · **76 paths** ·
+**183 schemas** · api version `v1` · moved 2026-09-19 by TASK-0086 (attendance, class/head teacher remarks, remark templates, §6.7.7).
+Previous: `9c2f8d55fe3a…` / 71 paths / 170 schemas, TASK-0083 on 2026-09-19; before that `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
 
-**Additive verified MECHANICALLY at promotion by the orchestrator** (the previous document was copied aside and diffed
+**TASK-0086 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff): 0 paths / 0 schemas removed;
+5 paths added (`/arms/{armId}/attendance`, `/class-teacher-remarks`, `/head-teacher-remarks`, `/remark-templates`, `/remark-templates/{id}`),
+13 schemas added; the one changed path (`/terms/{id}`) is byte-identical once `description` is stripped (new 409 in text only); zero existing
+schemas changed with description/example stripped.
+
+**TASK-0083's promotion (previous hash):** additive verified mechanically (the previous document was copied aside and diffed
 with `jq`). 0 paths removed, 0 schemas removed. Added: 2 paths (`GET`/`PUT /api/v1/arms/{armId}/trait-ratings` and
 `/development-ratings`) and 11 schemas. The 3 changed paths (`PUT /settings/rating-scales`, `/development-domains`, `/traits`)
 are byte-identical once `description` is stripped: the new R2 409s are documented in text only. Changed schemas:
@@ -157,8 +162,8 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0085, same PR as TASK-0083). The orchestrator re-ran
-  `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
+- Frontend client is **STALE against this hash** until TASK-0087 (regeneration, same PR as TASK-0086). Was current against `9c2f8d55…` (TASK-0085: No drift, verify
+  55 files / 381 tests). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
   from application code yet.
