@@ -188,7 +188,8 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **carded 2026-09-19**; queued behind TASK-0083 stage 0; runs in a worktree off main after TASK-0072 merges |
+| TASK-0086 | Attendance, class and head teacher remarks, remark templates | backend-dev | **dispatched 2026-09-19**, stage A; branch `task-0086` stacked on `task-0083`; delta approved in the card |
+| TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **dispatched 2026-09-19** in worktree `../gras-task-0084`, branch `task-0084` off `origin/main`, parallel to 0086 |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -203,6 +204,10 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **Human rulings on TASK-0086**: L remarks 300 chars (not §6.7.7's 240); A attendance stores present only, absent derived;
+  T two template lists by kind, class-teacher list at ANY scope; H head remark editable until Published. → `decisions/2026-Q3.md`
+- 2026-09-19 **TASK-0084 runs parallel to a contract-moving card (0086)**, bending `rules/contract.md` §3's letter on the human's "alongside"
+  instruction: separate worktree off main, 0084 contract impact none and must STOP otherwise. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0083 closed** — trait and development rating entry, `ratesTraits`, R2 refusals; contract `9c2f8d55…`, 71 paths. Full gate
   1534/1534 on the FIRST run. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0085 closed** — client current against `9c2f8d55…`, same PR. → `decisions/2026-Q3.md`
