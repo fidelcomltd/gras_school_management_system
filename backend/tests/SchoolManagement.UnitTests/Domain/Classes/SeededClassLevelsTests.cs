@@ -22,6 +22,17 @@ public sealed class SeededClassLevelsTests
         SeededClassLevels.PrimarySectionId.ShouldBe(Guid.Parse("00000000-0000-0000-0000-000000000302"));
     }
 
+    // TASK-0083 ruling R1: an arm rates traits only when its section's RatesTraits is true.
+    [Fact]
+    public void Sections_RateTraitsOnPrimaryOnly()
+    {
+        var nursery = SeededClassLevels.Sections.Single(section => section.Name == "Nursery");
+        var primary = SeededClassLevels.Sections.Single(section => section.Name == "Primary");
+
+        nursery.RatesTraits.ShouldBeFalse();
+        primary.RatesTraits.ShouldBeTrue();
+    }
+
     [Fact]
     public void NineLevels_HaveFixedDistinctIdsAndVersions()
     {

@@ -18,7 +18,7 @@ internal sealed class ListSectionsHandler(ISectionRepository sections)
 
         var items = all
             .OrderBy(section => section.Name, StringComparer.Ordinal)
-            .Select(section => new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name))
+            .Select(section => new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name, section.RatesTraits))
             .ToArray();
 
         return Result.Success(new SectionListResponse(items));

@@ -19,11 +19,12 @@ public sealed class Section : Entity<Guid>, IAuditableEntity
     /// <summary>See the type remarks — not spec-fixed, chosen to match <see cref="ClassLevel.NameMaxLength"/>.</summary>
     public const int NameMaxLength = 40;
 
-    private Section(Guid id, string name)
+    private Section(Guid id, string name, bool ratesTraits)
         : base(id)
     {
         Name = name;
         NameKey = name.ToLowerInvariant();
+        RatesTraits = ratesTraits;
     }
 
     // EF Core materialisation constructor.
@@ -43,6 +44,16 @@ public sealed class Section : Entity<Guid>, IAuditableEntity
     /// </summary>
     public string NameKey { get; private set; }
 
+    /// <summary>
+    /// Whether an arm of this section rates traits (TASK-0083 ruling R1) — a primary arm rates the
+    /// affective and psychomotor trait blocks; a nursery arm does not, and rates its section's
+    /// development domains instead (<c>DevelopmentDomain.SectionId</c>), independently of this flag.
+    /// Seeded Primary <see langword="true"/>, Nursery <see langword="false"/>
+    /// (<see cref="SeededClassLevels"/>). Not spec-numbered text — the human ruling on TASK-0083's
+    /// stage 0 delta, recorded 2026-09-19.
+    /// </summary>
+    public bool RatesTraits { get; private set; }
+
     /// <inheritdoc />
     public DateTimeOffset CreatedAtUtc { get; set; }
 
@@ -55,8 +66,13 @@ public sealed class Section : Entity<Guid>, IAuditableEntity
     /// <inheritdoc />
     public string? ModifiedBy { get; set; }
 
-    /// <summary>Creates a new section. The caller must already have checked name uniqueness.</summary>
-    public static Result<Section> Create(Guid id, string name)
+    /// <summary>
+    /// Creates a new section. The caller must already have checked name uniqueness.
+    /// <paramref name="ratesTraits"/> defaults to <see langword="false"/> when the caller (spec 6.4.9's
+    /// <c>POST</c>) omits it — additive, so an existing caller that never sends the field keeps today's
+    /// behaviour.
+    /// </summary>
+    public static Result<Section> Create(Guid id, string name, bool ratesTraits = false)
     {
         if (id == Guid.Empty)
         {
@@ -68,7 +84,7 @@ public sealed class Section : Entity<Guid>, IAuditableEntity
             return Result.Failure<Section>(error);
         }
 
-        return Result.Success(new Section(id, trimmed));
+        return Result.Success(new Section(id, trimmed, ratesTraits));
     }
 
     /// <summary>Renames the section. The caller must already have checked name uniqueness.</summary>
@@ -83,6 +99,9 @@ public sealed class Section : Entity<Guid>, IAuditableEntity
         NameKey = trimmed.ToLowerInvariant();
         return Result.Success();
     }
+
+    /// <summary>Changes whether an arm of this section rates traits (TASK-0083 ruling R1). No validation — either value is always valid.</summary>
+    public void SetRatesTraits(bool ratesTraits) => RatesTraits = ratesTraits;
 
     private static bool TryNormalizeName(string name, out string normalized, out Error error)
     {

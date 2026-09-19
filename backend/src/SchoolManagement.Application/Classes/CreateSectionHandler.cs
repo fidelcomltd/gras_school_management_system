@@ -32,7 +32,7 @@ internal sealed class CreateSectionHandler(
                 $"A section named {request.Name.Trim()} already exists."));
         }
 
-        var creation = Section.Create(Guid.CreateVersion7(), request.Name);
+        var creation = Section.Create(Guid.CreateVersion7(), request.Name, request.RatesTraits ?? false);
 
         if (creation.IsFailure)
         {
@@ -50,6 +50,6 @@ internal sealed class CreateSectionHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name));
+        return Result.Success(new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name, section.RatesTraits));
     }
 }

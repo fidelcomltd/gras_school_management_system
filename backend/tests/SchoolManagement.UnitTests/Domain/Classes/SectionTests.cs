@@ -60,4 +60,33 @@ public sealed class SectionTests
         result.IsFailure.ShouldBeTrue();
         section.Name.ShouldBe("Nursery");
     }
+
+    [Fact]
+    public void Create_WithRatesTraitsOmitted_DefaultsFalse()
+    {
+        var result = Section.Create(Guid.CreateVersion7(), "Secondary");
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.RatesTraits.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Create_WithRatesTraitsTrue_SetsIt()
+    {
+        var result = Section.Create(Guid.CreateVersion7(), "Secondary", ratesTraits: true);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.RatesTraits.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SetRatesTraits_ChangesTheFlagOnly()
+    {
+        var section = Section.Create(Guid.CreateVersion7(), "Nursery", ratesTraits: false).Value;
+
+        section.SetRatesTraits(true);
+
+        section.RatesTraits.ShouldBeTrue();
+        section.Name.ShouldBe("Nursery");
+    }
 }

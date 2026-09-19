@@ -199,10 +199,13 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IDevelopmentDomainRepository, DevelopmentDomainRepository>();
         services.AddScoped<IDevelopmentIndicatorUsageGate, DevelopmentIndicatorUsageGate>();
 
-        // TASK-0072 stage 3b: traits. ITraitUsageGate is a documented stand-in that returns false until
-        // Phase 3 creates a rating table — same pattern as IDevelopmentIndicatorUsageGate.
+        // TASK-0072 stage 3b: traits.
         services.AddScoped<ITraitRepository, TraitRepository>();
+
+        // TASK-0083 stage 1: trait ratings. ITraitUsageGate is now a real query against trait_rating,
+        // replacing TASK-0072 stage 3b's unconditional "never rated" stand-in.
         services.AddScoped<ITraitUsageGate, TraitUsageGate>();
+        services.AddScoped<ITraitRatingRepository, TraitRatingRepository>();
 
         // TASK-0072 stage 3a: one seam every settings handler asks for the whole config_version
         // snapshot input through, replacing the one-repository-per-OTHER-group constructor ripple —

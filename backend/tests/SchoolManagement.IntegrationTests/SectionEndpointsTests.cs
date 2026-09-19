@@ -79,6 +79,10 @@ public sealed class SectionEndpointsTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await ReadAsync<SectionListResponse>(response);
         body.Sections.Select(section => section.Name).ShouldBe(["Nursery", "Primary"]);
+
+        // TASK-0083 ruling R1: Primary rates traits, Nursery does not.
+        body.Sections.Single(section => section.Name == "Nursery").RatesTraits.ShouldBeFalse();
+        body.Sections.Single(section => section.Name == "Primary").RatesTraits.ShouldBeTrue();
     }
 
     [Fact]
@@ -94,6 +98,55 @@ public sealed class SectionEndpointsTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         var body = await ReadAsync<SectionDto>(response);
         body.Name.ShouldBe("Secondary");
+        body.RatesTraits.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Create_WithRatesTraitsTrue_PersistsIt()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantsAsync(Privileges.Level.Create);
+
+        var response = await PostAsync(
+            SectionsUrl, jar, new CreateSectionCommand("Sixth Form", RatesTraits: true), idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = await ReadAsync<SectionDto>(response);
+        body.RatesTraits.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Update_WithRatesTraitsOmitted_LeavesItUnchanged()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantsAsync(Privileges.Level.Create, Privileges.Level.Update, Privileges.Level.View);
+        var created = await ReadAsync<SectionDto>(
+            await PostAsync(SectionsUrl, jar, new CreateSectionCommand("Secondary", RatesTraits: true), idempotencyKey: $"key-{Guid.NewGuid():N}"));
+
+        var response = await PatchAsync($"{SectionsUrl}/{created.Id}", jar, new { name = "Renamed Secondary" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<SectionDto>(response);
+        body.RatesTraits.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Update_WithRatesTraitsExplicit_ChangesIt()
+    {
+        RequireDatabase();
+
+        var jar = await SignInWithGrantsAsync(Privileges.Level.Create, Privileges.Level.Update, Privileges.Level.View);
+        var created = await ReadAsync<SectionDto>(
+            await PostAsync(SectionsUrl, jar, new CreateSectionCommand("Secondary"), idempotencyKey: $"key-{Guid.NewGuid():N}"));
+        created.RatesTraits.ShouldBeFalse();
+
+        var response = await PatchAsync($"{SectionsUrl}/{created.Id}", jar, new { name = "Secondary", ratesTraits = true });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<SectionDto>(response);
+        body.RatesTraits.ShouldBeTrue();
     }
 
     [Fact]
