@@ -189,7 +189,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; delta approved (R1-R3, Q1-Q3 all A); stage 1 done (``27d7bdf``); stage 2 dispatched |
+| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; delta approved (R1-R3, Q1-Q3 all A); stages 1-2 done (``27d7bdf``, ``0fae7b7``); stage 3 (R2 refusals) dispatched |
 | TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **carded 2026-09-19**; queued behind TASK-0083 stage 0; runs in a worktree off main after TASK-0072 merges |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
@@ -205,6 +205,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0083 stage 2 done (`0fae7b7`)** — nursery development ratings, real indicator usage gate; unit 1055/1055,
+  integration 114/114 scoped. Point deletion under ANY rating is refused (FK), not only under open sets. → `tasks/TASK-0083.md` log
 - 2026-09-19 **TASK-0083 stage 1 done (`27d7bdf`)** — trait ratings, `ratesTraits`, real trait usage gate; unit 1023/1023, integration
   103/103 scoped; ~2190 lines. Mirrors score sheets, including their 404 and per-cell validation shape. → `tasks/TASK-0083.md` log
 - 2026-09-19 **TASK-0083 contract delta approved** — arm-scoped GET/PUT trait-ratings and development-ratings, `SectionDto.ratesTraits`,
