@@ -538,7 +538,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
-- 2026-09-18 **Appendix E.3 headings say domain 2 has 13 indicators and domain 3 has 16; the lists hold 14 and 15** (total 45 either way). Seeded the lists. *Owner: human, confirm with the school.* → `drift/2026-Q3.md`
+- 2026-09-18 ~~**Appendix E.3 headings say 13 and 16; the lists hold 14 and 15.**~~ **RESOLVED 2026-09-19**: the human confirmed 14 and 15. The heading counts are the typo, and the seed is correct as shipped. → `drift/2026-Q3.md`
 - 2026-09-18 **The school has not been told how fractional averages are banded** (ruled: threshold, 84.60 is B).
   It decides printed grades and the spec is silent. *Trigger: before the first result sheet is printed. Owner: human
   plus the school.* → `decisions/2026-Q3.md`
