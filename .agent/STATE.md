@@ -172,7 +172,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -189,7 +189,6 @@ archive and never against the working tree, so an under-claiming header was invi
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0086 | Attendance, class and head teacher remarks, remark templates | backend-dev | **dispatched 2026-09-19**, stage A; branch `task-0086` stacked on `task-0083`; delta approved in the card |
-| TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **dispatched 2026-09-19** in worktree `../gras-task-0084`, branch `task-0084` off `origin/main`, parallel to 0086 |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -204,6 +203,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0084 closed** — 401 is a legitimate interleaving (auth precedes lock); test split, deterministic, no product change.
+  Scoped gate 1112/1112. Branch `task-0084` (`3cfc232`) off main, needs its own PR. → `decisions/2026-Q3.md`
 - 2026-09-19 **Human rulings on TASK-0086**: L remarks 300 chars (not §6.7.7's 240); A attendance stores present only, absent derived;
   T two template lists by kind, class-teacher list at ANY scope; H head remark editable until Published. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0084 runs parallel to a contract-moving card (0086)**, bending `rules/contract.md` §3's letter on the human's "alongside"
@@ -701,7 +702,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 - 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
   fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
-- 2026-09-16 **A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**
+- 2026-09-16 ~~**A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**~~ **STRUCK 2026-09-19 by TASK-0084**: H1, racy test, product right; split per interleaving.
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
   which a real user would experience as a logout rather than a conflict. *Trigger: the next card
