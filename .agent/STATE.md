@@ -190,6 +190,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; rulings R1-R3 given (all A); stage 0 (delta) dispatched |
+| TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **carded 2026-09-19**; queued behind TASK-0083 stage 0; runs in a worktree off main after TASK-0072 merges |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -685,7 +686,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 - 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
   fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
-- 2026-09-16 **A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate), and nobody has looked.**
+- 2026-09-16 **A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
   which a real user would experience as a logout rather than a conflict. *Trigger: the next card
