@@ -24,4 +24,17 @@ public interface IDevelopmentIndicatorUsageGate
     /// <param name="indicatorId">The indicator to check.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<bool> HasEverBeenRatedAsync(Guid indicatorId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// R2 (TASK-0083 stage 3, human ruling): whether any of <paramref name="indicatorIds"/> (one
+    /// domain's indicators) has a <c>development_rating</c> on a point that belongs to
+    /// <paramref name="ratingScaleId"/>, in a result set that is NOT Published — "open" per the
+    /// ruling's own wording. Used only when a domain's <c>ratingScaleId</c> is about to CHANGE, to
+    /// decide whether that change is refused; a rating that exists only in a Published set does not
+    /// block the change.
+    /// </summary>
+    /// <param name="indicatorIds">Every indicator currently on the domain whose scale is changing.</param>
+    /// <param name="ratingScaleId">The domain's CURRENT (about-to-be-replaced) scale.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<bool> HasOpenRatingOnScaleAsync(IReadOnlyCollection<Guid> indicatorIds, Guid ratingScaleId, CancellationToken cancellationToken);
 }

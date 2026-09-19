@@ -43,6 +43,7 @@ public sealed class UpdateRatingScalesCommandHandlerTests
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
         _ratingScaleUsageGate.IsInUseAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _ratingScaleUsageGate.IsPointRatedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -361,5 +362,148 @@ public sealed class UpdateRatingScalesCommandHandlerTests
         error.ScaleIndex.ShouldBe(0);
         error.PointIndex.ShouldBe(1);
         await _ratingScaleRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<RatingScale>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ---- TASK-0083 stage 3, R2's point rule: settings.ratingscales.point_rated -----------------
+
+    [Fact]
+    public async Task HandleAsync_RemovingAPointStillRated_Returns409WithTheExactMessage()
+    {
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var keptPointId = Guid.CreateVersion7();
+        var ratedPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [
+                RatingScalePoint.Create(keptPointId, scaleId, "N", "Needs Improvement", 1),
+                RatingScalePoint.Create(ratedPointId, scaleId, "E", "Excellent", 2),
+            ]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+        _ratingScaleUsageGate.IsPointRatedAsync(ratedPointId, Arg.Any<CancellationToken>()).Returns(true);
+
+        // "Excellent" is omitted from the resubmitted scale — a removal.
+        var resubmitted = new RatingScaleInput(
+            "Custom",
+            [new RatingScalePointInput("N", "Needs Improvement", 1, Id: keptPointId)],
+            Id: scaleId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([resubmitted], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateRatingScalesCommandHandler.PointRatedErrorCode);
+        result.Error.Description.ShouldBe(
+            "Ratings have already been entered for Excellent this term. Keep the point on the scale, " +
+            "or update its label and code instead of removing it.");
+        await _ratingScaleRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<RatingScale>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemovingAPointRatedOnlyInAPublishedSet_StillReturns409()
+    {
+        // The rule the removal gate deliberately does NOT relax for: R2's open-sets-only carve-out is
+        // for a scale SWITCH, never for a point delete, because the rows FK the point directly and a
+        // Published sheet cannot be left pointing at a row that no longer exists.
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var ratedPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [RatingScalePoint.Create(ratedPointId, scaleId, "E", "Excellent", 1), RatingScalePoint.Create(Guid.CreateVersion7(), scaleId, "N", "Needs Improvement", 2)]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+        // The gate itself answers "rated" regardless of which result set's state holds the reference —
+        // that Published-inclusive query lives in Infrastructure, proven at the integration layer.
+        _ratingScaleUsageGate.IsPointRatedAsync(ratedPointId, Arg.Any<CancellationToken>()).Returns(true);
+
+        var resubmitted = new RatingScaleInput("Custom", [], Id: scaleId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([resubmitted], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateRatingScalesCommandHandler.PointRatedErrorCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemovingAnUnratedPoint_Succeeds()
+    {
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var removedPointId = Guid.CreateVersion7();
+        var keptPointId = Guid.CreateVersion7();
+        var otherKeptPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [
+                RatingScalePoint.Create(removedPointId, scaleId, "E", "Excellent", 1),
+                RatingScalePoint.Create(keptPointId, scaleId, "N", "Needs Improvement", 2),
+                RatingScalePoint.Create(otherKeptPointId, scaleId, "I", "Improving", 3),
+            ]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+
+        // Only "Excellent" is dropped — two points remain, satisfying the min-2 structural rule.
+        var resubmitted = new RatingScaleInput(
+            "Custom",
+            [
+                new RatingScalePointInput("N", "Needs Improvement", 2, Id: keptPointId),
+                new RatingScalePointInput("I", "Improving", 3, Id: otherKeptPointId),
+            ],
+            Id: scaleId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([resubmitted], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        await _ratingScaleUsageGate.Received(1).IsPointRatedAsync(removedPointId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_UpdatingAPointInPlace_IsAlwaysAllowedAndNeverConsultsThePointUsageGate()
+    {
+        CreateTrackedProfile();
+
+        var scaleId = Guid.CreateVersion7();
+        var pointId = Guid.CreateVersion7();
+        var otherPointId = Guid.CreateVersion7();
+        var existingScale = RatingScale.Create(
+            scaleId,
+            "Custom",
+            [
+                RatingScalePoint.Create(pointId, scaleId, "N", "Needs Improvement", 1),
+                RatingScalePoint.Create(otherPointId, scaleId, "E", "Excellent", 2),
+            ]);
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingScale]);
+        // Even a rated point must never be asked about — its id is still present, so it was never
+        // counted as "about to disappear".
+        _ratingScaleUsageGate.IsPointRatedAsync(pointId, Arg.Any<CancellationToken>()).Returns(true);
+
+        // Same ids, only the first point's code/label/order change — an in-place update, not a remove-and-add.
+        var updated = new RatingScaleInput(
+            "Custom",
+            [
+                new RatingScalePointInput("X", "Relabelled", 2, Id: pointId),
+                new RatingScalePointInput("E", "Excellent", 1, Id: otherPointId),
+            ],
+            Id: scaleId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateRatingScalesCommand([updated], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Scales[0].Points
+            .Single(point => point.Id == pointId.ToString("D", System.Globalization.CultureInfo.InvariantCulture))
+            .PointLabel.ShouldBe("Relabelled");
+        await _ratingScaleUsageGate.DidNotReceive().IsPointRatedAsync(pointId, Arg.Any<CancellationToken>());
     }
 }

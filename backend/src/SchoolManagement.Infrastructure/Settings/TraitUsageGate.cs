@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Settings;
@@ -18,4 +19,26 @@ internal sealed class TraitUsageGate(ApplicationDbContext context) : ITraitUsage
             .AsNoTracking()
             .AnyAsync(rating => rating.TraitId == traitId, cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<bool> HasOpenRatingOnScaleAsync(
+        IReadOnlyCollection<Guid> traitIds, Guid ratingScaleId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(traitIds);
+
+        if (traitIds.Count == 0)
+        {
+            return false;
+        }
+
+        return await context.TraitRatings
+            .AsNoTracking()
+            .Where(rating => traitIds.Contains(rating.TraitId))
+            .Where(rating => context.RatingScalePoints
+                .Any(point => point.Id == rating.RatingScalePointId && point.RatingScaleId == ratingScaleId))
+            .Where(rating => context.ResultSets
+                .Any(resultSet => resultSet.Id == rating.ResultSetId && resultSet.State != ResultSetState.Published))
+            .AnyAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

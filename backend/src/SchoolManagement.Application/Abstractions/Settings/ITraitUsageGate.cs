@@ -22,4 +22,17 @@ public interface ITraitUsageGate
     /// <param name="traitId">The trait to check.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<bool> HasEverBeenRatedAsync(Guid traitId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// R2 (TASK-0083 stage 3, human ruling): whether any of <paramref name="traitIds"/> (one block's
+    /// traits) has a <c>trait_rating</c> on a point that belongs to <paramref name="ratingScaleId"/>,
+    /// in a result set that is NOT Published — "open" per the ruling's own wording. Used only when a
+    /// block's <c>affectiveRatingScaleId</c>/<c>psychomotorRatingScaleId</c> is about to CHANGE, to
+    /// decide whether that change is refused; a rating that exists only in a Published set does not
+    /// block the change.
+    /// </summary>
+    /// <param name="traitIds">Every trait currently in the block whose scale is changing.</param>
+    /// <param name="ratingScaleId">The block's CURRENT (about-to-be-replaced) scale.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<bool> HasOpenRatingOnScaleAsync(IReadOnlyCollection<Guid> traitIds, Guid ratingScaleId, CancellationToken cancellationToken);
 }

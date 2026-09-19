@@ -31,4 +31,23 @@ internal sealed class RatingScaleUsageGate(ApplicationDbContext context) : IRati
             .AnyAsync(block => block.RatingScaleId == ratingScaleId, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public async Task<bool> IsPointRatedAsync(Guid pointId, CancellationToken cancellationToken)
+    {
+        var ratedByATrait = await context.TraitRatings
+            .AsNoTracking()
+            .AnyAsync(rating => rating.RatingScalePointId == pointId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (ratedByATrait)
+        {
+            return true;
+        }
+
+        return await context.DevelopmentRatings
+            .AsNoTracking()
+            .AnyAsync(rating => rating.RatingScalePointId == pointId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

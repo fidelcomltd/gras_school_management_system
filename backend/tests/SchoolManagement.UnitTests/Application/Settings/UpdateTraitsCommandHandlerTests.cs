@@ -43,7 +43,13 @@ public sealed class UpdateTraitsCommandHandlerTests
             RatingScale.Create(PsychomotorScaleId, "Also primary trait", [RatingScalePoint.Create(Guid.CreateVersion7(), PsychomotorScaleId, "E", "Excellent", 1)]),
         ]);
         _traitRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<Trait>());
+        _traitRepository.ListBlocksReadOnlyAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            TraitBlock.Create(TraitDomain.Affective, AffectiveScaleId),
+            TraitBlock.Create(TraitDomain.Psychomotor, PsychomotorScaleId),
+        ]);
         _traitUsageGate.HasEverBeenRatedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _traitUsageGate.HasOpenRatingOnScaleAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -321,5 +327,96 @@ public sealed class UpdateTraitsCommandHandlerTests
         await _configVersionRepository.Received(1).AddAsync(
             Arg.Is<ConfigVersion>(version => version != null && version.Reason == "The school renamed a trait."),
             Arg.Any<CancellationToken>());
+    }
+
+    // ---- TASK-0083 stage 3, R2: settings.traits.scale_changed_while_rated -----------------------
+
+    [Fact]
+    public async Task HandleAsync_ChangingTheAffectiveScaleWithAnOpenRating_Returns409WithTheExactMessage()
+    {
+        CreateTrackedProfile();
+
+        var traitId = Guid.CreateVersion7();
+        var existingTrait = Trait.Create(traitId, TraitDomain.Affective, "Punctuality", 1, TraitStatus.Active);
+        _traitRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingTrait]);
+        _traitUsageGate.HasOpenRatingOnScaleAsync(
+                Arg.Is<IReadOnlyCollection<Guid>>(ids => ids != null && ids.Contains(traitId)), AffectiveScaleId, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var newAffectiveScaleId = Guid.CreateVersion7();
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            RatingScale.Create(newAffectiveScaleId, "Custom", [RatingScalePoint.Create(Guid.CreateVersion7(), newAffectiveScaleId, "E", "Excellent", 1)]),
+            RatingScale.Create(PsychomotorScaleId, "Also primary trait", [RatingScalePoint.Create(Guid.CreateVersion7(), PsychomotorScaleId, "E", "Excellent", 1)]),
+        ]);
+
+        // Echoes the rated trait back unchanged — the only thing changing is the block's scale.
+        var command = new UpdateTraitsCommand(
+            newAffectiveScaleId,
+            PsychomotorScaleId,
+            [new TraitInput(TraitDomain.Affective, "Punctuality", 1, TraitStatus.Active, traitId)],
+            ExpectedVersion: 0,
+            Reason: null);
+
+        var result = await CreateHandler().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateTraitsCommandHandler.ScaleChangedWhileRatedErrorCode);
+        result.Error.Description.ShouldBe(
+            "Ratings have already been entered for the Affective block this term. Change its rating " +
+            "scale only after those result sets are approved and published, or leave the scale as it is.");
+        await _traitRepository.DidNotReceive().ReplaceAllAsync(
+            Arg.Any<IReadOnlyList<Trait>>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ChangingTheAffectiveScaleWithNoOpenRating_Succeeds()
+    {
+        // Covers both of R2's allowed cases at once, from the handler's point of view: the gate
+        // reports no OPEN rating on the old scale, whether that is because every rating on it sits in
+        // a Published set, or because the trait was never rated at all — the query-level distinction
+        // between those two is Infrastructure's job, proven at the integration layer.
+        CreateTrackedProfile();
+
+        var traitId = Guid.CreateVersion7();
+        var existingTrait = Trait.Create(traitId, TraitDomain.Affective, "Punctuality", 1, TraitStatus.Active);
+        _traitRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingTrait]);
+        // Default stub already answers false; asserted explicitly here for clarity.
+        _traitUsageGate.HasOpenRatingOnScaleAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var newAffectiveScaleId = Guid.CreateVersion7();
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            RatingScale.Create(newAffectiveScaleId, "Custom", [RatingScalePoint.Create(Guid.CreateVersion7(), newAffectiveScaleId, "E", "Excellent", 1)]),
+            RatingScale.Create(PsychomotorScaleId, "Also primary trait", [RatingScalePoint.Create(Guid.CreateVersion7(), PsychomotorScaleId, "E", "Excellent", 1)]),
+        ]);
+
+        var command = new UpdateTraitsCommand(
+            newAffectiveScaleId,
+            PsychomotorScaleId,
+            [new TraitInput(TraitDomain.Affective, "Punctuality", 1, TraitStatus.Active, traitId)],
+            ExpectedVersion: 0,
+            Reason: null);
+
+        var result = await CreateHandler().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.AffectiveRatingScaleId.ShouldBe(newAffectiveScaleId.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+        await _traitRepository.Received(1).ReplaceAllAsync(
+            Arg.Any<IReadOnlyList<Trait>>(), newAffectiveScaleId, PsychomotorScaleId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ResavingBothBlocksAtTheirCurrentScales_NeverConsultsTheOpenRatingGate()
+    {
+        CreateTrackedProfile();
+
+        var result = await CreateHandler().HandleAsync(ValidCommand([]), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        await _traitUsageGate.DidNotReceive().HasOpenRatingOnScaleAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

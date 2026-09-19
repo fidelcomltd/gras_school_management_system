@@ -29,6 +29,7 @@ public sealed class TraitRatingEndpointsTests(ApiTestFixture fixture) : Integrat
     private const string SignInUrl = "/api/v1/auth/sign-in";
     private const string SettingsUrl = "/api/v1/settings";
     private const string TraitsUrl = "/api/v1/settings/traits";
+    private const string RatingScalesUrl = "/api/v1/settings/rating-scales";
 
     private static readonly Guid PunctualityTraitId = TraitConfiguration.AllSeededIds[1];
     private static readonly Guid NeedsImprovementPointId = RatingScalePointConfiguration.AllSeededIds[4];
@@ -236,6 +237,107 @@ public sealed class TraitRatingEndpointsTests(ApiTestFixture fixture) : Integrat
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(response);
         document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.traits.trait_rated");
+    }
+
+    // ---- R2 (TASK-0083 stage 3): settings.traits.scale_changed_while_rated ---------------------
+
+    [Fact]
+    public async Task ChangingTheAffectiveScale_WhileAnOpenResultSetHoldsARatingOnTheOldOne_Returns409()
+    {
+        RequireDatabase();
+        var (armId, termId, _) = await SeedArmAsync(SeededClassLevels.PrimarySectionId);
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Kelechi");
+        var jar = await SignInAsSuperAdminAsync();
+        // Punctuality is Affective — this rating sits on the seeded Primary trait scale, and the
+        // result set is left in Draft (open).
+        await SaveGridAsync(armId, jar, termId, version: null, Row(pupilId, (PunctualityTraitId, ExcellentPointId)));
+
+        var settings = await ReadAsync<SettingsDto>(await GetSettingsAsync(jar));
+        var unreferencedScaleId = settings.RatingScales.Scales
+            .Single(scale => scale.Name == RatingScaleSeed.FivePointNumericName).Id;
+        var traitsCommand = new UpdateTraitsCommand(
+            Guid.Parse(unreferencedScaleId),
+            Guid.Parse(settings.Traits.PsychomotorRatingScaleId),
+            settings.Traits.Traits.Select(t => new TraitInput(t.Domain, t.Name, t.DisplayOrder, t.Status, Guid.Parse(t.Id))).ToList(),
+            settings.Traits.VersionNumber,
+            Reason: null);
+
+        var response = await PutAsync(TraitsUrl, jar, traitsCommand);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.traits.scale_changed_while_rated");
+    }
+
+    [Fact]
+    public async Task ChangingTheAffectiveScale_OnceTheOnlyRatingsAreInAPublishedResultSet_Succeeds()
+    {
+        RequireDatabase();
+        var (armId, termId, _) = await SeedArmAsync(SeededClassLevels.PrimarySectionId);
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Ijeoma");
+        var jar = await SignInAsSuperAdminAsync();
+        await SaveGridAsync(armId, jar, termId, version: null, Row(pupilId, (PunctualityTraitId, ExcellentPointId)));
+        await SetResultSetStateAsync(armId, termId, ResultSetState.Published);
+
+        var settings = await ReadAsync<SettingsDto>(await GetSettingsAsync(jar));
+        var unreferencedScaleId = settings.RatingScales.Scales
+            .Single(scale => scale.Name == RatingScaleSeed.FivePointNumericName).Id;
+        var traitsCommand = new UpdateTraitsCommand(
+            Guid.Parse(unreferencedScaleId),
+            Guid.Parse(settings.Traits.PsychomotorRatingScaleId),
+            settings.Traits.Traits.Select(t => new TraitInput(t.Domain, t.Name, t.DisplayOrder, t.Status, Guid.Parse(t.Id))).ToList(),
+            settings.Traits.VersionNumber,
+            // A result set is now Published in the active session, so 6.2.9's reason gate applies too.
+            Reason: "Switching the affective block to the five-point scale.");
+
+        var response = await PutAsync(TraitsUrl, jar, traitsCommand);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await ReadAsync<SettingsTraitsGroupDto>(response);
+        result.AffectiveRatingScaleId.ShouldBe(unreferencedScaleId);
+    }
+
+    // ---- settings.ratingscales.point_rated: a Published-set rating still refuses removal --------
+
+    [Fact]
+    public async Task RemovingARatedPoint_ViaSettingsRatingScales_Returns409EvenWhenTheResultSetIsPublished()
+    {
+        RequireDatabase();
+        var (armId, termId, _) = await SeedArmAsync(SeededClassLevels.PrimarySectionId);
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Obiora");
+        var jar = await SignInAsSuperAdminAsync();
+        await SaveGridAsync(armId, jar, termId, version: null, Row(pupilId, (PunctualityTraitId, ExcellentPointId)));
+        await SetResultSetStateAsync(armId, termId, ResultSetState.Published);
+
+        var settings = await ReadAsync<SettingsDto>(await GetSettingsAsync(jar));
+        var primaryTrait = settings.RatingScales.Scales.Single(scale => scale.Name == RatingScaleSeed.PrimaryTraitName);
+        var excellentPointIdText = ExcellentPointId.ToString("D", System.Globalization.CultureInfo.InvariantCulture);
+
+        // Every scale is echoed back unchanged, EXCEPT the Primary trait scale drops its rated
+        // "Excellent" point from the submitted points array — a removal.
+        var scalesCommand = new UpdateRatingScalesCommand(
+            settings.RatingScales.Scales.Select(scale => scale.Name == RatingScaleSeed.PrimaryTraitName
+                    ? new RatingScaleInput(
+                        scale.Name,
+                        scale.Points
+                            .Where(point => point.Id != excellentPointIdText)
+                            .Select(point => new RatingScalePointInput(point.PointCode, point.PointLabel, point.PointOrder, Guid.Parse(point.Id)))
+                            .ToList(),
+                        Guid.Parse(scale.Id))
+                    : new RatingScaleInput(
+                        scale.Name,
+                        scale.Points.Select(point => new RatingScalePointInput(point.PointCode, point.PointLabel, point.PointOrder, Guid.Parse(point.Id))).ToList(),
+                        Guid.Parse(scale.Id)))
+                .ToList(),
+            settings.RatingScales.VersionNumber,
+            Reason: null);
+
+        var response = await PutAsync(RatingScalesUrl, jar, scalesCommand);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.ratingscales.point_rated");
+        primaryTrait.Points.ShouldContain(point => point.Id == excellentPointIdText);
     }
 
     // ---- Seeding and HTTP helpers ----------------------------------------------------------------

@@ -276,6 +276,64 @@ public sealed class DevelopmentRatingEndpointsTests(ApiTestFixture fixture) : In
         document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.developmentdomains.indicator_rated");
     }
 
+    // ---- R2 (TASK-0083 stage 3): settings.developmentdomains.scale_changed_while_rated ---------
+
+    [Fact]
+    public async Task ChangingADomainsScale_WhileAnOpenResultSetHoldsARatingOnTheOldOne_Returns409()
+    {
+        RequireDatabase();
+        var (armId, termId, _) = await SeedArmAsync(SeededClassLevels.NurserySectionId);
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Kelechi");
+        var jar = await SignInAsSuperAdminAsync();
+        // Ability to count is on the seeded Maths Readiness domain, rated on the Nursery development
+        // scale; the result set is left in Draft (open).
+        await SaveGridAsync(armId, jar, termId, version: null, Row(pupilId, (AbilityToCountId, Cell(ExcellentPointId))));
+
+        var settings = await ReadAsync<SettingsDto>(await GetSettingsAsync(jar));
+        var otherScaleId = Guid.Parse(settings.RatingScales.Scales.Single(scale => scale.Name == RatingScaleSeed.PrimaryTraitName).Id);
+        var domainsInput = settings.DevelopmentDomains.Domains
+            .Select(domain => domain.Name == DevelopmentDomainSeed.MathsReadinessName
+                ? ToInput(domain) with { RatingScaleId = otherScaleId }
+                : ToInput(domain))
+            .ToList();
+        var command = new UpdateDevelopmentDomainsCommand(domainsInput, settings.DevelopmentDomains.VersionNumber, Reason: null);
+
+        var response = await PutAsync(DevelopmentDomainsUrl, jar, command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("settings.developmentdomains.scale_changed_while_rated");
+    }
+
+    [Fact]
+    public async Task ChangingADomainsScale_OnceTheOnlyRatingsAreInAPublishedResultSet_Succeeds()
+    {
+        RequireDatabase();
+        var (armId, termId, _) = await SeedArmAsync(SeededClassLevels.NurserySectionId);
+        var pupilId = await SeedPupilOnRosterAsync(armId, "Ijeoma");
+        var jar = await SignInAsSuperAdminAsync();
+        await SaveGridAsync(armId, jar, termId, version: null, Row(pupilId, (AbilityToCountId, Cell(ExcellentPointId))));
+        await SetResultSetStateAsync(armId, termId, ResultSetState.Published);
+
+        var settings = await ReadAsync<SettingsDto>(await GetSettingsAsync(jar));
+        var otherScaleId = Guid.Parse(settings.RatingScales.Scales.Single(scale => scale.Name == RatingScaleSeed.PrimaryTraitName).Id);
+        var domainsInput = settings.DevelopmentDomains.Domains
+            .Select(domain => domain.Name == DevelopmentDomainSeed.MathsReadinessName
+                ? ToInput(domain) with { RatingScaleId = otherScaleId }
+                : ToInput(domain))
+            .ToList();
+        // A result set is now Published in the active session, so 6.2.9's reason gate applies too.
+        var command = new UpdateDevelopmentDomainsCommand(
+            domainsInput, settings.DevelopmentDomains.VersionNumber, Reason: "Switching Maths Readiness to the primary trait scale.");
+
+        var response = await PutAsync(DevelopmentDomainsUrl, jar, command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await ReadAsync<SettingsDevelopmentDomainGroupDto>(response);
+        result.Domains.Single(domain => domain.Name == DevelopmentDomainSeed.MathsReadinessName).RatingScaleId
+            .ShouldBe(otherScaleId.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     private static DevelopmentDomainInput ToInput(DevelopmentDomainDto domain) => new(
         Guid.Parse(domain.SectionId),
         domain.Name,
