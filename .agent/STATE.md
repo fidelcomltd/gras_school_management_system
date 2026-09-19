@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-18 by orchestrator (TASK-0083 and TASK-0085 closed; contract `9c2f8d55…`) · no size cap, see
+Last reconciled: 2026-09-19 by orchestrator (TASK-0086 and TASK-0087 closed; contract `42d8e3b5…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -162,8 +162,8 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **STALE against this hash** until TASK-0087 (regeneration, same PR as TASK-0086). Was current against `9c2f8d55…` (TASK-0085: No drift, verify
-  55 files / 381 tests). Types only, zero wrapper code.
+- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0087, same PR as TASK-0086). The orchestrator re-ran
+  `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
   from application code yet.
@@ -177,7 +177,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -193,7 +193,6 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0086 | Attendance, class and head teacher remarks, remark templates | backend-dev | **stage A done 2026-09-19**; stage B (templates) dispatched; branch `task-0086` stacked on `task-0083`; delta approved in the card |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -208,6 +207,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0086 closed** — attendance, both remarks, remark templates, `ScopeResolution.AnyGrant`; contract `42d8e3b5…`, 76 paths.
+  Full gate 1653/1653 on the FIRST run. → `decisions/2026-Q3.md`
+- 2026-09-19 **TASK-0087 closed** — client current against `42d8e3b5…`, same PR. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0086 stage A done** — attendance + both remarks, term guard; orchestrator scoped gate 1270/1270, Format fixed on
   bounce (CRLF + imports); contract drift expected until promotion after stage B. → `tasks/TASK-0086.md` log
 - 2026-09-19 **TASK-0084 closed** — 401 is a legitimate interleaving (auth precedes lock); test split, deterministic, no product change.
@@ -710,6 +712,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-19 **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
+  handler built the DTO (found by reading, UNVERIFIED; TASK-0086 used `TimeProvider` instead). *Trigger: next card touching assignments (TASK-0046). Owner: `backend-dev`.*
+- 2026-09-19 **`RequireAuthenticatedCaller()`'s doc says "never an RBAC-gated business operation"; pupil and remark-template routes use it exactly so**
+  (handler-level guards). *Trigger: next card adding a handler-level guard. Owner: orchestrator — amend the doc or add a named helper.*
 - 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
   fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
 - 2026-09-16 ~~**A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**~~ **STRUCK 2026-09-19 by TASK-0084**: H1, racy test, product right; split per interleaving.

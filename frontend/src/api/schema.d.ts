@@ -335,6 +335,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms/{armId}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's attendance sheet for a term
+         * @description Spec 6.7.7/6.7.12 amendment: every active pupil in the arm as a row. `timesAbsent` is derived from the term's `timesSchoolOpened` minus `timesPresent` (ruling A) and is null while either side is unknown. `version` is null before any entry exists; send it back unchanged on `PUT` to detect a concurrent edit.
+         */
+        get: operations["GetAttendance"];
+        /**
+         * Save attendance, partial or whole sheet
+         * @description Spec 6.7.7/6.7.12 amendment: partial-save, one transaction — a pupil omitted from `rows` is left untouched, an explicit null `timesPresent` clears it. The first entry for an arm and term creates its result set (Draft), never flags `needsRecompute` on an EXISTING one. Allowed only while the result set is Draft or Returned for Correction, else 409 `attendance.result_set_locked`. 422 `times_present_out_of_range` below 0, or above the term's `timesSchoolOpened` when it is set (200 when blank).
+         */
+        put: operations["SaveAttendance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-events": {
         parameters: {
             query?: never;
@@ -567,6 +591,30 @@ export interface paths {
         patch: operations["UpdateLevel"];
         trace?: never;
     };
+    "/api/v1/arms/{armId}/class-teacher-remarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's class-teacher remark sheet for a term
+         * @description Spec 6.7.7, appendix C.6: every active pupil in the arm as a row. `version` is null before any remark exists; send it back unchanged on `PUT` to detect a concurrent edit.
+         */
+        get: operations["GetClassTeacherRemarks"];
+        /**
+         * Save class-teacher remarks, partial or whole sheet
+         * @description Spec 6.7.7, appendix C.6: partial-save, one transaction — a pupil omitted from `rows` is left untouched; an empty or whitespace-only `remark` clears it, like null. Text is trimmed. The first remark of either kind for an arm and term creates its result set (Draft). Allowed only while the result set is Draft or Returned for Correction (§6.7.11: submission locks it), else 409 `class_teacher_remarks.result_set_locked`. 422 `remark_too_long` above 300 characters (ruling L).
+         */
+        put: operations["SaveClassTeacherRemarks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms/{armId}/development-ratings": {
         parameters: {
             query?: never;
@@ -584,6 +632,30 @@ export interface paths {
          * @description Spec 6.7.7/6.7.12 amendment, Appendix E.3: partial-save, one transaction (Q1-A ruling — an omitted indicator key leaves that rating untouched, an explicit null clears it). Q3-A: a comment requires a point — 422 `request.validation_failed` when one is sent without the other, or over 120 characters, or on a domain whose `allowsIndicatorComment` is false; clearing the point clears the comment. The first rating for an arm and term creates its result set (Draft), never flags `needsRecompute` on an EXISTING one — ratings are never computed. Allowed only while the result set is Draft or Returned for Correction, else 409 `development_ratings.result_set_locked`. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.
          */
         put: operations["SaveDevelopmentRatings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/head-teacher-remarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's head-teacher remark sheet for a term
+         * @description Spec 6.7.7, appendix C.6: every active pupil in the arm as a row. `version` is null before any remark exists; send it back unchanged on `PUT` to detect a concurrent edit.
+         */
+        get: operations["GetHeadTeacherRemarks"];
+        /**
+         * Save head-teacher remarks, partial or whole sheet, with an optional fill-all
+         * @description Spec 6.7.7, appendix C.6: partial-save, one transaction — a pupil omitted from `rows` is left untouched; an empty or whitespace-only `remark` clears it, like null. `fillEmpty` (ruling H) sets that text for every pupil who STILL has no remark once `rows` has applied, never overwriting an existing one. The first remark of either kind for an arm and term creates its result set (Draft). Allowed in Draft, Returned for Correction, Awaiting Approval or Approved; 409 `head_teacher_remarks.result_set_locked` once Published or Withdrawn. 422 `remark_too_long` above 300 characters (ruling L), applied to both `rows` and `fillEmpty`.
+         */
+        put: operations["SaveHeadTeacherRemarks"];
         post?: never;
         delete?: never;
         options?: never;
@@ -758,6 +830,50 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remark-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List one kind's remark templates
+         * @description Spec §6.7.7 delta item 4. `kind` is required. In creation order; ships empty. The class-teacher list needs `result.remark.classteacher` under ANY grant — school-wide or arm-scoped (ruling T) — and the head-teacher list needs `result.remark.headteacher`, enforced server-side against the requested `kind`.
+         */
+        get: operations["ListRemarkTemplates"];
+        put?: never;
+        /**
+         * Add a remark template
+         * @description Spec §6.7.7 delta item 4: text trimmed, 1-300 characters, else 422. A duplicate within the same `kind` (trimmed, case-insensitive) is 409 `remark_template.duplicate`. `Idempotency-Key` is REQUIRED — there is no version to make a retry self-correcting the way a sheet save has. Privilege is checked against the body's `kind`, same rule as `ListRemarkTemplates`.
+         */
+        post: operations["CreateRemarkTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remark-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a remark template
+         * @description Spec §6.7.7 delta item 4: a HARD delete — inserted text is copied, never referenced. An unknown id is 404 only for a caller holding either remark-template privilege; anyone holding neither gets 403 first, before the id is even looked up. A caller holding only the OTHER kind's privilege gets 403 on a row of this kind, never 404, and the row is never touched.
+         */
+        delete: operations["DeleteRemarkTemplate"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1442,7 +1558,7 @@ export interface paths {
         head?: never;
         /**
          * Edit a term's schedule
-         * @description Spec 6.3.10: dates, label, times school opened, next resumption date. Every field is independently optional; an absent field is left unchanged. Times school opened is rejected once the term is `closed` (spec 6.3.6: printed on results already issued). `Idempotency-Key` is accepted, not required.
+         * @description Spec 6.3.10: dates, label, times school opened, next resumption date. Every field is independently optional; an absent field is left unchanged. Times school opened is rejected once the term is `closed` (spec 6.3.6: printed on results already issued), and refused with 409 `term.times_school_opened_below_attendance` if it would be set below the highest `timesPresent` already recorded for this term on any arm's attendance sheet (TASK-0086 delta item 5) — the derived times-absent would otherwise go negative. `Idempotency-Key` is accepted, not required.
          */
         patch: operations["UpdateTerm"];
         trace?: never;
@@ -2017,6 +2133,124 @@ export interface components {
              * @example false
              */
             isExamination: boolean;
+        };
+        /**
+         * @description One pupil's row on the attendance sheet (TASK-0086 stage A) — every active pupil in the arm, including one with no attendance entered at all.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "timesPresent": 58,
+         *       "timesAbsent": 4
+         *     }
+         */
+        AttendanceRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", same convention as TraitRatingRowDto.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * Format: int32
+             * @description `null` when nothing has been entered for this pupil.
+             * @example 58
+             */
+            timesPresent: null | number | string;
+            /**
+             * Format: int32
+             * @description Derived: `timesSchoolOpened - timesPresent` (ruling A, 2026-09-19). `null`
+             *     when either side is unknown — TimesPresent is null, or the term's
+             *     `timesSchoolOpened` is not yet set.
+             * @example 4
+             */
+            timesAbsent: null | number | string;
+        };
+        /**
+         * @description One arm's attendance sheet for one term (TASK-0086 stage A; spec §6.7.7, §6.7.12 amendment —
+         *     entered for a nursery arm too, even though it is not printed there). Arm-scoped rather than
+         *     result-set-scoped, mirroring TraitRatingSheetDto.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "timesSchoolOpened": 62,
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "timesPresent": 58,
+         *           "timesAbsent": 4
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "timesPresent": null,
+         *           "timesAbsent": null
+         *         }
+         *       ]
+         *     }
+         */
+        AttendanceSheetDto: {
+            /**
+             * @description The arm this sheet belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the entries the sheet covers. `null` before any entry
+             *     exists. Send back unchanged on `PUT` to detect a concurrent edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * Format: int32
+             * @description The term's own value (not per pupil). `null` while blank.
+             * @example 62
+             */
+            timesSchoolOpened: null | number | string;
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by attendance.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "timesPresent": 58,
+             *         "timesAbsent": 4
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "timesPresent": null,
+             *         "timesAbsent": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["AttendanceRowDto"][];
         };
         /**
          * @description One row of the audit trail (spec 6.1.12), rendered for the read surface. Carries every column
@@ -2855,6 +3089,24 @@ export interface components {
             otherInformation: null | string;
             /** @description Section A. Required — every pupil gets an admission record at creation. */
             admission: components["schemas"]["CreateAdmissionInput"];
+        };
+        /**
+         * @description `POST /api/v1/remark-templates` (TASK-0086 stage B; spec §6.7.7 delta item 4).
+         *             `Idempotency-Key` is REQUIRED — unlike a PUT sheet save, there is no version to make a
+         *             retry self-correcting, same posture `CreateSectionCommand` takes.
+         * @example {
+         *       "kind": "ClassTeacher",
+         *       "text": "A pleasure to have in school."
+         *     }
+         */
+        CreateRemarkTemplateCommand: {
+            /** @description Which list this phrase joins. Also decides the privilege — see RemarkTemplateAccessGuard. */
+            kind: components["schemas"]["RemarkKind"];
+            /**
+             * @description 1-300 characters after trimming, else 422. A duplicate within Kind (trimmed, case-insensitive) is 409.
+             * @example A pleasure to have in school.
+             */
+            text: string;
         };
         /**
          * @description `POST /api/v1/admins/{id}/assignments` (spec 6.1.5). Requires `role.assign` for a
@@ -5117,6 +5369,205 @@ export interface components {
          */
         RegNumberSerialReset: "PerYear" | "Continuous";
         /**
+         * @description Which of the two remark surfaces a PupilRemark belongs to (TASK-0086 stage A;
+         *     spec §6.7.7). Also the discriminator `remark_template` is keyed on (stage B) — ruling T,
+         *     2026-09-19: two lists by kind, not one shared list.
+         * @example ClassTeacher
+         * @enum {unknown}
+         */
+        RemarkKind: "ClassTeacher" | "HeadTeacher";
+        /**
+         * @description One pupil's row on a remark sheet (TASK-0086 stage A) — every active pupil in the arm, including
+         *     one with no remark entered at all. Shared shape for both the class-teacher and head-teacher
+         *     remark sheets (appendix C.6); which sheet a given RemarkSheetDto is belongs to is
+         *     implied by which endpoint returned it, not carried as a field.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "remark": "A diligent and attentive pupil this term.",
+         *       "writtenByName": "Mrs Adeyemi",
+         *       "writtenAt": "2026-12-12T09:30:00+01:00"
+         *     }
+         */
+        RemarkRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", same convention as TraitRatingRowDto.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description `null` when nothing has been written for this pupil.
+             * @example A diligent and attentive pupil this term.
+             */
+            remark: null | string;
+            /**
+             * @description The staff-name snapshot captured when the text last changed (appendix C.6). `null` alongside Remark.
+             * @example Mrs Adeyemi
+             */
+            writtenByName: null | string;
+            /**
+             * Format: date-time
+             * @description When the text last changed. `null` alongside Remark.
+             * @example 2026-12-12T09:30:00+01:00
+             */
+            writtenAt: null | string;
+        };
+        /**
+         * @description One arm's remark sheet (class-teacher's or head-teacher's) for one term (TASK-0086 stage A;
+         *     spec §6.7.7). Arm-scoped rather than result-set-scoped, mirroring TraitRatingSheetDto.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "remark": "A diligent and attentive pupil this term.",
+         *           "writtenByName": "Mrs Adeyemi",
+         *           "writtenAt": "2026-12-12T09:30:00+01:00"
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "remark": null,
+         *           "writtenByName": null,
+         *           "writtenAt": null
+         *         }
+         *       ]
+         *     }
+         */
+        RemarkSheetDto: {
+            /**
+             * @description The arm this sheet belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the remarks this sheet covers — the class-teacher and head-teacher sheets
+             *     version INDEPENDENTLY, each over its own `RemarkKind` slice only. `null`
+             *     before any remark of this kind exists. Send back unchanged on `PUT` to detect a concurrent
+             *     edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by remarks.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "remark": "A diligent and attentive pupil this term.",
+             *         "writtenByName": "Mrs Adeyemi",
+             *         "writtenAt": "2026-12-12T09:30:00+01:00"
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "remark": null,
+             *         "writtenByName": null,
+             *         "writtenAt": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["RemarkRowDto"][];
+        };
+        /**
+         * @description One saved phrase (TASK-0086 stage B; spec §6.7.7 delta item 4).
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41",
+         *       "kind": "ClassTeacher",
+         *       "text": "A pleasure to have in school.",
+         *       "createdAt": "2026-09-19T09:00:00Z"
+         *     }
+         */
+        RemarkTemplateDto: {
+            /**
+             * @description The template's id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41
+             */
+            id: string;
+            /** @description Which list this phrase belongs to. */
+            kind: components["schemas"]["RemarkKind"];
+            /**
+             * @description The phrase, trimmed.
+             * @example A pleasure to have in school.
+             */
+            text: string;
+            /**
+             * Format: date-time
+             * @description When it was added.
+             * @example 2026-09-19T09:00:00Z
+             */
+            createdAt: string;
+        };
+        /**
+         * @description `GET /api/v1/remark-templates?kind=`'s response — one kind's list, in creation order, never
+         *             paginated (admin-configuration-sized, same treatment as `SectionListResponse`). Ships empty.
+         * @example {
+         *       "templates": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41",
+         *           "kind": "ClassTeacher",
+         *           "text": "A pleasure to have in school.",
+         *           "createdAt": "2026-09-19T09:00:00Z"
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a42",
+         *           "kind": "ClassTeacher",
+         *           "text": "Needs to concentrate more in class.",
+         *           "createdAt": "2026-09-19T09:05:00Z"
+         *         }
+         *       ]
+         *     }
+         */
+        RemarkTemplateListDto: {
+            /**
+             * @description Every template of the requested kind, in creation order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41",
+             *         "kind": "ClassTeacher",
+             *         "text": "A pleasure to have in school.",
+             *         "createdAt": "2026-09-19T09:00:00Z"
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a42",
+             *         "kind": "ClassTeacher",
+             *         "text": "Needs to concentrate more in class.",
+             *         "createdAt": "2026-09-19T09:05:00Z"
+             *       }
+             *     ]
+             */
+            templates: components["schemas"]["RemarkTemplateDto"][];
+        };
+        /**
          * @description `POST /api/v1/terms/{id}/reopen` (spec 6.3.6): Super Admin only, a reason of at least
          *             int Term.ReopenReasonMinLength characters, refused outright if the following term has
          *             already been opened.
@@ -5485,6 +5936,135 @@ export interface components {
             modifiedAtUtc: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/attendance` (TASK-0086 stage A) — partial-save sheet write, one
+         *             transaction. The first save for an arm/term creates the result set (Draft), same convention as
+         *             `SaveTraitRatingsCommand`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "timesPresent": 58
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "timesPresent": null
+         *         }
+         *       ]
+         *     }
+         */
+        SaveAttendanceCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The sheet's version as last read, or `null` for a sheet with no entries yet. A
+             *     mismatch against the server's current version is a 409 `attendance.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A pupil not present here is left entirely untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "timesPresent": 58
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "timesPresent": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveAttendanceRowInput"][];
+        };
+        /**
+         * @description One submitted row of SaveAttendanceCommand (TASK-0086 stage A). A pupil OMITTED
+         *     from IReadOnlyList&lt;SaveAttendanceRowInput&gt; SaveAttendanceCommand.Rows leaves that pupil's existing entry UNTOUCHED
+         *     (Q1-A's convention, generalised to a single-value field). A pupil present with an explicit
+         *     `null`int? SaveAttendanceRowInput.TimesPresent CLEARS (deletes) the entry. A pupil present
+         *     with a number sets or replaces it.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "timesPresent": 58
+         *     }
+         */
+        SaveAttendanceRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * Format: int32
+             * @description `null` to clear.
+             * @example 58
+             */
+            timesPresent: null | number | string;
+        };
+        /**
+         * @description `PUT /api/v1/arms/{armId}/class-teacher-remarks` (TASK-0086 stage A) — partial-save sheet
+         *             write, one transaction. The first remark of either kind for an arm/term creates the result set
+         *             (Draft), same convention as `SaveTraitRatingsCommand`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "remark": "A diligent and attentive pupil this term."
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "remark": null
+         *         }
+         *       ]
+         *     }
+         */
+        SaveClassTeacherRemarksCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The sheet's version as last read, or `null` for a sheet with no class-teacher
+             *     remarks yet. A mismatch against the server's current version is a 409
+             *     `class_teacher_remarks.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A pupil not present here is left entirely untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "remark": "A diligent and attentive pupil this term."
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "remark": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveRemarkRowInput"][];
+        };
+        /**
          * @description `PUT /api/v1/arms/{armId}/development-ratings` (TASK-0083 stage 2) — partial-save grid write,
          *             one transaction. The first save for an arm/term creates the result set (Draft), same convention as
          *             `SaveTraitRatingsCommand`.
@@ -5587,6 +6167,83 @@ export interface components {
             ratings: null | {
                 [key: string]: components["schemas"]["DevelopmentRatingCellDto"];
             };
+        };
+        /**
+         * @description `PUT /api/v1/arms/{armId}/head-teacher-remarks` (TASK-0086 stage A) — partial-save sheet
+         *             write, one transaction, plus ruling H's fill-all action. The first remark of either kind for an
+         *             arm/term creates the result set (Draft), same convention as `SaveTraitRatingsCommand`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "remark": "A pleasure to have in school."
+         *         }
+         *       ],
+         *       "fillEmpty": "Keep up the good work."
+         *     }
+         */
+        SaveHeadTeacherRemarksCommand: {
+            /**
+             * @description The arm this sheet belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this sheet is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The sheet's version as last read, or `null` for a sheet with no head-teacher
+             *     remarks yet. A mismatch against the server's current version is a 409
+             *     `head_teacher_remarks.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A pupil not present here is left entirely untouched. Rows apply BEFORE FillEmpty (delta item 3).
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "remark": "A pleasure to have in school."
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveRemarkRowInput"][];
+            /**
+             * @description Optional fill-all text. Sets this text for every roster pupil who STILL has no remark after
+             *     Rows is applied — never overwrites an existing remark. `null`
+             *     to skip the fill action. Validated like a remark (1-300 characters after trimming).
+             * @example Keep up the good work.
+             */
+            fillEmpty: null | string;
+        };
+        /**
+         * @description One submitted row shared by `SaveClassTeacherRemarksCommand` and
+         *     `SaveHeadTeacherRemarksCommand` (TASK-0086 stage A). A pupil OMITTED from a command's
+         *     `Rows` leaves that pupil's existing remark UNTOUCHED (Q1-A's convention, generalised to a
+         *     single-value field, same as SaveAttendanceRowInput). A pupil present with a
+         *     `null` or empty/whitespace-only string? SaveRemarkRowInput.Remark CLEARS (deletes) the
+         *     remark. A pupil present with non-blank text sets or replaces it, trimmed.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "remark": "A diligent and attentive pupil this term."
+         *     }
+         */
+        SaveRemarkRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null`, empty or whitespace-only clears.
+             * @example A diligent and attentive pupil this term.
+             */
+            remark: null | string;
         };
         /**
          * @description `PUT /api/v1/arms/{armId}/score-sheets` (spec 6.7.4; TASK-0076's approved contract delta) —
@@ -10769,6 +11426,174 @@ export interface operations {
             };
         };
     };
+    GetAttendance: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveAttendance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAttendanceCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListAuditEvents: {
         parameters: {
             query?: {
@@ -11650,6 +12475,174 @@ export interface operations {
             };
         };
     };
+    GetClassTeacherRemarks: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveClassTeacherRemarks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveClassTeacherRemarksCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetDevelopmentRatings: {
         parameters: {
             query: {
@@ -11748,6 +12741,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DevelopmentRatingSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetHeadTeacherRemarks: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveHeadTeacherRemarks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveHeadTeacherRemarksCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkSheetDto"];
                 };
             };
             /** @description Unauthorized */
@@ -12517,6 +13678,212 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRemarkTemplates: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["RemarkKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkTemplateListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateRemarkTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRemarkTemplateCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemarkTemplateDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteRemarkTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
