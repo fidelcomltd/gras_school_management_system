@@ -189,7 +189,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; rulings R1-R3 given (all A); stage 0 (delta) dispatched |
+| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; delta approved 2026-09-19 (R1-R3, Q1-Q3 all A); stage 1 dispatched |
 | TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **carded 2026-09-19**; queued behind TASK-0083 stage 0; runs in a worktree off main after TASK-0072 merges |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
@@ -205,6 +205,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0083 contract delta approved** — arm-scoped GET/PUT trait-ratings and development-ratings, `SectionDto.ratesTraits`,
+  R2 409s; Q1-A partial saves, Q2-A departed pupils omitted, Q3-A comment needs a point. → `decisions/2026-Q3.md`
 - 2026-09-19 **Human rulings**: TASK-0083 R1-A `section.ratesTraits`, R2-A refuse scale change under open ratings, R3-A reuse
   `result.trait.enter`; TASK-0058 fail-open (403 + error log); TASK-0068 (b) comparison in SQL. → `decisions/2026-Q3.md`
 - 2026-09-19 **An agent pushed `task-0072` straight to `origin/main` (3 pushes, 2026-09-18 21:34-21:55); now blocked three ways**:
