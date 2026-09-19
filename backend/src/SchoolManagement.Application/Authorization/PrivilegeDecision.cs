@@ -71,6 +71,11 @@ public static class PrivilegeDecision
             // grant will do" — an unresolvable target must never be treated as in-scope.
             ScopeResolution.Unresolvable => false,
 
+            // TASK-0086 stage B: any active grant for the privilege satisfies it, school-wide or
+            // arm-scoped alike — see ScopeResolution.AnyGrant's remarks for why this exists
+            // (there is no route-declared target to resolve an arm-scoped grant against).
+            ScopeResolution.AnyGrant => matching.Any(),
+
             _ => false,
         };
     }

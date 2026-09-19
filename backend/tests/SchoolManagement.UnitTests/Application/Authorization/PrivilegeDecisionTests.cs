@@ -106,6 +106,42 @@ public sealed class PrivilegeDecisionTests
             .ShouldBeTrue();
     }
 
+    // ---- AnyGrant (TASK-0086 stage B) -----------------------------------------------------------
+
+    [Fact]
+    public void AnyGrant_AnArmScopedGrant_IsAuthorized()
+    {
+        var grants = new[] { ArmScopedGrant(Privileges.Results.RemarkClassTeacher, ArmA) };
+
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Results.RemarkClassTeacher, new ScopeResolution.AnyGrant())
+            .ShouldBeTrue("an arm-scoped grant must pass AnyGrant — the whole point of this mode over NotApplicable");
+    }
+
+    [Fact]
+    public void AnyGrant_ASchoolWideGrant_IsAuthorized()
+    {
+        var grants = new[] { SchoolWideGrant(Privileges.Results.RemarkHeadTeacher) };
+
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Results.RemarkHeadTeacher, new ScopeResolution.AnyGrant())
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AnyGrant_NoGrantAtAll_Returns403()
+    {
+        PrivilegeDecision.IsAuthorized([], Privileges.Results.RemarkClassTeacher, new ScopeResolution.AnyGrant())
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AnyGrant_AGrantForADifferentPrivilege_DoesNotAuthorize()
+    {
+        var grants = new[] { SchoolWideGrant(Privileges.Results.RemarkClassTeacher) };
+
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Results.RemarkHeadTeacher, new ScopeResolution.AnyGrant())
+            .ShouldBeFalse("holding the OTHER kind's privilege must not satisfy this one");
+    }
+
     private static PrivilegeGrant SchoolWideGrant(string privilege) =>
         new(privilege, ScopeType.SchoolWide, new HashSet<Guid>(), SessionId: null);
 

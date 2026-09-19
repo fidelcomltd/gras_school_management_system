@@ -196,6 +196,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     internal DbSet<PupilRemark> PupilRemarks => Set<PupilRemark>();
 
     /// <summary>
+    /// TASK-0086 stage B. Internal, not public: only this assembly's repositories may query it.
+    /// Saved phrases (spec 09 §6.7.7 delta item 4) — never referenced once picked, since the text is
+    /// copied into the remark it seeds.
+    /// </summary>
+    internal DbSet<RemarkTemplate> RemarkTemplates => Set<RemarkTemplate>();
+
+    /// <summary>
     /// TASK-0083 stage 2. Internal, not public: only this assembly's repositories may query it. One
     /// row per pupil per development indicator per result set (spec 02 §5.1) — nursery only.
     /// </summary>

@@ -31,4 +31,27 @@ public abstract record ScopeResolution
     /// target to resolve, and the check falls back to requiring a school-wide grant.
     /// </summary>
     public sealed record NotApplicable : ScopeResolution;
+
+    /// <summary>
+    /// Any active grant for the privilege satisfies the check, school-wide or arm-scoped alike —
+    /// unlike <see cref="NotApplicable"/>, an arm-scoped grant is NOT rejected here (TASK-0086
+    /// stage B). For a route with no single resolvable target at all (a class list, not one class's
+    /// record) where an arm-scoped holder should still pass — the remark-template routes are the
+    /// first caller: a class teacher's grant for <c>result.remark.classteacher</c> is ordinarily
+    /// arm-scoped, and there is no arm in the route to resolve it against.
+    /// </summary>
+    /// <remarks>
+    /// Constructed directly by a HANDLER (<c>RemarkTemplateAccessGuard</c>) that calls
+    /// <c>PrivilegeDecision.IsAuthorized</c> itself, the same "route maps with
+    /// <c>RequireAuthenticatedCaller()</c>, the handler does the data-dependent check" shape
+    /// <c>PupilAccessGuard</c> already established — NOT wired through
+    /// <see cref="ScopeParameterKind"/>/<c>ScopeResolver</c>, because which of two DIFFERENT
+    /// privileges (<c>result.remark.classteacher</c> vs <c>result.remark.headteacher</c>) applies
+    /// depends on a request's <c>kind</c> (query string, body field, or a stored row), never on a
+    /// route parameter the declarative mechanism can read. Like every other resolution here, this
+    /// does not consult <c>PrivilegeGrant.SessionId</c> — the same pre-existing gap
+    /// TODO(TASK-0060) on <c>PrivilegeDecision</c> describes, not newly introduced or widened by
+    /// this case.
+    /// </remarks>
+    public sealed record AnyGrant : ScopeResolution;
 }

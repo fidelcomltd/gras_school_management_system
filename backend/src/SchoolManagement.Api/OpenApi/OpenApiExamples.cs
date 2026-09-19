@@ -2234,6 +2234,41 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(RemarkTemplateDto)] = $$"""
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41",
+              "kind": "ClassTeacher",
+              "text": "A pleasure to have in school.",
+              "createdAt": "2026-09-19T09:00:00Z"
+            }
+            """,
+
+        [typeof(RemarkTemplateListDto)] = $$"""
+            {
+              "templates": [
+                {
+                  "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a41",
+                  "kind": "ClassTeacher",
+                  "text": "A pleasure to have in school.",
+                  "createdAt": "2026-09-19T09:00:00Z"
+                },
+                {
+                  "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a42",
+                  "kind": "ClassTeacher",
+                  "text": "Needs to concentrate more in class.",
+                  "createdAt": "2026-09-19T09:05:00Z"
+                }
+              ]
+            }
+            """,
+
+        [typeof(CreateRemarkTemplateCommand)] = """
+            {
+              "kind": "ClassTeacher",
+              "text": "A pleasure to have in school."
+            }
+            """,
+
         [typeof(VoidScoreSheetCommand)] = $$"""
             {
               "armId": "{{ExampleArmId}}",

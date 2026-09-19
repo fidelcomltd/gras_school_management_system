@@ -214,6 +214,9 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IAttendanceEntryRepository, AttendanceEntryRepository>();
         services.AddScoped<IPupilRemarkRepository, PupilRemarkRepository>();
 
+        // TASK-0086 stage B: remark templates.
+        services.AddScoped<IRemarkTemplateRepository, RemarkTemplateRepository>();
+
         // TASK-0072 stage 3a: one seam every settings handler asks for the whole config_version
         // snapshot input through, replacing the one-repository-per-OTHER-group constructor ripple —
         // see ISettingsSnapshotSource's own remarks.
