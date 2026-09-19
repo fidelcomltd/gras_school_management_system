@@ -189,6 +189,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
+| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; stage 0 (delta) waits on human rulings R1-R3 |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
