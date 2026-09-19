@@ -188,7 +188,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0086 | Attendance, class and head teacher remarks, remark templates | backend-dev | **dispatched 2026-09-19**, stage A; branch `task-0086` stacked on `task-0083`; delta approved in the card |
+| TASK-0086 | Attendance, class and head teacher remarks, remark templates | backend-dev | **stage A done 2026-09-19**; stage B (templates) dispatched; branch `task-0086` stacked on `task-0083`; delta approved in the card |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -203,6 +203,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0086 stage A done** — attendance + both remarks, term guard; orchestrator scoped gate 1270/1270, Format fixed on
+  bounce (CRLF + imports); contract drift expected until promotion after stage B. → `tasks/TASK-0086.md` log
 - 2026-09-19 **TASK-0084 closed** — 401 is a legitimate interleaving (auth precedes lock); test split, deterministic, no product change.
   Scoped gate 1112/1112. Branch `task-0084` (`3cfc232`) off main, needs its own PR. → `decisions/2026-Q3.md`
 - 2026-09-19 **Human rulings on TASK-0086**: L remarks 300 chars (not §6.7.7's 240); A attendance stores present only, absent derived;
@@ -551,6 +553,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-19 **An attendance save racing a term update can leave derived absent negative** — each reads the other's committed state only.
+  Unlikely (admin lowers opened while a teacher saves). *Trigger: the readiness/submission card, which must treat present > opened as incomplete. Owner: `backend-dev`.*
+- 2026-09-19 **§6.7.7 says remarks are 240 chars and types both attendance figures; built 300 and present-only by ruling L/A.** *Trigger: next spec revision. Owner: human.*
 - 2026-09-19 **Renaming a scale point's code or label in place is ungated, even when ratings use it.** Published sheets are safe ONLY if
   publication snapshots the scale legend (§6.7.12 requires it, and publication is not built yet); open sets would show the new code mid-term.
   *Trigger: the publication/snapshot card, or the rating-scales screen card. Owner: human ruling.* → `drift/2026-Q3.md`
