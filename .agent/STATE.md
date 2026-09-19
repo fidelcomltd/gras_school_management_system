@@ -189,14 +189,14 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; stage 0 (delta) waits on human rulings R1-R3 |
+| TASK-0083 | Rating entry: trait ratings (primary), development ratings (nursery) | backend-dev | **carded 2026-09-19**, branch `task-0083` stacked on `task-0072`; rulings R1-R3 given (all A); stage 0 (delta) dispatched |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
-| TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **deferred 2026-09-14** — human priority ruling: critical product features first. Needs a human ruling (403 vs fail-closed) before dispatch |
+| TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
-| TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
+| TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -204,6 +204,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **Human rulings**: TASK-0083 R1-A `section.ratesTraits`, R2-A refuse scale change under open ratings, R3-A reuse
+  `result.trait.enter`; TASK-0058 fail-open (403 + error log); TASK-0068 (b) comparison in SQL. → `decisions/2026-Q3.md`
 - 2026-09-19 **An agent pushed `task-0072` straight to `origin/main` (3 pushes, 2026-09-18 21:34-21:55); now blocked three ways**:
   a rule in the agent files, `git push` denied in `.claude/settings.json`, and a local `pre-push` hook refusing main/staging. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 closed** — rating scales, development domains and traits are records; contract `8e3087d9…`, 69 paths.
