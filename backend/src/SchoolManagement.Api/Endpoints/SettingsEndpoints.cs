@@ -48,6 +48,7 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapUpdateResultRules(settingsGroup);
         MapUpdateRatingScales(settingsGroup);
         MapUpdateDevelopmentDomains(settingsGroup);
+        MapUpdateTraits(settingsGroup);
 
         var configVersionsGroup = endpoints
             .MapGroup("/config-versions")
@@ -391,6 +392,44 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "least ten characters, only when a result set is Published in the active session " +
                 "(spec 6.2.9); otherwise it is ignored.")
             .Produces<SettingsDevelopmentDomainGroupDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUpdateTraits(RouteGroupBuilder group) =>
+        group.MapPut("/traits", async (
+                UpdateTraitsCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.TraitsUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .WithName("UpdateTraits")
+            .WithSummary("Replace the traits and their block rating scales")
+            .WithDescription(
+                "Whole trait set as one array, atomic (spec 6.2.7 / 6.2.13), plus which rating scale " +
+                "each of the two blocks (affective, psychomotor) is rated against. A trait's `id`, " +
+                "when supplied, must match an existing row — that is how a rename/reorder/archive is " +
+                "told apart from an add or a remove, matching `PUT /settings/development-domains`'s " +
+                "own convention. Traits are NOT section-scoped. `affectiveRatingScaleId`/" +
+                "`psychomotorRatingScaleId` must each match an existing rating scale, rejected " +
+                "`422 settings.traits.unknown_scale_id` otherwise; an unknown trait `id` is rejected " +
+                "`422 settings.traits.unknown_trait_id`; a duplicate trait name within the same " +
+                "domain is rejected `422 settings.traits.duplicate_name` — the same name is allowed " +
+                "in the other domain. Archiving a submitted id is always allowed and never gated; an " +
+                "EXISTING trait whose id is absent from the submission is being removed, and is " +
+                "refused `409 settings.traits.trait_rated` if it has ever been rated — archive it " +
+                "instead. `expectedVersion` must match the traits group's current `versionNumber` " +
+                "(from `GET /settings`) or the save is rejected `409 settings.traits.stale_version` " +
+                "before anything is written. `reason` is required, at least ten characters, only when " +
+                "a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.")
+            .Produces<SettingsTraitsGroupDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

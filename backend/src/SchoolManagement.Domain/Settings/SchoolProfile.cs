@@ -116,7 +116,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int assessmentVersionNumber,
         int resultRulesVersionNumber,
         int ratingScalesVersionNumber,
-        int developmentDomainsVersionNumber)
+        int developmentDomainsVersionNumber,
+        int traitsVersionNumber)
         : base(id)
     {
         SchoolName = schoolName;
@@ -139,6 +140,7 @@ public sealed class SchoolProfile : Entity<Guid>
         ResultRulesVersionNumber = resultRulesVersionNumber;
         RatingScalesVersionNumber = ratingScalesVersionNumber;
         DevelopmentDomainsVersionNumber = developmentDomainsVersionNumber;
+        TraitsVersionNumber = traitsVersionNumber;
     }
 
     /// <summary>Full school name (spec 6.2.3). Appears in full on the result sheet header.</summary>
@@ -236,6 +238,13 @@ public sealed class SchoolProfile : Entity<Guid>
     /// <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
     /// </summary>
     public int DevelopmentDomainsVersionNumber { get; private set; }
+
+    /// <summary>
+    /// The traits group's own, independent optimistic-concurrency pointer (TASK-0072 stage 3b). The
+    /// traits and trait blocks themselves live in the separate <see cref="Trait"/>/<see cref="TraitBlock"/>
+    /// tables — see <see cref="GradingVersionNumber"/>'s remarks for why the pointer lives here regardless.
+    /// </summary>
+    public int TraitsVersionNumber { get; private set; }
 
     /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
@@ -337,6 +346,12 @@ public sealed class SchoolProfile : Entity<Guid>
     public void IncrementDevelopmentDomainsVersion() => DevelopmentDomainsVersionNumber++;
 
     /// <summary>
+    /// Bumps <see cref="TraitsVersionNumber"/> for a successful <c>PUT /settings/traits</c> save
+    /// (TASK-0072 stage 3b). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
+    /// </summary>
+    public void IncrementTraitsVersion() => TraitsVersionNumber++;
+
+    /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration
     /// seed's shape. Production code never constructs a <see cref="SchoolProfile"/> — the row already
     /// exists from the moment the migration runs — so there is no public factory to reuse; this one
@@ -364,7 +379,8 @@ public sealed class SchoolProfile : Entity<Guid>
         int assessmentVersionNumber = 0,
         int resultRulesVersionNumber = 0,
         int ratingScalesVersionNumber = 0,
-        int developmentDomainsVersionNumber = 0) =>
+        int developmentDomainsVersionNumber = 0,
+        int traitsVersionNumber = 0) =>
         new(
             id,
             schoolName,
@@ -386,5 +402,6 @@ public sealed class SchoolProfile : Entity<Guid>
             assessmentVersionNumber,
             resultRulesVersionNumber,
             ratingScalesVersionNumber,
-            developmentDomainsVersionNumber);
+            developmentDomainsVersionNumber,
+            traitsVersionNumber);
 }

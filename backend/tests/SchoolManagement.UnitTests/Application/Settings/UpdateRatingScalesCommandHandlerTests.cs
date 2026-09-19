@@ -48,7 +48,9 @@ public sealed class UpdateRatingScalesCommandHandlerTests
             Array.Empty<AssessmentComponent>(),
             ResultRules.CreateSeed(Guid.CreateVersion7()),
             Array.Empty<RatingScale>(),
-            Array.Empty<DevelopmentDomain>()));
+            Array.Empty<DevelopmentDomain>(),
+            Array.Empty<Trait>(),
+            Array.Empty<TraitBlock>()));
     }
 
     private UpdateRatingScalesCommandHandler CreateHandler() => new(

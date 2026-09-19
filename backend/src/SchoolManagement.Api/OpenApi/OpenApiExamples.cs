@@ -236,6 +236,14 @@ internal static class OpenApiExamples
                   }
                 ],
                 "versionNumber": 0
+              },
+              "traits": {
+                "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+                "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+                "traits": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01", "domain": "Affective", "name": "Punctuality", "displayOrder": 2, "status": "Active" }
+                ],
+                "versionNumber": 0
               }
             }
             """,
@@ -464,6 +472,48 @@ internal static class OpenApiExamples
                     { "name": "Potty trained", "displayOrder": 1, "status": "Active" }
                   ]
                 }
+              ],
+              "expectedVersion": 0,
+              "reason": null
+            }
+            """,
+
+        [typeof(TraitDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+              "domain": "Affective",
+              "name": "Punctuality",
+              "displayOrder": 2,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(SettingsTraitsGroupDto)] = """
+            {
+              "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+              "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+              "traits": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01", "domain": "Affective", "name": "Punctuality", "displayOrder": 2, "status": "Active" }
+              ],
+              "versionNumber": 0
+            }
+            """,
+
+        [typeof(TraitInput)] = """
+            {
+              "domain": "Affective",
+              "name": "Punctuality",
+              "displayOrder": 2,
+              "status": "Active"
+            }
+            """,
+
+        [typeof(UpdateTraitsCommand)] = """
+            {
+              "affectiveRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+              "psychomotorRatingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+              "traits": [
+                { "domain": "Affective", "name": "Punctuality", "displayOrder": 2, "status": "Active" }
               ],
               "expectedVersion": 0,
               "reason": null

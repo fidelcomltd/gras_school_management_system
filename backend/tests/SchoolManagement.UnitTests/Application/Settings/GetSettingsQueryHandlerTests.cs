@@ -20,6 +20,7 @@ public sealed class GetSettingsQueryHandlerTests
     private readonly IRatingScaleRepository _ratingScaleRepository = Substitute.For<IRatingScaleRepository>();
     private readonly IDevelopmentDomainRepository _developmentDomainRepository = Substitute.For<IDevelopmentDomainRepository>();
     private readonly ISectionRepository _sectionRepository = Substitute.For<ISectionRepository>();
+    private readonly ITraitRepository _traitRepository = Substitute.For<ITraitRepository>();
 
     // Defaults set in the CONSTRUCTOR (runs once before each test method, per xUnit's per-test
     // instance model) so a test's own .Returns() setup — configured inside the test method body,
@@ -34,11 +35,13 @@ public sealed class GetSettingsQueryHandlerTests
         _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<RatingScale>());
         _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
         _sectionRepository.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<Section>());
+        _traitRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<Trait>());
+        _traitRepository.ListBlocksReadOnlyAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<TraitBlock>());
     }
 
     private GetSettingsQueryHandler CreateHandler() =>
         new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository, _ratingScaleRepository,
-            _developmentDomainRepository, _sectionRepository);
+            _developmentDomainRepository, _sectionRepository, _traitRepository);
 
     [Fact]
     public async Task HandleAsync_ReturnsTheIdentityGroupMappedFromTheProfile()

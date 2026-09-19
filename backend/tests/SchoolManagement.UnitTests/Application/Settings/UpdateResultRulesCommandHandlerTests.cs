@@ -41,7 +41,9 @@ public sealed class UpdateResultRulesCommandHandlerTests
             Array.Empty<AssessmentComponent>(),
             ResultRules.CreateSeed(Guid.CreateVersion7()),
             Array.Empty<RatingScale>(),
-            Array.Empty<DevelopmentDomain>()));
+            Array.Empty<DevelopmentDomain>(),
+            Array.Empty<Trait>(),
+            Array.Empty<TraitBlock>()));
         CreateTrackedProfile();
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
     }

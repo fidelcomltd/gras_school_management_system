@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-18 by orchestrator (TASK-0071 and TASK-0081 closed; contract `0ebca075…`) · no size cap, see
+Last reconciled: 2026-09-18 by orchestrator (TASK-0072 and TASK-0082 closed; contract `8e3087d9…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,18 +115,19 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `0ebca075110efcf2f6aeaf740842fba519f0fdc4bcc515b8642b4a9c3d834265`** · **66 paths** ·
-**139 schemas** · api version `v1` · moved 2026-09-18 by TASK-0071 (result computation, §8.2).
-Previous: `84b46211e9fc…` / 65 paths / 137 schemas, TASK-0077 on 2026-09-18; before that
+**Current: `8e3087d93f02314b76ac4a92d30b07cd73fd987b194d537e5c873072580c56c8`** · **69 paths** ·
+**159 schemas** · api version `v1` · moved 2026-09-18 by TASK-0072 (rating scales, development domains, traits, §6.2.13).
+Previous: `0ebca075110e…` / 66 paths / 139 schemas, TASK-0071 on 2026-09-18; before that `84b46211e9fc…` (TASK-0077),
 `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069) and `b293db2bc2b4…` (TASK-0063).
 
 **Additive verified MECHANICALLY at promotion by the orchestrator, not read off the card**: the previous
-document was copied aside before `-Promote` and diffed with `jq`. Paths removed, existing paths changed,
-schemas removed and existing schemas changed in any way **all came back empty**. Added: 1 path
-(`POST /api/v1/result-sets/{resultSetId}/compute`) and 2 schemas (`ComputeResultSetResponse`,
-`ComputeResultSetFlagDto`). Responses 200/401/403/409/422/429 and **no 404**, per the 2026-09-18 ruling. The ledger
-gate caught this block stale on the first attempt again, the fifth time since TASK-0075 built it. (TASK-0077's
-promotion paragraph, which this replaces: `decisions/2026-Q3.md`, TASK-0077 closure.)
+document was copied aside before `-Promote` and diffed with `jq`. Paths removed, existing paths changed and
+schemas removed **all came back empty**. Added: 3 paths (`PUT /api/v1/settings/rating-scales`,
+`/settings/development-domains`, `/settings/traits`) and 20 schemas. The one changed schema is `SettingsDto`, a
+**response** schema that gains 3 always-present properties (`ratingScales`, `developmentDomains`, `traits`, also
+added to its `required`). All 5 existing properties are byte-identical, so every existing client still reads it.
+Responses 200/401/403/409/422/429 and no 404. (TASK-0071's promotion paragraph, which this replaces:
+`decisions/2026-Q3.md`, TASK-0071 closure.)
 
 **Updated by the closing card at promotion.** Promotion run by the ORCHESTRATOR
 (`generate-openapi.ps1 -Promote`); `CONTRACT.lock` written in the same run. **Additive verified
@@ -157,9 +158,8 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-18 (TASK-0081). `check:api-drift` re-run by
-  the orchestrator: `No drift`, exit 0; `npm run verify` 55 files / 381 tests / build clean, exit 0. Types only,
-  zero new wrapper code.
+- Frontend client is **CURRENT against this hash** as of 2026-09-18 (TASK-0082, same PR as TASK-0072). The orchestrator re-ran
+  `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
   from application code yet.
@@ -173,7 +173,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -196,7 +196,6 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0036 | End-of-session promotion | backend-dev | **blocked** — arms, pupils and enrolments now exist (0059); still needs annual results |
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **queued 2026-09-16 — NEEDS A HUMAN RULING before dispatch.** A surname with an apostrophe can vanish from the register; fix is either a collation migration or an all-SQL comparison, and the choice ties to Open question 5 |
-| TASK-0072 | Rating scales, traits, development domains and indicators | backend-dev | **in progress 2026-09-18, branch `task-0072`; stages 1, 2a, 2b done; stage 3 (snapshot refactor + traits) dispatched** — scale is per rating block, not school-wide (conflict 6). Carry the §6.2.7 was/now table; also add the missing `CreateSubjectHandler` `code_duplicate` unit test noted at TASK-0070 closure |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
 
@@ -204,6 +203,9 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-18 **TASK-0072 closed** — rating scales, development domains and traits are records; contract `8e3087d9…`, 69 paths.
+  Full gate 1437/1437 on the 3rd run (a privilege-count fix, then the known concurrency flake). → `decisions/2026-Q3.md`
+- 2026-09-18 **TASK-0082 closed** — client current against `8e3087d9…`, generated only, same PR as the promotion. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 stage 2b done (`b9ee49f`)** — `PUT /settings/development-domains`; stage 1's 10 unit failures fixed by
   reason (95 privileges). Unit 972/972 whole project. Snapshot ripple ~1720 lines; stage 3 refactors it first. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 stage 2a done (`fa55845`)** — domain/indicator tables, 4/45 seed, `RatingScaleUsageGate` real. Stage 1's
@@ -678,7 +680,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 - 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
   fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
-- 2026-09-16 **A concurrency test answered 401 where it expects 409, once, and nobody has looked.**
+- 2026-09-16 **A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate), and nobody has looked.**
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
   which a real user would experience as a logout rather than a conflict. *Trigger: the next card

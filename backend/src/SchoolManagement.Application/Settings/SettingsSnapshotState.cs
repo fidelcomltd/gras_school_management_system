@@ -27,9 +27,13 @@ namespace SchoolManagement.Application.Settings;
 /// <param name="ResultRules">The result rules singleton row (TASK-0077).</param>
 /// <param name="RatingScales">The rating scales, with their points attached (TASK-0072 stage 1).</param>
 /// <param name="DevelopmentDomains">The nursery development domains, with their indicators attached (TASK-0072 stage 2).</param>
+/// <param name="Traits">Every trait (TASK-0072 stage 3b) — the FIRST group added entirely under this seam, touching no other handler.</param>
+/// <param name="TraitBlocks">The two trait blocks (affective, psychomotor) and which scale each currently points at (TASK-0072 stage 3b).</param>
 public sealed record SettingsSnapshotState(
     IReadOnlyList<GradingBand> GradingBands,
     IReadOnlyList<AssessmentComponent> AssessmentComponents,
     ResultRules ResultRules,
     IReadOnlyList<RatingScale> RatingScales,
-    IReadOnlyList<DevelopmentDomain> DevelopmentDomains);
+    IReadOnlyList<DevelopmentDomain> DevelopmentDomains,
+    IReadOnlyList<Trait> Traits,
+    IReadOnlyList<TraitBlock> TraitBlocks);

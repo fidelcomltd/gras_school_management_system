@@ -153,6 +153,36 @@ internal static class SettingsMapper
         return new SettingsDevelopmentDomainGroupDto(dtos, versionNumber);
     }
 
+    /// <summary>
+    /// Maps <paramref name="traits"/> (already ordered by the caller) and both block scale ids to the
+    /// wire DTO.
+    /// </summary>
+    public static SettingsTraitsGroupDto ToTraitsDto(
+        IReadOnlyList<Trait> traits,
+        Guid affectiveRatingScaleId,
+        Guid psychomotorRatingScaleId,
+        int versionNumber)
+    {
+        ArgumentNullException.ThrowIfNull(traits);
+
+        var dtos = traits
+            .OrderBy(trait => trait.Domain)
+            .ThenBy(trait => trait.DisplayOrder)
+            .Select(trait => new TraitDto(
+                trait.Id.ToString("D", CultureInfo.InvariantCulture),
+                trait.Domain,
+                trait.Name,
+                trait.DisplayOrder,
+                trait.Status))
+            .ToList();
+
+        return new SettingsTraitsGroupDto(
+            affectiveRatingScaleId.ToString("D", CultureInfo.InvariantCulture),
+            psychomotorRatingScaleId.ToString("D", CultureInfo.InvariantCulture),
+            dtos,
+            versionNumber);
+    }
+
     /// <summary>Maps <paramref name="resultRules"/> to the wire DTO. <paramref name="versionNumber"/> comes from the caller's <see cref="SchoolProfile.ResultRulesVersionNumber"/> read, matching <see cref="ToGradingDto"/>'s and <see cref="ToAssessmentDto"/>'s own pattern.</summary>
     public static ResultRulesDto ToResultRulesDto(ResultRules resultRules, int versionNumber)
     {

@@ -16,7 +16,8 @@ internal sealed class SettingsSnapshotSource(
     IAssessmentComponentRepository assessmentComponentRepository,
     IResultRulesRepository resultRulesRepository,
     IRatingScaleRepository ratingScaleRepository,
-    IDevelopmentDomainRepository developmentDomainRepository)
+    IDevelopmentDomainRepository developmentDomainRepository,
+    ITraitRepository traitRepository)
     : ISettingsSnapshotSource
 {
     /// <inheritdoc />
@@ -27,7 +28,9 @@ internal sealed class SettingsSnapshotSource(
         var resultRules = await resultRulesRepository.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var ratingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var developmentDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var traits = await traitRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var traitBlocks = await traitRepository.ListBlocksReadOnlyAsync(cancellationToken).ConfigureAwait(false);
 
-        return new SettingsSnapshotState(bands, components, resultRules, ratingScales, developmentDomains);
+        return new SettingsSnapshotState(bands, components, resultRules, ratingScales, developmentDomains, traits, traitBlocks);
     }
 }

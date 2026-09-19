@@ -35,4 +35,7 @@ public enum ConfigVersionGroup
 
     /// <summary>A save through <c>PUT /settings/development-domains</c> (TASK-0072 stage 2b).</summary>
     DevelopmentDomains = 7,
+
+    /// <summary>A save through <c>PUT /settings/traits</c> (TASK-0072 stage 3b).</summary>
+    Traits = 8,
 }

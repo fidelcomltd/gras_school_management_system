@@ -6,16 +6,29 @@ namespace SchoolManagement.Infrastructure.Settings;
 
 /// <summary>
 /// Real implementation of <see cref="IRatingScaleUsageGate"/> (TASK-0072 stage 2a) — a scale is in use
-/// when any <c>development_domain</c> row references it. Replaces the stage 1 stand-in that
-/// unconditionally answered "not in use", now that <c>development_domain.rating_scale_id</c> exists to
-/// query, per the port's own documented seam. Stage 3 (trait blocks) extends this with an
-/// <c>OR EXISTS</c> against its own new reference column, not a second query method.
+/// when any <c>development_domain</c> row, or either <c>trait_block</c> row (stage 3b), references it.
+/// Replaces the stage 1 stand-in that unconditionally answered "not in use", now that
+/// <c>development_domain.rating_scale_id</c>/<c>trait_block.rating_scale_id</c> exist to query, per the
+/// port's own documented seam.
 /// </summary>
 internal sealed class RatingScaleUsageGate(ApplicationDbContext context) : IRatingScaleUsageGate
 {
     /// <inheritdoc />
-    public Task<bool> IsInUseAsync(Guid ratingScaleId, CancellationToken cancellationToken) =>
-        context.DevelopmentDomains
+    public async Task<bool> IsInUseAsync(Guid ratingScaleId, CancellationToken cancellationToken)
+    {
+        var usedByDevelopmentDomain = await context.DevelopmentDomains
             .AsNoTracking()
-            .AnyAsync(domain => domain.RatingScaleId == ratingScaleId, cancellationToken);
+            .AnyAsync(domain => domain.RatingScaleId == ratingScaleId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (usedByDevelopmentDomain)
+        {
+            return true;
+        }
+
+        return await context.TraitBlocks
+            .AsNoTracking()
+            .AnyAsync(block => block.RatingScaleId == ratingScaleId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

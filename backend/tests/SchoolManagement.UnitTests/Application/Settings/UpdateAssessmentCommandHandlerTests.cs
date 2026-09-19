@@ -53,7 +53,9 @@ public sealed class UpdateAssessmentCommandHandlerTests
             Array.Empty<AssessmentComponent>(),
             ResultRules.CreateSeed(Guid.CreateVersion7()),
             Array.Empty<RatingScale>(),
-            Array.Empty<DevelopmentDomain>()));
+            Array.Empty<DevelopmentDomain>(),
+            Array.Empty<Trait>(),
+            Array.Empty<TraitBlock>()));
     }
 
     private UpdateAssessmentCommandHandler CreateHandler()

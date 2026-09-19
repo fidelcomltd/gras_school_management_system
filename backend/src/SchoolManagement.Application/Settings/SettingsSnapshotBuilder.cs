@@ -22,6 +22,10 @@ namespace SchoolManagement.Application.Settings;
 /// byte-identical to before this change; only how a caller ASSEMBLES the input moved, pinned by
 /// <c>SettingsSnapshotBuilderTests.Build_ProducesTheSameShapeAsBeforeTheStage3ARefactor</c>.
 /// </remarks>
+/// <remarks>
+/// TASK-0072 STAGE 3B adds the <c>traits</c> section — the first group added entirely under the stage
+/// 3a seam. No existing caller changed; <see cref="UpdateTraitsCommandHandler"/> is the only new one.
+/// </remarks>
 internal static class SettingsSnapshotBuilder
 {
     // camelCase, matching the wire format every other DTO in this API serialises with.
@@ -42,12 +46,19 @@ internal static class SettingsSnapshotBuilder
         var resultRules = state.ResultRules;
         var ratingScales = state.RatingScales;
         var developmentDomains = state.DevelopmentDomains;
+        var traits = state.Traits;
+        var traitBlocks = state.TraitBlocks;
 
         ArgumentNullException.ThrowIfNull(bands);
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(resultRules);
         ArgumentNullException.ThrowIfNull(ratingScales);
         ArgumentNullException.ThrowIfNull(developmentDomains);
+        ArgumentNullException.ThrowIfNull(traits);
+        ArgumentNullException.ThrowIfNull(traitBlocks);
+
+        var affectiveScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Affective)?.RatingScaleId ?? Guid.Empty;
+        var psychomotorScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Psychomotor)?.RatingScaleId ?? Guid.Empty;
 
         var snapshot = new SettingsSnapshot(
             new SchoolProfileSnapshot(
@@ -125,7 +136,16 @@ internal static class SettingsSnapshotBuilder
                         .Select(indicator => new DevelopmentIndicatorSnapshot(indicator.Name, indicator.DisplayOrder, indicator.Status))
                         .ToList()))
                 .ToList(),
-            profile.DevelopmentDomainsVersionNumber);
+            profile.DevelopmentDomainsVersionNumber,
+            new TraitsGroupSnapshot(
+                affectiveScaleId,
+                psychomotorScaleId,
+                traits
+                    .OrderBy(trait => trait.Domain)
+                    .ThenBy(trait => trait.DisplayOrder)
+                    .Select(trait => new TraitSnapshot(trait.Domain, trait.Name, trait.DisplayOrder, trait.Status))
+                    .ToList()),
+            profile.TraitsVersionNumber);
 
         return JsonSerializer.Serialize(snapshot, Options);
     }
@@ -141,7 +161,9 @@ internal static class SettingsSnapshotBuilder
         IReadOnlyList<RatingScaleSnapshot> RatingScales,
         int RatingScalesVersionNumber,
         IReadOnlyList<DevelopmentDomainSnapshot> DevelopmentDomains,
-        int DevelopmentDomainsVersionNumber);
+        int DevelopmentDomainsVersionNumber,
+        TraitsGroupSnapshot Traits,
+        int TraitsVersionNumber);
 
     private sealed record SchoolProfileSnapshot(
         string SchoolName,
@@ -202,4 +224,11 @@ internal static class SettingsSnapshotBuilder
         IReadOnlyList<DevelopmentIndicatorSnapshot> Indicators);
 
     private sealed record DevelopmentIndicatorSnapshot(string Name, int DisplayOrder, DevelopmentIndicatorStatus Status);
+
+    private sealed record TraitsGroupSnapshot(
+        Guid AffectiveRatingScaleId,
+        Guid PsychomotorRatingScaleId,
+        IReadOnlyList<TraitSnapshot> Items);
+
+    private sealed record TraitSnapshot(TraitDomain Domain, string Name, int DisplayOrder, TraitStatus Status);
 }
