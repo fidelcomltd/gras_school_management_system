@@ -193,11 +193,14 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0072 stage 2a: development domains and indicators. IRatingScaleUsageGate is now a real
         // query against development_domain, replacing stage 1's unconditional "not in use" stand-in.
-        // IDevelopmentIndicatorUsageGate is itself the new stand-in — no rating table exists until
-        // Phase 3 — see its own remarks.
         services.AddScoped<IRatingScaleUsageGate, RatingScaleUsageGate>();
         services.AddScoped<IDevelopmentDomainRepository, DevelopmentDomainRepository>();
+
+        // TASK-0083 stage 2: development ratings. IDevelopmentIndicatorUsageGate is now a real query
+        // against development_rating, replacing TASK-0072 stage 2a's unconditional "never rated"
+        // stand-in.
         services.AddScoped<IDevelopmentIndicatorUsageGate, DevelopmentIndicatorUsageGate>();
+        services.AddScoped<IDevelopmentRatingRepository, DevelopmentRatingRepository>();
 
         // TASK-0072 stage 3b: traits.
         services.AddScoped<ITraitRepository, TraitRepository>();

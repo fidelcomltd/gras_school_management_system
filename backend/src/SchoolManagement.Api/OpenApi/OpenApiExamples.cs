@@ -1974,6 +1974,134 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(DevelopmentRatingCellDto)] = """
+            {
+              "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+              "comment": "Needs reminding after lunch."
+            }
+            """,
+
+        [typeof(DevelopmentRatingDomainDto)] = """
+            {
+              "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+              "name": "Personal & Physical Development",
+              "displayOrder": 3,
+              "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+              "scale": {
+                "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                "name": "Nursery development",
+                "points": [
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701", "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702", "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703", "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                  { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                ]
+              },
+              "allowsIndicatorComment": true,
+              "activeIndicatorCount": 1,
+              "indicators": [
+                { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901", "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+              ]
+            }
+            """,
+
+        [typeof(DevelopmentRatingRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "ratings": {
+                "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": { "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "comment": "Needs reminding after lunch." }
+              }
+            }
+            """,
+
+        [typeof(DevelopmentRatingSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": true
+              },
+              "domains": [
+                {
+                  "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+                  "name": "Personal & Physical Development",
+                  "displayOrder": 3,
+                  "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                  "scale": {
+                    "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+                    "name": "Nursery development",
+                    "points": [
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701", "pointCode": "N", "pointLabel": "Needs Improvement", "pointOrder": 1 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702", "pointCode": "I", "pointLabel": "Improving", "pointOrder": 2 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703", "pointCode": "S", "pointLabel": "Satisfied", "pointOrder": 3 },
+                      { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "pointCode": "E", "pointLabel": "Excellent", "pointOrder": 4 }
+                    ]
+                  },
+                  "allowsIndicatorComment": true,
+                  "activeIndicatorCount": 1,
+                  "indicators": [
+                    { "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901", "name": "Potty trained", "displayOrder": 1, "status": "Active" }
+                  ]
+                }
+              ],
+              "activeIndicatorTotal": 1,
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "ratings": {
+                    "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": { "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "comment": "Needs reminding after lunch." }
+                  }
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "ratings": {
+                    "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": { "pointId": null, "comment": null }
+                  }
+                }
+              ]
+            }
+            """,
+
+        [typeof(SaveDevelopmentRatingsRowInput)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "ratings": {
+                "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": { "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "comment": "Needs reminding after lunch." }
+              }
+            }
+            """,
+
+        [typeof(SaveDevelopmentRatingsCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "ratings": {
+                    "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": { "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704", "comment": "Needs reminding after lunch." }
+                  }
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "ratings": {
+                    "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": null
+                  }
+                }
+              ]
+            }
+            """,
+
         [typeof(VoidScoreSheetCommand)] = $$"""
             {
               "armId": "{{ExampleArmId}}",

@@ -115,6 +115,10 @@ public sealed class PipelineTests
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ITraitRatingRepository>());
 
+        // TASK-0083 stage 2: the development-rating handlers (Get/Save) depend on this port,
+        // implemented by Infrastructure — same treatment as every other repository stubbed above.
+        services.AddSingleton(Substitute.For<IDevelopmentRatingRepository>());
+
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<ISectionRepository>());
