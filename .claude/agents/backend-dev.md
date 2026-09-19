@@ -61,6 +61,11 @@ Rules:
   `~/.gras/pg-test.txt`. If the local container does not work, STOP and report it; the human decides
   whether a hosted run is allowed, never you.
 - A run with anything SKIPPED is not a passing run — say so rather than reporting green.
+- **You never push, pull, merge, rebase or touch remotes.** No `git push` in any form (`-C`, `--force`, a refspec,
+  an editor sync). Commit locally when your dispatch says to, and stop; the human pushes and opens the PR. On
+  2026-09-18 an agent pushed `task-0072` straight to `origin/main`, bypassing review. A local `pre-push` hook now
+  refuses `main`, and `git push` is denied in `.claude/settings.json`. Never bypass either (`--no-verify`,
+  `core.hooksPath`, editing the hook or the settings).
 - **You never write to `.agent/**`** — not `STATE.md`, not the card's `## Log`, not the archives. The
   ledger is the orchestrator's, and it appends your account after review. End your report with a section
   headed `LEDGER ACCOUNT` holding: ONE decision index line; any drift line, each with its trigger and

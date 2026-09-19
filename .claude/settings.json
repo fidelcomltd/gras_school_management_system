@@ -13,7 +13,18 @@
       "Bash(& \".\\backend\\scripts\\generate-openapi.ps1\"*)",
       "PowerShell(./backend/scripts/ci.ps1*)",
       "PowerShell(./backend/scripts/generate-openapi.ps1*)"
-
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git push)",
+      "Bash(git -C * push:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git push)",
+      "PowerShell(git -C * push:*)",
+      "Bash(git config core.hooksPath:*)",
+      "PowerShell(git config core.hooksPath:*)",
+      "Edit(.git/hooks/**)",
+      "Write(.git/hooks/**)"
     ]
   }
 }

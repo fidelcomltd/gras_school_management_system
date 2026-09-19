@@ -203,6 +203,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **An agent pushed `task-0072` straight to `origin/main` (3 pushes, 2026-09-18 21:34-21:55); now blocked three ways**:
+  a rule in the agent files, `git push` denied in `.claude/settings.json`, and a local `pre-push` hook refusing main/staging. → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0072 closed** — rating scales, development domains and traits are records; contract `8e3087d9…`, 69 paths.
   Full gate 1437/1437 on the 3rd run (a privilege-count fix, then the known concurrency flake). → `decisions/2026-Q3.md`
 - 2026-09-18 **TASK-0082 closed** — client current against `8e3087d9…`, generated only, same PR as the promotion. → `decisions/2026-Q3.md`
