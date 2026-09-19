@@ -2,9 +2,11 @@ namespace SchoolManagement.Domain.Classes;
 
 /// <summary>
 /// One seeded section (spec 6.4.2). Fixed id and concurrency-token seed value, same reasoning as
-/// <see cref="SeededLevelDefinition"/>.
+/// <see cref="SeededLevelDefinition"/>. <see cref="RatesTraits"/> is TASK-0083 ruling R1, not spec
+/// 6.4.2 — Primary rates traits, Nursery does not (it rates development domains instead, via
+/// <c>DevelopmentDomain.SectionId</c>, independently of this flag).
 /// </summary>
-public sealed record SeededSectionDefinition(Guid Id, string Name, Guid Version);
+public sealed record SeededSectionDefinition(Guid Id, string Name, bool RatesTraits, Guid Version);
 
 /// <summary>One seeded level (spec 6.4.2). Fixed id and concurrency-token seed value, same reasoning as <c>SeededRoleDefinition</c>.</summary>
 public sealed record SeededLevelDefinition(Guid Id, string Name, Guid SectionId, int ProgressionOrder, Guid? NextLevelId, Guid Version);
@@ -39,8 +41,8 @@ public static class SeededClassLevels
     /// <summary>The two seeded sections.</summary>
     public static readonly IReadOnlyList<SeededSectionDefinition> Sections =
     [
-        new(NurserySectionId, "Nursery", NurserySectionVersion),
-        new(PrimarySectionId, "Primary", PrimarySectionVersion),
+        new(NurserySectionId, "Nursery", RatesTraits: false, NurserySectionVersion),
+        new(PrimarySectionId, "Primary", RatesTraits: true, PrimarySectionVersion),
     ];
 
     private static readonly Guid Nursery1Id = new("00000000-0000-0000-0000-000000000311");

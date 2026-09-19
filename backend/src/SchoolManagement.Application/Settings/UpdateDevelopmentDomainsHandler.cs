@@ -76,6 +76,9 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
     /// <summary>Stable error code for removing an indicator that has ever been rated (spec 6.2.13's exact message).</summary>
     public const string IndicatorRatedErrorCode = "settings.developmentdomains.indicator_rated";
 
+    /// <summary>Stable error code for changing a domain's <c>ratingScaleId</c> while an open result set holds a rating under the old one (TASK-0083 stage 3, R2).</summary>
+    public const string ScaleChangedWhileRatedErrorCode = "settings.developmentdomains.scale_changed_while_rated";
+
     private const string SchoolProfileEntityType = "school_profile";
 
     /// <inheritdoc />
@@ -112,6 +115,20 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
                 "editing. Reload and make your change again."));
         }
 
+        var existingDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+
+        // R2 (scale_changed_while_rated), stage 3: BEFORE the reason gate, structural validation or
+        // the existing indicator-removal gate — a RETAINED domain (submitted id matches an existing
+        // one) whose ratingScaleId is CHANGING is refused while any open (not Published) result set
+        // holds a rating on the OLD scale for one of its indicators. A brand-new domain, or one with
+        // no id change, never reaches the gate.
+        var scaleChangedResult = await RefuseIfScaleChangedWhileRatedAsync(request.Domains, existingDomains, cancellationToken)
+            .ConfigureAwait(false);
+        if (scaleChangedResult is not null)
+        {
+            return scaleChangedResult;
+        }
+
         var reasonCheck = await PublishedResultsReasonGate
             .RequireReasonIfPublishedAsync(request.Reason, academicSessionRepository, publishedResultsGate, cancellationToken)
             .ConfigureAwait(false);
@@ -132,7 +149,6 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
         var existingRatingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var existingRatingScaleIds = existingRatingScales.Select(scale => scale.Id).ToHashSet();
 
-        var existingDomains = await developmentDomainRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var existingDomainsById = existingDomains.ToDictionary(domain => domain.Id);
         var submittedDomainIds = request.Domains
             .Where(domain => domain.Id is not null)
@@ -315,5 +331,60 @@ internal sealed class UpdateDevelopmentDomainsCommandHandler(
             IndicatorRatedErrorCode,
             $"Ratings have already been entered for {indicator.Name} this term. Archive the " +
             "indicator instead, which keeps it on this term's sheets and removes it from next term."));
+    }
+
+    /// <summary>
+    /// Walks every EXISTING, RETAINED domain (its id present in <paramref name="submittedDomains"/>)
+    /// whose <c>ratingScaleId</c> the submission is changing, and refuses on the FIRST one that still
+    /// has an open (not Published) rating under its OLD scale — R2, TASK-0083 stage 3. A brand-new
+    /// domain, an omitted (about to be removed) one, or a retained one whose scale is unchanged, is
+    /// never asked. Returns <see langword="null"/> when nothing is refused.
+    /// </summary>
+    private async Task<Result<SettingsDevelopmentDomainGroupDto>?> RefuseIfScaleChangedWhileRatedAsync(
+        IReadOnlyList<DevelopmentDomainInput> submittedDomains,
+        IReadOnlyList<DevelopmentDomain> existingDomains,
+        CancellationToken cancellationToken)
+    {
+        var submittedDomainsById = submittedDomains
+            .Where(domain => domain.Id is not null)
+            .ToDictionary(domain => domain.Id!.Value, domain => domain);
+
+        foreach (var existingDomain in existingDomains)
+        {
+            if (!submittedDomainsById.TryGetValue(existingDomain.Id, out var retainedDomainInput))
+            {
+                continue;
+            }
+
+            if (retainedDomainInput.RatingScaleId == existingDomain.RatingScaleId)
+            {
+                continue;
+            }
+
+            var indicatorIds = existingDomain.Indicators.Select(indicator => indicator.Id).ToList();
+            var openRating = await developmentIndicatorUsageGate
+                .HasOpenRatingOnScaleAsync(indicatorIds, existingDomain.RatingScaleId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!openRating)
+            {
+                continue;
+            }
+
+            await auditSink.RecordRejectionAsync(
+                "settings.developmentdomains.save_rejected_scale_changed_while_rated",
+                "development_domain",
+                existingDomain.Id.ToString("D", CultureInfo.InvariantCulture),
+                metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["domainName"] = existingDomain.Name },
+                actorAdminId: currentUser.UserId,
+                cancellationToken).ConfigureAwait(false);
+
+            return Result.Failure<SettingsDevelopmentDomainGroupDto>(Error.Conflict(
+                ScaleChangedWhileRatedErrorCode,
+                $"Ratings have already been entered for {existingDomain.Name} this term. Change its " +
+                "rating scale only after those result sets are approved and published, or leave the " +
+                "scale as it is."));
+        }
+
+        return null;
     }
 }

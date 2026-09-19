@@ -49,6 +49,8 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         _sectionRepository.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns([Section.Create(SectionId, "Nursery").Value]);
         _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<DevelopmentDomain>());
         _developmentIndicatorUsageGate.HasEverBeenRatedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _developmentIndicatorUsageGate.HasOpenRatingOnScaleAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -410,5 +412,109 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(PublishedResultsReasonGate.ReasonRequiredErrorCode);
         await _developmentDomainRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<DevelopmentDomain>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ---- TASK-0083 stage 3, R2: settings.developmentdomains.scale_changed_while_rated -----------
+
+    [Fact]
+    public async Task HandleAsync_ChangingARetainedDomainsScaleWithAnOpenRating_Returns409WithTheExactMessage()
+    {
+        CreateTrackedProfile();
+
+        var domainId = Guid.CreateVersion7();
+        var indicatorId = Guid.CreateVersion7();
+        var existingDomain = DevelopmentDomain.Create(
+            domainId, SectionId, "Maths Readiness", 1, RatingScaleId, true, DevelopmentDomainStatus.Active,
+            [DevelopmentIndicator.Create(indicatorId, domainId, "Ability to count", 1, DevelopmentIndicatorStatus.Active)]);
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingDomain]);
+        _developmentIndicatorUsageGate.HasOpenRatingOnScaleAsync(
+                Arg.Is<IReadOnlyCollection<Guid>>(ids => ids != null && ids.Contains(indicatorId)), RatingScaleId, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var newScaleId = Guid.CreateVersion7();
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            RatingScale.Create(RatingScaleId, "Nursery development", [RatingScalePoint.Create(Guid.CreateVersion7(), RatingScaleId, "E", "Excellent", 1)]),
+            RatingScale.Create(newScaleId, "Custom", [RatingScalePoint.Create(Guid.CreateVersion7(), newScaleId, "E", "Excellent", 1)]),
+        ]);
+
+        // Echoes the rated domain and indicator back unchanged — only ratingScaleId changes.
+        var changedScale = new DevelopmentDomainInput(
+            SectionId, "Maths Readiness", 1, newScaleId, true, DevelopmentDomainStatus.Active,
+            [new DevelopmentIndicatorInput("Ability to count", 1, DevelopmentIndicatorStatus.Active, indicatorId)],
+            domainId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateDevelopmentDomainsCommand([changedScale], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(UpdateDevelopmentDomainsCommandHandler.ScaleChangedWhileRatedErrorCode);
+        result.Error.Description.ShouldBe(
+            "Ratings have already been entered for Maths Readiness this term. Change its rating scale " +
+            "only after those result sets are approved and published, or leave the scale as it is.");
+        await _developmentDomainRepository.DidNotReceive().ReplaceAllAsync(Arg.Any<IReadOnlyList<DevelopmentDomain>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ChangingARetainedDomainsScaleWithNoOpenRating_Succeeds()
+    {
+        // Covers both of R2's allowed cases from the handler's point of view: the gate reports no
+        // OPEN rating on the old scale, whether every rating on it sits in a Published set or the
+        // domain was never rated at all — that query-level distinction is Infrastructure's job,
+        // proven at the integration layer.
+        CreateTrackedProfile();
+
+        var domainId = Guid.CreateVersion7();
+        var indicatorId = Guid.CreateVersion7();
+        var existingDomain = DevelopmentDomain.Create(
+            domainId, SectionId, "Maths Readiness", 1, RatingScaleId, true, DevelopmentDomainStatus.Active,
+            [DevelopmentIndicator.Create(indicatorId, domainId, "Ability to count", 1, DevelopmentIndicatorStatus.Active)]);
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingDomain]);
+
+        var newScaleId = Guid.CreateVersion7();
+        _ratingScaleRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            RatingScale.Create(RatingScaleId, "Nursery development", [RatingScalePoint.Create(Guid.CreateVersion7(), RatingScaleId, "E", "Excellent", 1)]),
+            RatingScale.Create(newScaleId, "Custom", [RatingScalePoint.Create(Guid.CreateVersion7(), newScaleId, "E", "Excellent", 1)]),
+        ]);
+
+        var changedScale = new DevelopmentDomainInput(
+            SectionId, "Maths Readiness", 1, newScaleId, true, DevelopmentDomainStatus.Active,
+            [new DevelopmentIndicatorInput("Ability to count", 1, DevelopmentIndicatorStatus.Active, indicatorId)],
+            domainId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateDevelopmentDomainsCommand([changedScale], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Domains[0].RatingScaleId.ShouldBe(newScaleId.ToString("D", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ResavingADomainAtItsCurrentScale_NeverConsultsTheOpenRatingGate()
+    {
+        CreateTrackedProfile();
+
+        var domainId = Guid.CreateVersion7();
+        var indicatorId = Guid.CreateVersion7();
+        var existingDomain = DevelopmentDomain.Create(
+            domainId, SectionId, "Custom", 1, RatingScaleId, true, DevelopmentDomainStatus.Active,
+            [DevelopmentIndicator.Create(indicatorId, domainId, "Potty trained", 1, DevelopmentIndicatorStatus.Active)]);
+        _developmentDomainRepository.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([existingDomain]);
+
+        var resubmitted = new DevelopmentDomainInput(
+            SectionId, "Custom", 1, RatingScaleId, true, DevelopmentDomainStatus.Active,
+            [new DevelopmentIndicatorInput("Potty trained", 1, DevelopmentIndicatorStatus.Active, indicatorId)],
+            domainId);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateDevelopmentDomainsCommand([resubmitted], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        await _developmentIndicatorUsageGate.DidNotReceive().HasOpenRatingOnScaleAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

@@ -344,7 +344,12 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "scale whose id is absent from the submitted array is removed, rejected " +
                 "`409 settings.ratingscales.in_use` when a rating block still references it; an id " +
                 "that matches no current row is rejected `422 settings.ratingscales.unknown_scale_id` " +
-                "/ `settings.ratingscales.unknown_point_id`. All other save-time rules run over the " +
+                "/ `settings.ratingscales.unknown_point_id`. A point absent from its (retained or " +
+                "removed) scale's submitted array is rejected `409 settings.ratingscales.point_rated` " +
+                "when any trait or development rating still references it — Published result sets " +
+                "included, since those rows FK the point. An in-place update of a point (its `id` " +
+                "echoed back, only `pointCode`/`pointLabel`/`pointOrder` changed) is always allowed and " +
+                "never checked against a rating. All other save-time rules run over the " +
                 "whole submitted set as one unit; on the first failure nothing is written and the " +
                 "response's `scaleIndex`/`pointIndex` extensions name the offending position in the " +
                 "submitted array. `expectedVersion` must match the rating-scales group's current " +
@@ -386,7 +391,11 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "Archiving a submitted id is always allowed and never gated; an EXISTING domain or " +
                 "indicator whose id is absent from the submission is being removed, and is refused " +
                 "`409 settings.developmentdomains.indicator_rated` if it, or any indicator of an " +
-                "omitted domain, has ever been rated — archive it instead. `expectedVersion` must " +
+                "omitted domain, has ever been rated — archive it instead. Changing a RETAINED " +
+                "domain's `ratingScaleId` is refused `409 settings.developmentdomains." +
+                "scale_changed_while_rated` while an open (not Published) result set still holds a " +
+                "rating on the old scale for one of its indicators; a change is allowed once those " +
+                "sets are published, or when there were never any ratings. `expectedVersion` must " +
                 "match the development-domains group's current `versionNumber` (from `GET /settings`) " +
                 "or the save is rejected `409` before anything is written. `reason` is required, at " +
                 "least ten characters, only when a result set is Published in the active session " +
@@ -425,7 +434,11 @@ public sealed class SettingsEndpoints : IEndpointModule
                 "in the other domain. Archiving a submitted id is always allowed and never gated; an " +
                 "EXISTING trait whose id is absent from the submission is being removed, and is " +
                 "refused `409 settings.traits.trait_rated` if it has ever been rated — archive it " +
-                "instead. `expectedVersion` must match the traits group's current `versionNumber` " +
+                "instead. Changing `affectiveRatingScaleId` or `psychomotorRatingScaleId` is refused " +
+                "`409 settings.traits.scale_changed_while_rated` while an open (not Published) result " +
+                "set still holds a rating on the old scale for a trait in that block; a change is " +
+                "allowed once those sets are published, or when there were never any ratings. " +
+                "`expectedVersion` must match the traits group's current `versionNumber` " +
                 "(from `GET /settings`) or the save is rejected `409 settings.traits.stale_version` " +
                 "before anything is written. `reason` is required, at least ten characters, only when " +
                 "a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.")

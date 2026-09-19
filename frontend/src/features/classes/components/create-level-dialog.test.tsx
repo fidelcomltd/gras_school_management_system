@@ -52,7 +52,9 @@ describe('CreateLevelDialog — insert-after (AC: proves the chain rewired)', ()
   it('creating a level inserted after Primary 1 reorders the list on refetch, not just a 201', async () => {
     mockMe('level.view', 'level.create');
     server.use(
-      http.get(apiUrl('/api/v1/sections'), () => HttpResponse.json({ sections: [{ id: 'sec-1', name: 'Primary' }] })),
+      http.get(apiUrl('/api/v1/sections'), () =>
+        HttpResponse.json({ sections: [{ id: 'sec-1', name: 'Primary', ratesTraits: true }] }),
+      ),
     );
 
     let created = false;

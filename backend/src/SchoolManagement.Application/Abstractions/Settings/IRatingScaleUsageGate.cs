@@ -23,4 +23,17 @@ public interface IRatingScaleUsageGate
     /// <param name="ratingScaleId">The scale to check.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<bool> IsInUseAsync(Guid ratingScaleId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the point identified by <paramref name="pointId"/> is referenced by any
+    /// <c>trait_rating</c> or <c>development_rating</c> row, IN ANY RESULT SET, Published included
+    /// (TASK-0083 stage 3) — unlike <see cref="ITraitUsageGate.HasOpenRatingOnScaleAsync"/>'s
+    /// open-sets-only rule, a point cannot simply vanish out from under a Published sheet: the rows
+    /// FK it, and a delete would otherwise surface as a 500 rather than a clean refusal. An in-place
+    /// update of a point (same id — label, code or order) never calls this; only a point whose id is
+    /// about to disappear from its scale does.
+    /// </summary>
+    /// <param name="pointId">The point to check.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<bool> IsPointRatedAsync(Guid pointId, CancellationToken cancellationToken);
 }

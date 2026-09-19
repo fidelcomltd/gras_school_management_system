@@ -46,6 +46,11 @@ internal sealed class UpdateSectionHandler(
             return Result.Failure<SectionDto>(rename.Error);
         }
 
+        if (request.RatesTraits is { } ratesTraits)
+        {
+            section.SetRatesTraits(ratesTraits);
+        }
+
         await auditSink.RecordAsync(
             Privileges.Level.Update,
             EntityType,
@@ -54,6 +59,6 @@ internal sealed class UpdateSectionHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name));
+        return Result.Success(new SectionDto(section.Id.ToString("D", CultureInfo.InvariantCulture), section.Name, section.RatesTraits));
     }
 }

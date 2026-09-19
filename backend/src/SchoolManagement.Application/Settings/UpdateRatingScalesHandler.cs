@@ -61,6 +61,9 @@ internal sealed class UpdateRatingScalesCommandHandler(
     /// <summary>Stable error code for a submitted point id that matches no current point of its owning scale.</summary>
     public const string UnknownPointIdErrorCode = "settings.ratingscales.unknown_point_id";
 
+    /// <summary>Stable error code for removing a point any rating still FKs (TASK-0083 stage 3, R2's point rule).</summary>
+    public const string PointRatedErrorCode = "settings.ratingscales.point_rated";
+
     private const string SchoolProfileEntityType = "school_profile";
 
     /// <inheritdoc />
@@ -97,6 +100,18 @@ internal sealed class UpdateRatingScalesCommandHandler(
                 "Reload and make your change again."));
         }
 
+        var existingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+
+        // R2 (point_rated), stage 3: BEFORE the reason gate, structural validation or the existing
+        // in-use gate — removing a point that any rating still FKs is refused, Published sets
+        // included, since a delete would otherwise surface downstream as a 500, not a clean 409.
+        var pointRatedResult = await RefuseIfAnyRemovedPointIsRatedAsync(request.Scales, existingScales, cancellationToken)
+            .ConfigureAwait(false);
+        if (pointRatedResult is not null)
+        {
+            return pointRatedResult;
+        }
+
         var reasonCheck = await PublishedResultsReasonGate
             .RequireReasonIfPublishedAsync(request.Reason, academicSessionRepository, publishedResultsGate, cancellationToken)
             .ConfigureAwait(false);
@@ -111,7 +126,6 @@ internal sealed class UpdateRatingScalesCommandHandler(
             return Result.Failure<SettingsRatingScaleGroupDto>(validation.Error);
         }
 
-        var existingScales = await ratingScaleRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var existingScalesById = existingScales.ToDictionary(scale => scale.Id);
         var submittedScaleIds = request.Scales
             .Where(scale => scale.Id is not null)
@@ -218,5 +232,70 @@ internal sealed class UpdateRatingScalesCommandHandler(
             cancellationToken).ConfigureAwait(false);
 
         return Result.Success(SettingsMapper.ToRatingScalesDto(scales, profile.RatingScalesVersionNumber));
+    }
+
+    /// <summary>
+    /// Walks every point about to disappear from persistence — because its whole owning scale is
+    /// absent from <paramref name="submittedScales"/>, or because the scale is retained but the point
+    /// itself is dropped from its submitted <c>points</c> array — and refuses on the FIRST one any
+    /// rating still FKs, Published sets included (see <see cref="PointRatedErrorCode"/>'s remarks on
+    /// <see cref="IRatingScaleUsageGate.IsPointRatedAsync"/>). An in-place update (id present, only
+    /// label/code/order changed) never reaches this loop: the point's id is still present in
+    /// <paramref name="submittedScales"/>, so it is never counted as "about to disappear". Returns
+    /// <see langword="null"/> when nothing is refused, meaning the caller may proceed.
+    /// </summary>
+    private async Task<Result<SettingsRatingScaleGroupDto>?> RefuseIfAnyRemovedPointIsRatedAsync(
+        IReadOnlyList<RatingScaleInput> submittedScales,
+        IReadOnlyList<RatingScale> existingScales,
+        CancellationToken cancellationToken)
+    {
+        var submittedScalesById = submittedScales
+            .Where(scale => scale.Id is not null)
+            .ToDictionary(scale => scale.Id!.Value, scale => scale);
+
+        foreach (var existingScale in existingScales)
+        {
+            var submittedPointIds = submittedScalesById.TryGetValue(existingScale.Id, out var retainedScale)
+                ? retainedScale.Points
+                    .Where(point => point.Id is not null)
+                    .Select(point => point.Id!.Value)
+                    .ToHashSet()
+                : [];
+
+            foreach (var existingPoint in existingScale.Points)
+            {
+                if (submittedPointIds.Contains(existingPoint.Id))
+                {
+                    continue;
+                }
+
+                var rated = await ratingScaleUsageGate
+                    .IsPointRatedAsync(existingPoint.Id, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!rated)
+                {
+                    continue;
+                }
+
+                await auditSink.RecordRejectionAsync(
+                    "settings.ratingscales.save_rejected_point_rated",
+                    "rating_scale_point",
+                    existingPoint.Id.ToString("D", CultureInfo.InvariantCulture),
+                    metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["pointLabel"] = existingPoint.PointLabel,
+                        ["scaleName"] = existingScale.Name,
+                    },
+                    actorAdminId: currentUser.UserId,
+                    cancellationToken).ConfigureAwait(false);
+
+                return Result.Failure<SettingsRatingScaleGroupDto>(Error.Conflict(
+                    PointRatedErrorCode,
+                    $"Ratings have already been entered for {existingPoint.PointLabel} this term. Keep " +
+                    "the point on the scale, or update its label and code instead of removing it."));
+            }
+        }
+
+        return null;
     }
 }

@@ -677,6 +677,10 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("name_key");
 
+                    b.Property<bool>("RatesTraits")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rates_traits");
+
                     b.Property<Guid>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("uuid")
@@ -698,6 +702,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Name = "Nursery",
                             NameKey = "nursery",
+                            RatesTraits = false,
                             Version = new Guid("00000000-0000-0000-0000-000000000303")
                         },
                         new
@@ -706,6 +711,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             CreatedAtUtc = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Name = "Primary",
                             NameKey = "primary",
+                            RatesTraits = true,
                             Version = new Guid("00000000-0000-0000-0000-000000000304")
                         });
                 });
@@ -1068,6 +1074,75 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("sample_records", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.DevelopmentRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("IndicatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indicator_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("RatingScalePointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rating_scale_point_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_development_rating");
+
+                    b.HasIndex("IndicatorId")
+                        .HasDatabaseName("ix_development_rating_indicator_id");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_development_rating_pupil_id");
+
+                    b.HasIndex("RatingScalePointId")
+                        .HasDatabaseName("ix_development_rating_rating_scale_point_id");
+
+                    b.HasIndex("ResultSetId", "PupilId", "IndicatorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_development_rating_result_set_pupil_indicator_unique");
+
+                    b.ToTable("development_rating", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>
@@ -1478,6 +1553,70 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasFilter("voided_at IS NULL");
 
                     b.ToTable("subject_score", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.TraitRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("RatingScalePointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rating_scale_point_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("TraitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trait_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trait_rating");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_trait_rating_pupil_id");
+
+                    b.HasIndex("RatingScalePointId")
+                        .HasDatabaseName("ix_trait_rating_rating_scale_point_id");
+
+                    b.HasIndex("TraitId")
+                        .HasDatabaseName("ix_trait_rating_trait_id");
+
+                    b.HasIndex("ResultSetId", "PupilId", "TraitId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trait_rating_result_set_pupil_trait_unique");
+
+                    b.ToTable("trait_rating", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Security.Role", b =>
@@ -3764,6 +3903,37 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pupil_reg_number_history_pupils_pupil_id");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Results.DevelopmentRating", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Settings.DevelopmentIndicator", null)
+                        .WithMany()
+                        .HasForeignKey("IndicatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_development_rating_development_indicator_indicator_id");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_development_rating_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Settings.RatingScalePoint", null)
+                        .WithMany()
+                        .HasForeignKey("RatingScalePointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_development_rating_rating_scale_points_rating_scale_point_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_development_rating_result_sets_result_set_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
@@ -3868,6 +4038,37 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subject_score_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.TraitRating", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trait_rating_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Settings.RatingScalePoint", null)
+                        .WithMany()
+                        .HasForeignKey("RatingScalePointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trait_rating_rating_scale_point_rating_scale_point_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trait_rating_result_set_result_set_id");
+
+                    b.HasOne("SchoolManagement.Domain.Settings.Trait", null)
+                        .WithMany()
+                        .HasForeignKey("TraitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trait_rating_trait_trait_id");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Security.RoleAssignment", b =>

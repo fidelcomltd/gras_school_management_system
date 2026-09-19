@@ -75,6 +75,9 @@ internal sealed class UpdateTraitsCommandHandler(
     /// <summary>Stable error code for removing a trait that has ever been rated (spec 6.2.7's exact message).</summary>
     public const string TraitRatedErrorCode = "settings.traits.trait_rated";
 
+    /// <summary>Stable error code for changing a block's rating scale while an open result set holds a rating under the old one (TASK-0083 stage 3, R2).</summary>
+    public const string ScaleChangedWhileRatedErrorCode = "settings.traits.scale_changed_while_rated";
+
     private const string SchoolProfileEntityType = "school_profile";
 
     /// <inheritdoc />
@@ -109,6 +112,21 @@ internal sealed class UpdateTraitsCommandHandler(
                 "make your change again."));
         }
 
+        var existingTraits = await traitRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var existingTraitBlocks = await traitRepository.ListBlocksReadOnlyAsync(cancellationToken).ConfigureAwait(false);
+
+        // R2 (scale_changed_while_rated), stage 3: BEFORE the reason gate, unknown-scale-id checks,
+        // structural validation or the existing trait-removal gate — a block whose scale is CHANGING
+        // is refused while any open (not Published) result set holds a rating, on the OLD scale, for
+        // one of ITS traits. A block whose scale is unchanged is never asked.
+        var scaleChangedResult = await RefuseIfBlockScaleChangedWhileRatedAsync(
+                request, existingTraits, existingTraitBlocks, cancellationToken)
+            .ConfigureAwait(false);
+        if (scaleChangedResult is not null)
+        {
+            return scaleChangedResult;
+        }
+
         var reasonCheck = await PublishedResultsReasonGate
             .RequireReasonIfPublishedAsync(request.Reason, academicSessionRepository, publishedResultsGate, cancellationToken)
             .ConfigureAwait(false);
@@ -140,7 +158,6 @@ internal sealed class UpdateTraitsCommandHandler(
             return Result.Failure<SettingsTraitsGroupDto>(structuralValidation.Error);
         }
 
-        var existingTraits = await traitRepository.ListReadOnlyOrderedAsync(cancellationToken).ConfigureAwait(false);
         var existingTraitsById = existingTraits.ToDictionary(trait => trait.Id);
         var submittedTraitIds = request.Traits
             .Where(trait => trait.Id is not null)
@@ -238,5 +255,61 @@ internal sealed class UpdateTraitsCommandHandler(
             request.AffectiveRatingScaleId,
             request.PsychomotorRatingScaleId,
             profile.TraitsVersionNumber));
+    }
+
+    /// <summary>
+    /// Walks both <paramref name="existingTraitBlocks"/> and refuses on the FIRST one whose scale
+    /// <paramref name="request"/> is CHANGING (its submitted <c>affectiveRatingScaleId</c>/
+    /// <c>psychomotorRatingScaleId</c> differs from the block's current <see cref="TraitBlock.RatingScaleId"/>)
+    /// while that block still has an open (not Published) rating under its OLD scale — R2, TASK-0083
+    /// stage 3. A block whose scale is unchanged is never asked. Returns <see langword="null"/> when
+    /// nothing is refused.
+    /// </summary>
+    private async Task<Result<SettingsTraitsGroupDto>?> RefuseIfBlockScaleChangedWhileRatedAsync(
+        UpdateTraitsCommand request,
+        IReadOnlyList<Trait> existingTraits,
+        IReadOnlyList<TraitBlock> existingTraitBlocks,
+        CancellationToken cancellationToken)
+    {
+        foreach (var block in existingTraitBlocks)
+        {
+            var submittedScaleId = block.Id == TraitDomain.Affective
+                ? request.AffectiveRatingScaleId
+                : request.PsychomotorRatingScaleId;
+
+            if (submittedScaleId == block.RatingScaleId)
+            {
+                continue;
+            }
+
+            var traitIds = existingTraits
+                .Where(trait => trait.Domain == block.Id)
+                .Select(trait => trait.Id)
+                .ToList();
+
+            var openRating = await traitUsageGate
+                .HasOpenRatingOnScaleAsync(traitIds, block.RatingScaleId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!openRating)
+            {
+                continue;
+            }
+
+            await auditSink.RecordRejectionAsync(
+                "settings.traits.save_rejected_scale_changed_while_rated",
+                "trait_block",
+                block.Id.ToString(),
+                metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["domain"] = block.Id.ToString() },
+                actorAdminId: currentUser.UserId,
+                cancellationToken).ConfigureAwait(false);
+
+            return Result.Failure<SettingsTraitsGroupDto>(Error.Conflict(
+                ScaleChangedWhileRatedErrorCode,
+                $"Ratings have already been entered for the {block.Id} block this term. Change its " +
+                "rating scale only after those result sets are approved and published, or leave the " +
+                "scale as it is."));
+        }
+
+        return null;
     }
 }

@@ -1,16 +1,45 @@
+using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Domain.Results;
+using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Settings;
 
 /// <summary>
-/// TASK-0072 STAGE 2A stand-in for <see cref="IDevelopmentIndicatorUsageGate"/> — honestly answers
-/// "never rated" unconditionally. No <c>development_indicator_rating</c> table exists yet; Phase 3's
-/// entry screens replace this with a real query once it does, the same documented-seam shape
-/// <see cref="RatingScaleUsageGate"/> used before <c>development_domain</c> existed.
+/// Real implementation of <see cref="IDevelopmentIndicatorUsageGate"/> (TASK-0083 stage 2) — an
+/// indicator has been rated when any <c>development_rating</c> row references it, in any result set,
+/// ever. Replaces TASK-0072 stage 2a's stand-in that unconditionally answered "never rated", now that
+/// <c>development_rating</c> exists to query, per the port's own documented seam — same shape
+/// <see cref="TraitUsageGate"/> took over its own stand-in in TASK-0083 stage 1.
 /// </summary>
-internal sealed class DevelopmentIndicatorUsageGate : IDevelopmentIndicatorUsageGate
+internal sealed class DevelopmentIndicatorUsageGate(ApplicationDbContext context) : IDevelopmentIndicatorUsageGate
 {
     /// <inheritdoc />
-    public Task<bool> HasEverBeenRatedAsync(Guid indicatorId, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
+    public async Task<bool> HasEverBeenRatedAsync(Guid indicatorId, CancellationToken cancellationToken) =>
+        await context.DevelopmentRatings
+            .AsNoTracking()
+            .AnyAsync(rating => rating.IndicatorId == indicatorId, cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<bool> HasOpenRatingOnScaleAsync(
+        IReadOnlyCollection<Guid> indicatorIds, Guid ratingScaleId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(indicatorIds);
+
+        if (indicatorIds.Count == 0)
+        {
+            return false;
+        }
+
+        return await context.DevelopmentRatings
+            .AsNoTracking()
+            .Where(rating => indicatorIds.Contains(rating.IndicatorId))
+            .Where(rating => context.RatingScalePoints
+                .Any(point => point.Id == rating.RatingScalePointId && point.RatingScaleId == ratingScaleId))
+            .Where(rating => context.ResultSets
+                .Any(resultSet => resultSet.Id == rating.ResultSetId && resultSet.State != ResultSetState.Published))
+            .AnyAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

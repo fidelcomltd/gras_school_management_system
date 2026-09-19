@@ -29,6 +29,10 @@ internal sealed class SectionConfiguration : IEntityTypeConfiguration<Section>
             .HasMaxLength(Section.NameMaxLength)
             .HasColumnName("name_key");
 
+        builder.Property(section => section.RatesTraits)
+            .IsRequired()
+            .HasColumnName("rates_traits");
+
         builder.Property(section => section.CreatedBy).HasMaxLength(AuditActorMaxLength);
         builder.Property(section => section.ModifiedBy).HasMaxLength(AuditActorMaxLength);
 
@@ -47,6 +51,7 @@ internal sealed class SectionConfiguration : IEntityTypeConfiguration<Section>
             section.Id,
             section.Name,
             NameKey = section.Name.ToLowerInvariant(),
+            section.RatesTraits,
             CreatedAtUtc = SeededClassLevels.SeedTimestamp,
             CreatedBy = (string?)null,
             ModifiedAtUtc = (DateTimeOffset?)null,

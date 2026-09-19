@@ -177,6 +177,18 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     internal DbSet<SubjectScore> SubjectScores => Set<SubjectScore>();
 
     /// <summary>
+    /// TASK-0083 stage 1. Internal, not public: only this assembly's repositories may query it. One
+    /// row per pupil per trait per result set (spec 09 §6.7.3).
+    /// </summary>
+    internal DbSet<TraitRating> TraitRatings => Set<TraitRating>();
+
+    /// <summary>
+    /// TASK-0083 stage 2. Internal, not public: only this assembly's repositories may query it. One
+    /// row per pupil per development indicator per result set (spec 02 §5.1) — nursery only.
+    /// </summary>
+    internal DbSet<DevelopmentRating> DevelopmentRatings => Set<DevelopmentRating>();
+
+    /// <summary>
     /// TASK-0071. Internal, not public: only this assembly's repositories may query it. One row per
     /// pupil per subject per result set (spec 09 §6.7.6) — deleted and rewritten wholesale on every
     /// computation.

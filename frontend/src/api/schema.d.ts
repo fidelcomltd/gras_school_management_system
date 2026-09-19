@@ -567,6 +567,30 @@ export interface paths {
         patch: operations["UpdateLevel"];
         trace?: never;
     };
+    "/api/v1/arms/{armId}/development-ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's development-rating grid for a term
+         * @description Spec 6.7.7/6.7.12 amendment, Appendix E.3: every active pupil in the arm as a row, across the arm's section's ACTIVE development domains, ordered by display order. `activeIndicatorTotal` is the sum an entry screen reads for the >60 warning. `version` is null before any rating exists; send it back unchanged on `PUT` to detect a concurrent edit. 422 `development_ratings.section_not_rated` when the arm's section has no active development domain (ruling R1) — a primary arm, for example.
+         */
+        get: operations["GetDevelopmentRatings"];
+        /**
+         * Save development-indicator ratings, partial or whole grid
+         * @description Spec 6.7.7/6.7.12 amendment, Appendix E.3: partial-save, one transaction (Q1-A ruling — an omitted indicator key leaves that rating untouched, an explicit null clears it). Q3-A: a comment requires a point — 422 `request.validation_failed` when one is sent without the other, or over 120 characters, or on a domain whose `allowsIndicatorComment` is false; clearing the point clears the comment. The first rating for an arm and term creates its result set (Draft), never flags `needsRecompute` on an EXISTING one — ratings are never computed. Allowed only while the result set is Draft or Returned for Correction, else 409 `development_ratings.result_set_locked`. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.
+         */
+        put: operations["SaveDevelopmentRatings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privileges": {
         parameters: {
             query?: never;
@@ -1141,7 +1165,7 @@ export interface paths {
         get?: never;
         /**
          * Replace the rating scales
-         * @description Whole set as one array, atomic (spec 6.2.13). A scale's or point's `id`, when supplied, must match an existing row — that is how a rename/reorder is told apart from an add or a remove, matching `PUT /settings/assessment`'s own convention, and matters because stage 2/3 rating blocks reference a scale BY that id. An existing scale whose id is absent from the submitted array is removed, rejected `409 settings.ratingscales.in_use` when a rating block still references it; an id that matches no current row is rejected `422 settings.ratingscales.unknown_scale_id` / `settings.ratingscales.unknown_point_id`. All other save-time rules run over the whole submitted set as one unit; on the first failure nothing is written and the response's `scaleIndex`/`pointIndex` extensions name the offending position in the submitted array. `expectedVersion` must match the rating-scales group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         * @description Whole set as one array, atomic (spec 6.2.13). A scale's or point's `id`, when supplied, must match an existing row — that is how a rename/reorder is told apart from an add or a remove, matching `PUT /settings/assessment`'s own convention, and matters because stage 2/3 rating blocks reference a scale BY that id. An existing scale whose id is absent from the submitted array is removed, rejected `409 settings.ratingscales.in_use` when a rating block still references it; an id that matches no current row is rejected `422 settings.ratingscales.unknown_scale_id` / `settings.ratingscales.unknown_point_id`. A point absent from its (retained or removed) scale's submitted array is rejected `409 settings.ratingscales.point_rated` when any trait or development rating still references it — Published result sets included, since those rows FK the point. An in-place update of a point (its `id` echoed back, only `pointCode`/`pointLabel`/`pointOrder` changed) is always allowed and never checked against a rating. All other save-time rules run over the whole submitted set as one unit; on the first failure nothing is written and the response's `scaleIndex`/`pointIndex` extensions name the offending position in the submitted array. `expectedVersion` must match the rating-scales group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
          */
         put: operations["UpdateRatingScales"];
         post?: never;
@@ -1161,7 +1185,7 @@ export interface paths {
         get?: never;
         /**
          * Replace the nursery development domains and their indicators
-         * @description Whole set as one array, atomic (spec 6.2.13). A domain's or indicator's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/rating-scales`'s own convention. An unknown `sectionId` or `ratingScaleId` is rejected `422 settings.developmentdomains.unknown_section_id` / `unknown_rating_scale_id`, naming the offending domain's `domainIndex`; an unknown domain or indicator `id` is rejected `422 settings.developmentdomains.unknown_domain_id` / `unknown_indicator_id`. A duplicate domain name within the same section, or a duplicate indicator name within a domain, is rejected `422 settings.developmentdomains.duplicate_name` / `duplicate_indicator_name` — the same domain name is allowed in a different section. Archiving a submitted id is always allowed and never gated; an EXISTING domain or indicator whose id is absent from the submission is being removed, and is refused `409 settings.developmentdomains.indicator_rated` if it, or any indicator of an omitted domain, has ever been rated — archive it instead. `expectedVersion` must match the development-domains group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         * @description Whole set as one array, atomic (spec 6.2.13). A domain's or indicator's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/rating-scales`'s own convention. An unknown `sectionId` or `ratingScaleId` is rejected `422 settings.developmentdomains.unknown_section_id` / `unknown_rating_scale_id`, naming the offending domain's `domainIndex`; an unknown domain or indicator `id` is rejected `422 settings.developmentdomains.unknown_domain_id` / `unknown_indicator_id`. A duplicate domain name within the same section, or a duplicate indicator name within a domain, is rejected `422 settings.developmentdomains.duplicate_name` / `duplicate_indicator_name` — the same domain name is allowed in a different section. Archiving a submitted id is always allowed and never gated; an EXISTING domain or indicator whose id is absent from the submission is being removed, and is refused `409 settings.developmentdomains.indicator_rated` if it, or any indicator of an omitted domain, has ever been rated — archive it instead. Changing a RETAINED domain's `ratingScaleId` is refused `409 settings.developmentdomains.scale_changed_while_rated` while an open (not Published) result set still holds a rating on the old scale for one of its indicators; a change is allowed once those sets are published, or when there were never any ratings. `expectedVersion` must match the development-domains group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
          */
         put: operations["UpdateDevelopmentDomains"];
         post?: never;
@@ -1181,7 +1205,7 @@ export interface paths {
         get?: never;
         /**
          * Replace the traits and their block rating scales
-         * @description Whole trait set as one array, atomic (spec 6.2.7 / 6.2.13), plus which rating scale each of the two blocks (affective, psychomotor) is rated against. A trait's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/development-domains`'s own convention. Traits are NOT section-scoped. `affectiveRatingScaleId`/`psychomotorRatingScaleId` must each match an existing rating scale, rejected `422 settings.traits.unknown_scale_id` otherwise; an unknown trait `id` is rejected `422 settings.traits.unknown_trait_id`; a duplicate trait name within the same domain is rejected `422 settings.traits.duplicate_name` — the same name is allowed in the other domain. Archiving a submitted id is always allowed and never gated; an EXISTING trait whose id is absent from the submission is being removed, and is refused `409 settings.traits.trait_rated` if it has ever been rated — archive it instead. `expectedVersion` must match the traits group's current `versionNumber` (from `GET /settings`) or the save is rejected `409 settings.traits.stale_version` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
+         * @description Whole trait set as one array, atomic (spec 6.2.7 / 6.2.13), plus which rating scale each of the two blocks (affective, psychomotor) is rated against. A trait's `id`, when supplied, must match an existing row — that is how a rename/reorder/archive is told apart from an add or a remove, matching `PUT /settings/development-domains`'s own convention. Traits are NOT section-scoped. `affectiveRatingScaleId`/`psychomotorRatingScaleId` must each match an existing rating scale, rejected `422 settings.traits.unknown_scale_id` otherwise; an unknown trait `id` is rejected `422 settings.traits.unknown_trait_id`; a duplicate trait name within the same domain is rejected `422 settings.traits.duplicate_name` — the same name is allowed in the other domain. Archiving a submitted id is always allowed and never gated; an EXISTING trait whose id is absent from the submission is being removed, and is refused `409 settings.traits.trait_rated` if it has ever been rated — archive it instead. Changing `affectiveRatingScaleId` or `psychomotorRatingScaleId` is refused `409 settings.traits.scale_changed_while_rated` while an open (not Published) result set still holds a rating on the old scale for a trait in that block; a change is allowed once those sets are published, or when there were never any ratings. `expectedVersion` must match the traits group's current `versionNumber` (from `GET /settings`) or the save is rejected `409 settings.traits.stale_version` before anything is written. `reason` is required, at least ten characters, only when a result set is Published in the active session (spec 6.2.9); otherwise it is ignored.
          */
         put: operations["UpdateTraits"];
         post?: never;
@@ -1477,6 +1501,30 @@ export interface paths {
          * @description Spec 6.3.6: `term.close` PLUS `isSuperAdmin` (checked in the handler — not a privilege code), a reason of at least 10 characters, and refused outright if the following term has already been opened.
          */
         post: operations["ReopenTerm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/trait-ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's trait-rating grid for a term
+         * @description Spec 6.7.7/6.7.12 amendment: every active pupil in the arm as a row, across the affective and psychomotor blocks. `version` is null before any rating exists; send it back unchanged on `PUT` to detect a concurrent edit. 422 `trait_ratings.section_not_rated` when the arm's section does not rate traits (ruling R1).
+         */
+        get: operations["GetTraitRatings"];
+        /**
+         * Save trait ratings, partial or whole grid
+         * @description Spec 6.7.7/6.7.12 amendment: partial-save, one transaction (Q1-A ruling — an omitted trait key leaves that rating untouched, an explicit null clears it). The first rating for an arm and term creates its result set (Draft), never flags `needsRecompute` on an EXISTING one — ratings are never computed. Allowed only while the result set is Draft or Returned for Correction, else 409 `trait_ratings.result_set_locked`. `Idempotency-Key` is ACCEPTED, not required — a retry otherwise 409s on its own stale `version`.
+         */
+        put: operations["SaveTraitRatings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2921,7 +2969,8 @@ export interface components {
         /**
          * @description `POST /api/v1/sections` (spec 6.4.9).
          * @example {
-         *       "name": "Secondary"
+         *       "name": "Secondary",
+         *       "ratesTraits": false
          *     }
          */
         CreateSectionCommand: {
@@ -2930,6 +2979,13 @@ export interface components {
              * @example Secondary
              */
             name: string;
+            /**
+             * @description TASK-0083 ruling R1, additive. Optional — `null` (an existing caller that omits
+             *     the field) defaults to `false`, same as a section created before this field
+             *     existed.
+             * @example false
+             */
+            ratesTraits?: null | boolean;
         };
         /**
          * @description `POST /api/v1/sessions` (spec 6.3.5). Creates the session AND its three terms in one
@@ -3756,6 +3812,369 @@ export interface components {
          * @enum {unknown}
          */
         DevelopmentIndicatorStatus: "Active" | "Archived";
+        /**
+         * @description One rated cell (TASK-0083 stage 2) — used BOTH ways: as a GET row's value (never null; an unrated
+         *     indicator carries `{ pointId: null, comment: null }`) and, wrapped nullable, as a submitted
+         *     PUT cell, where the whole value being JSON `null`, or an object with a null
+         *     string? DevelopmentRatingCellDto.PointId, both mean "clear this cell" (Q1-A / Q3-A: clearing the point clears the
+         *     comment) — see `SaveDevelopmentRatingsHandler`'s remarks for the exact rule.
+         * @example {
+         *       "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *       "comment": "Needs reminding after lunch."
+         *     }
+         */
+        DevelopmentRatingCellDto: {
+            /**
+             * @description The chosen point, or `null` when unrated.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704
+             */
+            pointId: null | string;
+            /**
+             * @description Free text up to 120 characters (Appendix E.3), or `null`. Never non-null without a point.
+             * @example Needs reminding after lunch.
+             */
+            comment: null | string;
+        };
+        /**
+         * @description One development domain on the entry grid (TASK-0083 stage 2). Reuses RatingScaleDto
+         *     and DevelopmentIndicatorDto exactly as the settings screen's own DTOs shape them —
+         *     same convention `TraitRatingBlockDto` established for the primary grid: this is the same
+         *     data, read for entry rather than for editing the settings screen.
+         * @example {
+         *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+         *       "name": "Personal & Physical Development",
+         *       "displayOrder": 3,
+         *       "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *       "scale": {
+         *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *         "name": "Nursery development",
+         *         "points": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *             "pointCode": "N",
+         *             "pointLabel": "Needs Improvement",
+         *             "pointOrder": 1
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+         *             "pointCode": "I",
+         *             "pointLabel": "Improving",
+         *             "pointOrder": 2
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+         *             "pointCode": "S",
+         *             "pointLabel": "Satisfied",
+         *             "pointOrder": 3
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *             "pointCode": "E",
+         *             "pointLabel": "Excellent",
+         *             "pointOrder": 4
+         *           }
+         *         ]
+         *       },
+         *       "allowsIndicatorComment": true,
+         *       "activeIndicatorCount": 1,
+         *       "indicators": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *           "name": "Potty trained",
+         *           "displayOrder": 1,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        DevelopmentRatingDomainDto: {
+            /**
+             * @description The domain's id.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801
+             */
+            id: string;
+            /**
+             * @description The block heading, for example "Personal &amp; Physical Development".
+             * @example Personal & Physical Development
+             */
+            name: string;
+            /**
+             * Format: int32
+             * @description Printed block order within the section (Appendix E.3: "Four blocks, in this order").
+             * @example 3
+             */
+            displayOrder: number | string;
+            /**
+             * @description The scale this domain's indicators are rated against.
+             * @example 0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601
+             */
+            ratingScaleId: string;
+            /** @description That scale, with its points and legend. */
+            scale: components["schemas"]["RatingScaleDto"];
+            /**
+             * @description Whether the entry screen prints a per-indicator Comments column for this domain.
+             * @example true
+             */
+            allowsIndicatorComment: boolean;
+            /**
+             * Format: int32
+             * @description Active indicators in this domain — what the client's own &gt;60 warning sums across every domain.
+             * @example 1
+             */
+            activeIndicatorCount: number | string;
+            /**
+             * @description Every ACTIVE indicator on this domain, in display order. An archived indicator leaves this list; its existing ratings are kept.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+             *         "name": "Potty trained",
+             *         "displayOrder": 1,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            indicators: components["schemas"]["DevelopmentIndicatorDto"][];
+        };
+        /**
+         * @description One pupil's row on the grid (TASK-0083 stage 2) — every active pupil in the arm, including one with no ratings entered at all.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "ratings": {
+         *         "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+         *           "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *           "comment": "Needs reminding after lunch."
+         *         }
+         *       }
+         *     }
+         */
+        DevelopmentRatingRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", same convention as ScoreSheetRowDto.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description Indicator id to its cell, one key per ACTIVE indicator across every ACTIVE domain of the arm's
+             *     section. An unrated cell is present, not omitted — `{ pointId: null, comment: null }`. Only
+             *     active indicators are keys; an archived indicator's existing rating is kept in storage but is not
+             *     a key here, because it has left the entry screen.
+             * @example {
+             *       "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+             *         "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *         "comment": "Needs reminding after lunch."
+             *       }
+             *     }
+             */
+            ratings: {
+                [key: string]: components["schemas"]["DevelopmentRatingCellDto"];
+            };
+        };
+        /**
+         * @description One arm's development-rating grid for one term (TASK-0083 stage 2; spec §6.7.7, §6.7.12 amendment,
+         *     Appendix E.3). Arm-scoped rather than result-set-scoped, mirroring TraitRatingSheetDto
+         *     — see `DevelopmentRatingEndpoints`'s own remarks for why.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "domains": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+         *           "name": "Personal & Physical Development",
+         *           "displayOrder": 3,
+         *           "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *           "scale": {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+         *             "name": "Nursery development",
+         *             "points": [
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+         *                 "pointCode": "N",
+         *                 "pointLabel": "Needs Improvement",
+         *                 "pointOrder": 1
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+         *                 "pointCode": "I",
+         *                 "pointLabel": "Improving",
+         *                 "pointOrder": 2
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+         *                 "pointCode": "S",
+         *                 "pointLabel": "Satisfied",
+         *                 "pointOrder": 3
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *                 "pointCode": "E",
+         *                 "pointLabel": "Excellent",
+         *                 "pointOrder": 4
+         *               }
+         *             ]
+         *           },
+         *           "allowsIndicatorComment": true,
+         *           "activeIndicatorCount": 1,
+         *           "indicators": [
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+         *               "name": "Potty trained",
+         *               "displayOrder": 1,
+         *               "status": "Active"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "activeIndicatorTotal": 1,
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+         *               "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *               "comment": "Needs reminding after lunch."
+         *             }
+         *           }
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+         *               "pointId": null,
+         *               "comment": null
+         *             }
+         *           }
+         *         }
+         *       ]
+         *     }
+         */
+        DevelopmentRatingSheetDto: {
+            /**
+             * @description The arm this grid belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this grid is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the ratings the grid covers (see `DevelopmentRatingVersion`).
+             *     `null` before any rating exists. Send back unchanged on `PUT` to detect a
+             *     concurrent edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description Every ACTIVE domain of the arm's section, in display order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6801",
+             *         "name": "Personal & Physical Development",
+             *         "displayOrder": 3,
+             *         "ratingScaleId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+             *         "scale": {
+             *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
+             *           "name": "Nursery development",
+             *           "points": [
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6701",
+             *               "pointCode": "N",
+             *               "pointLabel": "Needs Improvement",
+             *               "pointOrder": 1
+             *             },
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6702",
+             *               "pointCode": "I",
+             *               "pointLabel": "Improving",
+             *               "pointOrder": 2
+             *             },
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6703",
+             *               "pointCode": "S",
+             *               "pointLabel": "Satisfied",
+             *               "pointOrder": 3
+             *             },
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *               "pointCode": "E",
+             *               "pointLabel": "Excellent",
+             *               "pointOrder": 4
+             *             }
+             *           ]
+             *         },
+             *         "allowsIndicatorComment": true,
+             *         "activeIndicatorCount": 1,
+             *         "indicators": [
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901",
+             *             "name": "Potty trained",
+             *             "displayOrder": 1,
+             *             "status": "Active"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            domains: components["schemas"]["DevelopmentRatingDomainDto"][];
+            /**
+             * Format: int32
+             * @description The sum of every domain's `activeIndicatorCount` — the client's &gt;60 warning reads this directly rather than summing itself.
+             * @example 1
+             */
+            activeIndicatorTotal: number | string;
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by ratings.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+             *             "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *             "comment": "Needs reminding after lunch."
+             *           }
+             *         }
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+             *             "pointId": null,
+             *             "comment": null
+             *           }
+             *         }
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["DevelopmentRatingRowDto"][];
+        };
         /**
          * @description One entry of IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges, mirroring PrivilegeGrant
          *                 minus its session id — that field is server-internal and never crosses the wire.
@@ -5066,6 +5485,110 @@ export interface components {
             modifiedAtUtc: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/development-ratings` (TASK-0083 stage 2) — partial-save grid write,
+         *             one transaction. The first save for an arm/term creates the result set (Draft), same convention as
+         *             `SaveTraitRatingsCommand`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+         *               "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *               "comment": "Needs reminding after lunch."
+         *             }
+         *           }
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": null
+         *           }
+         *         }
+         *       ]
+         *     }
+         */
+        SaveDevelopmentRatingsCommand: {
+            /**
+             * @description The arm this grid belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this grid is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The grid's version as last read, or `null` for a grid with no ratings yet. A
+             *     mismatch against the server's current version is a 409 `development_ratings.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A row not present here is left entirely untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+             *             "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *             "comment": "Needs reminding after lunch."
+             *           }
+             *         }
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": null
+             *         }
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveDevelopmentRatingsRowInput"][];
+        };
+        /**
+         * @description One submitted row of SaveDevelopmentRatingsCommand (TASK-0083 stage 2; human rulings
+         *     Q1-A and Q3-A, 2026-09-19).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "ratings": {
+         *         "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+         *           "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+         *           "comment": "Needs reminding after lunch."
+         *         }
+         *       }
+         *     }
+         */
+        SaveDevelopmentRatingsRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Indicator id to a cell. Q1-A: a key OMITTED from this map leaves that indicator's existing rating
+             *     UNTOUCHED. A key present with an explicit JSON `null` value CLEARS (deletes) that
+             *     rating. A key present with string? DevelopmentRatingCellDto.PointId also
+             *     `null` is treated the SAME as an explicit null value — Q3-A's "clearing the point
+             *     clears the comment": whichever way the client expresses "no point", the whole cell (point and
+             *     comment) is deleted. A key present with a non-null `pointId` sets or replaces both the point
+             *     and the comment together — a whole-cell replace, never a sub-field patch of an existing comment.
+             * @example {
+             *       "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6901": {
+             *         "pointId": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6704",
+             *         "comment": "Needs reminding after lunch."
+             *       }
+             *     }
+             */
+            ratings: null | {
+                [key: string]: components["schemas"]["DevelopmentRatingCellDto"];
+            };
+        };
+        /**
          * @description `PUT /api/v1/arms/{armId}/score-sheets` (spec 6.7.4; TASK-0076's approved contract delta) —
          *             whole-sheet save, one transaction. The first save for an arm/term creates the result set (Draft).
          * @example {
@@ -5259,6 +5782,96 @@ export interface components {
              * @example false
              */
             dryRun: boolean;
+        };
+        /**
+         * @description `PUT /api/v1/arms/{armId}/trait-ratings` (TASK-0083 stage 1) — partial-save grid write, one
+         *             transaction. The first save for an arm/term creates the result set (Draft), same convention as
+         *             `SaveScoreSheetCommand`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+         *           }
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": null
+         *           }
+         *         }
+         *       ]
+         *     }
+         */
+        SaveTraitRatingsCommand: {
+            /**
+             * @description The arm this grid belongs to, from the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this grid is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The grid's version as last read, or `null` for a grid with no ratings yet. A
+             *     mismatch against the server's current version is a 409 `trait_ratings.stale_version`.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            /**
+             * @description Every row being saved. A row not present here is left entirely untouched.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+             *         }
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": null
+             *         }
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["SaveTraitRatingsRowInput"][];
+        };
+        /**
+         * @description One submitted row of SaveTraitRatingsCommand (TASK-0083 stage 1; human ruling Q1-A,
+         *     2026-09-19).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "ratings": {
+         *         "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+         *       }
+         *     }
+         */
+        SaveTraitRatingsRowInput: {
+            /**
+             * @description Must be on the arm's active roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Trait id to point id. Q1-A: a key OMITTED from this map leaves that trait's existing rating
+             *     UNTOUCHED. A key present with an explicit `null` value CLEARS (deletes) that
+             *     rating. A key present with a point id sets or replaces it. A row can therefore touch as few or as
+             *     many traits as the caller intends — this is a partial save, unlike the score sheet's whole-row
+             *     `ComponentMarks`.
+             * @example {
+             *       "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+             *     }
+             */
+            ratings: null | {
+                [key: string]: string;
+            };
         };
         /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
@@ -5482,7 +6095,8 @@ export interface components {
          * @description The wire shape of a Section (spec 6.4.2, 6.4.9).
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-         *       "name": "Primary"
+         *       "name": "Primary",
+         *       "ratesTraits": true
          *     }
          */
         SectionDto: {
@@ -5496,6 +6110,12 @@ export interface components {
              * @example Primary
              */
             name: string;
+            /**
+             * @description Whether an arm of this section rates traits (TASK-0083 ruling R1). Additive property — every
+             *     existing caller that ignores it keeps working.
+             * @example true
+             */
+            ratesTraits: boolean;
         };
         /**
          * @description `GET /api/v1/sections`'s response (spec 6.4.9): "Not paged — a two-row seeded list a school
@@ -5505,11 +6125,13 @@ export interface components {
          *       "sections": [
          *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
-         *           "name": "Nursery"
+         *           "name": "Nursery",
+         *           "ratesTraits": false
          *         },
          *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-         *           "name": "Primary"
+         *           "name": "Primary",
+         *           "ratesTraits": true
          *         }
          *       ]
          *     }
@@ -5520,11 +6142,13 @@ export interface components {
              * @example [
              *       {
              *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d45",
-             *         "name": "Nursery"
+             *         "name": "Nursery",
+             *         "ratesTraits": false
              *       },
              *       {
              *         "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-             *         "name": "Primary"
+             *         "name": "Primary",
+             *         "ratesTraits": true
              *       }
              *     ]
              */
@@ -7041,6 +7665,261 @@ export interface components {
             id?: null | string;
         };
         /**
+         * @description One trait block on the entry grid (TASK-0083 stage 1; the human's amendment to stage 0's proposal,
+         *     2026-09-19: one shape, not two). RatingScaleDto TraitRatingBlockDto.Scale and IReadOnlyList&lt;TraitDto&gt; TraitRatingBlockDto.Traits reuse the same DTOs
+         *     `SettingsTraitsGroupDto` already exposes — this is the same data, read for entry rather than
+         *     for editing the settings screen.
+         * @example {
+         *       "domain": "Affective",
+         *       "scale": {
+         *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *         "name": "Primary trait",
+         *         "points": [
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6705",
+         *             "pointCode": "N",
+         *             "pointLabel": "Needs Improvement",
+         *             "pointOrder": 1
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6706",
+         *             "pointCode": "I",
+         *             "pointLabel": "Improving",
+         *             "pointOrder": 2
+         *           },
+         *           {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707",
+         *             "pointCode": "E",
+         *             "pointLabel": "Excellent",
+         *             "pointOrder": 3
+         *           }
+         *         ]
+         *       },
+         *       "traits": [
+         *         {
+         *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+         *           "domain": "Affective",
+         *           "name": "Punctuality",
+         *           "displayOrder": 2,
+         *           "status": "Active"
+         *         }
+         *       ]
+         *     }
+         */
+        TraitRatingBlockDto: {
+            /** @description Affective or psychomotor. */
+            domain: components["schemas"]["TraitDomain"];
+            /** @description The scale this block's traits are rated against, with its points and legend. */
+            scale: components["schemas"]["RatingScaleDto"];
+            /**
+             * @description Every ACTIVE trait in this block, in display order. An archived trait leaves this list; its existing ratings are kept, just not shown here.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+             *         "domain": "Affective",
+             *         "name": "Punctuality",
+             *         "displayOrder": 2,
+             *         "status": "Active"
+             *       }
+             *     ]
+             */
+            traits: components["schemas"]["TraitDto"][];
+        };
+        /**
+         * @description One pupil's row on the grid (TASK-0083 stage 1) — every active pupil in the arm, including one with no ratings entered at all.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "ratings": {
+         *         "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+         *       }
+         *     }
+         */
+        TraitRatingRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", same convention as ScoreSheetRowDto.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description Trait id to the chosen point id, one key per ACTIVE trait — `null` for an unrated
+             *     cell. Only active traits are keys; an archived trait's existing rating is kept in storage but is
+             *     not a key here, because it has left the entry screen.
+             * @example {
+             *       "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+             *     }
+             */
+            ratings: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * @description One arm's trait-rating grid for one term (TASK-0083 stage 1; spec §6.7.7, §6.7.12 amendment).
+         *     Arm-scoped rather than result-set-scoped, mirroring ScoreSheetDto — see
+         *     `TraitRatingEndpoints`'s own remarks for why.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "version": "5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": true
+         *       },
+         *       "blocks": [
+         *         {
+         *           "domain": "Affective",
+         *           "scale": {
+         *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+         *             "name": "Primary trait",
+         *             "points": [
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6705",
+         *                 "pointCode": "N",
+         *                 "pointLabel": "Needs Improvement",
+         *                 "pointOrder": 1
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6706",
+         *                 "pointCode": "I",
+         *                 "pointLabel": "Improving",
+         *                 "pointOrder": 2
+         *               },
+         *               {
+         *                 "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707",
+         *                 "pointCode": "E",
+         *                 "pointLabel": "Excellent",
+         *                 "pointOrder": 3
+         *               }
+         *             ]
+         *           },
+         *           "traits": [
+         *             {
+         *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+         *               "domain": "Affective",
+         *               "name": "Punctuality",
+         *               "displayOrder": 2,
+         *               "status": "Active"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+         *           }
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "ratings": {
+         *             "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": null
+         *           }
+         *         }
+         *       ]
+         *     }
+         */
+        TraitRatingSheetDto: {
+            /**
+             * @description The arm this grid belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this grid is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Opaque, derived from the ratings the grid covers (see `TraitRatingVersion`).
+             *     `null` before any rating exists. Send back unchanged on `PUT` to detect a
+             *     concurrent edit.
+             * @example 5f3759df1f2c4a9b8e0d6c7a3b1f9e2d4c6a8b0d2e4f6a8c0e2d4f6a8b0c2e4f
+             */
+            version: null | string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description The affective block then the psychomotor block, each with its own scale.
+             * @example [
+             *       {
+             *         "domain": "Affective",
+             *         "scale": {
+             *           "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6602",
+             *           "name": "Primary trait",
+             *           "points": [
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6705",
+             *               "pointCode": "N",
+             *               "pointLabel": "Needs Improvement",
+             *               "pointOrder": 1
+             *             },
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6706",
+             *               "pointCode": "I",
+             *               "pointLabel": "Improving",
+             *               "pointOrder": 2
+             *             },
+             *             {
+             *               "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707",
+             *               "pointCode": "E",
+             *               "pointLabel": "Excellent",
+             *               "pointOrder": 3
+             *             }
+             *           ]
+             *         },
+             *         "traits": [
+             *           {
+             *             "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01",
+             *             "domain": "Affective",
+             *             "name": "Punctuality",
+             *             "displayOrder": 2,
+             *             "status": "Active"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            blocks: components["schemas"]["TraitRatingBlockDto"][];
+            /**
+             * @description Every active pupil in the arm, surname then id — fixed, never affected by ratings.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6707"
+             *         }
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "ratings": {
+             *           "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6a01": null
+             *         }
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["TraitRatingRowDto"][];
+        };
+        /**
          * @description Lifecycle state of a Trait (spec 6.2.7's status rule, carried into 6.2.13's per-block
          *     scales). Archiving, not deleting, is how a trait that has ever been rated is removed from new entry
          *     screens while staying on historical sheets through the publication snapshot.
@@ -7932,10 +8811,11 @@ export interface components {
             expectedVersion: number | string;
         };
         /**
-         * @description `PATCH /api/v1/sections/{id}` (spec 6.4.9). Name only.
+         * @description `PATCH /api/v1/sections/{id}` (spec 6.4.9).
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-         *       "name": "Secondary"
+         *       "name": "Secondary",
+         *       "ratesTraits": true
          *     }
          */
         UpdateSectionCommand: {
@@ -7950,6 +8830,12 @@ export interface components {
              * @example Secondary
              */
             name: string;
+            /**
+             * @description TASK-0083 ruling R1, additive. Optional — `null` leaves the section's current
+             *     value unchanged; only a non-null value changes it.
+             * @example true
+             */
+            ratesTraits?: null | boolean;
         };
         /**
          * @description `PATCH /api/v1/sessions/{id}` (spec 6.3.10): "Name and dates, while upcoming or active."
@@ -10694,6 +11580,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LevelDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDevelopmentRatings: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevelopmentRatingSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveDevelopmentRatings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDevelopmentRatingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevelopmentRatingSheetDto"];
                 };
             };
             /** @description Unauthorized */
@@ -15133,6 +16187,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTraitRatings: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraitRatingSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveTraitRatings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveTraitRatingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraitRatingSheetDto"];
                 };
             };
             /** @description Unauthorized */

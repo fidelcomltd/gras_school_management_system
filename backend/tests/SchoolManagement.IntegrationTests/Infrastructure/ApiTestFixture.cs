@@ -326,10 +326,10 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
             await context.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO sections
-                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key, version)
+                    (id, created_at_utc, created_by, modified_at_utc, modified_by, name, name_key, rates_traits, version)
                 VALUES
                     ({section.Id}, {SeededClassLevels.SeedTimestamp}, NULL, NULL, NULL,
-                     {section.Name}, {section.Name.ToLowerInvariant()}, {section.Version})
+                     {section.Name}, {section.Name.ToLowerInvariant()}, {section.RatesTraits}, {section.Version})
                 """,
                 cancellationToken);
         }

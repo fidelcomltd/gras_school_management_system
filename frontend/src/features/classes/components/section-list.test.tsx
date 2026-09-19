@@ -80,13 +80,13 @@ describe('SectionList — create, gated by level.create', () => {
     let created = false;
     server.use(
       http.get(apiUrl('/api/v1/sections'), () =>
-        HttpResponse.json({ sections: created ? [{ id: 'sec-2', name: 'Secondary' }] : [] }),
+        HttpResponse.json({ sections: created ? [{ id: 'sec-2', name: 'Secondary', ratesTraits: false }] : [] }),
       ),
     );
     server.use(
       http.post(apiUrl('/api/v1/sections'), () => {
         created = true;
-        return HttpResponse.json({ id: 'sec-2', name: 'Secondary' }, { status: 201 });
+        return HttpResponse.json({ id: 'sec-2', name: 'Secondary', ratesTraits: false }, { status: 201 });
       }),
     );
 
@@ -105,11 +105,15 @@ describe('SectionList — rename (UpdateSection)', () => {
   it('renames a section and shows the new name once the list refetches', async () => {
     mockMe('level.view', 'level.update');
     let name = 'Primary';
-    server.use(http.get(apiUrl('/api/v1/sections'), () => HttpResponse.json({ sections: [{ id: 'sec-1', name }] })));
+    server.use(
+      http.get(apiUrl('/api/v1/sections'), () =>
+        HttpResponse.json({ sections: [{ id: 'sec-1', name, ratesTraits: true }] }),
+      ),
+    );
     server.use(
       http.patch(apiUrl('/api/v1/sections/sec-1'), () => {
         name = 'Primary School';
-        return HttpResponse.json({ id: 'sec-1', name });
+        return HttpResponse.json({ id: 'sec-1', name, ratesTraits: true });
       }),
     );
 
