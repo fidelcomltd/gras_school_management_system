@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Application.Subjects;
@@ -13,6 +16,7 @@ using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.Infrastructure.Persistence.Configurations;
+using SchoolManagement.Infrastructure.Persistence.Repositories;
 using SchoolManagement.IntegrationTests.Infrastructure;
 
 namespace SchoolManagement.IntegrationTests;
@@ -95,28 +99,59 @@ public sealed class ResultSetRecomputeTriggerEndpointsTests(ApiTestFixture fixtu
 
     // The originally-approved delta's own decision paragraph names the exact bug this proves fixed:
     // "a settings flag committing while compute runs is overwritten by compute's NeedsRecompute =
-    // false" — result_set carries no concurrency token, so without a row lock a slow compute's own
-    // unconditional final write silently erases a flag a faster settings save set while it was still
-    // running. Compute's row lock is its VERY FIRST database statement (before it loads the arm,
-    // rules or a single mark); the settings save's own flagging lock is its LAST step, after every
-    // validation and the grading-band replace. Firing both requests together therefore reliably lets
-    // compute acquire the lock first in practice, forcing the settings save to wait and apply its
-    // flag ON TOP of compute's finished write — proving the flag is never the one that goes missing.
+    // false" — result_set carries no concurrency token, so a slow compute's own unconditional final
+    // write can silently erase a flag a settings save set WHILE compute was still running.
+    //
+    // Review finding: firing both requests together and only checking the end state is NOT proof —
+    // the ordinary serial interleaving (compute finishes completely, THEN settings flags) produces
+    // the exact same "flag true at the end" outcome with no lock involved at all. To force the actual
+    // race window, this test pauses compute, via a DI-replaceable dependency it already has
+    // (IResultComputationRepository — no production code added), AFTER compute has taken its row
+    // lock and read every input (arm, rules, subjects, roster, marks, components, bands) but BEFORE
+    // it writes a single row or clears NeedsRecompute. With compute paused there, the settings save
+    // is fired and PROVEN blocked (has not completed after a real wait), which is only possible if it
+    // is waiting on the row lock compute is holding. Only then is compute released.
     [Fact]
     public async Task UpdateGrading_RacingCompute_EndsWithTheFlagSet()
     {
         RequireDatabase();
         var (armId, subjectId, termId, _) = await SeedArmWithSubjectAsync();
-        var jar = await SignInAsSuperAdminAsync();
         var pupilId = await SeedPupilOnRosterAsync(armId, "Okonkwo");
-        await SaveSheetAsync(armId, jar, subjectId, termId, version: null, RowWithMarks(pupilId, 18, 16, 52)); // complete: compute can run
+
+        var gate = new PauseGate();
+        await using var factory = Fixture.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IResultComputationRepository>();
+            services.AddScoped<IResultComputationRepository>(sp =>
+                new PausingResultComputationRepository(
+                    new ResultComputationRepository(sp.GetRequiredService<ApplicationDbContext>()), gate));
+        }));
+        using var client = factory.CreateClient();
+
+        var jar = await SignInAsSuperAdminAsync(client);
+        await SaveSheetAsync(armId, jar, subjectId, termId, null, [RowWithMarks(pupilId, 18, 16, 52)], client); // complete: compute can run
         var resultSetId = await GetResultSetIdAsync(armId, termId);
 
         using var computeRequest = BuildPostRequestNoBody($"/api/v1/result-sets/{resultSetId}/compute", jar);
-        using var settingsRequest = BuildPutRequest(GradingUrl, jar, TwoBandScale(expectedVersion: 0));
+        var computeTask = client.SendAsync(computeRequest, TestContext.Current.CancellationToken);
 
-        var computeTask = Client.SendAsync(computeRequest, TestContext.Current.CancellationToken);
-        var settingsTask = Client.SendAsync(settingsRequest, TestContext.Current.CancellationToken);
+        // Compute has taken its row lock, read everything, and computed in memory — it is now
+        // paused immediately before its first write. If this never signals, compute never reached
+        // that point (a real failure, not a flaky one) and the 10s wait times out loudly.
+        await gate.Reached.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        using var settingsRequest = BuildPutRequest(GradingUrl, jar, TwoBandScale(expectedVersion: 0));
+        var settingsTask = client.SendAsync(settingsRequest, TestContext.Current.CancellationToken);
+
+        // Proof this is a genuine block, not a coincidence of timing: the settings save tries to
+        // lock the SAME result_set row compute is still holding, so it must still be pending after a
+        // real wait. Under the vacuous version of this test (no pause, no lock), this would already
+        // have completed.
+        await Task.Delay(TimeSpan.FromMilliseconds(750), TestContext.Current.CancellationToken);
+        settingsTask.IsCompleted.ShouldBeFalse();
+
+        gate.Release();
+
         var responses = await Task.WhenAll(computeTask, settingsTask);
 
         try
@@ -140,6 +175,44 @@ public sealed class ResultSetRecomputeTriggerEndpointsTests(ApiTestFixture fixtu
             {
                 response.Dispose();
             }
+        }
+    }
+
+    /// <summary>
+    /// Test-only synchronisation point for the concurrency test above. Not production code: it wraps
+    /// the real <see cref="IResultComputationRepository"/> — an existing DI-replaceable dependency —
+    /// so the test can observe "compute has read everything and is about to write" and hold it there
+    /// deterministically, rather than hoping a race resolves a particular way.
+    /// </summary>
+    private sealed class PauseGate
+    {
+        private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Reached => _reached.Task;
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task WaitHereAsync(CancellationToken cancellationToken)
+        {
+            _reached.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private sealed class PausingResultComputationRepository(IResultComputationRepository inner, PauseGate gate)
+        : IResultComputationRepository
+    {
+        public async Task ReplaceComputedRowsAsync(
+            Guid resultSetId,
+            IReadOnlyList<SubjectResultLine> subjectLines,
+            IReadOnlyList<SubjectArmStatistic> subjectStatistics,
+            IReadOnlyList<PupilTermResult> pupilResults,
+            CancellationToken cancellationToken)
+        {
+            await gate.WaitHereAsync(cancellationToken).ConfigureAwait(false);
+            await inner.ReplaceComputedRowsAsync(resultSetId, subjectLines, subjectStatistics, pupilResults, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
@@ -275,39 +348,39 @@ public sealed class ResultSetRecomputeTriggerEndpointsTests(ApiTestFixture fixtu
     }
 
     private Task<HttpResponseMessage> SaveSheetAsync(
-        Guid armId, CookieJar jar, Guid subjectId, Guid termId, string? version, params object[] rows) =>
-        Client.SendAsync(
+        Guid armId, CookieJar jar, Guid subjectId, Guid termId, string? version, object[] rows, HttpClient? client = null) =>
+        (client ?? Client).SendAsync(
             BuildPutRequest(
                 $"/api/v1/arms/{armId}/score-sheets", jar,
                 new { subjectId = subjectId.ToString(), termId = termId.ToString(), version, rows }),
             TestContext.Current.CancellationToken);
 
-    private async Task<CookieJar> SignInAsSuperAdminAsync()
+    private async Task<CookieJar> SignInAsSuperAdminAsync(HttpClient? client = null)
     {
         var (_, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
         var jar = new CookieJar();
-        await GetAsync(CsrfUrl, jar);
-        var signIn = await PostAsync(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password));
+        await GetAsync(CsrfUrl, jar, client);
+        var signIn = await PostAsync(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password), client);
         signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
         return jar;
     }
 
-    private async Task<HttpResponseMessage> GetAsync(string url, CookieJar jar)
+    private async Task<HttpResponseMessage> GetAsync(string url, CookieJar jar, HttpClient? client = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         jar.Apply(request);
-        return await SendCapturingAsync(request, jar).ConfigureAwait(false);
+        return await SendCapturingAsync(request, jar, client).ConfigureAwait(false);
     }
 
-    private Task<HttpResponseMessage> PostAsync<T>(string url, CookieJar jar, T payload) =>
-        SendCapturingAsync(BuildPostRequest(url, jar, payload), jar);
+    private Task<HttpResponseMessage> PostAsync<T>(string url, CookieJar jar, T payload, HttpClient? client = null) =>
+        SendCapturingAsync(BuildPostRequest(url, jar, payload), jar, client);
 
-    private Task<HttpResponseMessage> PutAsync<T>(string url, CookieJar jar, T payload) =>
-        SendCapturingAsync(BuildPutRequest(url, jar, payload), jar);
+    private Task<HttpResponseMessage> PutAsync<T>(string url, CookieJar jar, T payload, HttpClient? client = null) =>
+        SendCapturingAsync(BuildPutRequest(url, jar, payload), jar, client);
 
-    private async Task<HttpResponseMessage> SendCapturingAsync(HttpRequestMessage request, CookieJar jar)
+    private async Task<HttpResponseMessage> SendCapturingAsync(HttpRequestMessage request, CookieJar jar, HttpClient? client = null)
     {
-        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+        var response = await (client ?? Client).SendAsync(request, TestContext.Current.CancellationToken);
         jar.Capture(response);
         return response;
     }

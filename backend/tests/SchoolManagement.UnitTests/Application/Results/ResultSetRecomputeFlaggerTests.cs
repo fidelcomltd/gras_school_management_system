@@ -14,11 +14,13 @@ public sealed class ResultSetRecomputeFlaggerTests
 {
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
 
-    private static ResultSet WithState(ResultSetState state)
+    private static ResultSet WithState(ResultSetState state) => WithState(state, needsRecompute: false);
+
+    private static ResultSet WithState(ResultSetState state, bool needsRecompute)
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, state);
-        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, needsRecompute);
         return resultSet;
     }
 
@@ -43,6 +45,31 @@ public sealed class ResultSetRecomputeFlaggerTests
             reason: null,
             beforeMetadata: Arg.Is<IReadOnlyDictionary<string, object?>?>(metadata =>
                 metadata != null && !(bool)metadata["needsRecompute"]! && (string)metadata["state"]! == "ReturnedForCorrection"));
+    }
+
+    // Review finding: beforeMetadata must reflect the REAL prior value, not a hardcoded false — a set
+    // that was Returned for Correction and ALREADY flagged (e.g. a second settings save before anyone
+    // recomputed) must be audited with needsRecompute=true on the before side.
+    [Fact]
+    public async Task FlagAsync_OnAnAlreadyFlaggedReturnedForCorrectionSet_AuditsTheRealBeforeValue()
+    {
+        var resultSet = WithState(ResultSetState.ReturnedForCorrection, needsRecompute: true);
+
+        await ResultSetRecomputeFlagger.FlagAsync([resultSet], _auditSink, TestContext.Current.CancellationToken);
+
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+
+        await _auditSink.Received(1).RecordAsync(
+            "result_set.returned_for_correction_reverted_to_draft",
+            "result_set",
+            resultSet.Id.ToString(),
+            Arg.Any<IReadOnlyDictionary<string, object?>?>(),
+            actorAdminId: null,
+            Arg.Any<CancellationToken>(),
+            reason: null,
+            beforeMetadata: Arg.Is<IReadOnlyDictionary<string, object?>?>(metadata =>
+                metadata != null && (bool)metadata["needsRecompute"]! && (string)metadata["state"]! == "ReturnedForCorrection"));
     }
 
     // Awaiting Approval and Approved keep their state and only gain the flag — no audit event of

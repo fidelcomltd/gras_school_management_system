@@ -32,6 +32,12 @@ internal static class ResultSetRecomputeFlagger
     {
         foreach (var resultSet in lockedResultSets)
         {
+            // Captured BEFORE mutating: an already-flagged Returned for Correction set has
+            // NeedsRecompute true going in, and hardcoding false here would audit a before-image
+            // that never existed (review finding, TASK-0088).
+            var stateBefore = resultSet.State;
+            var needsRecomputeBefore = resultSet.NeedsRecompute;
+
             var droppedToDraft = resultSet.FlagNeedsRecomputeBySystem();
 
             if (!droppedToDraft)
@@ -52,8 +58,8 @@ internal static class ResultSetRecomputeFlagger
                 cancellationToken,
                 beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
-                    ["state"] = nameof(ResultSetState.ReturnedForCorrection),
-                    ["needsRecompute"] = false,
+                    ["state"] = stateBefore.ToString(),
+                    ["needsRecompute"] = needsRecomputeBefore,
                 }).ConfigureAwait(false);
         }
     }
