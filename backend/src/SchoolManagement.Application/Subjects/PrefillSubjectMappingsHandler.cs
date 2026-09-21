@@ -3,8 +3,10 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -32,6 +34,7 @@ internal sealed class PrefillSubjectMappingsHandler(
     IClassLevelRepository levels,
     ISubjectRepository subjects,
     ISubjectMappingRepository mappings,
+    IResultSetRepository resultSets,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<PrefillSubjectMappingsCommand, Result<SaveSubjectMappingGridResponse>>
@@ -133,6 +136,19 @@ internal sealed class PrefillSubjectMappingsHandler(
             },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A2: prefill is additive-only, so every affected class level came from an
+        // addition — flags every non-Published result set of this term for those class levels.
+        var affectedClassLevelIds = diff.Additions.Select(addition => addition.ClassLevelId).ToHashSet();
+
+        if (affectedClassLevelIds.Count > 0)
+        {
+            var lockedResultSets = await resultSets
+                .LockNonPublishedByTermAndClassLevelsAsync(termId, affectedClassLevelIds, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(new SaveSubjectMappingGridResponse(additionDtos, Endings: [], DryRun: false));
     }

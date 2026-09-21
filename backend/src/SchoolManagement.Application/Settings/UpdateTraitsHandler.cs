@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -57,6 +58,7 @@ internal sealed class UpdateTraitsCommandHandler(
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ITraitUsageGate traitUsageGate,
+    IResultSetRepository resultSetRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -249,6 +251,17 @@ internal sealed class UpdateTraitsCommandHandler(
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["traitCount"] = traits.Count },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A1: a traits save flags every non-Published result set in the active session.
+        var activeSessionForFlag = await academicSessionRepository.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+        if (activeSessionForFlag is not null)
+        {
+            var lockedResultSets = await resultSetRepository
+                .LockNonPublishedInSessionAsync(activeSessionForFlag.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(SettingsMapper.ToTraitsDto(
             traits,

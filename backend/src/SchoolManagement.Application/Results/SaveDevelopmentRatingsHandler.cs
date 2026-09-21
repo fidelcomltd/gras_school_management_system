@@ -123,7 +123,8 @@ internal sealed class SaveDevelopmentRatingsHandler(
             return Result.Failure<DevelopmentRatingSheetDto>(new ValidationError(failures));
         }
 
-        var existingResultSet = await resultSets.FindTrackedByArmTermAsync(armId, termId, cancellationToken).ConfigureAwait(false);
+        // TASK-0088 AC A4: row-locked before the state check below.
+        var existingResultSet = await resultSets.FindTrackedByArmTermForUpdateAsync(armId, termId, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<DevelopmentRating> existingRatings = existingResultSet is null
             ? []
             : await developmentRatings.ListTrackedAsync(existingResultSet.Id, cancellationToken).ConfigureAwait(false);

@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
 
@@ -24,6 +25,7 @@ public sealed class ResetGradingCommandHandlerTests
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
+    private readonly IResultSetRepository _resultSetRepository = Substitute.For<IResultSetRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
@@ -34,6 +36,8 @@ public sealed class ResetGradingCommandHandlerTests
     public ResetGradingCommandHandlerTests()
     {
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
+        _resultSetRepository.LockNonPublishedInSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -52,6 +56,7 @@ public sealed class ResetGradingCommandHandlerTests
             _configVersionRepository,
             _academicSessionRepository,
             _publishedResultsGate,
+            _resultSetRepository,
             _settingsSnapshotSource,
             _currentUser,
             _auditSink,
@@ -97,5 +102,30 @@ public sealed class ResetGradingCommandHandlerTests
         await _gradingBandRepository.Received(1).ReplaceAllAsync(
             Arg.Is<IReadOnlyList<GradingBand>>(bands => bands != null && bands.Count == 9),
             Arg.Any<CancellationToken>());
+    }
+
+    // TASK-0088 AC A1/A5: a reset is an ordinary grading save, so it flags the active session exactly
+    // like UpdateGradingCommandHandler — proven here by a Returned for Correction set dropping to Draft.
+    [Fact]
+    public async Task HandleAsync_WithAnActiveSessionHoldingAReturnedForCorrectionSet_DropsItToDraftAndFlagsIt()
+    {
+        CreateTrackedProfile();
+
+        var session = AcademicSession.Create(Guid.CreateVersion7(), "2026/2027", new DateOnly(2026, 9, 1), new DateOnly(2027, 7, 31)).Value;
+        _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns(session);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(
+            new ResetGradingCommand(ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

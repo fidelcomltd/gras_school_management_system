@@ -48,7 +48,7 @@ public sealed class SaveAttendanceHandlerTests
         _enrolments.ListActiveRosterByArmAsync(ArmId, Arg.Any<CancellationToken>())
             .Returns([new ArmRosterPupil(PupilId, "GRAS/2026/0001", "Okafor", "Chidera", null)]);
 
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
         _attendanceEntries.ListTrackedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
     }
 
@@ -159,7 +159,7 @@ public sealed class SaveAttendanceHandlerTests
     public async Task HandleAsync_OmittedPupil_LeavesTheExistingEntryUntouched()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         var otherPupilId = Guid.CreateVersion7();
         var existingEntry = AttendanceEntry.Create(Guid.CreateVersion7(), resultSet.Id, otherPupilId, 30).Value;
         _attendanceEntries.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([existingEntry]);
@@ -181,7 +181,7 @@ public sealed class SaveAttendanceHandlerTests
     public async Task HandleAsync_ExplicitNullClearsTheExistingEntry()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         var existingEntry = AttendanceEntry.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, 30).Value;
         _attendanceEntries.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([existingEntry]);
 
@@ -199,7 +199,7 @@ public sealed class SaveAttendanceHandlerTests
     public async Task HandleAsync_WithAStaleVersion_Returns409()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _attendanceEntries.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
         var row = new SaveAttendanceRowInput(PupilId.ToString(), 58);
 
@@ -214,7 +214,7 @@ public sealed class SaveAttendanceHandlerTests
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _attendanceEntries.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
         var row = new SaveAttendanceRowInput(PupilId.ToString(), 58);
 
@@ -230,7 +230,7 @@ public sealed class SaveAttendanceHandlerTests
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         resultSet.MarkComputed(null, DateTimeOffset.UtcNow, pupilCount: 1);
         resultSet.NeedsRecompute.ShouldBeFalse();
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _attendanceEntries.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
         var row = new SaveAttendanceRowInput(PupilId.ToString(), 58);
 

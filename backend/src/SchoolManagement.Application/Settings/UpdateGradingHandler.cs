@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -45,6 +46,7 @@ internal sealed class UpdateGradingCommandHandler(
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
+    IResultSetRepository resultSetRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -137,6 +139,19 @@ internal sealed class UpdateGradingCommandHandler(
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["bandCount"] = bands.Count },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A1: a grading save flags every non-Published result set in the active session
+        // — spec 6.2.9's "the system sets a needs_recompute flag on every result set in the session
+        // that is not Published." No active session means nothing to flag.
+        var activeSessionForFlag = await academicSessionRepository.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+        if (activeSessionForFlag is not null)
+        {
+            var lockedResultSets = await resultSetRepository
+                .LockNonPublishedInSessionAsync(activeSessionForFlag.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber));
     }

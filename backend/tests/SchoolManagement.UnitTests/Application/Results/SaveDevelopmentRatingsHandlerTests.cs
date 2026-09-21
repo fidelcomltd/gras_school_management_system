@@ -89,7 +89,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
         var otherScale = RatingScale.Create(OtherScaleId, "Primary trait", [RatingScalePoint.Create(WrongScalePointId, OtherScaleId, "E", "Excellent", 1)]);
         _ratingScales.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([scale, otherScale]);
 
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
         _developmentRatings.ListTrackedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
     }
 
@@ -240,7 +240,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
     {
         // Q1-A ruling: a key absent from Ratings leaves that indicator's existing rating alone.
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _resultSets.FindReadOnlyByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
 
         var existingRating = DevelopmentRating.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, OtherIndicatorId, PointId, "Existing comment.").Value;
@@ -266,7 +266,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
     {
         // Q1-A ruling: a key present with an explicit null deletes that indicator's rating.
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
 
         var existingRating = DevelopmentRating.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, IndicatorId, PointId, "Existing comment.").Value;
         _developmentRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([existingRating]);
@@ -291,7 +291,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
         // riding along) is a second, equivalent way to express the same clear Q1-A's explicit-null
         // value expresses.
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
 
         var existingRating = DevelopmentRating.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, IndicatorId, PointId, "Existing comment.").Value;
         _developmentRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([existingRating]);
@@ -314,7 +314,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
     public async Task HandleAsync_WithAStaleVersion_Returns409()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _developmentRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveDevelopmentRatingsRowInput(
@@ -331,7 +331,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _developmentRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveDevelopmentRatingsRowInput(
@@ -351,7 +351,7 @@ public sealed class SaveDevelopmentRatingsHandlerTests
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         resultSet.MarkComputed(null, DateTimeOffset.UtcNow, pupilCount: 1);
         resultSet.NeedsRecompute.ShouldBeFalse();
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _developmentRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveDevelopmentRatingsRowInput(

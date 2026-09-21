@@ -2,10 +2,12 @@ using NSubstitute;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Subjects;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Subjects;
 
@@ -31,6 +33,7 @@ public sealed class CreateSubjectExceptionHandlerTests
     private readonly ISubjectRepository _subjects = Substitute.For<ISubjectRepository>();
     private readonly ISubjectMappingRepository _mappings = Substitute.For<ISubjectMappingRepository>();
     private readonly ISubjectMappingExceptionRepository _exceptions = Substitute.For<ISubjectMappingExceptionRepository>();
+    private readonly IResultSetRepository _resultSets = Substitute.For<IResultSetRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
 
@@ -56,11 +59,13 @@ public sealed class CreateSubjectExceptionHandlerTests
 
         _subjects.FindReadOnlyByIdAsync(_subject.Id, Arg.Any<CancellationToken>()).Returns(_subject);
         _exceptions.ExistsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((ResultSet?)null);
         _currentUser.UserId.Returns("admin-1");
     }
 
     private CreateSubjectExceptionHandler CreateHandler() =>
-        new(_arms, _levels, _sessions, _terms, _subjects, _mappings, _exceptions, _currentUser, _auditSink);
+        new(_arms, _levels, _sessions, _terms, _subjects, _mappings, _exceptions, _resultSets, _currentUser, _auditSink);
 
     private CreateSubjectExceptionCommand CommandFor(SubjectExceptionMode mode) =>
         new(_armId.ToString(), _subject.Id.ToString(), _termId.ToString(), mode, "A stated reason");
@@ -208,5 +213,42 @@ public sealed class CreateSubjectExceptionHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("subject_exception.subject_not_found");
+    }
+
+    // TASK-0088 AC A2/A5: an include/exclude exception flags this ONE arm's non-Published result set
+    // for this term, if one exists — proven here on a Returned for Correction set dropping to Draft.
+    [Fact]
+    public async Task HandleAsync_WithAnExistingReturnedForCorrectionResultSetForThisArmAndTerm_DropsItToDraftAndFlagsIt()
+    {
+        _mappings.IsActivelyMappedAsync(_subject.Id, _classLevelId, _termId, Arg.Any<CancellationToken>()).Returns(false);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), _armId, _termId).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(_armId, _termId, Arg.Any<CancellationToken>()).Returns(resultSet);
+
+        var result = await CreateHandler().HandleAsync(CommandFor(SubjectExceptionMode.Include), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+    }
+
+    // A Published result set is never flagged (spec 6.7.11: "it renders from its snapshot").
+    [Fact]
+    public async Task HandleAsync_WithAnExistingPublishedResultSetForThisArmAndTerm_NeverFlagsIt()
+    {
+        _mappings.IsActivelyMappedAsync(_subject.Id, _classLevelId, _termId, Arg.Any<CancellationToken>()).Returns(false);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), _armId, _termId).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Published);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(_armId, _termId, Arg.Any<CancellationToken>()).Returns(resultSet);
+
+        var result = await CreateHandler().HandleAsync(CommandFor(SubjectExceptionMode.Include), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Published);
+        resultSet.NeedsRecompute.ShouldBeFalse();
     }
 }

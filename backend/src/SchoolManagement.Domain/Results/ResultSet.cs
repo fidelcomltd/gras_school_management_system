@@ -144,6 +144,34 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
     public void MarkNeedsRecompute() => NeedsRecompute = true;
 
     /// <summary>
+    /// System-triggered flag (TASK-0088 AC A1/A2): a §6.2.9 settings save or a subject-mapping change
+    /// invalidates this set's computed rows — spec 6.7.11's "Any state -&gt; Same state with
+    /// needs_recompute true | System" row. Distinct from <see cref="MarkNeedsRecompute"/>, which the
+    /// six sheet-save handlers call on a plain mark/rating/attendance/remark edit and which NEVER
+    /// changes <see cref="State"/> — only a settings or mapping change can drop a Returned for
+    /// Correction set back to Draft (the state machine's separate System row, same table), because
+    /// Awaiting Approval and Approved must keep their state and only gain the flag (human ruling,
+    /// TASK-0088 carding).
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when <see cref="State"/> actually changed (Returned for Correction to
+    /// Draft), so the caller knows whether this is a genuine state transition worth its own audit
+    /// event, as opposed to a set that merely gained the flag.
+    /// </returns>
+    public bool FlagNeedsRecomputeBySystem()
+    {
+        NeedsRecompute = true;
+
+        if (State != ResultSetState.ReturnedForCorrection)
+        {
+            return false;
+        }
+
+        State = ResultSetState.Draft;
+        return true;
+    }
+
+    /// <summary>
     /// Applies computation's outcome (spec 8.2 step 11): stamps <see cref="ComputedAtUtc"/>/
     /// <see cref="ComputedBy"/>, writes <see cref="PupilCount"/> (the ranked denominator printed on
     /// the sheet), and clears <see cref="NeedsRecompute"/>. Does NOT change <see cref="State"/> —

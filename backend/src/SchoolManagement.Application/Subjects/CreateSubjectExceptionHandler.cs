@@ -3,9 +3,12 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Subjects;
@@ -21,6 +24,7 @@ internal sealed class CreateSubjectExceptionHandler(
     ISubjectRepository subjects,
     ISubjectMappingRepository mappings,
     ISubjectMappingExceptionRepository exceptions,
+    IResultSetRepository resultSets,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<CreateSubjectExceptionCommand, Result<SubjectExceptionDto>>
@@ -129,6 +133,20 @@ internal sealed class CreateSubjectExceptionHandler(
             },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A2: an include/exclude exception changes exactly this ONE arm's in-effect
+        // subject list — flags its result set for this term, if one exists and is not Published
+        // (spec 6.7.11: "A Published set is never flagged, because it renders from its snapshot").
+        var lockedResultSet = await resultSets
+            .FindTrackedByArmTermForUpdateAsync(armId, termId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (lockedResultSet is { State: not ResultSetState.Published })
+        {
+            await ResultSetRecomputeFlagger
+                .FlagAsync([lockedResultSet], auditSink, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return Result.Success(new SubjectExceptionDto(
             exception.Id.ToString("D", CultureInfo.InvariantCulture),

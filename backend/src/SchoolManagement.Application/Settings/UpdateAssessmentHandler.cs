@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -48,6 +49,7 @@ internal sealed class UpdateAssessmentCommandHandler(
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ISubjectScoreSessionLockLookup subjectScoreSessionLockLookup,
+    IResultSetRepository resultSetRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -239,6 +241,17 @@ internal sealed class UpdateAssessmentCommandHandler(
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["componentCount"] = savedComponents.Count },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A1: flags every non-Published result set in the active session already
+        // resolved above for the session lock — no second lookup needed.
+        if (activeSession is not null)
+        {
+            var lockedResultSets = await resultSetRepository
+                .LockNonPublishedInSessionAsync(activeSession.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(SettingsMapper.ToAssessmentDto(savedComponents, profile.AssessmentVersionNumber));
     }

@@ -92,7 +92,8 @@ internal sealed class SaveClassTeacherRemarksHandler(
             return Result.Failure<RemarkSheetDto>(new ValidationError(failures));
         }
 
-        var existingResultSet = await resultSets.FindTrackedByArmTermAsync(armId, termId, cancellationToken).ConfigureAwait(false);
+        // TASK-0088 AC A4: row-locked before the state check below.
+        var existingResultSet = await resultSets.FindTrackedByArmTermForUpdateAsync(armId, termId, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<PupilRemark> existingRemarks = existingResultSet is null
             ? []
             : await pupilRemarks.ListTrackedAsync(existingResultSet.Id, RemarkKind.ClassTeacher, cancellationToken).ConfigureAwait(false);

@@ -39,4 +39,59 @@ public sealed class ResultSetTests
 
         resultSet.NeedsRecompute.ShouldBeTrue();
     }
+
+    private static ResultSet WithState(ResultSetState state)
+    {
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, state);
+        return resultSet;
+    }
+
+    // AC A3: Returned for Correction is the ONE state the system flag also moves — the state
+    // machine's separate System row, distinct from the flag-only row every other state takes.
+    [Fact]
+    public void FlagNeedsRecomputeBySystem_OnAReturnedForCorrectionSet_DropsToDraftAndReportsAChange()
+    {
+        var resultSet = WithState(ResultSetState.ReturnedForCorrection);
+
+        var stateChanged = resultSet.FlagNeedsRecomputeBySystem();
+
+        stateChanged.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+    }
+
+    // Awaiting Approval and Approved keep their state and only gain the flag (human ruling,
+    // TASK-0088 carding) — proven for every OTHER state the flag can legally reach, so a change that
+    // widened the drop-to-Draft branch to any of these would fail here first.
+    [Theory]
+    [InlineData(ResultSetState.Draft)]
+    [InlineData(ResultSetState.AwaitingApproval)]
+    [InlineData(ResultSetState.Approved)]
+    public void FlagNeedsRecomputeBySystem_OnAnyOtherOpenState_OnlyFlagsAndReportsNoChange(ResultSetState state)
+    {
+        var resultSet = WithState(state);
+
+        var stateChanged = resultSet.FlagNeedsRecomputeBySystem();
+
+        stateChanged.ShouldBeFalse();
+        resultSet.State.ShouldBe(state);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+    }
+
+    // Published and Withdrawn are never handed to this method by a caller that respects the
+    // non-Published scope the flaggers query for — pinned anyway so the domain method itself, in
+    // isolation, is proven not to silently resurrect a Published set into the editable state machine.
+    [Theory]
+    [InlineData(ResultSetState.Published)]
+    [InlineData(ResultSetState.Withdrawn)]
+    public void FlagNeedsRecomputeBySystem_OnAPublishedOrWithdrawnSet_NeverChangesState(ResultSetState state)
+    {
+        var resultSet = WithState(state);
+
+        var stateChanged = resultSet.FlagNeedsRecomputeBySystem();
+
+        stateChanged.ShouldBeFalse();
+        resultSet.State.ShouldBe(state);
+    }
 }

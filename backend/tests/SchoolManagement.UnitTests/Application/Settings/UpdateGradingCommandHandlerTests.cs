@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
 
@@ -31,6 +32,7 @@ public sealed class UpdateGradingCommandHandlerTests
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
+    private readonly IResultSetRepository _resultSetRepository = Substitute.For<IResultSetRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
@@ -43,6 +45,8 @@ public sealed class UpdateGradingCommandHandlerTests
     public UpdateGradingCommandHandlerTests()
     {
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
+        _resultSetRepository.LockNonPublishedInSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -61,6 +65,7 @@ public sealed class UpdateGradingCommandHandlerTests
             _configVersionRepository,
             _academicSessionRepository,
             _publishedResultsGate,
+            _resultSetRepository,
             _settingsSnapshotSource,
             _currentUser,
             _auditSink,
@@ -163,5 +168,34 @@ public sealed class UpdateGradingCommandHandlerTests
         await _configVersionRepository.Received(1).AddAsync(
             Arg.Is<ConfigVersion>(version => version != null && version.Reason == "The school revised the pass mark policy."),
             Arg.Any<CancellationToken>());
+    }
+
+    // TASK-0088 AC A1/A5: a grading save flags every non-Published result set in the active session —
+    // Awaiting Approval and Approved keep their state and only gain the flag.
+    [Theory]
+    [InlineData(ResultSetState.Draft)]
+    [InlineData(ResultSetState.AwaitingApproval)]
+    [InlineData(ResultSetState.Approved)]
+    public async Task HandleAsync_WithAnActiveSessionHoldingANonPublishedSet_FlagsItWithoutChangingState(ResultSetState state)
+    {
+        var profile = CreateTrackedProfile();
+
+        var session = AcademicSession.Create(Guid.CreateVersion7(), "2026/2027", new DateOnly(2026, 9, 1), new DateOnly(2027, 7, 31)).Value;
+        _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns(session);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, state);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateGradingCommand(ValidBands, ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        profile.GradingVersionNumber.ShouldBe(1);
+        resultSet.State.ShouldBe(state);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

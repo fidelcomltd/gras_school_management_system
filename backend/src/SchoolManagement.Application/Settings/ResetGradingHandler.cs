@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -26,6 +27,7 @@ internal sealed class ResetGradingCommandHandler(
     IConfigVersionRepository configVersionRepository,
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
+    IResultSetRepository resultSetRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -112,6 +114,18 @@ internal sealed class ResetGradingCommandHandler(
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["bandCount"] = bands.Count },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A1: a reset is, mechanically, an ordinary grading save (see this type's own
+        // remarks) so it flags the active session exactly as UpdateGradingCommandHandler does.
+        var activeSessionForFlag = await academicSessionRepository.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+        if (activeSessionForFlag is not null)
+        {
+            var lockedResultSets = await resultSetRepository
+                .LockNonPublishedInSessionAsync(activeSessionForFlag.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber));
     }

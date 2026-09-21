@@ -8,6 +8,7 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
 
@@ -36,6 +37,7 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
     private readonly IDevelopmentIndicatorUsageGate _developmentIndicatorUsageGate =
         Substitute.For<IDevelopmentIndicatorUsageGate>();
 
+    private readonly IResultSetRepository _resultSetRepository = Substitute.For<IResultSetRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
@@ -51,6 +53,8 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         _developmentIndicatorUsageGate.HasEverBeenRatedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         _developmentIndicatorUsageGate.HasOpenRatingOnScaleAsync(
             Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -70,6 +74,7 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         _academicSessionRepository,
         _publishedResultsGate,
         _developmentIndicatorUsageGate,
+        _resultSetRepository,
         _settingsSnapshotSource,
         _currentUser,
         _auditSink,
@@ -516,5 +521,29 @@ public sealed class UpdateDevelopmentDomainsCommandHandlerTests
         result.IsSuccess.ShouldBeTrue();
         await _developmentIndicatorUsageGate.DidNotReceive().HasOpenRatingOnScaleAsync(
             Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    // TASK-0088 AC A1/A5: a development-domains save flags every non-Published result set in the active session.
+    [Fact]
+    public async Task HandleAsync_WithAnActiveSessionHoldingAReturnedForCorrectionSet_DropsItToDraftAndFlagsIt()
+    {
+        CreateTrackedProfile();
+
+        var session = AcademicSession.Create(Guid.CreateVersion7(), "2026/2027", new DateOnly(2026, 9, 1), new DateOnly(2027, 7, 31)).Value;
+        _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns(session);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateDevelopmentDomainsCommand([ValidDomain()], ExpectedVersion: 0, Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

@@ -53,7 +53,7 @@ public sealed class SaveClassTeacherRemarksHandlerTests
         _enrolments.ListActiveRosterByArmAsync(ArmId, Arg.Any<CancellationToken>())
             .Returns([new ArmRosterPupil(PupilId, "GRAS/2026/0001", "Okafor", "Chidera", null)]);
 
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
         _pupilRemarks.ListTrackedAsync(Arg.Any<Guid>(), RemarkKind.ClassTeacher, Arg.Any<CancellationToken>()).Returns([]);
 
         _currentUser.UserId.Returns(ActorId.ToString());
@@ -136,7 +136,7 @@ public sealed class SaveClassTeacherRemarksHandlerTests
     public async Task HandleAsync_WhitespaceOnlyRemark_ClearsAnExistingRow()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         var existing = PupilRemark.Create(
             Guid.CreateVersion7(), resultSet.Id, PupilId, RemarkKind.ClassTeacher, "Old text.", ActorId, "Mrs Adeyemi", DateTimeOffset.UtcNow).Value;
         _pupilRemarks.ListTrackedAsync(resultSet.Id, RemarkKind.ClassTeacher, Arg.Any<CancellationToken>()).Returns([existing]);
@@ -155,7 +155,7 @@ public sealed class SaveClassTeacherRemarksHandlerTests
     public async Task HandleAsync_ResavingTheSameTextByADifferentAdmin_LeavesTheSnapshotUntouchedAndIsNotAudited()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         var originalWrittenAt = DateTimeOffset.UtcNow.AddDays(-1);
         var existing = PupilRemark.Create(
             Guid.CreateVersion7(), resultSet.Id, PupilId, RemarkKind.ClassTeacher, "Unchanged.", Guid.CreateVersion7(), "Mr Bello", originalWrittenAt).Value;
@@ -178,7 +178,7 @@ public sealed class SaveClassTeacherRemarksHandlerTests
     public async Task HandleAsync_WithAStaleVersion_Returns409()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _pupilRemarks.ListTrackedAsync(resultSet.Id, RemarkKind.ClassTeacher, Arg.Any<CancellationToken>()).Returns([]);
         var row = new SaveRemarkRowInput(PupilId.ToString(), "Text");
 
@@ -193,7 +193,7 @@ public sealed class SaveClassTeacherRemarksHandlerTests
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _pupilRemarks.ListTrackedAsync(resultSet.Id, RemarkKind.ClassTeacher, Arg.Any<CancellationToken>()).Returns([]);
         var row = new SaveRemarkRowInput(PupilId.ToString(), "Text");
 
