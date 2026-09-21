@@ -156,7 +156,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     }
 
     [Theory]
-    [InlineData("Too short.")]
+    [InlineData("Too short")]
     [InlineData("")]
     public async Task Return_WithATooShortReason_Returns422(string reason)
     {
