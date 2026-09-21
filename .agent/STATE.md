@@ -208,6 +208,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **TASK-0088 stage A done** (`5ecd9c4`, `a2913f7`) — 12 recompute triggers + result_set row lock; scoped gate 1379/1379 local container;
+  race test was vacuous on review, rebuilt deterministic, RED/GREEN by two different mutations. Dispatch died on rate limit — FIFTH occurrence. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0088 carded** — head remark gates publication only (not submit); recompute triggers built first in the same card;
   readiness arm-routed; submit 422 is the first typed problem extension; new result_set row-lock rule. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0086 closed** — attendance, both remarks, remark templates, `ScopeResolution.AnyGrant`; contract `42d8e3b5…`, 76 paths.
@@ -584,7 +586,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**
   *Trigger: next spec revision or a card citing §6.3.6. Owner: human.* → `drift/2026-Q3.md`
 - 2026-09-17 **`needs_recompute` will be set by mark changes only** — transfer, mapping and settings
-  triggers are unbuilt after TASK-0076. *Trigger: TASK-0088 stage A (all but transfer). Owner: `backend-dev`.* → `drift/2026-Q3.md`
+  triggers are unbuilt after TASK-0076. *Built by TASK-0088 stage A except the transfer trigger; trigger now: the card that builds pupil transfers. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-17 **Result-rules promotion lock not built** (§6.2.8 "editable until promotion is run").
   *Trigger: TASK-0036. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **`08-module-subjects.md` §6.6.2 still says "No subjects are seeded" — rev 3.1 reversed
