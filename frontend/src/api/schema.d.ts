@@ -771,6 +771,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms/{armId}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's completeness gate for a term
+         * @description Spec 6.7.5/6.7.11: the readiness grid (subjects across the top, pupils down the side, marks/ratings/attendance/remarks completeness), the five counters, pupils who left the arm during the term, and why submission is blocked, if it is. Answers for a Not started arm too — `resultSet: null`, everything reads as missing. The head teacher's remark is an informational counter only, never a blocker (TASK-0088 human ruling: it gates publication, not submission).
+         */
+        get: operations["GetResultSetReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/ping": {
         parameters: {
             query?: never;
@@ -893,6 +913,26 @@ export interface paths {
          * @description Spec 8.2: deletes and rewrites subject_result_line, subject_arm_statistic and pupil_term_result from the arm's current marks. Idempotent — running it twice on unchanged inputs produces identical rows, and never changes the result set's state. Permitted in Draft, Awaiting Approval, Approved and Returned for Correction; refused 409 once Published or Withdrawn, because a published set renders from its fixed snapshot and is never recomputed. `Idempotency-Key` is ACCEPTED, not required — computation has no side effect a retry could duplicate.
          */
         post: operations["ComputeResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/result-sets/{resultSetId}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a result set for approval
+         * @description Spec 6.7.5/6.7.11: moves Draft or Returned for Correction to Awaiting Approval, locking marks, ratings, attendance and the class teacher's remark against editing. The head teacher's remark is NEVER a submission blocker — it gates publication only (TASK-0088 human ruling). Re-evaluates the completeness gate under the same row lock compute and every sheet save take, so a concurrent save either lands first or is refused 409 once this commits. 422 `result_set.not_ready` carries the SAME `readiness` body `GET /arms/{armId}/readiness` returns for this set, so the screen needs no second call. 409 when the state is not Draft or Returned for Correction, or the arm's session or term is closed. An unknown id is 403, not 404 (TASK-0071 ruling). `Idempotency-Key` is ACCEPTED, not required.
+         */
+        post: operations["SubmitResultSet"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4673,6 +4713,14 @@ export interface components {
          */
         LevelStatus: "Active" | "Inactive";
         /**
+         * @description Whether a mark cell has every part filled, some, or none (TASK-0088 stage B; spec §6.7.4, §6.7.5).
+         *     A blank part is never a zero — MarkCompletionStatus.Empty and MarkCompletionStatus.Partial both mean "at least
+         *     one part still unfilled", distinguished only by whether ANY part has been.
+         * @example Complete
+         * @enum {unknown}
+         */
+        MarkCompletionStatus: "Complete" | "Partial" | "Empty";
+        /**
          * @description The response to NextArmLabelQuery.
          * @example {
          *       "label": "C"
@@ -5346,6 +5394,225 @@ export interface components {
             id?: null | string;
         };
         /**
+         * @description One reason submission is blocked (TASK-0088 stage B, AC B3), in the fixed order the card names.
+         * @example {
+         *       "code": "attendance_incomplete",
+         *       "message": "2 of 28 pupils are missing attendance."
+         *     }
+         */
+        ReadinessBlockerDto: {
+            /**
+             * @description One of the eight stable codes AC B3 lists.
+             * @example attendance_incomplete
+             */
+            code: string;
+            /**
+             * @description Human-readable, reusing spec §6.7.5/§6.7.12 wording where one exists.
+             * @example 2 of 28 pupils are missing attendance.
+             */
+            message: string;
+        };
+        /**
+         * @description One readiness counter (TASK-0088 stage B) — cells for marks, pupils for everything else.
+         * @example {
+         *       "complete": 246,
+         *       "total": 252
+         *     }
+         */
+        ReadinessCounterDto: {
+            /**
+             * Format: int32
+             * @description How many are complete.
+             * @example 26
+             */
+            complete: number | string;
+            /**
+             * Format: int32
+             * @description How many there are altogether.
+             * @example 28
+             */
+            total: number | string;
+        };
+        /**
+         * @description The five counters spec §6.7.5 names, plus the head teacher's remark as an informational fifth (TASK-0088 human ruling).
+         * @example {
+         *       "marks": {
+         *         "complete": 1,
+         *         "total": 2
+         *       },
+         *       "ratings": {
+         *         "complete": 1,
+         *         "total": 2
+         *       },
+         *       "attendance": {
+         *         "complete": 1,
+         *         "total": 2
+         *       },
+         *       "classTeacherRemarks": {
+         *         "complete": 1,
+         *         "total": 2
+         *       },
+         *       "headTeacherRemarks": {
+         *         "complete": 0,
+         *         "total": 2
+         *       }
+         *     }
+         */
+        ReadinessCountersDto: {
+            /** @description Cells: pupils times subjects. */
+            marks: components["schemas"]["ReadinessCounterDto"];
+            /** @description Pupils. */
+            ratings: components["schemas"]["ReadinessCounterDto"];
+            /** @description Pupils. */
+            attendance: components["schemas"]["ReadinessCounterDto"];
+            /** @description Pupils. */
+            classTeacherRemarks: components["schemas"]["ReadinessCounterDto"];
+            /** @description Pupils — informational, never a blocker. */
+            headTeacherRemarks: components["schemas"]["ReadinessCounterDto"];
+        };
+        /**
+         * @description One pupil excluded from the gate because their enrolment in this arm closed during the term (TASK-0088 stage B, AC B4).
+         * @example {
+         *       "pupilId": "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605",
+         *       "registrationNumber": "GRAS/2026/0009",
+         *       "displayName": "Nwachukwu Ifeoma",
+         *       "leftOn": "2026-11-02"
+         *     }
+         */
+        ReadinessLeftDuringTermPupilDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-8c3e-7a6b-9f8d-3bebafd60605
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0009
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle".
+             * @example Nwachukwu Ifeoma
+             */
+            displayName: string;
+            /**
+             * Format: date
+             * @description The enrolment's `EffectiveTo` date.
+             * @example 2026-11-02
+             */
+            leftOn: string;
+        };
+        /**
+         * @description One pupil's mark cell for one subject (TASK-0088 stage B) — parallel to ReadinessSubjectDto in IReadOnlyList&lt;ReadinessMarkCellDto&gt; ReadinessPupilRowDto.Marks.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "status": "Complete",
+         *       "filledParts": 2
+         *     }
+         */
+        ReadinessMarkCellDto: {
+            /**
+             * @description Which subject column this cell belongs to.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /** @description Complete, Partial or Empty. */
+            status: components["schemas"]["MarkCompletionStatus"];
+            /**
+             * Format: int32
+             * @description How many of the sheet's `componentCount` parts are filled.
+             * @example 2
+             */
+            filledParts: number | string;
+        };
+        /**
+         * @description One pupil's row on the readiness grid (TASK-0088 stage B) — every active pupil in the arm, surname order.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "marks": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "status": "Complete",
+         *           "filledParts": 2
+         *         }
+         *       ],
+         *       "ratingsComplete": true,
+         *       "attendanceComplete": true,
+         *       "classTeacherRemarkPresent": true,
+         *       "headTeacherRemarkPresent": false
+         *     }
+         */
+        ReadinessPupilRowDto: {
+            /**
+             * @description The pupil's id.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description `null` only if somehow unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Composed "Surname First Middle", same convention as `ScoreSheetRowDto`.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description One cell per subject in the sheet's `subjects` list, same order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "status": "Complete",
+             *         "filledParts": 2
+             *       }
+             *     ]
+             */
+            marks: components["schemas"]["ReadinessMarkCellDto"][];
+            /**
+             * @description R1-A: every active trait rated (when the arm's section rates traits) or every active development
+             *     indicator of the section's active domains rated (otherwise). Indicator comments are never required.
+             * @example true
+             */
+            ratingsComplete: boolean;
+            /**
+             * @description `timesPresent` is set, the term's `timesSchoolOpened` is set, and present is at most opened (2026-09-19 race drift).
+             * @example true
+             */
+            attendanceComplete: boolean;
+            /**
+             * @description Whether a class-teacher remark row exists for this pupil.
+             * @example true
+             */
+            classTeacherRemarkPresent: boolean;
+            /**
+             * @description Whether a head-teacher remark row exists for this pupil — informational only, never a submission blocker.
+             * @example false
+             */
+            headTeacherRemarkPresent: boolean;
+        };
+        /**
+         * @description One subject column on the readiness grid (TASK-0088 stage B), in §8.1's resolver order.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": "Mathematics"
+         *     }
+         */
+        ReadinessSubjectDto: {
+            /**
+             * @description The subject's id.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description The subject's display name.
+             * @example Mathematics
+             */
+            name: string;
+        };
+        /**
          * @description The response body of GetRegNumberPreviewQuery.
          * @example {
          *       "preview": "GRAS/2026/0040"
@@ -5735,6 +6002,301 @@ export interface components {
              * @example 0
              */
             versionNumber: number | string;
+        };
+        /**
+         * @description The DOCUMENTED shape of `POST /api/v1/result-sets/{resultSetId}/submit`'s `422` response
+         *     (TASK-0088 stage B) — the contract's first typed problem-details extension.
+         * @example {
+         *       "type": "urn:schoolmanagement:error:result_set.not_ready",
+         *       "title": "Validation failed",
+         *       "status": 422,
+         *       "detail": "This result set is not ready to submit. See the readiness grid.",
+         *       "instance": "/api/v1/result-sets/0192f0c4-37e9-7566-4a38-e6960588b1b0/submit",
+         *       "errorCode": "result_set.not_ready",
+         *       "traceId": "0af7651916cd43dd8448eb211c80319c",
+         *       "readiness": {
+         *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *         "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *         "resultSet": {
+         *           "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *           "state": "Draft",
+         *           "needsRecompute": false
+         *         },
+         *         "subjects": [
+         *           {
+         *             "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *             "name": "Mathematics"
+         *           }
+         *         ],
+         *         "componentCount": 2,
+         *         "pupils": [
+         *           {
+         *             "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *             "registrationNumber": "GRAS/2026/0042",
+         *             "displayName": "Bello Musa",
+         *             "marks": [
+         *               {
+         *                 "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *                 "status": "Partial",
+         *                 "filledParts": 1
+         *               }
+         *             ],
+         *             "ratingsComplete": false,
+         *             "attendanceComplete": false,
+         *             "classTeacherRemarkPresent": false,
+         *             "headTeacherRemarkPresent": false
+         *           }
+         *         ],
+         *         "leftDuringTerm": [],
+         *         "counters": {
+         *           "marks": {
+         *             "complete": 0,
+         *             "total": 1
+         *           },
+         *           "ratings": {
+         *             "complete": 0,
+         *             "total": 1
+         *           },
+         *           "attendance": {
+         *             "complete": 0,
+         *             "total": 1
+         *           },
+         *           "classTeacherRemarks": {
+         *             "complete": 0,
+         *             "total": 1
+         *           },
+         *           "headTeacherRemarks": {
+         *             "complete": 0,
+         *             "total": 1
+         *           }
+         *         },
+         *         "blockers": [
+         *           {
+         *             "code": "marks_incomplete",
+         *             "message": "1 of 1 mark cells are still missing."
+         *           }
+         *         ],
+         *         "canSubmit": false
+         *       }
+         *     }
+         */
+        ResultSetNotReadyProblemDetails: {
+            /** @example urn:schoolmanagement:error:sample_record.label_taken */
+            type?: null | string;
+            /** @example Conflict with current state */
+            title?: null | string;
+            /**
+             * Format: int32
+             * @example 409
+             */
+            status?: null | number | string;
+            /** @example A record with that label already exists. */
+            detail?: null | string;
+            /** @example /api/v1/reference/records */
+            instance?: null | string;
+            /**
+             * @description Always string ResultSetNotReadyError.ErrorCode on this response.
+             * @example result_set.not_ready
+             */
+            errorCode?: string;
+            /**
+             * @description Correlation id for this specific response occurrence.
+             * @example 0af7651916cd43dd8448eb211c80319c
+             */
+            traceId?: string;
+            /**
+             * @description The same body `GET /arms/{armId}/readiness` returns for this set (AC B6) — what is still
+             *     missing, so the screen needs no second call.
+             */
+            readiness?: components["schemas"]["ResultSetReadinessDto"];
+        };
+        /**
+         * @description The arm's readiness grid for one term (TASK-0088 stage B; spec §6.7.5, §6.7.11) — both what
+         *     `GET /arms/{armId}/readiness` returns and what `POST /result-sets/{id}/submit`'s 422
+         *     carries, so the screen never needs a second call for the same information.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Draft",
+         *         "needsRecompute": false
+         *       },
+         *       "subjects": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "name": "Mathematics"
+         *         }
+         *       ],
+         *       "componentCount": 2,
+         *       "pupils": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "marks": [
+         *             {
+         *               "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *               "status": "Complete",
+         *               "filledParts": 2
+         *             }
+         *           ],
+         *           "ratingsComplete": true,
+         *           "attendanceComplete": true,
+         *           "classTeacherRemarkPresent": true,
+         *           "headTeacherRemarkPresent": false
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "registrationNumber": "GRAS/2026/0042",
+         *           "displayName": "Bello Musa",
+         *           "marks": [
+         *             {
+         *               "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *               "status": "Partial",
+         *               "filledParts": 1
+         *             }
+         *           ],
+         *           "ratingsComplete": false,
+         *           "attendanceComplete": false,
+         *           "classTeacherRemarkPresent": false,
+         *           "headTeacherRemarkPresent": false
+         *         }
+         *       ],
+         *       "leftDuringTerm": [
+         *         {
+         *           "pupilId": "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605",
+         *           "registrationNumber": "GRAS/2026/0009",
+         *           "displayName": "Nwachukwu Ifeoma",
+         *           "leftOn": "2026-11-02"
+         *         }
+         *       ],
+         *       "counters": {
+         *         "marks": {
+         *           "complete": 1,
+         *           "total": 2
+         *         },
+         *         "ratings": {
+         *           "complete": 1,
+         *           "total": 2
+         *         },
+         *         "attendance": {
+         *           "complete": 1,
+         *           "total": 2
+         *         },
+         *         "classTeacherRemarks": {
+         *           "complete": 1,
+         *           "total": 2
+         *         },
+         *         "headTeacherRemarks": {
+         *           "complete": 0,
+         *           "total": 2
+         *         }
+         *       },
+         *       "blockers": [
+         *         {
+         *           "code": "marks_incomplete",
+         *           "message": "1 of 2 mark cells are still missing."
+         *         }
+         *       ],
+         *       "canSubmit": false
+         *     }
+         */
+        ResultSetReadinessDto: {
+            /**
+             * @description The arm this grid belongs to.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term this grid is for.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            resultSet: null | components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * @description The subjects in effect, in §8.1 resolver order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "name": "Mathematics"
+             *       }
+             *     ]
+             */
+            subjects: components["schemas"]["ReadinessSubjectDto"][];
+            /**
+             * Format: int32
+             * @description Parts per mark cell: the non-exam components plus the exam.
+             * @example 2
+             */
+            componentCount: number | string;
+            /**
+             * @description Every active pupil in the arm, surname order.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "marks": [
+             *           {
+             *             "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *             "status": "Complete",
+             *             "filledParts": 2
+             *           }
+             *         ],
+             *         "ratingsComplete": true,
+             *         "attendanceComplete": true,
+             *         "classTeacherRemarkPresent": true,
+             *         "headTeacherRemarkPresent": false
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "registrationNumber": "GRAS/2026/0042",
+             *         "displayName": "Bello Musa",
+             *         "marks": [
+             *           {
+             *             "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *             "status": "Partial",
+             *             "filledParts": 1
+             *           }
+             *         ],
+             *         "ratingsComplete": false,
+             *         "attendanceComplete": false,
+             *         "classTeacherRemarkPresent": false,
+             *         "headTeacherRemarkPresent": false
+             *       }
+             *     ]
+             */
+            pupils: components["schemas"]["ReadinessPupilRowDto"][];
+            /**
+             * @description Pupils whose enrolment in this arm closed inside the term's dates (AC B4) — excluded from every counter and from Pupils.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605",
+             *         "registrationNumber": "GRAS/2026/0009",
+             *         "displayName": "Nwachukwu Ifeoma",
+             *         "leftOn": "2026-11-02"
+             *       }
+             *     ]
+             */
+            leftDuringTerm: components["schemas"]["ReadinessLeftDuringTermPupilDto"][];
+            /** @description The five completeness counters. */
+            counters: components["schemas"]["ReadinessCountersDto"];
+            /**
+             * @description Why submission is blocked, in a fixed order. Empty when nothing blocks it.
+             * @example [
+             *       {
+             *         "code": "marks_incomplete",
+             *         "message": "1 of 2 mark cells are still missing."
+             *       }
+             *     ]
+             */
+            blockers: components["schemas"]["ReadinessBlockerDto"][];
+            /**
+             * @description True iff Blockers is empty and the set is Draft or Returned for Correction.
+             * @example false
+             */
+            canSubmit: boolean;
         };
         /**
          * @description A ResultSet's lifecycle state (spec 09 §6.7.11). A result set that does not exist
@@ -8157,6 +8719,27 @@ export interface components {
          * @enum {unknown}
          */
         SubjectStatus: "Active" | "Inactive";
+        /**
+         * @description The 200 response (contract delta item 2).
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "AwaitingApproval",
+         *         "needsRecompute": false
+         *       },
+         *       "submittedAt": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        SubmitResultSetResponse: {
+            /** @description The set's new state (Awaiting Approval) and its other summary fields. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * Format: date-time
+             * @description When this submission was recorded.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            submittedAt: string;
+        };
         /**
          * @description The wire shape of a term (spec 6.3.4), shared by every term-facing endpoint and nested inside
          *     SessionDetailDto.
@@ -13478,6 +14061,66 @@ export interface operations {
             };
         };
     };
+    GetResultSetReadiness: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultSetReadinessDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Ping: {
         parameters: {
             query: {
@@ -13961,6 +14604,90 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SubmitResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ResultSetNotReadyProblemDetails"];
                 };
             };
             /** @description Too Many Requests */
