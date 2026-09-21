@@ -4,7 +4,7 @@ Owner: backend-dev
 Depends on: TASK-0005a (done). Branch `task-0005b` is stacked on the branch current at dispatch.
 Contract impact: **additive. The delta below is APPROVED by the orchestrator (2026-09-21)** and extends the TASK-0005 approval in
 `decisions/2026-Q3-contract-deltas.md`. The orchestrator promotes once, after stage C. Dev agents never run `-Promote`.
-Status: queued. It dispatches after TASK-0090 closes, because both move the contract (`contract.md` §3).
+Status: **stage A dispatched 2026-09-21** (processor, no contract move). TASK-0090 closed first.
 Stages: FOUR dispatches of ~400 hand-written lines each, tests included (`governance.md` §2). One stage per dispatch.
 Reads: `.agent/rules/contract.md`, `.agent/rules/wire.md`, `.agent/rules/gates.md` §1 (backend row: **no integration runs**);
        `product-specification/14-non-functional-requirements.md` §9.6; `04-module-school-settings.md` lines 23-24, 72-77, 267-268, 278;
