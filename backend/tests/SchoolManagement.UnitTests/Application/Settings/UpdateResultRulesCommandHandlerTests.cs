@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
@@ -29,6 +30,7 @@ public sealed class UpdateResultRulesCommandHandlerTests
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly ISubjectRepository _subjectRepository = Substitute.For<ISubjectRepository>();
+    private readonly IResultSetRepository _resultSetRepository = Substitute.For<IResultSetRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
@@ -46,6 +48,8 @@ public sealed class UpdateResultRulesCommandHandlerTests
             Array.Empty<TraitBlock>()));
         CreateTrackedProfile();
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
+        _resultSetRepository.LockNonPublishedInSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
     }
 
     private UpdateResultRulesCommandHandler CreateHandler() => new(
@@ -55,6 +59,7 @@ public sealed class UpdateResultRulesCommandHandlerTests
         _academicSessionRepository,
         _publishedResultsGate,
         _subjectRepository,
+        _resultSetRepository,
         _settingsSnapshotSource,
         _currentUser,
         _auditSink,
@@ -296,5 +301,31 @@ public sealed class UpdateResultRulesCommandHandlerTests
             TestContext.Current.CancellationToken);
 
         result.IsSuccess.ShouldBeTrue();
+    }
+
+    // TASK-0088 AC A1/A5: a result-rules save flags every non-Published result set in the active
+    // session, using the SAME active-session lookup this handler already resolves for the 6.2.10
+    // locks — no second lookup.
+    [Fact]
+    public async Task HandleAsync_WithNoLockTrippedAndAnActiveSessionHoldingAReturnedForCorrectionSet_DropsItToDraftAndFlagsIt()
+    {
+        CreateTrackedDefaultRow(); // seeded defaults: Arm / SharedPosition / SimpleAverage
+
+        var session = StubActiveSession();
+        _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns(session);
+        _publishedResultsGate.CountPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>()).Returns(0);
+        _publishedResultsGate.AnyThirdTermPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>()).Returns(false);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(DefaultsCommand(), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

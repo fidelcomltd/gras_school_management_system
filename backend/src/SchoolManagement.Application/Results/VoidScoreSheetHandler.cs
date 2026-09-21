@@ -58,7 +58,8 @@ internal sealed class VoidScoreSheetHandler(
             return Result.Failure<VoidScoreSheetResponse>(Error.NotFound("subject.not_found", "No subject was found with that id."));
         }
 
-        var resultSet = await resultSets.FindTrackedByArmTermAsync(armId, termId, cancellationToken).ConfigureAwait(false);
+        // TASK-0088 AC A4: row-locked before the state check below.
+        var resultSet = await resultSets.FindTrackedByArmTermForUpdateAsync(armId, termId, cancellationToken).ConfigureAwait(false);
         if (resultSet is null)
         {
             // Nothing has ever been entered for this arm and term — nothing to void.

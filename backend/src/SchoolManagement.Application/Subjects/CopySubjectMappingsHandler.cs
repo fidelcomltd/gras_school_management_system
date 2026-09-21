@@ -2,8 +2,10 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -19,6 +21,7 @@ internal sealed class CopySubjectMappingsHandler(
     IClassLevelRepository levels,
     ISubjectRepository subjects,
     ISubjectMappingRepository mappings,
+    IResultSetRepository resultSets,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<CopySubjectMappingsCommand, Result<SaveSubjectMappingGridResponse>>
@@ -122,6 +125,19 @@ internal sealed class CopySubjectMappingsHandler(
             },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A2: copy is additive-only into the DESTINATION term — flags every non-Published
+        // result set of that term for the class levels an addition touched.
+        var affectedClassLevelIds = diff.Additions.Select(addition => addition.ClassLevelId).ToHashSet();
+
+        if (affectedClassLevelIds.Count > 0)
+        {
+            var lockedResultSets = await resultSets
+                .LockNonPublishedByTermAndClassLevelsAsync(destinationTermId, affectedClassLevelIds, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(new SaveSubjectMappingGridResponse(additionDtos, Endings: [], DryRun: false));
     }

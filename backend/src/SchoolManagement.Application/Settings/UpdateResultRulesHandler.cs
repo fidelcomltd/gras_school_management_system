@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Abstractions.Subjects;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
@@ -48,6 +49,7 @@ internal sealed class UpdateResultRulesCommandHandler(
     IAcademicSessionRepository academicSessionRepository,
     IPublishedResultsGate publishedResultsGate,
     ISubjectRepository subjectRepository,
+    IResultSetRepository resultSetRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -218,6 +220,17 @@ internal sealed class UpdateResultRulesCommandHandler(
             cancellationToken,
             reason: reasonCheck.Value,
             beforeMetadata: beforeMetadata).ConfigureAwait(false);
+
+        // TASK-0088 AC A1: flags every non-Published result set in the active session already
+        // resolved above for the two 6.2.10 hard locks — no second lookup needed.
+        if (activeSession is not null)
+        {
+            var lockedResultSets = await resultSetRepository
+                .LockNonPublishedInSessionAsync(activeSession.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(SettingsMapper.ToResultRulesDto(resultRules, profile.ResultRulesVersionNumber));
     }

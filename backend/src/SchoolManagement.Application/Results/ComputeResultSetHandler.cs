@@ -49,7 +49,9 @@ internal sealed class ComputeResultSetHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var resultSet = await resultSets.FindTrackedByIdAsync(request.ResultSetId, cancellationToken).ConfigureAwait(false);
+        // TASK-0088 AC A4: row-locked before the state check below, so a concurrent settings/mapping
+        // flag cannot commit between this read and MarkComputed's clear of NeedsRecompute.
+        var resultSet = await resultSets.FindTrackedByIdForUpdateAsync(request.ResultSetId, cancellationToken).ConfigureAwait(false);
         if (resultSet is null)
         {
             return Result.Failure<ComputeResultSetResponse>(Error.NotFound(

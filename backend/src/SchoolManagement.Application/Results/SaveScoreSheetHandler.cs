@@ -112,7 +112,8 @@ internal sealed class SaveScoreSheetHandler(
             return Result.Failure<ScoreSheetDto>(new ValidationError(failures));
         }
 
-        var existingResultSet = await resultSets.FindTrackedByArmTermAsync(armId, termId, cancellationToken).ConfigureAwait(false);
+        // TASK-0088 AC A4: row-locked before the state check below.
+        var existingResultSet = await resultSets.FindTrackedByArmTermForUpdateAsync(armId, termId, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<SubjectScore> existingScores = existingResultSet is null
             ? []
             : await scores.ListActiveTrackedAsync(existingResultSet.Id, subjectId, cancellationToken).ConfigureAwait(false);

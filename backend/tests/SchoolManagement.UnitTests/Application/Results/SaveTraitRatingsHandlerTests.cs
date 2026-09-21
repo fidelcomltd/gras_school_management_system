@@ -87,7 +87,7 @@ public sealed class SaveTraitRatingsHandlerTests
             PsychomotorScaleId, "Other scale", [RatingScalePoint.Create(WrongScalePointId, PsychomotorScaleId, "S", "Sports", 1)]);
         _ratingScales.ListReadOnlyOrderedAsync(Arg.Any<CancellationToken>()).Returns([affectiveScale, psychomotorScale]);
 
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns((ResultSet?)null);
         _traitRatings.ListTrackedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
     }
 
@@ -207,7 +207,7 @@ public sealed class SaveTraitRatingsHandlerTests
     {
         // Q1-A ruling: a key absent from Ratings leaves that trait's existing rating alone.
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _resultSets.FindReadOnlyByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
 
         var existingRating = TraitRating.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, OtherTraitId, AffectivePointId).Value;
@@ -234,7 +234,7 @@ public sealed class SaveTraitRatingsHandlerTests
     {
         // Q1-A ruling: a key present with an explicit null deletes that trait's rating.
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
 
         var existingRating = TraitRating.Create(Guid.CreateVersion7(), resultSet.Id, PupilId, TraitId, AffectivePointId).Value;
         _traitRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([existingRating]);
@@ -254,7 +254,7 @@ public sealed class SaveTraitRatingsHandlerTests
     public async Task HandleAsync_WithAStaleVersion_Returns409()
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _traitRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveTraitRatingsRowInput(PupilId.ToString(), new Dictionary<string, string?>
@@ -273,7 +273,7 @@ public sealed class SaveTraitRatingsHandlerTests
     {
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _traitRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveTraitRatingsRowInput(PupilId.ToString(), new Dictionary<string, string?>
@@ -295,7 +295,7 @@ public sealed class SaveTraitRatingsHandlerTests
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), ArmId, TermId).Value;
         resultSet.MarkComputed(null, DateTimeOffset.UtcNow, pupilCount: 1);
         resultSet.NeedsRecompute.ShouldBeFalse();
-        _resultSets.FindTrackedByArmTermAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(ArmId, TermId, Arg.Any<CancellationToken>()).Returns(resultSet);
         _traitRatings.ListTrackedAsync(resultSet.Id, Arg.Any<CancellationToken>()).Returns([]);
 
         var row = new SaveTraitRatingsRowInput(PupilId.ToString(), new Dictionary<string, string?>

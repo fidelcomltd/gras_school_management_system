@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
 
@@ -27,6 +28,7 @@ public sealed class UpdateAssessmentCommandHandlerTests
     private readonly IAcademicSessionRepository _academicSessionRepository = Substitute.For<IAcademicSessionRepository>();
     private readonly IPublishedResultsGate _publishedResultsGate = Substitute.For<IPublishedResultsGate>();
     private readonly ISubjectScoreSessionLockLookup _subjectScoreSessionLockLookup = Substitute.For<ISubjectScoreSessionLockLookup>();
+    private readonly IResultSetRepository _resultSetRepository = Substitute.For<IResultSetRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
@@ -48,6 +50,8 @@ public sealed class UpdateAssessmentCommandHandlerTests
     public UpdateAssessmentCommandHandlerTests()
     {
         _academicSessionRepository.FindActiveAsync(Arg.Any<CancellationToken>()).Returns((AcademicSession?)null);
+        _resultSetRepository.LockNonPublishedInSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _settingsSnapshotSource.LoadAsync(Arg.Any<CancellationToken>()).Returns(new SettingsSnapshotState(
             Array.Empty<GradingBand>(),
             Array.Empty<AssessmentComponent>(),
@@ -67,6 +71,7 @@ public sealed class UpdateAssessmentCommandHandlerTests
             _academicSessionRepository,
             _publishedResultsGate,
             _subjectScoreSessionLockLookup,
+            _resultSetRepository,
             _settingsSnapshotSource,
             _currentUser,
             _auditSink,
@@ -331,5 +336,38 @@ public sealed class UpdateAssessmentCommandHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(UpdateAssessmentCommandHandler.StructureLockedErrorCode);
+    }
+
+    // TASK-0088 AC A1/A5: an assessment save flags every non-Published result set in the active
+    // session — proven here on the very session already resolved for the structure lock, unlocked so
+    // the save itself succeeds.
+    [Fact]
+    public async Task HandleAsync_WithAnActiveSessionHoldingAReturnedForCorrectionSet_DropsItToDraftAndFlagsIt()
+    {
+        var profile = CreateTrackedProfile();
+        SeedExistingComponents();
+        var session = StubActiveSession(locked: false);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSetRepository.LockNonPublishedInSessionAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(
+            new UpdateAssessmentCommand(
+                [
+                    new AssessmentComponentSaveRequest(IdOf(_firstCa), "1st CA", "CA1", 20, false),
+                    new AssessmentComponentSaveRequest(IdOf(_secondCa), "2nd CA", "CA2", 20, false),
+                    new AssessmentComponentSaveRequest(IdOf(_exam), "Exam", "EXAM", 60, true),
+                ],
+                ExpectedVersion: 0,
+                Reason: null),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        profile.AssessmentVersionNumber.ShouldBe(1);
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

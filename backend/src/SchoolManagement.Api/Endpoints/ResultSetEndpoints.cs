@@ -27,6 +27,7 @@ public sealed class ResultSetEndpoints : IEndpointModule
         var group = endpoints.MapGroup("/result-sets").WithTags(Tag);
 
         MapCompute(group);
+        MapSubmit(group);
     }
 
     private static void MapCompute(RouteGroupBuilder group) =>
@@ -54,6 +55,39 @@ public sealed class ResultSetEndpoints : IEndpointModule
                 "computation has no side effect a retry could duplicate.")
             .Produces<ComputeResultSetResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapSubmit(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/submit", async (
+                Guid resultSetId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new SubmitResultSetCommand(resultSetId), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Submit, ScopeParameterKind.ResultSet, "resultSetId")
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("SubmitResultSet")
+            .WithSummary("Submit a result set for approval")
+            .WithDescription(
+                "Spec 6.7.5/6.7.11: moves Draft or Returned for Correction to Awaiting Approval, " +
+                "locking marks, ratings, attendance and the class teacher's remark against editing. " +
+                "The head teacher's remark is NEVER a submission blocker — it gates publication only " +
+                "(TASK-0088 human ruling). Re-evaluates the completeness gate under the same row lock " +
+                "compute and every sheet save take, so a concurrent save either lands first or is " +
+                "refused 409 once this commits. 422 `result_set.not_ready` carries the SAME `readiness` " +
+                "body `GET /arms/{armId}/readiness` returns for this set, so the screen needs no second " +
+                "call. 409 when the state is not Draft or Returned for Correction, or the arm's session " +
+                "or term is closed. An unknown id is 403, not 404 (TASK-0071 ruling). " +
+                "`Idempotency-Key` is ACCEPTED, not required.")
+            .Produces<SubmitResultSetResponse>(StatusCodes.Status200OK)
+            .Produces<ResultSetNotReadyProblemDetails>(StatusCodes.Status422UnprocessableEntity, "application/problem+json")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict)

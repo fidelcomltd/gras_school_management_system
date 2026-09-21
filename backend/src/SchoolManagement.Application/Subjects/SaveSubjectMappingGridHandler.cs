@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -34,6 +35,7 @@ internal sealed class SaveSubjectMappingGridHandler(
     ISubjectMappingRepository mappings,
     ISubjectMappingMarkLookup markLookup,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
+    IResultSetRepository resultSets,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<SaveSubjectMappingGridCommand, Result<SaveSubjectMappingGridResponse>>
@@ -165,6 +167,22 @@ internal sealed class SaveSubjectMappingGridHandler(
             },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        // TASK-0088 AC A2: flags every non-Published result set of this term whose arm's in-effect
+        // subject list this save can change — every class level an addition or an ending touched.
+        // Reorders never change what is in effect, so they never widen this set.
+        var affectedClassLevelIds = diff.Additions.Select(addition => addition.ClassLevelId)
+            .Concat(diff.Endings.Select(ending => ending.ClassLevelId))
+            .ToHashSet();
+
+        if (affectedClassLevelIds.Count > 0)
+        {
+            var lockedResultSets = await resultSets
+                .LockNonPublishedByTermAndClassLevelsAsync(termId, affectedClassLevelIds, cancellationToken)
+                .ConfigureAwait(false);
+
+            await ResultSetRecomputeFlagger.FlagAsync(lockedResultSets, auditSink, cancellationToken).ConfigureAwait(false);
+        }
 
         return Result.Success(new SaveSubjectMappingGridResponse(additionDtos, endingDtos, DryRun: false));
     }

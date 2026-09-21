@@ -112,6 +112,11 @@ card already meets it; what overruns is the `## Log`, which is history and archi
 `.agent/tasks/logs/TASK-####.log.md` at close. A *body* longer than 120 lines is two cards, or it
 is restating a spec section it should cite instead.
 
+**Each stage is ONE dispatch of ~400 hand-written lines, tests included — CLAUDE.md §1's limit, now enforced at carding
+(human directive, 2026-09-21).** The card lists its stages, each with a line estimate; a stage estimated over ~400 is split
+before dispatch, not after. TASK-0086 (~4,000/stage) and TASK-0088 (~1,350 and ~2,300) ignored the limit, and the cost was
+long-lived agents re-sending a growing context on every turn, plus two rate-limit deaths. More, smaller stages are cheaper.
+
 ## 3. Card sufficiency — the pre-dispatch check
 
 **This is the counterweight to the context budget, and it outranks it.** Lazy loading only works

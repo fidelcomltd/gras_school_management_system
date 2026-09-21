@@ -2,10 +2,12 @@ using NSubstitute;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Subjects;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Subjects;
 
@@ -23,6 +25,7 @@ public sealed class PrefillSubjectMappingsHandlerTests
     private readonly IClassLevelRepository _levels = Substitute.For<IClassLevelRepository>();
     private readonly ISubjectRepository _subjects = Substitute.For<ISubjectRepository>();
     private readonly ISubjectMappingRepository _mappings = Substitute.For<ISubjectMappingRepository>();
+    private readonly IResultSetRepository _resultSets = Substitute.For<IResultSetRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
 
@@ -45,11 +48,13 @@ public sealed class PrefillSubjectMappingsHandlerTests
 
         _subjects.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns(_allSubjects);
         _mappings.ListByTermTrackedAsync(_termId, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<SubjectMapping>)[]);
+        _resultSets.LockNonPublishedByTermAndClassLevelsAsync(Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _currentUser.UserId.Returns("admin-1");
     }
 
     private PrefillSubjectMappingsHandler CreateHandler() =>
-        new(_terms, _sessions, _levels, _subjects, _mappings, _currentUser, _auditSink);
+        new(_terms, _sessions, _levels, _subjects, _mappings, _resultSets, _currentUser, _auditSink);
 
     private Subject SubjectNamed(string name) => _allSubjects.Single(subject => subject.Name == name);
 
@@ -153,5 +158,25 @@ public sealed class PrefillSubjectMappingsHandlerTests
         result.Error.Description.ShouldContain("First Term");
         result.Error.Description.ShouldContain("2026/2027");
         result.Error.Description.ShouldContain("Its subject mappings cannot be changed.");
+    }
+
+    // TASK-0088 AC A2/A5: a real (non-dry-run) prefill flags every non-Published result set of this
+    // term for the class level(s) the addition touches.
+    [Fact]
+    public async Task HandleAsync_FlagsNonPublishedResultSetsOfTheAffectedClassLevel()
+    {
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), _termId).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSets.LockNonPublishedByTermAndClassLevelsAsync(
+                _termId, Arg.Is<IReadOnlyCollection<Guid>>(ids => ids!.Contains(_nurseryLevelId)), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(
+            new PrefillSubjectMappingsCommand(_termId.ToString(), DryRun: false), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

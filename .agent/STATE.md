@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-19 by orchestrator (TASK-0086 and TASK-0087 closed; contract `42d8e3b5…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088 and TASK-0089 closed; TASK-0086 and TASK-0087 closed; contract `584a4a3c…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,14 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `42d8e3b52ba4e97dc8b4d0282f1f07e2195df7435e74181b1d9dd80176c068f5`** · **76 paths** ·
-**183 schemas** · api version `v1` · moved 2026-09-19 by TASK-0086 (attendance, class/head teacher remarks, remark templates, §6.7.7).
-Previous: `9c2f8d55fe3a…` / 71 paths / 170 schemas, TASK-0083 on 2026-09-19; before that `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `584a4a3c9d5ccc80e7177610d0516104e692cf27f7095489ecb025e8df99f19b`** · **78 paths** ·
+**194 schemas** · api version `v1` · moved 2026-09-21 by TASK-0088 (readiness grid and submission, §6.7.5, §6.7.11).
+Previous: `42d8e3b52ba4…` / 76 paths / 183 schemas, TASK-0086 on 2026-09-19; before that `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**TASK-0088 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff, description/example stripped):
+0 paths / 0 schemas removed; 2 paths added (`/arms/{armId}/readiness`, `/result-sets/{resultSetId}/submit`), 11 schemas added; ZERO existing paths
+or schemas changed. The submit 422 references `ResultSetNotReadyProblemDetails` (the first typed problem extension) with `content` present.
 
 **TASK-0086 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff): 0 paths / 0 schemas removed;
 5 paths added (`/arms/{armId}/attendance`, `/class-teacher-remarks`, `/head-teacher-remarks`, `/remark-templates`, `/remark-templates/{id}`),
@@ -162,7 +166,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0087, same PR as TASK-0086). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** as of 2026-09-21 (TASK-0089, same PR as TASK-0088). Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -177,7 +181,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0088, 0089, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -207,6 +211,16 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **TASK-0089 closed** — client current against `584a4a3c…` (`2462299`); typed 422 unreachable via `ApiError`, readiness-screen card owns it. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0088 closed** — recompute triggers, row lock, readiness, submit; contract `584a4a3c…`, 78 paths. Scoped gate 1401/1401. → `decisions/2026-Q3.md`
+- 2026-09-21 **HUMAN DIRECTIVE: dev agents run no integration tests and no mutation proofs; the orchestrator does both once per card.**
+  Each stage is one dispatch of ~400 lines, split at carding. `gates.md` §1, `governance.md` §2, `backend-dev.md`. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0088 stage B implemented (`c9946d1`); dispatch died on the rate limit (SIXTH) mid RED/GREEN, mutation left in tree** —
+  reverted by the orchestrator, which ran 17/17 new integration + RED/GREEN itself; promoted `584a4a3c…`, additive. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0088 stage A done** (`5ecd9c4`, `a2913f7`) — 12 recompute triggers + result_set row lock; scoped gate 1379/1379 local container;
+  race test was vacuous on review, rebuilt deterministic, RED/GREEN by two different mutations. Dispatch died on rate limit — FIFTH occurrence. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0088 carded** — head remark gates publication only (not submit); recompute triggers built first in the same card;
+  readiness arm-routed; submit 422 is the first typed problem extension; new result_set row-lock rule. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0086 closed** — attendance, both remarks, remark templates, `ScopeResolution.AnyGrant`; contract `42d8e3b5…`, 76 paths.
   Full gate 1653/1653 on the FIRST run. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0087 closed** — client current against `42d8e3b5…`, same PR. → `decisions/2026-Q3.md`
@@ -560,8 +574,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-21 **The head teacher's remark gates publication only, departing from the §6.7.12 amendment's submission gate list** (human ruling,
+  TASK-0088). *Trigger: next spec revision; the publication card enforces it per §6.7.9. Owner: human.* → `decisions/2026-Q3.md`
 - 2026-09-19 **An attendance save racing a term update can leave derived absent negative** — each reads the other's committed state only.
-  Unlikely (admin lowers opened while a teacher saves). *Trigger: the readiness/submission card, which must treat present > opened as incomplete. Owner: `backend-dev`.*
+  Unlikely (admin lowers opened while a teacher saves). *Trigger: TASK-0088 (AC B2 carries it). Owner: `backend-dev`.*
 - 2026-09-19 **§6.7.7 says remarks are 240 chars and types both attendance figures; built 300 and present-only by ruling L/A.** *Trigger: next spec revision. Owner: human.*
 - 2026-09-19 **Renaming a scale point's code or label in place is ungated, even when ratings use it.** Published sheets are safe ONLY if
   publication snapshots the scale legend (§6.7.12 requires it, and publication is not built yet); open sets would show the new code mid-term.
@@ -579,7 +595,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**
   *Trigger: next spec revision or a card citing §6.3.6. Owner: human.* → `drift/2026-Q3.md`
 - 2026-09-17 **`needs_recompute` will be set by mark changes only** — transfer, mapping and settings
-  triggers are unbuilt after TASK-0076. *Trigger: the submission card. Owner: `backend-dev`.* → `drift/2026-Q3.md`
+  triggers are unbuilt after TASK-0076. *Built by TASK-0088 stage A except the transfer trigger; trigger now: the card that builds pupil transfers. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-17 **Result-rules promotion lock not built** (§6.2.8 "editable until promotion is run").
   *Trigger: TASK-0036. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **`08-module-subjects.md` §6.6.2 still says "No subjects are seeded" — rev 3.1 reversed
@@ -712,6 +728,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-21 **`admin-detail-screen.test.tsx` "suspend then reactivate" timed out at 5s in a loaded `verify` run** (380/381); passed 4/4 alone in ~3s.
+  *Trigger: if it recurs, raise its timeout or find the slow await. Owner: `frontend-dev`.*
+- 2026-09-21 **`ApiError.problem` is one generic union, so `SubmitResultSet`'s typed 422 (`readiness`) is unreachable without a cast.** *Trigger: the
+  readiness-screen card. Owner: `frontend-dev`.*
 - 2026-09-19 **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
   handler built the DTO (found by reading, UNVERIFIED; TASK-0086 used `TimeProvider` instead). *Trigger: next card touching assignments (TASK-0046). Owner: `backend-dev`.*
 - 2026-09-19 **`RequireAuthenticatedCaller()`'s doc says "never an RBAC-gated business operation"; pupil and remark-template routes use it exactly so**

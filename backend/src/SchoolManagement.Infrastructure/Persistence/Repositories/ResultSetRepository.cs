@@ -73,4 +73,124 @@ internal sealed class ResultSetRepository(ApplicationDbContext context) : IResul
 
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public async Task<ResultSet?> FindTrackedByArmTermForUpdateAsync(Guid armId, Guid termId, CancellationToken cancellationToken)
+    {
+        // Raw SQL, same technique as AdminAccountRepository.LockActiveSuperAdminIdsAsync: the lock is
+        // taken on the id(s) first, then the tracked entity is loaded through EF's own query so change
+        // tracking sees it. A single arm/term pair has at most one row (the unique index), so this
+        // never needs an ORDER BY of its own.
+        var lockedIds = await context.Database
+            .SqlQuery<Guid>(
+                $"""
+                SELECT id FROM result_set
+                WHERE arm_id = {armId} AND term_id = {termId}
+                FOR UPDATE
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (lockedIds.Count == 0)
+        {
+            return null;
+        }
+
+        return await context.ResultSets
+            .FirstOrDefaultAsync(resultSet => resultSet.Id == lockedIds[0], cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResultSet?> FindTrackedByIdForUpdateAsync(Guid resultSetId, CancellationToken cancellationToken)
+    {
+        var lockedIds = await context.Database
+            .SqlQuery<Guid>(
+                $"""
+                SELECT id FROM result_set
+                WHERE id = {resultSetId}
+                FOR UPDATE
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (lockedIds.Count == 0)
+        {
+            return null;
+        }
+
+        return await context.ResultSets
+            .FirstOrDefaultAsync(resultSet => resultSet.Id == resultSetId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ResultSet>> LockNonPublishedInSessionAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var lockedIds = await context.Database
+            .SqlQuery<Guid>(
+                $"""
+                SELECT rs.id FROM result_set rs
+                JOIN terms t ON t.id = rs.term_id
+                WHERE t.session_id = {sessionId} AND rs.state <> 'Published'
+                ORDER BY rs.id
+                FOR UPDATE OF rs
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return await LoadTrackedInLockOrderAsync(lockedIds, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ResultSet>> LockNonPublishedByTermAndClassLevelsAsync(
+        Guid termId, IReadOnlyCollection<Guid> classLevelIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(classLevelIds);
+
+        if (classLevelIds.Count == 0)
+        {
+            return [];
+        }
+
+        var classLevelIdArray = classLevelIds.ToArray();
+
+        var lockedIds = await context.Database
+            .SqlQuery<Guid>(
+                $"""
+                SELECT rs.id FROM result_set rs
+                JOIN arms a ON a.id = rs.arm_id
+                WHERE rs.term_id = {termId} AND a.class_level_id = ANY({classLevelIdArray}) AND rs.state <> 'Published'
+                ORDER BY rs.id
+                FOR UPDATE OF rs
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return await LoadTrackedInLockOrderAsync(lockedIds, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Loads the TRACKED entities for a set of ids already row-locked by the caller's raw SQL, and
+    /// returns them in the SAME order the ids were locked (ascending id) — the ordering the lock
+    /// itself was taken in, not whatever order the follow-up <c>WHERE id IN (...)</c> query happens to
+    /// return.
+    /// </summary>
+    private async Task<IReadOnlyList<ResultSet>> LoadTrackedInLockOrderAsync(
+        List<Guid> lockedIdsInOrder, CancellationToken cancellationToken)
+    {
+        if (lockedIdsInOrder.Count == 0)
+        {
+            return [];
+        }
+
+        var resultSets = await context.ResultSets
+            .Where(resultSet => lockedIdsInOrder.Contains(resultSet.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var byId = resultSets.ToDictionary(resultSet => resultSet.Id);
+
+        return lockedIdsInOrder.Select(id => byId[id]).ToList();
+    }
 }

@@ -1,8 +1,10 @@
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Subjects;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Subjects;
 
@@ -18,10 +20,15 @@ namespace SchoolManagement.UnitTests.Application.Subjects;
 public sealed class DeleteSubjectExceptionHandlerTests
 {
     private readonly ISubjectMappingExceptionRepository _exceptions = Substitute.For<ISubjectMappingExceptionRepository>();
+    private readonly IResultSetRepository _resultSets = Substitute.For<IResultSetRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
 
-    private DeleteSubjectExceptionHandler CreateHandler() => new(_exceptions, _currentUser, _auditSink);
+    public DeleteSubjectExceptionHandlerTests() =>
+        _resultSets.FindTrackedByArmTermForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((ResultSet?)null);
+
+    private DeleteSubjectExceptionHandler CreateHandler() => new(_exceptions, _resultSets, _currentUser, _auditSink);
 
     [Fact]
     public async Task HandleAsync_WhenTheExceptionDoesNotExist_ReturnsNotFound()
@@ -55,5 +62,29 @@ public sealed class DeleteSubjectExceptionHandlerTests
             Arg.Any<IReadOnlyDictionary<string, object?>?>(),
             "admin-1",
             Arg.Any<CancellationToken>());
+    }
+
+    // TASK-0088 AC A2/A5: removing an exception flags the arm's non-Published result set for this
+    // term, if one exists — proven here on a Returned for Correction set dropping to Draft.
+    [Fact]
+    public async Task HandleAsync_WithAnExistingReturnedForCorrectionResultSetForTheExceptionsArmAndTerm_DropsItToDraftAndFlagsIt()
+    {
+        var armId = Guid.CreateVersion7();
+        var termId = Guid.CreateVersion7();
+        var exception = SubjectMappingException.Create(
+            Guid.CreateVersion7(), armId, Guid.CreateVersion7(), termId, SubjectExceptionMode.Include, "A reason").Value;
+        _exceptions.FindTrackedByIdAsync(exception.Id, Arg.Any<CancellationToken>()).Returns(exception);
+        _currentUser.UserId.Returns("admin-1");
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), armId, termId).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSets.FindTrackedByArmTermForUpdateAsync(armId, termId, Arg.Any<CancellationToken>()).Returns(resultSet);
+
+        var result = await CreateHandler().HandleAsync(new DeleteSubjectExceptionCommand(exception.Id), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

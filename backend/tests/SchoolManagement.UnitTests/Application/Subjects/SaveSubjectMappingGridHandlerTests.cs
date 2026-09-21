@@ -8,6 +8,7 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Subjects;
 using SchoolManagement.Application.Subjects;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Subjects;
@@ -28,6 +29,7 @@ public sealed class SaveSubjectMappingGridHandlerTests
     private readonly ISubjectMappingRepository _mappings = Substitute.For<ISubjectMappingRepository>();
     private readonly ISubjectMappingMarkLookup _markLookup = Substitute.For<ISubjectMappingMarkLookup>();
     private readonly IEffectivePrivilegeProvider _privileges = Substitute.For<IEffectivePrivilegeProvider>();
+    private readonly IResultSetRepository _resultSets = Substitute.For<IResultSetRepository>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
 
@@ -48,11 +50,13 @@ public sealed class SaveSubjectMappingGridHandlerTests
         _subjects.ListAllReadOnlyAsync(Arg.Any<CancellationToken>()).Returns((IReadOnlyList<Subject>)[_subject]);
         _markLookup.FindArmsWithMarksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<SubjectMarkArmSummary>)[]);
+        _resultSets.LockNonPublishedByTermAndClassLevelsAsync(Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[]);
         _currentUser.UserId.Returns("admin-1");
     }
 
     private SaveSubjectMappingGridHandler CreateHandler() =>
-        new(_terms, _sessions, _levels, _subjects, _mappings, _markLookup, _privileges, _currentUser, _auditSink);
+        new(_terms, _sessions, _levels, _subjects, _mappings, _markLookup, _privileges, _resultSets, _currentUser, _auditSink);
 
     private void Grant(params string[] privileges) =>
         _privileges.GetGrantsAsync("admin-1", Arg.Any<CancellationToken>())
@@ -252,5 +256,27 @@ public sealed class SaveSubjectMappingGridHandlerTests
         var result = await CreateHandler().HandleAsync(command, TestContext.Current.CancellationToken);
 
         result.IsSuccess.ShouldBeTrue();
+    }
+
+    // TASK-0088 AC A2/A5: an addition flags every non-Published result set of this term whose arm's
+    // class level the addition touches — proven here on a Returned for Correction set dropping to Draft.
+    [Fact]
+    public async Task HandleAsync_AddingAMapping_FlagsNonPublishedResultSetsOfTheAffectedClassLevel()
+    {
+        _mappings.ListByTermTrackedAsync(_termId, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<SubjectMapping>)[]);
+        Grant(Privileges.Subject.Map);
+
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), _termId).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.NeedsRecompute))!.SetValue(resultSet, false);
+        _resultSets.LockNonPublishedByTermAndClassLevelsAsync(
+                _termId, Arg.Is<IReadOnlyCollection<Guid>>(ids => ids!.Contains(_classLevelId)), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<ResultSet>)[resultSet]);
+
+        var result = await CreateHandler().HandleAsync(AdditionOnlyCommand(), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
     }
 }

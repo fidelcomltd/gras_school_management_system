@@ -373,6 +373,43 @@ public sealed class OpenApiContractTests
     }
 
     [Fact]
+    public void SubmitResultSet_422Response_DeclaresProblemJsonContentWithTheTypedSchema()
+    {
+        // TASK-0088 stage B: the contract's FIRST typed problem-details extension, declared with
+        // .Produces<ResultSetNotReadyProblemDetails>(422, "application/problem+json") specifically
+        // because TASK-0049's trap (see ExportAuditEvents_200Response_DeclaresTextCsvContent above)
+        // is that a TYPE-LESS .Produces(422) silently emits {"description": "..."} with no "content"
+        // section at all. Pinned here so a future refactor that drops the type argument, or that
+        // widens the schema back to the generic ProblemDetails, is caught mechanically rather than
+        // discovered by a frontend author who cannot find `readiness` anywhere in the document.
+        var responses = Document
+            .GetProperty("paths")
+            .GetProperty("/api/v1/result-sets/{resultSetId}/submit")
+            .GetProperty("post")
+            .GetProperty("responses");
+
+        var unprocessable = responses.GetProperty("422");
+
+        unprocessable.TryGetProperty("content", out var content).ShouldBeTrue(
+            "POST /api/v1/result-sets/{resultSetId}/submit's 422 response must declare a 'content' " +
+            "section — it carries a structured readiness body, not an empty one.");
+
+        content.TryGetProperty("application/problem+json", out var problemJson).ShouldBeTrue(
+            "The 422 response must declare 'application/problem+json' as its content type.");
+
+        problemJson.TryGetProperty("schema", out var schema).ShouldBeTrue(
+            "The declared application/problem+json content must carry a schema.");
+        schema.GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ResultSetNotReadyProblemDetails");
+
+        var schemas = Document.GetProperty("components").GetProperty("schemas");
+        schemas.TryGetProperty("ResultSetNotReadyProblemDetails", out var notReadySchema).ShouldBeTrue(
+            "ResultSetNotReadyProblemDetails must be its own schema, distinct from the generic ProblemDetails.");
+        notReadySchema.GetProperty("properties").TryGetProperty("readiness", out var readinessProperty).ShouldBeTrue(
+            "ResultSetNotReadyProblemDetails must declare 'readiness' as a real property.");
+        readinessProperty.GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ResultSetReadinessDto");
+    }
+
+    [Fact]
     public void Document_HasApiLevelDocumentation()
     {
         var info = Document.GetProperty("info");
