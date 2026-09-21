@@ -193,7 +193,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0088 | Recompute triggers, readiness grid and submission | backend-dev | **queued 2026-09-21** — carded, delta approved, two human rulings. Stage A triggers + result_set lock, stage B readiness + submit |
+| TASK-0088 | Recompute triggers, readiness grid and submission | backend-dev | **in progress** — stage A done 2026-09-21, stage B dispatched. Stage A triggers + result_set lock, stage B readiness + submit |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
