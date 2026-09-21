@@ -11,8 +11,9 @@ namespace SchoolManagement.Application.Results;
 
 /// <summary>Handles <see cref="ReturnResultSetCommand"/>.</summary>
 /// <remarks>
-/// <c>result.return</c> is the route's ONE declarative privilege (result-set-scoped, like
-/// <see cref="SubmitResultSetHandler"/>) — the state check is DATA-DEPENDENT and so is enforced here.
+/// <c>result.return</c> is the route's ONE declarative privilege — SCHOOL-WIDE, not result-set-scoped
+/// (coordinator amendment, TASK-0090 review: same separation reasoning as
+/// <see cref="ApproveResultSetHandler"/>). The state check is DATA-DEPENDENT and so is enforced here.
 /// A set can be returned any number of times, from Awaiting Approval or from Approved (spec 6.7.8);
 /// each return is its OWN audit event, even when it overwrites a still-live reason from an earlier one.
 /// </remarks>
@@ -34,9 +35,11 @@ internal sealed class ReturnResultSetHandler(
         var resultSet = await resultSets.FindTrackedByIdForUpdateAsync(request.ResultSetId, cancellationToken).ConfigureAwait(false);
         if (resultSet is null)
         {
-            // TASK-0071 ruling, reused here: an unknown result-set id is 403, not 404.
-            return Result.Failure<ReturnResultSetResponse>(Error.Forbidden(
-                "result_set.forbidden", "You do not have access to this result set."));
+            // Coordinator amendment, TASK-0090 review: this route is school-wide (unscoped), so the
+            // TASK-0071 403-for-unknown-id ruling (which applies only to a SCOPED route) does not
+            // apply. Plain 404, same as ComputeResultSetHandler.
+            return Result.Failure<ReturnResultSetResponse>(Error.NotFound(
+                "result_set.not_found", "No result set was found with that id."));
         }
 
         if (resultSet.State is not (ResultSetState.AwaitingApproval or ResultSetState.Approved))

@@ -11,11 +11,13 @@ namespace SchoolManagement.Application.Results;
 
 /// <summary>Handles <see cref="ApproveResultSetCommand"/>.</summary>
 /// <remarks>
-/// <c>result.approve</c> is the route's ONE declarative privilege (result-set-scoped, like
-/// <see cref="SubmitResultSetHandler"/>) — the state check and the <c>needsRecompute</c> guard are
-/// DATA-DEPENDENT and so are enforced here, the same "route declares the baseline, handler enforces
-/// the data-dependent rest" split <see cref="SubmitResultSetHandler"/> uses. Spec 6.7.11: "Preconditions:
-/// none beyond the state" — unlike submit, there is no session/term-closed check here.
+/// <c>result.approve</c> is the route's ONE declarative privilege — SCHOOL-WIDE, not result-set-scoped
+/// (coordinator amendment, TASK-0090 review: an arm-scoped grant would let a class teacher approve
+/// their own class, exactly the separation spec 6.7.8 exists for). The state check and the
+/// <c>needsRecompute</c> guard are DATA-DEPENDENT and so are enforced here, the same "route declares
+/// the baseline, handler enforces the data-dependent rest" split <see cref="SubmitResultSetHandler"/>
+/// uses. Spec 6.7.11: "Preconditions: none beyond the state" — unlike submit, there is no
+/// session/term-closed check here.
 /// </remarks>
 internal sealed class ApproveResultSetHandler(
     IResultSetRepository resultSets,
@@ -41,10 +43,12 @@ internal sealed class ApproveResultSetHandler(
         var resultSet = await resultSets.FindTrackedByIdForUpdateAsync(request.ResultSetId, cancellationToken).ConfigureAwait(false);
         if (resultSet is null)
         {
-            // TASK-0071 ruling, reused here: an unknown result-set id is 403, not 404 — the id is
-            // never guessable from a route a legitimate caller would have followed.
-            return Result.Failure<ApproveResultSetResponse>(Error.Forbidden(
-                "result_set.forbidden", "You do not have access to this result set."));
+            // Coordinator amendment, TASK-0090 review: this route is school-wide (unscoped), unlike
+            // submit/compute — the TASK-0071 403-for-unknown-id ruling applies only to a SCOPED route,
+            // where the id would otherwise leak whether an arm exists. Plain 404, same as
+            // ComputeResultSetHandler.
+            return Result.Failure<ApproveResultSetResponse>(Error.NotFound(
+                "result_set.not_found", "No result set was found with that id."));
         }
 
         if (resultSet.State != ResultSetState.AwaitingApproval)

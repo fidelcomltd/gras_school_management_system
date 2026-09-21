@@ -6,6 +6,7 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Results;
+using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
@@ -13,11 +14,15 @@ using SchoolManagement.IntegrationTests.Infrastructure;
 namespace SchoolManagement.IntegrationTests;
 
 /// <summary>
-/// End-to-end proof of TASK-0090's approve and return endpoints (spec §6.7.8, §6.7.11): the happy
-/// paths, every 409 the contract delta names, the 422 reason bounds, and that an unknown id is 403.
-/// Neither route needs a "ready" set the way submit does (spec 6.7.11: approval's own precondition is
-/// "none beyond the state"; return's is only the reason) so seeding here is a bare result set in the
-/// state under test, not <c>ResultSetSubmitEndpointsTests</c>'s full sheet round trip.
+/// End-to-end proof of TASK-0090's approve and return endpoints (spec §6.7.8, §6.7.11, as AMENDED on
+/// review: both routes are SCHOOL-WIDE, not result-set-scoped — an arm-scoped grant would let a class
+/// teacher approve their own class, exactly the separation §6.7.8 exists for). Covers the happy paths,
+/// every 409 the contract delta names, the 422 reason bounds, a plain 404 for an unknown id (this
+/// route is unscoped, so TASK-0071's 403-for-unknown-id ruling does not apply), and a genuine 403 for
+/// a caller who holds an arm-scoped grant but not the school-wide privilege. Neither route needs a
+/// "ready" set the way submit does (spec 6.7.11: approval's own precondition is "none beyond the
+/// state"; return's is only the reason) so seeding here is a bare result set in the state under test,
+/// not <c>ResultSetSubmitEndpointsTests</c>'s full sheet round trip.
 /// </summary>
 public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
@@ -33,7 +38,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Approve_AnAwaitingApprovalSet_MovesToApprovedAndReturns200()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
 
         var response = await ApproveAsync(resultSetId, jar);
 
@@ -54,7 +59,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Approve_WhenNeedsRecomputeIsSet_Returns409()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval, needsRecompute: true);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval, needsRecompute: true);
 
         var response = await ApproveAsync(resultSetId, jar);
 
@@ -67,7 +72,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Approve_FromDraft_Returns409()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.Draft);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.Draft);
 
         var response = await ApproveAsync(resultSetId, jar);
 
@@ -77,12 +82,29 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     }
 
     [Fact]
-    public async Task Approve_AnUnknownResultSetId_Returns403()
+    public async Task Approve_AnUnknownResultSetId_Returns404()
     {
         RequireDatabase();
         var jar = await SignInAsSuperAdminAsync();
 
         var response = await ApproveAsync(Guid.CreateVersion7(), jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("result_set.not_found");
+    }
+
+    // AC: "403 without the privilege" — an unknown id is NOT proof of this on an unscoped route (that
+    // is what the amendment above corrected). A caller who holds some grant over the arm, arm-scoped,
+    // but not the school-wide result.approve, is refused.
+    [Fact]
+    public async Task Approve_WithAnArmScopedGrantButNotTheSchoolWidePrivilege_Returns403()
+    {
+        RequireDatabase();
+        var (resultSetId, armId, sessionId, _) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var jar = await SignInWithArmScopedGrantAsync(armId, sessionId, Privileges.Results.Submit);
+
+        var response = await ApproveAsync(resultSetId, jar);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
@@ -95,7 +117,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Return_AnAwaitingApprovalOrApprovedSet_MovesToReturnedForCorrectionAndReturns200(ResultSetState fromState)
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(fromState);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(fromState);
 
         var response = await ReturnAsync(resultSetId, jar, ValidReason);
 
@@ -116,7 +138,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Return_ASecondTime_OverwritesThePriorReason()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
         var first = await ReturnAsync(resultSetId, jar, ValidReason);
         first.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -139,7 +161,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Return_WithATooShortReason_Returns422(string reason)
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
 
         var response = await ReturnAsync(resultSetId, jar, reason);
 
@@ -150,7 +172,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Return_WithAReasonOverFiveHundredCharacters_Returns422()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
 
         var response = await ReturnAsync(resultSetId, jar, new string('x', 501));
 
@@ -161,7 +183,7 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     public async Task Return_FromDraft_Returns409()
     {
         RequireDatabase();
-        var (resultSetId, jar) = await SeedResultSetAsync(ResultSetState.Draft);
+        var (resultSetId, _, _, jar) = await SeedResultSetAsync(ResultSetState.Draft);
 
         var response = await ReturnAsync(resultSetId, jar, ValidReason);
 
@@ -171,12 +193,27 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     }
 
     [Fact]
-    public async Task Return_AnUnknownResultSetId_Returns403()
+    public async Task Return_AnUnknownResultSetId_Returns404()
     {
         RequireDatabase();
         var jar = await SignInAsSuperAdminAsync();
 
         var response = await ReturnAsync(Guid.CreateVersion7(), jar, ValidReason);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("result_set.not_found");
+    }
+
+    // AC: "403 without the privilege" — same reasoning as the approve-side test above.
+    [Fact]
+    public async Task Return_WithAnArmScopedGrantButNotTheSchoolWidePrivilege_Returns403()
+    {
+        RequireDatabase();
+        var (resultSetId, armId, sessionId, _) = await SeedResultSetAsync(ResultSetState.AwaitingApproval);
+        var jar = await SignInWithArmScopedGrantAsync(armId, sessionId, Privileges.Results.Submit);
+
+        var response = await ReturnAsync(resultSetId, jar, ValidReason);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
@@ -187,7 +224,8 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
     /// A bare result set in <paramref name="state"/> — one session, term and arm, no marks. Neither
     /// approve nor return re-checks the completeness gate (spec 6.7.11), so nothing more is needed.
     /// </summary>
-    private async Task<(Guid ResultSetId, CookieJar Jar)> SeedResultSetAsync(ResultSetState state, bool needsRecompute = false)
+    private async Task<(Guid ResultSetId, Guid ArmId, Guid SessionId, CookieJar Jar)> SeedResultSetAsync(
+        ResultSetState state, bool needsRecompute = false)
     {
         var (accountId, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false, email: $"admin-{Guid.NewGuid():N}@example.com");
 
@@ -228,7 +266,52 @@ public sealed class ResultSetApprovalEndpointsTests(ApiTestFixture fixture) : In
         var signIn = await PostAsyncCore(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password), Client);
         signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        return (resultSet.Id, jar);
+        return (resultSet.Id, arm.Id, session.Id, jar);
+    }
+
+    private async Task<Guid> SeedRoleAsync(string name, IReadOnlyCollection<string> privileges)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var creation = Role.Create(Guid.CreateVersion7(), name, null, privileges);
+        creation.IsSuccess.ShouldBeTrue(creation.IsFailure ? creation.Error.Description : string.Empty);
+
+        context.Add(creation.Value);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return creation.Value.Id;
+    }
+
+    /// <summary>
+    /// Signs in as a REGULAR (non-Super-Admin) account holding <paramref name="privileges"/> scoped
+    /// to <paramref name="armId"/> only — the same accepted direct-DbContext technique
+    /// <c>AuditEventEndpointsTests.SignInWithGrantAsync</c> uses, widened to an arm-scoped assignment
+    /// so a caller genuinely holds SOME grant over the arm without holding the school-wide
+    /// approve/return privilege the amended delta requires (AC: "403 without the privilege").
+    /// </summary>
+    private async Task<CookieJar> SignInWithArmScopedGrantAsync(Guid armId, Guid sessionId, params string[] privileges)
+    {
+        var (accountId, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
+        var roleId = await SeedRoleAsync($"Role-{Guid.NewGuid():N}", privileges);
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var creation = RoleAssignment.Create(
+                Guid.CreateVersion7(), accountId, roleId, sessionId, ScopeType.ArmList, [armId], accountId);
+            creation.IsSuccess.ShouldBeTrue(creation.IsFailure ? creation.Error.Description : string.Empty);
+
+            context.Add(creation.Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var jar = new CookieJar();
+        await GetAsyncCore(CsrfUrl, jar, Client);
+        var signIn = await PostAsyncCore(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password), Client);
+        signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return jar;
     }
 
     private async Task SetResultSetStateAsync(Guid resultSetId, ResultSetState state)
