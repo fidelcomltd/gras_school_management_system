@@ -126,4 +126,65 @@ public sealed class ResultSetTests
 
         resultSet.ReturnReason.ShouldBeNull();
     }
+
+    // TASK-0090, AC 1: Awaiting Approval -> Approved, writing approved_at/approved_by.
+    [Fact]
+    public void Approve_FromAwaitingApproval_MovesToApprovedAndStampsApproval()
+    {
+        var resultSet = WithState(ResultSetState.AwaitingApproval);
+        var approvedBy = Guid.CreateVersion7();
+        var approvedAtUtc = DateTimeOffset.UtcNow;
+
+        var result = resultSet.Approve(approvedBy, approvedAtUtc);
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Approved);
+        resultSet.ApprovedBy.ShouldBe(approvedBy);
+        resultSet.ApprovedAtUtc.ShouldBe(approvedAtUtc);
+    }
+
+    // TASK-0090, AC 1: a set can be returned from either Awaiting Approval or Approved.
+    [Theory]
+    [InlineData(ResultSetState.AwaitingApproval)]
+    [InlineData(ResultSetState.Approved)]
+    public void Return_FromAwaitingApprovalOrApproved_MovesToReturnedForCorrectionAndStoresTheReason(ResultSetState fromState)
+    {
+        var resultSet = WithState(fromState);
+
+        var result = resultSet.Return("Please recheck Mathematics marks.");
+
+        result.IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.ReturnedForCorrection);
+        resultSet.ReturnReason.ShouldBe("Please recheck Mathematics marks.");
+    }
+
+    // TASK-0090, AC 1: a set can be returned any number of times — a second return overwrites the
+    // reason rather than being blocked by the first one already being set.
+    [Fact]
+    public void Return_ASecondTime_OverwritesThePriorReason()
+    {
+        var resultSet = WithState(ResultSetState.AwaitingApproval);
+        resultSet.Return("First reason.");
+
+        resultSet.Return("Second, different reason.");
+
+        resultSet.State.ShouldBe(ResultSetState.ReturnedForCorrection);
+        resultSet.ReturnReason.ShouldBe("Second, different reason.");
+    }
+
+    // TASK-0090, AC 2 (round trip, at unit level): return, then the Returned -> Awaiting Approval
+    // path (Submit) clears the reason it just stored.
+    [Fact]
+    public void Return_ThenSubmit_ClearsTheReasonTheReturnJustStored()
+    {
+        var resultSet = WithState(ResultSetState.AwaitingApproval);
+
+        resultSet.Return("Please recheck Mathematics marks.");
+        resultSet.ReturnReason.ShouldNotBeNull();
+
+        resultSet.Submit(Guid.CreateVersion7(), DateTimeOffset.UtcNow);
+
+        resultSet.State.ShouldBe(ResultSetState.AwaitingApproval);
+        resultSet.ReturnReason.ShouldBeNull();
+    }
 }
