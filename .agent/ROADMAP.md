@@ -101,7 +101,8 @@ Largest module. `index.md` says split it; expect five or more cards.
 | TASK-0071 | Computation engine | BE | 09 §6.7.6, 13 (fixture) |
 | TASK-0088 | Recompute triggers, readiness, completeness gate, submission (carded 2026-09-21) | BE | 09 §6.7.5, 6.7.11, 04 §6.2.9 |
 | — | Non-academic input, section-specific | BE | 09 §6.7.7, 6.7.12 |
-| — | Approval, publication, config snapshot (approve refuses while `needs_recompute`, §6.2.9; head remark is a publish precondition, 2026-09-21 ruling; must re-check sibling level positions, TASK-0071 ruling; Third Term publish refuses `requireCorePass` with no core subjects, 2026-09-18 ruling) | BE | 09 §6.7.8, 6.7.9 |
+| TASK-0090 | Approve and return (carded 2026-09-21) | BE | 09 §6.7.8, 6.7.11 |
+| — | Publication, config snapshot, withdraw/reopen (approve refuses while `needs_recompute`, §6.2.9; head remark is a publish precondition, 2026-09-21 ruling; must re-check sibling level positions, TASK-0071 ruling; Third Term publish refuses `requireCorePass` with no core subjects, 2026-09-18 ruling) | BE | 09 §6.7.8, 6.7.9 |
 | — | Annual cumulative result | BE | 09 §6.7.10 |
 | — | Score entry grid with offline resilience | FE | 09 §6.7.4, 14 §9.8.2 |
 | — | Result rules settings screen (first save requires core subjects, pre-selecting English + Mathematics for confirmation, 2026-09-18 ruling) | FE | 04 §6.2.8, 6.2.9 |
