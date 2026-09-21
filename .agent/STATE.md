@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088 and TASK-0089 closed; TASK-0086 and TASK-0087 closed; contract `e7113c87…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `e7113c87…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -170,7 +170,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **STALE against this hash** since 2026-09-21 (TASK-0090 promotion); was current against `584a4a3c…` (TASK-0089). Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** as of 2026-09-21 (TASK-0091). Orchestrator: `No drift`; verify 55/381, build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -185,7 +185,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0088, 0089, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0088, 0089, 0090, 0091, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -201,7 +201,6 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0090 | Approve and return a result set | backend-dev | **dispatched 2026-09-21** — one ~400-line stage, delta approved |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -210,12 +209,15 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **written in full 2026-09-21**, four stages; dispatches after TASK-0090 closes (both move the contract) |
+| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **stage A dispatched 2026-09-21** (processor, no contract); four stages |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **TASK-0090 closed** — approve/return, school-wide; contract `e7113c87…`, 80 paths; gate 1384/1384. **The orchestrator's delta wrongly scoped both
+  routes; the agent widened the privileges to comply; review reverted it** — FOURTH orchestrator delta error. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0091 closed** — client current against `e7113c87…` (`be208a0`); verify 381/381. → `decisions/2026-Q3.md`
 - 2026-09-21 **HUMAN RULINGS: hosting is a VPS; file storage is Cloudinary; image library SkiaSharp.** TASK-0005b written in full, four stages;
   Cloudinary as private (`authenticated`) store, API-proxied, processed locally first, assets immutable. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0090 carded and dispatched** — approve/return, `ResultSetSummaryDto.returnReason`; one ~400-line stage. → `tasks/TASK-0090.md`
