@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088 and TASK-0089 closed; TASK-0086 and TASK-0087 closed; contract `584a4a3c…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088 and TASK-0089 closed; TASK-0086 and TASK-0087 closed; contract `e7113c87…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,14 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `584a4a3c9d5ccc80e7177610d0516104e692cf27f7095489ecb025e8df99f19b`** · **78 paths** ·
-**194 schemas** · api version `v1` · moved 2026-09-21 by TASK-0088 (readiness grid and submission, §6.7.5, §6.7.11).
-Previous: `42d8e3b52ba4…` / 76 paths / 183 schemas, TASK-0086 on 2026-09-19; before that `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `e7113c87a76bbb4c1a387087448d468732b4b8ba20b845d877cbaf99922263df`** · **80 paths** ·
+**197 schemas** · api version `v1` · moved 2026-09-21 by TASK-0090 (approve and return, §6.7.8).
+Previous: `584a4a3c9d5c…` / 78 paths / 194 schemas, TASK-0088 on 2026-09-21; before that `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**TASK-0090 additive verified MECHANICALLY by the orchestrator** (`jq`, description/example stripped): 2 paths and 3 schemas added, nothing removed,
+zero existing paths changed. ONE existing schema changed: `ResultSetSummaryDto` gains response-required nullable `returnReason`; it appears in no
+request body (checked), so additive, as `SectionDto.ratesTraits` was.
 
 **TASK-0088 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff, description/example stripped):
 0 paths / 0 schemas removed; 2 paths added (`/arms/{armId}/readiness`, `/result-sets/{resultSetId}/submit`), 11 schemas added; ZERO existing paths
@@ -166,7 +170,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-21 (TASK-0089, same PR as TASK-0088). Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **STALE against this hash** since 2026-09-21 (TASK-0090 promotion); was current against `584a4a3c…` (TASK-0089). Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
