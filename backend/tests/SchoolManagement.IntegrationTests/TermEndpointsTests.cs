@@ -112,6 +112,51 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         json.RootElement.GetProperty("errorCode").GetString().ShouldBe("term.times_school_opened_immutable");
     }
 
+    // TASK-0086 delta item 5: refuses to drop times_school_opened below the highest times_present
+    // already recorded for the term on ANY arm's attendance sheet — the derived times-absent
+    // (attendance ruling A) would otherwise go negative for that pupil.
+    [Fact]
+    public async Task Update_TimesSchoolOpenedBelowTheHighestRecordedTimesPresent_Returns409()
+    {
+        RequireDatabase();
+
+        var (sessionId, termIds) = await SeedSessionAsync(
+            "2026/2027", SessionState.Active, [TermState.Active, TermState.Upcoming, TermState.Upcoming], timesSchoolOpened: [58, null, null]);
+        var armId = await SeedArmAsync(sessionId);
+        var resultSetId = await SeedResultSetAsync(armId, termIds[0], ResultSetState.Draft);
+        var pupilId = await SeedPupilAsync();
+        await SeedAttendanceEntryAsync(resultSetId, pupilId, timesPresent: 54);
+
+        var jar = await SignInWithGrantsAsync(Privileges.Session.Update);
+
+        var response = await PatchAsync($"{TermsUrl}/{termIds[0]}", jar, new { timesSchoolOpened = 50 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var json = await ReadJsonAsync(response);
+        json.RootElement.GetProperty("errorCode").GetString().ShouldBe("term.times_school_opened_below_attendance");
+    }
+
+    [Fact]
+    public async Task Update_TimesSchoolOpenedAtOrAboveTheHighestRecordedTimesPresent_Succeeds()
+    {
+        RequireDatabase();
+
+        var (sessionId, termIds) = await SeedSessionAsync(
+            "2026/2027", SessionState.Active, [TermState.Active, TermState.Upcoming, TermState.Upcoming], timesSchoolOpened: [58, null, null]);
+        var armId = await SeedArmAsync(sessionId);
+        var resultSetId = await SeedResultSetAsync(armId, termIds[0], ResultSetState.Draft);
+        var pupilId = await SeedPupilAsync();
+        await SeedAttendanceEntryAsync(resultSetId, pupilId, timesPresent: 54);
+
+        var jar = await SignInWithGrantsAsync(Privileges.Session.Update);
+
+        var response = await PatchAsync($"{TermsUrl}/{termIds[0]}", jar, new { timesSchoolOpened = 54 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<TermDto>(response);
+        body.TimesSchoolOpened.ShouldBe(54);
+    }
+
     // TASK-0039, spec 6.3.6's third precondition — opening blocked with no arm anywhere in the session.
     [Fact]
     public async Task Open_WithNoArmsForSession_Returns409NamingTheSession()
@@ -653,6 +698,17 @@ public sealed class TermEndpointsTests : IAsyncLifetime
         }
 
         context.Add(score);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>Seeds one <c>attendance_entry</c> row against an existing result set (TASK-0086 delta item 5's fixture).</summary>
+    private async Task SeedAttendanceEntryAsync(Guid resultSetId, Guid pupilId, int timesPresent)
+    {
+        await using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var entry = AttendanceEntry.Create(Guid.CreateVersion7(), resultSetId, pupilId, timesPresent).Value;
+        context.Add(entry);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 

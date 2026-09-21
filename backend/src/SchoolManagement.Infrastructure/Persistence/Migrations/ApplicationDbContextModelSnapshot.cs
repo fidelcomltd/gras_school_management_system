@@ -1076,6 +1076,60 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("sample_records", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Results.AttendanceEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<int>("TimesPresent")
+                        .HasColumnType("integer")
+                        .HasColumnName("times_present");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_entry");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_attendance_entry_pupil_id");
+
+                    b.HasIndex("ResultSetId", "PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_attendance_entry_result_set_pupil_unique");
+
+                    b.ToTable("attendance_entry", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Results.DevelopmentRating", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1143,6 +1197,85 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_development_rating_result_set_pupil_indicator_unique");
 
                     b.ToTable("development_rating", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.PupilRemark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("text");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<DateTimeOffset>("WrittenAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("written_at_utc");
+
+                    b.Property<Guid>("WrittenByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("written_by_admin_id");
+
+                    b.Property<string>("WrittenByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("written_by_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pupil_remark");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_pupil_remark_pupil_id");
+
+                    b.HasIndex("WrittenByAdminId")
+                        .HasDatabaseName("ix_pupil_remark_written_by_admin_id");
+
+                    b.HasIndex("ResultSetId", "PupilId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pupil_remark_result_set_pupil_kind_unique");
+
+                    b.ToTable("pupil_remark", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>
@@ -1220,6 +1353,63 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_pupil_term_result_result_set_id_pupil_id_unique");
 
                     b.ToTable("pupil_term_result", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.RemarkTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("text");
+
+                    b.Property<string>("TextKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("text_key");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_remark_template");
+
+                    b.HasIndex("Kind", "TextKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_remark_template_kind_text_key_unique");
+
+                    b.ToTable("remark_template", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.ResultSet", b =>
@@ -3903,6 +4093,23 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pupil_reg_number_history_pupils_pupil_id");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Results.AttendanceEntry", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_entry_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_entry_result_sets_result_set_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Results.DevelopmentRating", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Settings.DevelopmentIndicator", null)
@@ -3932,6 +4139,30 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_development_rating_result_sets_result_set_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.PupilRemark", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_remark_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_remark_result_sets_result_set_id");
+
+                    b.HasOne("SchoolManagement.Domain.Auth.AdminAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WrittenByAdminId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pupil_remark_admin_accounts_written_by_admin_id");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.PupilTermResult", b =>

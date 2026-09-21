@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-18 by orchestrator (TASK-0083 and TASK-0085 closed; contract `9c2f8d55…`) · no size cap, see
+Last reconciled: 2026-09-19 by orchestrator (TASK-0086 and TASK-0087 closed; contract `42d8e3b5…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,12 +115,17 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `9c2f8d55fe3a1d9994dd31bb160bc8841292f280e35957c4bab4c6fd3b82267f`** · **71 paths** ·
-**170 schemas** · api version `v1` · moved 2026-09-19 by TASK-0083 (trait and development rating entry, §6.7.7 / §6.7.12).
-Previous: `8e3087d93f02…` / 69 paths / 159 schemas, TASK-0072 on 2026-09-18; before that `0ebca075110e…` (TASK-0071),
+**Current: `42d8e3b52ba4e97dc8b4d0282f1f07e2195df7435e74181b1d9dd80176c068f5`** · **76 paths** ·
+**183 schemas** · api version `v1` · moved 2026-09-19 by TASK-0086 (attendance, class/head teacher remarks, remark templates, §6.7.7).
+Previous: `9c2f8d55fe3a…` / 71 paths / 170 schemas, TASK-0083 on 2026-09-19; before that `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
 
-**Additive verified MECHANICALLY at promotion by the orchestrator** (the previous document was copied aside and diffed
+**TASK-0086 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff): 0 paths / 0 schemas removed;
+5 paths added (`/arms/{armId}/attendance`, `/class-teacher-remarks`, `/head-teacher-remarks`, `/remark-templates`, `/remark-templates/{id}`),
+13 schemas added; the one changed path (`/terms/{id}`) is byte-identical once `description` is stripped (new 409 in text only); zero existing
+schemas changed with description/example stripped.
+
+**TASK-0083's promotion (previous hash):** additive verified mechanically (the previous document was copied aside and diffed
 with `jq`). 0 paths removed, 0 schemas removed. Added: 2 paths (`GET`/`PUT /api/v1/arms/{armId}/trait-ratings` and
 `/development-ratings`) and 11 schemas. The 3 changed paths (`PUT /settings/rating-scales`, `/development-domains`, `/traits`)
 are byte-identical once `description` is stripped: the new R2 409s are documented in text only. Changed schemas:
@@ -157,7 +162,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0085, same PR as TASK-0083). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0087, same PR as TASK-0086). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -172,7 +177,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -188,7 +193,6 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0084 | Investigate: concurrent mutual suspension returns 401, not 409 | backend-dev | **carded 2026-09-19**; queued behind TASK-0083 stage 0; runs in a worktree off main after TASK-0072 merges |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -203,6 +207,17 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-19 **TASK-0086 closed** — attendance, both remarks, remark templates, `ScopeResolution.AnyGrant`; contract `42d8e3b5…`, 76 paths.
+  Full gate 1653/1653 on the FIRST run. → `decisions/2026-Q3.md`
+- 2026-09-19 **TASK-0087 closed** — client current against `42d8e3b5…`, same PR. → `decisions/2026-Q3.md`
+- 2026-09-19 **TASK-0086 stage A done** — attendance + both remarks, term guard; orchestrator scoped gate 1270/1270, Format fixed on
+  bounce (CRLF + imports); contract drift expected until promotion after stage B. → `tasks/TASK-0086.md` log
+- 2026-09-19 **TASK-0084 closed** — 401 is a legitimate interleaving (auth precedes lock); test split, deterministic, no product change.
+  Scoped gate 1112/1112. Branch `task-0084` (`3cfc232`) off main, needs its own PR. → `decisions/2026-Q3.md`
+- 2026-09-19 **Human rulings on TASK-0086**: L remarks 300 chars (not §6.7.7's 240); A attendance stores present only, absent derived;
+  T two template lists by kind, class-teacher list at ANY scope; H head remark editable until Published. → `decisions/2026-Q3.md`
+- 2026-09-19 **TASK-0084 runs parallel to a contract-moving card (0086)**, bending `rules/contract.md` §3's letter on the human's "alongside"
+  instruction: separate worktree off main, 0084 contract impact none and must STOP otherwise. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0083 closed** — trait and development rating entry, `ratesTraits`, R2 refusals; contract `9c2f8d55…`, 71 paths. Full gate
   1534/1534 on the FIRST run. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0085 closed** — client current against `9c2f8d55…`, same PR. → `decisions/2026-Q3.md`
@@ -545,6 +560,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-19 **An attendance save racing a term update can leave derived absent negative** — each reads the other's committed state only.
+  Unlikely (admin lowers opened while a teacher saves). *Trigger: the readiness/submission card, which must treat present > opened as incomplete. Owner: `backend-dev`.*
+- 2026-09-19 **§6.7.7 says remarks are 240 chars and types both attendance figures; built 300 and present-only by ruling L/A.** *Trigger: next spec revision. Owner: human.*
 - 2026-09-19 **Renaming a scale point's code or label in place is ungated, even when ratings use it.** Published sheets are safe ONLY if
   publication snapshots the scale legend (§6.7.12 requires it, and publication is not built yet); open sets would show the new code mid-term.
   *Trigger: the publication/snapshot card, or the rating-scales screen card. Owner: human ruling.* → `drift/2026-Q3.md`
@@ -694,9 +712,13 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-19 **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
+  handler built the DTO (found by reading, UNVERIFIED; TASK-0086 used `TimeProvider` instead). *Trigger: next card touching assignments (TASK-0046). Owner: `backend-dev`.*
+- 2026-09-19 **`RequireAuthenticatedCaller()`'s doc says "never an RBAC-gated business operation"; pupil and remark-template routes use it exactly so**
+  (handler-level guards). *Trigger: next card adding a handler-level guard. Owner: orchestrator — amend the doc or add a named helper.*
 - 2026-09-17 ~~**The `Secret scan` gate has been RED since TASK-0075.**~~ **STRUCK 2026-09-17 by TASK-0078**:
   fixture-dir allowlist, planted-credential proof, both passes `no leaks found`. → `drift/2026-Q3.md`
-- 2026-09-16 **A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**
+- 2026-09-16 ~~**A concurrency test answered 401 where it expects 409, TWICE now (recurred 2026-09-18 on TASK-0072's close gate). Carded as TASK-0084.**~~ **STRUCK 2026-09-19 by TASK-0084**: H1, racy test, product right; split per interleaving.
   `AdminAccountEndpointsTests.ChangeStatus_TwoSuperAdmins...`; did not recur in three clean runs.
   **Not obviously a flaky assertion** — the losing racer may be losing its SESSION, not the race,
   which a real user would experience as a logout rather than a conflict. *Trigger: the next card

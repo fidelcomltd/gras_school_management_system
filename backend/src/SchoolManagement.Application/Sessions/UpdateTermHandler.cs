@@ -2,6 +2,7 @@ using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -13,6 +14,7 @@ namespace SchoolManagement.Application.Sessions;
 internal sealed class UpdateTermHandler(
     ITermRepository terms,
     IAcademicSessionRepository sessions,
+    IAttendanceEntryRepository attendanceEntries,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<UpdateTermCommand, Result<TermDto>>
@@ -104,6 +106,22 @@ internal sealed class UpdateTermHandler(
 
         if (request.TimesSchoolOpened is { } timesSchoolOpened)
         {
+            // TASK-0086 delta item 5: refuse to drop times_school_opened below the highest
+            // times_present already recorded for this term (any arm) — the derived times-absent
+            // (attendance ruling A) would otherwise go negative for whichever pupil holds that
+            // record.
+            var maxTimesPresent = await attendanceEntries
+                .FindMaxTimesPresentByTermAsync(term.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (maxTimesPresent is { } recordedMax && timesSchoolOpened < recordedMax)
+            {
+                return Result.Failure<TermDto>(Error.Conflict(
+                    "term.times_school_opened_below_attendance",
+                    $"Times school opened cannot be set below {recordedMax}, the highest times present " +
+                    $"already recorded for {term.Name}."));
+            }
+
             var setResult = term.SetTimesSchoolOpened(timesSchoolOpened);
 
             if (setResult.IsFailure)

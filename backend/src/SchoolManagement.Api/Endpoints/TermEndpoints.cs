@@ -57,7 +57,10 @@ public sealed class TermEndpoints : IEndpointModule
                 "Spec 6.3.10: dates, label, times school opened, next resumption date. Every field " +
                 "is independently optional; an absent field is left unchanged. Times school opened " +
                 "is rejected once the term is `closed` (spec 6.3.6: printed on results already " +
-                "issued). `Idempotency-Key` is accepted, not required.")
+                "issued), and refused with 409 `term.times_school_opened_below_attendance` if it " +
+                "would be set below the highest `timesPresent` already recorded for this term on any " +
+                "arm's attendance sheet (TASK-0086 delta item 5) — the derived times-absent would " +
+                "otherwise go negative. `Idempotency-Key` is accepted, not required.")
             .Produces<TermDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
