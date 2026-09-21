@@ -115,10 +115,14 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `42d8e3b52ba4e97dc8b4d0282f1f07e2195df7435e74181b1d9dd80176c068f5`** · **76 paths** ·
-**183 schemas** · api version `v1` · moved 2026-09-19 by TASK-0086 (attendance, class/head teacher remarks, remark templates, §6.7.7).
-Previous: `9c2f8d55fe3a…` / 71 paths / 170 schemas, TASK-0083 on 2026-09-19; before that `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `584a4a3c9d5ccc80e7177610d0516104e692cf27f7095489ecb025e8df99f19b`** · **78 paths** ·
+**194 schemas** · api version `v1` · moved 2026-09-21 by TASK-0088 (readiness grid and submission, §6.7.5, §6.7.11).
+Previous: `42d8e3b52ba4…` / 76 paths / 183 schemas, TASK-0086 on 2026-09-19; before that `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**TASK-0088 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff, description/example stripped):
+0 paths / 0 schemas removed; 2 paths added (`/arms/{armId}/readiness`, `/result-sets/{resultSetId}/submit`), 11 schemas added; ZERO existing paths
+or schemas changed. The submit 422 references `ResultSetNotReadyProblemDetails` (the first typed problem extension) with `content` present.
 
 **TASK-0086 additive verified MECHANICALLY by the orchestrator** (previous document copied aside, `jq` diff): 0 paths / 0 schemas removed;
 5 paths added (`/arms/{armId}/attendance`, `/class-teacher-remarks`, `/head-teacher-remarks`, `/remark-templates`, `/remark-templates/{id}`),
@@ -162,7 +166,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-19 (TASK-0087, same PR as TASK-0086). The orchestrator re-ran
+- Frontend client is **STALE against this hash** since 2026-09-21 (TASK-0088 promotion); regeneration card to follow in the same PR. Was current against `42d8e3b5…` (TASK-0087). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
