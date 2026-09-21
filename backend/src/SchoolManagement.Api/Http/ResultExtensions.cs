@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -107,6 +108,15 @@ internal static class ResultExtensions
         {
             extensions["domainIndex"] = developmentDomainError.DomainIndex;
             extensions["indicatorIndex"] = developmentDomainError.IndicatorIndex;
+        }
+
+        // TASK-0088 stage B: the contract's first typed problem extension — spec 6.7.5's "422 with a
+        // structured list of what is missing", the SAME body GET /arms/{armId}/readiness returns (AC
+        // B6). Documented as ResultSetNotReadyProblemDetails (see its own remarks); this is the runtime
+        // half, an ordinary extension member exactly like errorCode/traceId/lockedUntil above.
+        if (error is ResultSetNotReadyError notReadyError)
+        {
+            extensions["readiness"] = notReadyError.Readiness;
         }
 
         return TypedResults.Problem(

@@ -13,6 +13,20 @@ namespace SchoolManagement.Application.Abstractions.Enrolments;
 /// <param name="MiddleName">For the composed display name. Optional.</param>
 public sealed record ArmRosterPupil(Guid PupilId, string? RegistrationNumber, string Surname, string FirstName, string? MiddleName);
 
+/// <summary>
+/// One pupil whose enrolment in an arm closed during a term (TASK-0088 stage B, AC B4) — the readiness
+/// grid's "Left during the term" group (spec §6.7.5). Identity fields mirror <see cref="ArmRosterPupil"/>;
+/// <see cref="LeftOn"/> is the closed enrolment's <c>EffectiveTo</c>.
+/// </summary>
+/// <param name="PupilId">The pupil's id.</param>
+/// <param name="RegistrationNumber">Null only if somehow unissued.</param>
+/// <param name="Surname">For the composed display name and row order.</param>
+/// <param name="FirstName">For the composed display name.</param>
+/// <param name="MiddleName">For the composed display name. Optional.</param>
+/// <param name="LeftOn">The closed enrolment's effective-to date.</param>
+public sealed record ArmLeaverPupil(
+    Guid PupilId, string? RegistrationNumber, string Surname, string FirstName, string? MiddleName, DateOnly LeftOn);
+
 /// <summary>Persistence port for <see cref="Enrolment"/>.</summary>
 /// <remarks>
 /// Pupil-scale, same convention as <c>IPupilRepository</c> — reads go through targeted,
@@ -59,4 +73,15 @@ public interface IEnrolmentRepository
     /// reuses this for the same roster.
     /// </summary>
     Task<IReadOnlyList<ArmRosterPupil>> ListActiveRosterByArmAsync(Guid armId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every pupil whose enrolment in <paramref name="armId"/> CLOSED with an <c>EffectiveTo</c>
+    /// between <paramref name="termStart"/> and <paramref name="termEnd"/> inclusive (TASK-0088 stage
+    /// B, AC B4) — regardless of which status the pupil moved to, because this reads the ENROLMENT,
+    /// not <see cref="Domain.Pupils.PupilStatus"/>. Mutually exclusive with
+    /// <see cref="ListActiveRosterByArmAsync"/>: that reads only the OPEN row (<c>EffectiveTo IS
+    /// NULL</c>), this only a CLOSED one. Ordered surname then id, same convention. <c>AsNoTracking</c>.
+    /// </summary>
+    Task<IReadOnlyList<ArmLeaverPupil>> ListLeftDuringTermByArmAsync(
+        Guid armId, DateOnly termStart, DateOnly termEnd, CancellationToken cancellationToken);
 }

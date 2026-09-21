@@ -42,6 +42,12 @@ public static class ApplicationDependencyInjection
         // GetArmSubjectsHandler, ListSubjectsHandler and, later, the result-computation engine.
         services.AddScoped<Subjects.SubjectsInEffectResolver>();
 
+        // TASK-0088 stage B: shared by GetResultSetReadinessHandler and SubmitResultSetHandler so the
+        // submit 422's `readiness` body is computed by the SAME code as the GET (AC B6) — registered
+        // behind its interface (unlike SubjectsInEffectResolver above) so the racing-concurrency
+        // integration test can pause it via a DI-replaceable seam. See its own remarks.
+        services.AddScoped<Results.IResultSetReadinessEvaluator, Results.ResultSetReadinessEvaluator>();
+
         AddPipelineBehaviors(services);
 
         services.AddValidatorsFromAssembly(Assembly, includeInternalTypes: true);

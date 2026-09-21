@@ -77,6 +77,9 @@ internal static class OpenApiExamples
     private const string ExampleComponentId = "0192f0c4-6a1c-7869-7d6b-19c938bbe4e3";
     private const string ExampleExaminationComponentId = "0192f0c4-7b2d-796a-8e7c-2ada49ccf5f4";
 
+    /// <summary>Example identifiers for the TASK-0088 stage B readiness examples, each a distinct entity.</summary>
+    private const string ExampleThirdPupilId = "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605";
+
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
     /// wire format.
@@ -984,6 +987,70 @@ internal static class OpenApiExamples
                 "PageSize": [
                   "PageSize must be at most 100."
                 ]
+              }
+            }
+            """,
+
+        // TASK-0088 stage B: the contract's first typed problem-details extension — see
+        // ResultSetNotReadyProblemDetails's own remarks. `readiness` is the SAME shape
+        // ResultSetReadinessDto's own example above carries, condensed here to one incomplete pupil.
+        [typeof(SchoolManagement.Api.Http.ResultSetNotReadyProblemDetails)] = $$"""
+            {
+              "type": "urn:schoolmanagement:error:result_set.not_ready",
+              "title": "Validation failed",
+              "status": 422,
+              "detail": "This result set is not ready to submit. See the readiness grid.",
+              "instance": "/api/v1/result-sets/{{ExampleResultSetId}}/submit",
+              "errorCode": "result_set.not_ready",
+              "traceId": "0af7651916cd43dd8448eb211c80319c",
+              "readiness": {
+                "armId": "{{ExampleArmId}}",
+                "termId": "{{ExampleTermId}}",
+                "resultSet": {
+                  "id": "{{ExampleResultSetId}}",
+                  "state": "Draft",
+                  "needsRecompute": false
+                },
+                "subjects": [
+                  {
+                    "subjectId": "{{ExampleSubjectId}}",
+                    "name": "Mathematics"
+                  }
+                ],
+                "componentCount": 2,
+                "pupils": [
+                  {
+                    "pupilId": "{{ExampleSecondPupilId}}",
+                    "registrationNumber": "GRAS/2026/0042",
+                    "displayName": "Bello Musa",
+                    "marks": [
+                      {
+                        "subjectId": "{{ExampleSubjectId}}",
+                        "status": "Partial",
+                        "filledParts": 1
+                      }
+                    ],
+                    "ratingsComplete": false,
+                    "attendanceComplete": false,
+                    "classTeacherRemarkPresent": false,
+                    "headTeacherRemarkPresent": false
+                  }
+                ],
+                "leftDuringTerm": [],
+                "counters": {
+                  "marks": { "complete": 0, "total": 1 },
+                  "ratings": { "complete": 0, "total": 1 },
+                  "attendance": { "complete": 0, "total": 1 },
+                  "classTeacherRemarks": { "complete": 0, "total": 1 },
+                  "headTeacherRemarks": { "complete": 0, "total": 1 }
+                },
+                "blockers": [
+                  {
+                    "code": "marks_incomplete",
+                    "message": "1 of 1 mark cells are still missing."
+                  }
+                ],
+                "canSubmit": false
               }
             }
             """,
@@ -2305,6 +2372,159 @@ internal static class OpenApiExamples
               "code": "no_examination_sat",
               "subjectId": "{{ExampleSubjectId}}",
               "pupilId": null
+            }
+            """,
+
+        [typeof(ReadinessSubjectDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "name": "Mathematics"
+            }
+            """,
+
+        [typeof(ReadinessMarkCellDto)] = $$"""
+            {
+              "subjectId": "{{ExampleSubjectId}}",
+              "status": "Complete",
+              "filledParts": 2
+            }
+            """,
+
+        [typeof(ReadinessPupilRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "marks": [
+                {
+                  "subjectId": "{{ExampleSubjectId}}",
+                  "status": "Complete",
+                  "filledParts": 2
+                }
+              ],
+              "ratingsComplete": true,
+              "attendanceComplete": true,
+              "classTeacherRemarkPresent": true,
+              "headTeacherRemarkPresent": false
+            }
+            """,
+
+        [typeof(ReadinessLeftDuringTermPupilDto)] = $$"""
+            {
+              "pupilId": "{{ExampleThirdPupilId}}",
+              "registrationNumber": "GRAS/2026/0009",
+              "displayName": "Nwachukwu Ifeoma",
+              "leftOn": "2026-11-02"
+            }
+            """,
+
+        [typeof(ReadinessCounterDto)] = """
+            {
+              "complete": 26,
+              "total": 28
+            }
+            """,
+
+        [typeof(ReadinessCountersDto)] = """
+            {
+              "marks": { "complete": 246, "total": 252 },
+              "ratings": { "complete": 28, "total": 28 },
+              "attendance": { "complete": 26, "total": 28 },
+              "classTeacherRemarks": { "complete": 24, "total": 28 },
+              "headTeacherRemarks": { "complete": 0, "total": 28 }
+            }
+            """,
+
+        [typeof(ReadinessBlockerDto)] = """
+            {
+              "code": "attendance_incomplete",
+              "message": "2 of 28 pupils are missing attendance."
+            }
+            """,
+
+        [typeof(ResultSetReadinessDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Draft",
+                "needsRecompute": false
+              },
+              "subjects": [
+                {
+                  "subjectId": "{{ExampleSubjectId}}",
+                  "name": "Mathematics"
+                }
+              ],
+              "componentCount": 2,
+              "pupils": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "marks": [
+                    {
+                      "subjectId": "{{ExampleSubjectId}}",
+                      "status": "Complete",
+                      "filledParts": 2
+                    }
+                  ],
+                  "ratingsComplete": true,
+                  "attendanceComplete": true,
+                  "classTeacherRemarkPresent": true,
+                  "headTeacherRemarkPresent": false
+                },
+                {
+                  "pupilId": "{{ExampleSecondPupilId}}",
+                  "registrationNumber": "GRAS/2026/0042",
+                  "displayName": "Bello Musa",
+                  "marks": [
+                    {
+                      "subjectId": "{{ExampleSubjectId}}",
+                      "status": "Partial",
+                      "filledParts": 1
+                    }
+                  ],
+                  "ratingsComplete": false,
+                  "attendanceComplete": false,
+                  "classTeacherRemarkPresent": false,
+                  "headTeacherRemarkPresent": false
+                }
+              ],
+              "leftDuringTerm": [
+                {
+                  "pupilId": "{{ExampleThirdPupilId}}",
+                  "registrationNumber": "GRAS/2026/0009",
+                  "displayName": "Nwachukwu Ifeoma",
+                  "leftOn": "2026-11-02"
+                }
+              ],
+              "counters": {
+                "marks": { "complete": 1, "total": 2 },
+                "ratings": { "complete": 1, "total": 2 },
+                "attendance": { "complete": 1, "total": 2 },
+                "classTeacherRemarks": { "complete": 1, "total": 2 },
+                "headTeacherRemarks": { "complete": 0, "total": 2 }
+              },
+              "blockers": [
+                {
+                  "code": "marks_incomplete",
+                  "message": "1 of 2 mark cells are still missing."
+                }
+              ],
+              "canSubmit": false
+            }
+            """,
+
+        [typeof(SubmitResultSetResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "AwaitingApproval",
+                "needsRecompute": false
+              },
+              "submittedAt": "{{CanonicalTimestamp}}"
             }
             """,
     };

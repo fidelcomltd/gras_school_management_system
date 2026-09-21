@@ -57,4 +57,17 @@ internal sealed class EnrolmentRepository(ApplicationDbContext context) : IEnrol
                select new ArmRosterPupil(pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ArmLeaverPupil>> ListLeftDuringTermByArmAsync(
+        Guid armId, DateOnly termStart, DateOnly termEnd, CancellationToken cancellationToken) =>
+        await (from enrolment in context.Enrolments.AsNoTracking()
+               where enrolment.ArmId == armId && enrolment.EffectiveTo != null
+                     && enrolment.EffectiveTo >= termStart && enrolment.EffectiveTo <= termEnd
+               join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+               orderby pupil.Surname.ToLower(), pupil.Id
+               select new ArmLeaverPupil(
+                   pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName, enrolment.EffectiveTo!.Value))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 }

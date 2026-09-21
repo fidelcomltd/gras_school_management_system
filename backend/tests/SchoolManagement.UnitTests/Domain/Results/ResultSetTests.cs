@@ -94,4 +94,36 @@ public sealed class ResultSetTests
         stateChanged.ShouldBeFalse();
         resultSet.State.ShouldBe(state);
     }
+
+    // TASK-0088 stage B, AC B5: covers both the first submission (Draft) and a resubmission
+    // (Returned for Correction) in one assertion each — both move to Awaiting Approval identically.
+    [Theory]
+    [InlineData(ResultSetState.Draft)]
+    [InlineData(ResultSetState.ReturnedForCorrection)]
+    public void Submit_FromDraftOrReturnedForCorrection_MovesToAwaitingApprovalAndStampsSubmission(ResultSetState fromState)
+    {
+        var resultSet = WithState(fromState);
+        var submittedBy = Guid.CreateVersion7();
+        var submittedAtUtc = DateTimeOffset.UtcNow;
+
+        resultSet.Submit(submittedBy, submittedAtUtc);
+
+        resultSet.State.ShouldBe(ResultSetState.AwaitingApproval);
+        resultSet.SubmittedBy.ShouldBe(submittedBy);
+        resultSet.SubmittedAtUtc.ShouldBe(submittedAtUtc);
+    }
+
+    // A resubmission's whole point is escaping Returned for Correction — the reason must not survive
+    // into Awaiting Approval, or the head teacher's queue would show a stale rejection reason beside a
+    // set that was never actually returned this time around.
+    [Fact]
+    public void Submit_OnAReturnedForCorrectionSet_ClearsTheReturnReason()
+    {
+        var resultSet = WithState(ResultSetState.ReturnedForCorrection);
+        typeof(ResultSet).GetProperty(nameof(ResultSet.ReturnReason))!.SetValue(resultSet, "Please recheck Mathematics marks.");
+
+        resultSet.Submit(Guid.CreateVersion7(), DateTimeOffset.UtcNow);
+
+        resultSet.ReturnReason.ShouldBeNull();
+    }
 }

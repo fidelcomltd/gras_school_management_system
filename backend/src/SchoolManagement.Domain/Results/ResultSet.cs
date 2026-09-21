@@ -185,4 +185,19 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
         PupilCount = pupilCount;
         NeedsRecompute = false;
     }
+
+    /// <summary>
+    /// Moves Draft or Returned for Correction to Awaiting Approval (spec 6.7.11; TASK-0088 stage B) —
+    /// covers both the first submission and a resubmission, which is why <see cref="ReturnReason"/> is
+    /// unconditionally cleared here rather than only when it was set. The caller has already checked
+    /// <see cref="State"/> and the completeness gate; this entity trusts that, the same posture
+    /// <see cref="MarkComputed"/> takes.
+    /// </summary>
+    public void Submit(Guid? submittedBy, DateTimeOffset submittedAtUtc)
+    {
+        State = ResultSetState.AwaitingApproval;
+        SubmittedAtUtc = submittedAtUtc;
+        SubmittedBy = submittedBy;
+        ReturnReason = null;
+    }
 }
