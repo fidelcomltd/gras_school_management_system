@@ -209,7 +209,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **stage A dispatched 2026-09-21** (processor, no contract); four stages |
+| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **stage A done** (`d03906e`), **B1 dispatched** 2026-09-21; five stages (A, B1, B2, C, D) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 

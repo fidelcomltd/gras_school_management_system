@@ -4,8 +4,9 @@ Owner: backend-dev
 Depends on: TASK-0005a (done). Branch `task-0005b` is stacked on the branch current at dispatch.
 Contract impact: **additive. The delta below is APPROVED by the orchestrator (2026-09-21)** and extends the TASK-0005 approval in
 `decisions/2026-Q3-contract-deltas.md`. The orchestrator promotes once, after stage C. Dev agents never run `-Promote`.
-Status: **stage A dispatched 2026-09-21** (processor, no contract move). TASK-0090 closed first.
-Stages: FOUR dispatches of ~400 hand-written lines each, tests included (`governance.md` §2). One stage per dispatch.
+Status: **stage A done** (`d03906e`); **stage B1 dispatched 2026-09-21**.
+Stages: FIVE dispatches (A, B1, B2, C, D). Each is ~400 hand-written lines, tests included (`governance.md` §2), and one stage is one dispatch.
+Agents have landed at ~1.7× their estimates, so B was split on 2026-09-21.
 Reads: `.agent/rules/contract.md`, `.agent/rules/wire.md`, `.agent/rules/gates.md` §1 (backend row: **no integration runs**);
        `product-specification/14-non-functional-requirements.md` §9.6; `04-module-school-settings.md` lines 23-24, 72-77, 267-268, 278;
        `decisions/2026-Q3-contract-deltas.md`: `grep -n "Amendment 4\|serving endpoints\|multipart-fingerprint"` (read ~15 lines each);
@@ -46,16 +47,19 @@ privilege-checked endpoints. Publication (a later card) needs both.
 ## Acceptance criteria
 
 **Stage A: the processor. The contract does not move.** `ISchoolImageProcessor` goes in Application and the SkiaSharp implementation in Infrastructure.
-- [ ] Magic bytes decide the type: PNG and JPEG are accepted, and everything else is refused, including SVG, GIF, WebP and a PNG renamed `.jpg`.
-- [ ] Caps: logo ≤2 MB and ≥300×300; signature ≤1 MB, with no minimum (600×200 is only a recommendation).
-- [ ] Re-encoding strips all metadata. A committed JPEG fixture carrying EXIF GPS comes out with none, proven by reading the output's metadata.
-- [ ] PNG transparency survives. Logo derivatives come out at 200 and 64 px on the long edge, aspect kept. The signature is re-encoded but never resized.
-**Stage B: storage port, entity and upload routes (delta 1 and 3)**
+- [x] Magic bytes decide the type: PNG and JPEG are accepted, and everything else is refused, including SVG, GIF, WebP and a PNG renamed `.jpg`.
+- [x] Caps: logo ≤2 MB and ≥300×300; signature ≤1 MB, with no minimum (600×200 is only a recommendation).
+- [x] Re-encoding strips all metadata. A committed JPEG fixture carrying EXIF GPS comes out with none, proven by reading the output's metadata.
+- [x] PNG transparency survives. Logo derivatives come out at 200 and 64 px on the long edge, aspect kept. The signature is re-encoded but never resized.
+**Stage B1: orientation fix, store port, entity. The contract does not move.**
+- [ ] **EXIF orientation is applied BEFORE metadata is stripped** (review finding on stage A). Use `SKCodec.EncodedOrigin` and rotate or flip the pixels,
+      so a portrait phone photo comes out upright. Unit-test it with a fixture tagged with orientation 6 (rotate 90°), asserting the output's dimensions are swapped.
 - [ ] `ISchoolImageStore` with `PutAsync(bytes, contentType) → assetId` and `OpenAsync(assetId) → stream`, plus the in-memory fake.
       A `school_image` row holds kind, size variant, asset id, width, height, content type, and uploaded at/by. `school_profile` points at the
-      current logo set and signature. There is a migration.
+      current logo set and signature. There is a migration. The domain invariant (Amendment 4, below) lives on the entity.
+**Stage B2: upload routes (delta 1 and 3)**
 - [ ] Upload replaces the current pointer and never deletes the old asset. It is audited with `before_json`/`after_json` (asset ids,
-      never bytes). The domain invariant from Amendment 4 guards set→null with its verbatim message, unit-tested.
+      never bytes). The domain invariant from Amendment 4 guards set→null with its verbatim message. It is unit-tested in B1 and wired here.
 - [ ] **Idempotency fingerprint gap:** fold a SHA-256 of the uploaded bytes into `BuildFingerprint`. The same key with different bytes
       is `idempotency.key_conflict`, not a replay (unit test).
 **Stage C: serving (delta 2)**
@@ -90,3 +94,5 @@ and client regeneration (the orchestrator cards it after promotion).
 
 - 2026-09-06 created by the orchestrator as a stub (TASK-0005's three-way split).
 - 2026-09-21 written in full after the human ruled: Cloudinary on a VPS, SkiaSharp. Four stages.
+- 2026-09-21 Stage A `d03906e` (~668 lines). Orchestrator: fixtures independently parsed (JPEG IFD0 carries GPS pointer 0x8825; PNG has `eXIf`),
+  processor tests 19/19, no vulnerable packages. Accepted. Review: EXIF orientation is lost by stripping → moved into B1. B split into B1/B2.
