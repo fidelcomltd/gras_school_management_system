@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-19 by orchestrator (TASK-0086 and TASK-0087 closed; contract `42d8e3b5…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088 carded; TASK-0086 and TASK-0087 closed; contract `42d8e3b5…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -193,6 +193,7 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
+| TASK-0088 | Recompute triggers, readiness grid and submission | backend-dev | **queued 2026-09-21** — carded, delta approved, two human rulings. Stage A triggers + result_set lock, stage B readiness + submit |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -207,6 +208,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **TASK-0088 carded** — head remark gates publication only (not submit); recompute triggers built first in the same card;
+  readiness arm-routed; submit 422 is the first typed problem extension; new result_set row-lock rule. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0086 closed** — attendance, both remarks, remark templates, `ScopeResolution.AnyGrant`; contract `42d8e3b5…`, 76 paths.
   Full gate 1653/1653 on the FIRST run. → `decisions/2026-Q3.md`
 - 2026-09-19 **TASK-0087 closed** — client current against `42d8e3b5…`, same PR. → `decisions/2026-Q3.md`
@@ -560,8 +563,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
+- 2026-09-21 **The head teacher's remark gates publication only, departing from the §6.7.12 amendment's submission gate list** (human ruling,
+  TASK-0088). *Trigger: next spec revision; the publication card enforces it per §6.7.9. Owner: human.* → `decisions/2026-Q3.md`
 - 2026-09-19 **An attendance save racing a term update can leave derived absent negative** — each reads the other's committed state only.
-  Unlikely (admin lowers opened while a teacher saves). *Trigger: the readiness/submission card, which must treat present > opened as incomplete. Owner: `backend-dev`.*
+  Unlikely (admin lowers opened while a teacher saves). *Trigger: TASK-0088 (AC B2 carries it). Owner: `backend-dev`.*
 - 2026-09-19 **§6.7.7 says remarks are 240 chars and types both attendance figures; built 300 and present-only by ruling L/A.** *Trigger: next spec revision. Owner: human.*
 - 2026-09-19 **Renaming a scale point's code or label in place is ungated, even when ratings use it.** Published sheets are safe ONLY if
   publication snapshots the scale legend (§6.7.12 requires it, and publication is not built yet); open sets would show the new code mid-term.
@@ -579,7 +584,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-17 **Term close also blocks on Returned for Correction (human ruling), beyond §6.3.6's literal list.**
   *Trigger: next spec revision or a card citing §6.3.6. Owner: human.* → `drift/2026-Q3.md`
 - 2026-09-17 **`needs_recompute` will be set by mark changes only** — transfer, mapping and settings
-  triggers are unbuilt after TASK-0076. *Trigger: the submission card. Owner: `backend-dev`.* → `drift/2026-Q3.md`
+  triggers are unbuilt after TASK-0076. *Trigger: TASK-0088 stage A (all but transfer). Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-17 **Result-rules promotion lock not built** (§6.2.8 "editable until promotion is run").
   *Trigger: TASK-0036. Owner: `backend-dev`.* → `drift/2026-Q3.md`
 - 2026-09-16 **`08-module-subjects.md` §6.6.2 still says "No subjects are seeded" — rev 3.1 reversed
