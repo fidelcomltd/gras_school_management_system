@@ -79,6 +79,14 @@ public sealed class SchoolProfile : Entity<Guid>
     /// <summary>6.2.3: <c>head_teacher_name</c>, String 120.</summary>
     public const int HeadTeacherNameMaxLength = 120;
 
+    /// <summary>
+    /// Amendment 4's verbatim text (spec 6.2.11; <c>decisions/2026-Q3-contract-deltas.md</c>): there
+    /// is no delete route (6.2.12 lists none, and 6.2.2 confirms the logo is not seeded), so "deleting
+    /// a logo with no replacement" is refused here, at the domain level, rather than by a route that
+    /// does not exist.
+    /// </summary>
+    public const string LogoRequiredMessage = "A logo is required. Upload a replacement before removing the current one.";
+
     // EF Core materialisation constructor. Every field is set from a database row (or migration seed
     // data) immediately afterward — there is no code path that leaves these placeholders live.
     private SchoolProfile()
@@ -247,6 +255,20 @@ public sealed class SchoolProfile : Entity<Guid>
     public int TraitsVersionNumber { get; private set; }
 
     /// <summary>
+    /// TASK-0005b stage B1. The <c>SchoolImage.UploadGroupId</c> shared by the three renditions of
+    /// the CURRENT logo upload, or <see langword="null"/> before the first upload (6.2.2: not
+    /// seeded). Set only through <see cref="SetCurrentLogo"/>.
+    /// </summary>
+    public Guid? CurrentLogoGroupId { get; private set; }
+
+    /// <summary>
+    /// TASK-0005b stage B1. The <c>SchoolImage.UploadGroupId</c> for the CURRENT signature upload, or
+    /// <see langword="null"/> before the first upload. Set only through
+    /// <see cref="SetCurrentSignature"/>.
+    /// </summary>
+    public Guid? CurrentSignatureGroupId { get; private set; }
+
+    /// <summary>
     /// Applies a <c>PATCH /settings/identity</c> edit (spec 6.2.3's identity fields, minus
     /// <see cref="Abbreviation"/> and <see cref="Timezone"/>, both owned elsewhere) and bumps
     /// <see cref="IdentityVersionNumber"/>.
@@ -350,6 +372,39 @@ public sealed class SchoolProfile : Entity<Guid>
     /// (TASK-0072 stage 3b). See <see cref="IncrementGradingVersion"/>'s remarks — same reasoning.
     /// </summary>
     public void IncrementTraitsVersion() => TraitsVersionNumber++;
+
+    /// <summary>
+    /// Repoints <see cref="CurrentLogoGroupId"/> at a new upload's <c>SchoolImage.UploadGroupId</c>
+    /// (TASK-0005b stage B2 will call this after a successful upload). The old rows are never
+    /// touched — see the class remarks on <see cref="SchoolImage"/>.
+    /// </summary>
+    /// <param name="uploadGroupId">
+    /// The new upload's group id. <see langword="null"/> is REFUSED — Amendment 4: there is no
+    /// delete route, and "removing the current logo with no replacement" is a domain error, not a
+    /// state this method allows. Production code never has occasion to pass <see langword="null"/>
+    /// here (every real call is from a just-completed upload); this guard exists so the invariant is
+    /// enforced and testable at the domain level even though no route can trigger it.
+    /// </param>
+    /// <exception cref="InvalidOperationException"><paramref name="uploadGroupId"/> is <see langword="null"/>.</exception>
+    public void SetCurrentLogo(Guid? uploadGroupId)
+    {
+        if (uploadGroupId is null)
+        {
+            throw new InvalidOperationException(LogoRequiredMessage);
+        }
+
+        CurrentLogoGroupId = uploadGroupId;
+    }
+
+    /// <summary>
+    /// Repoints <see cref="CurrentSignatureGroupId"/> at a new upload's
+    /// <c>SchoolImage.UploadGroupId</c>. Unlike <see cref="SetCurrentLogo"/>, <see langword="null"/>
+    /// is allowed: Amendment 4's invariant is the logo's alone (spec 6.2.11 names only the logo). A
+    /// missing signature is a PUBLICATION precondition (04-module-school-settings.md), not a save-time
+    /// refusal, and publication is out of this card's scope.
+    /// </summary>
+    /// <param name="uploadGroupId">The new upload's group id, or <see langword="null"/>.</param>
+    public void SetCurrentSignature(Guid? uploadGroupId) => CurrentSignatureGroupId = uploadGroupId;
 
     /// <summary>
     /// TEST-ONLY SEAM. Builds an instance with arbitrary starting state, matching the migration

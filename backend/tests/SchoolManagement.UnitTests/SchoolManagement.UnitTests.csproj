@@ -37,6 +37,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Infrastructure\Settings\Fixtures\logo-with-gps-exif.jpg" />
     <EmbeddedResource Include="Infrastructure\Settings\Fixtures\logo-with-exif-chunk.png" />
+    <!-- TASK-0005b stage B1: 40x30 stored pixels, a 4x4 red marker at the stored top-left corner,
+         tagged EXIF orientation 6 ("rotate 90 CW to display correctly"). -->
+    <EmbeddedResource Include="Infrastructure\Settings\Fixtures\orientation-6.jpg" />
   </ItemGroup>
 
 </Project>

@@ -171,6 +171,56 @@ public sealed class SkiaSchoolImageProcessorTests
         PngHasChunk(outputBytes, "eXIf").ShouldBeFalse("re-encoded output must carry no eXIf chunk");
     }
 
+    // --- Orientation (stage B1: review finding on stage A) -----------------------------------
+
+    [Fact]
+    public void ProcessSignature_WithExifOrientationSix_RotatesPixelsBeforeStrippingMetadata()
+    {
+        // Fixture: 40x30 AS STORED, a 4x4 red marker at the STORED top-left corner, tagged EXIF
+        // orientation 6 ("rotate 90 CW to display correctly"). A camera that shot this in portrait
+        // and stored it landscape-with-a-tag is exactly the scenario this stage exists for.
+        var sourceBytes = ReadEmbeddedFixture("orientation-6.jpg");
+
+        var result = _processor.ProcessSignature(sourceBytes);
+
+        result.IsSuccess.ShouldBeTrue();
+        var original = result.Value.Original;
+
+        // Rotating 40x30 stored pixels 90 degrees CW gives 30x40 displayed pixels — swapped, not
+        // just re-encoded at the stored dimensions.
+        original.WidthPixels.ShouldBe(30);
+        original.HeightPixels.ShouldBe(40);
+
+        // Physically rotating an image 90 CW moves its top-left corner to the top-right. The output
+        // has no EXIF any more (stage A), so this decode reads raw pixels with no correction applied
+        // — if the marker is where a 90 CW rotation predicts, the correction actually happened before
+        // the encode, not merely a claim.
+        using var decoded = SKBitmap.Decode(original.Bytes.ToArray());
+        var topRight = decoded.GetPixel(decoded.Width - 1, 0);
+        var topLeft = decoded.GetPixel(0, 0);
+        var bottomRight = decoded.GetPixel(decoded.Width - 1, decoded.Height - 1);
+
+        IsReddish(topRight).ShouldBeTrue($"expected the marker at the rotated top-right, got {topRight}");
+        IsBlueish(topLeft).ShouldBeTrue($"expected background at the top-left, got {topLeft}");
+        IsBlueish(bottomRight).ShouldBeTrue($"expected background at the bottom-right, got {bottomRight}");
+    }
+
+    [Fact]
+    public void ProcessSignature_WithNoExifOrientationTag_LeavesPixelsUnchanged()
+    {
+        // CreatePng carries no EXIF at all, so SKCodec.EncodedOrigin is TopLeft (the default) and no
+        // rotation should be applied — dimensions must come out exactly as authored.
+        var result = _processor.ProcessSignature(CreatePng(600, 200));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Original.WidthPixels.ShouldBe(600);
+        result.Value.Original.HeightPixels.ShouldBe(200);
+    }
+
+    private static bool IsReddish(SKColor color) => color.Red > 120 && color.Blue < 120;
+
+    private static bool IsBlueish(SKColor color) => color.Blue > 120 && color.Red < 120;
+
     // --- Transparency and derivatives ---------------------------------------------------------
 
     [Fact]

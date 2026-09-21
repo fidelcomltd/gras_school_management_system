@@ -275,6 +275,14 @@ public static class InfrastructureDependencyInjection
         // decodes and encodes its own bitmaps), so singleton rather than per-request.
         services.AddSingleton<ISchoolImageProcessor, SkiaSchoolImageProcessor>();
 
+        // TASK-0005b stage B1: PLACEHOLDER registration. The in-memory fake is registered
+        // unconditionally here because nothing consumes ISchoolImageStore yet (upload routes are
+        // stage B2); stage D replaces this with an environment-based choice between this fake (tests)
+        // and the real CloudinaryImageStore (everywhere else) — "tests never touch the network"
+        // (orchestrator design, 2026-09-21). Singleton so uploads persist for the lifetime of the
+        // process, matching a real store's behaviour closely enough for a fake.
+        services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
         // routing traffic here instead of restarting a container that is working fine.

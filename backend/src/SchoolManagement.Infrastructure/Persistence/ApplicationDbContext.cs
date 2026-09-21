@@ -65,6 +65,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<ConfigVersion> ConfigVersions => Set<ConfigVersion>();
 
+    /// <summary>
+    /// TASK-0005b stage B1. Internal, not public: only this assembly's repositories may query it.
+    /// One row per stored rendition of the logo or signature — immutable, never deleted (see
+    /// <see cref="SchoolImage"/>'s remarks).
+    /// </summary>
+    internal DbSet<SchoolImage> SchoolImages => Set<SchoolImage>();
+
     /// <summary>TASK-0005c. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<RegistrationCounter> RegistrationCounters => Set<RegistrationCounter>();
 

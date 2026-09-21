@@ -14,6 +14,13 @@ namespace SchoolManagement.Infrastructure.Settings;
 /// encoder writes only pixel data plus the container format's own required structural chunks — it
 /// never carries an input EXIF block or PNG <c>eXIf</c> chunk across, so metadata stripping falls
 /// out of the re-encode rather than needing a separate "remove metadata" step.
+/// <para>
+/// TASK-0005b stage B1 (review finding on stage A): <see cref="SKCodec.EncodedOrigin"/> is read and
+/// applied to the PIXELS, by rotating/flipping into a fresh bitmap, BEFORE that re-encode. Stage A's
+/// re-encode already stripped the EXIF <c>Orientation</c> tag along with everything else — correct
+/// on the "no metadata survives" requirement, but it left a portrait phone photo stored sideways
+/// with nothing left to say so. Applying the correction first and stripping second gets both.
+/// </para>
 /// </remarks>
 internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
 {
@@ -100,14 +107,96 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
 
         using var data = SKData.CreateCopy(fileBytes);
         using var codec = SKCodec.Create(data);
-        var bitmap = SKBitmap.Decode(codec);
+        var rawBitmap = SKBitmap.Decode(codec);
 
-        if (bitmap is null)
+        if (rawBitmap is null)
         {
             return Result.Failure<(SKBitmap, string)>(UnsupportedType());
         }
 
-        return Result.Success((bitmap, contentType));
+        // CA2000 cannot see across the Result boundary: ownership of whichever bitmap this method
+        // returns transfers to the caller, which disposes it via `using var bitmap = decoded.Value.Bitmap;`
+        // (see ProcessLogo/ProcessSignature) — the same ownership-transfer shape SKBitmap.Decode
+        // itself already had before this method wrapped it.
+#pragma warning disable CA2000
+        var orientedBitmap = ApplyExifOrientation(rawBitmap, codec.EncodedOrigin);
+#pragma warning restore CA2000
+
+        if (!ReferenceEquals(orientedBitmap, rawBitmap))
+        {
+            rawBitmap.Dispose();
+        }
+
+        return Result.Success((orientedBitmap, contentType));
+    }
+
+    /// <summary>
+    /// Rotates/flips <paramref name="source"/>'s PIXELS into a fresh bitmap matching what
+    /// <paramref name="origin"/> (the file's own EXIF <c>Orientation</c> tag, as SkiaSharp read it)
+    /// says the image should look like once displayed correctly. Returns <paramref name="source"/>
+    /// itself, unchanged, when no correction is needed — the common case.
+    /// </summary>
+    /// <remarks>
+    /// The four "swap" origins (5-8) exchange width and height, matching the two possible 90-degree
+    /// rotations: a stored landscape photo tagged orientation 6 comes out portrait, and vice versa.
+    /// </remarks>
+    private static SKBitmap ApplyExifOrientation(SKBitmap source, SKEncodedOrigin origin)
+    {
+        if (origin == SKEncodedOrigin.TopLeft)
+        {
+            return source;
+        }
+
+        var swapsDimensions = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
+            or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+
+        var oriented = new SKBitmap(
+            swapsDimensions ? source.Height : source.Width,
+            swapsDimensions ? source.Width : source.Height,
+            source.ColorType,
+            source.AlphaType);
+
+        using (var canvas = new SKCanvas(oriented))
+        {
+            switch (origin)
+            {
+                case SKEncodedOrigin.TopRight: // 2: mirror horizontal.
+                    canvas.Translate(oriented.Width, 0);
+                    canvas.Scale(-1, 1);
+                    break;
+                case SKEncodedOrigin.BottomRight: // 3: rotate 180.
+                    canvas.Translate(oriented.Width, oriented.Height);
+                    canvas.RotateDegrees(180);
+                    break;
+                case SKEncodedOrigin.BottomLeft: // 4: mirror vertical.
+                    canvas.Translate(0, oriented.Height);
+                    canvas.Scale(1, -1);
+                    break;
+                case SKEncodedOrigin.LeftTop: // 5: transpose (mirror horizontal, then rotate 270 CW).
+                    canvas.RotateDegrees(90);
+                    canvas.Scale(1, -1);
+                    break;
+                case SKEncodedOrigin.RightTop: // 6: rotate 90 CW.
+                    canvas.Translate(oriented.Width, 0);
+                    canvas.RotateDegrees(90);
+                    break;
+                case SKEncodedOrigin.RightBottom: // 7: transverse (mirror horizontal, then rotate 90 CW).
+                    canvas.Translate(oriented.Width, oriented.Height);
+                    canvas.RotateDegrees(90);
+                    canvas.Scale(-1, 1);
+                    break;
+                case SKEncodedOrigin.LeftBottom: // 8: rotate 270 CW.
+                    canvas.Translate(0, oriented.Height);
+                    canvas.RotateDegrees(-90);
+                    break;
+                default:
+                    break;
+            }
+
+            canvas.DrawBitmap(source, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+        }
+
+        return oriented;
     }
 
     /// <summary>
