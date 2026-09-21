@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088 closed, TASK-0089 dispatched; TASK-0086 and TASK-0087 closed; contract `584a4a3c…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088 and TASK-0089 closed; TASK-0086 and TASK-0087 closed; contract `584a4a3c…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -166,7 +166,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **STALE against this hash** since 2026-09-21 (TASK-0088 promotion); regeneration card to follow in the same PR. Was current against `42d8e3b5…` (TASK-0087). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** as of 2026-09-21 (TASK-0089, same PR as TASK-0088). Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -181,7 +181,7 @@ the archive and not this block. Verified against the working tree, not prose.
 ## In flight
 
 Open cards only. Closed: TASK-0001–0004, 0006–0029, 0031–0035, 0037–0045, 0047, 0048, 0049,
-0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0088, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
+0050, 0051, 0052, 0053, 0054, 0055, 0059, 0061, 0062, 0063, 0064, 0065, 0066, 0067, 0069, 0070, 0073, 0074, 0075, 0076, 0077, 0078, 0079, 0080, 0071, 0081, 0072, 0082, 0083, 0085, 0084, 0086, 0087, 0088, 0089, 0005a, 0005c. Closure notes: `decisions/2026-Q3.md`.
 
 **Corrected 2026-09-14:** this list previously read `0037–0044`, which silently claimed 0041, 0042
 and 0043 as closed while the table below correctly showed them in `review`. Their card headers
@@ -197,7 +197,6 @@ archive and never against the working tree, so an under-claiming header was invi
 
 | Task | Title | Owner | Status |
 |---|---|---|---|
-| TASK-0089 | Regenerate the typed client against `584a4a3c…` | frontend-dev | **dispatched 2026-09-21** — same PR as TASK-0088 |
 | TASK-0060 | Enforce the session boundary in scope decisions | backend-dev | **queued 2026-09-15** — a grant scoped to one session currently authorises against a target in another. Cross-cutting |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
@@ -212,6 +211,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **TASK-0089 closed** — client current against `584a4a3c…` (`2462299`); typed 422 unreachable via `ApiError`, readiness-screen card owns it. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0088 closed** — recompute triggers, row lock, readiness, submit; contract `584a4a3c…`, 78 paths. Scoped gate 1401/1401. → `decisions/2026-Q3.md`
 - 2026-09-21 **HUMAN DIRECTIVE: dev agents run no integration tests and no mutation proofs; the orchestrator does both once per card.**
   Each stage is one dispatch of ~400 lines, split at carding. `gates.md` §1, `governance.md` §2, `backend-dev.md`. → `decisions/2026-Q3.md`
@@ -728,6 +728,10 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-21 **`admin-detail-screen.test.tsx` "suspend then reactivate" timed out at 5s in a loaded `verify` run** (380/381); passed 4/4 alone in ~3s.
+  *Trigger: if it recurs, raise its timeout or find the slow await. Owner: `frontend-dev`.*
+- 2026-09-21 **`ApiError.problem` is one generic union, so `SubmitResultSet`'s typed 422 (`readiness`) is unreachable without a cast.** *Trigger: the
+  readiness-screen card. Owner: `frontend-dev`.*
 - 2026-09-19 **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
   handler built the DTO (found by reading, UNVERIFIED; TASK-0086 used `TimeProvider` instead). *Trigger: next card touching assignments (TASK-0046). Owner: `backend-dev`.*
 - 2026-09-19 **`RequireAuthenticatedCaller()`'s doc says "never an RBAC-gated business operation"; pupil and remark-template routes use it exactly so**
