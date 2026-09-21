@@ -29,4 +29,14 @@
              Link="Application\Results\Computation\ResultComputationFixtureData.cs" />
   </ItemGroup>
 
+  <!--
+    TASK-0005b stage A: a real JPEG carrying EXIF GPS, and a real PNG carrying an eXIf chunk, for
+    SkiaSchoolImageProcessorTests' metadata-stripping proof. Embedded (not CopyToOutputDirectory) so
+    the test reads them via GetManifestResourceStream regardless of the runner's working directory.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Infrastructure\Settings\Fixtures\logo-with-gps-exif.jpg" />
+    <EmbeddedResource Include="Infrastructure\Settings\Fixtures\logo-with-exif-chunk.png" />
+  </ItemGroup>
+
 </Project>

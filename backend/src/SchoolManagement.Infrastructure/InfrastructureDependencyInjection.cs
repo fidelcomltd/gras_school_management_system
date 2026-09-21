@@ -271,6 +271,10 @@ public static class InfrastructureDependencyInjection
         // TASK-0070 stand-in now that the table exists.
         services.AddScoped<ISubjectMappingMarkLookup, SubjectMappingMarkLookup>();
 
+        // TASK-0005b stage A: logo/signature re-encoding. Stateless and thread-safe (each call
+        // decodes and encodes its own bitmaps), so singleton rather than per-request.
+        services.AddSingleton<ISchoolImageProcessor, SkiaSchoolImageProcessor>();
+
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
         // routing traffic here instead of restarting a container that is working fine.

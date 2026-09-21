@@ -31,6 +31,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <!-- TASK-0003: Argon2id password hashing (spec 9.1). -->
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+    <!-- TASK-0005b stage A: school logo/signature re-encoding (spec 9.6). See Directory.Packages.props
+         for the full justification. -->
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <!-- Design-time only: enables `dotnet ef migrations add`. Not shipped at runtime. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
