@@ -53,9 +53,15 @@ more than ever: **a hand-rolled `dotnet test --filter` skips silently and still 
 
 | Agent | Runs | Does NOT run |
 |---|---|---|
-| `backend-dev` | `dotnet test --filter` over what it touched; `dotnet build -warnaserror` on the projects it changed | `backend/scripts/ci.ps1` |
+| `backend-dev` | `dotnet build -warnaserror`, `dotnet format --verify-no-changes`, the whole UNIT project. Writes integration tests and makes them COMPILE | `backend/scripts/ci.ps1`; **any integration run** (since 2026-09-21); mutation (RED/GREEN) proofs |
 | `frontend-dev` | `npm run typecheck`, `npm run lint`, `npm run test -- <path>` over what it touched | `npm run verify`, `npm run test:e2e`, `npm run check:api-drift` |
 | `orchestrator` | the **scoped** gate once per card per §0 (full local run only when §0's blast-radius test says so), `run_in_background: true`, reviewing the diff while it runs | — |
+
+**Integration runs and non-vacuity proofs belong to the orchestrator (human directive, 2026-09-21).** TASK-0088's two backend
+dispatches spent most of ~1.1M tokens in slow integration loops (minutes per run, repeated after each fix); stage B died on the
+rate limit mid RED/GREEN and left its mutation in the tree. The orchestrator ran the same verification in ~5 minutes. A dev
+agent hands back compiling integration tests; the orchestrator runs them once, plus the mutation proofs the card names, and
+bounces failing lines. The agent must also COMMIT at each green build, so a dead dispatch never leaves unrecorded work.
 
 **Rationale (backend, 2026-09-09, after it cost THREE dispatches; extended to the frontend
 2026-09-14).** The backend suite is 700+ tests plus a Release build, coverage merge, gitleaks over

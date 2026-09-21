@@ -212,6 +212,10 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **HUMAN DIRECTIVE: dev agents run no integration tests and no mutation proofs; the orchestrator does both once per card.**
+  Each stage is one dispatch of ~400 lines, split at carding. `gates.md` §1, `governance.md` §2, `backend-dev.md`. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0088 stage B implemented (`c9946d1`); dispatch died on the rate limit (SIXTH) mid RED/GREEN, mutation left in tree** —
+  reverted by the orchestrator, which ran 17/17 new integration + RED/GREEN itself; promoted `584a4a3c…`, additive. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0088 stage A done** (`5ecd9c4`, `a2913f7`) — 12 recompute triggers + result_set row lock; scoped gate 1379/1379 local container;
   race test was vacuous on review, rebuilt deterministic, RED/GREEN by two different mutations. Dispatch died on rate limit — FIFTH occurrence. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0088 carded** — head remark gates publication only (not submit); recompute triggers built first in the same card;

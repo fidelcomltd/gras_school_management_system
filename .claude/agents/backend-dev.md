@@ -53,13 +53,15 @@ Rules:
 - Never edit `contracts/openapi.json` by hand; regenerate it from the build.
 - Never touch `frontend/**`. If the frontend needs a change, say so in your report.
 - **You do NOT run the full gate.** Never run `backend/scripts/ci.ps1` — the orchestrator owns
-  that run, once per card, backgrounded. You verify with `dotnet test --filter` over what you
-  touched and `dotnet build -warnaserror` on the projects you changed, and you report the counts.
+  that run, once per card, backgrounded. You verify with `dotnet build -warnaserror`,
+  `dotnet format --verify-no-changes` and the WHOLE unit project, and you report the counts.
   That is a complete report, not a half-done one. `.agent/rules/gates.md` section 1.
-- **Integration tests run against the LOCAL container only** (`.agent/rules/gates.md` §7, human
-  directive 2026-09-17). Never set `POSTGRES_TEST_CONNECTION` to a hosted host, never read
-  `~/.gras/pg-test.txt`. If the local container does not work, STOP and report it; the human decides
-  whether a hosted run is allowed, never you.
+- **You do NOT run integration tests, and you do not do mutation (RED/GREEN) proofs** (human directive
+  2026-09-21). Write the integration tests the card asks for and make them COMPILE; the orchestrator runs
+  them once on the local container, plus the proofs, and bounces failing lines back to you. Never set
+  `POSTGRES_TEST_CONNECTION`, never read `~/.gras/pg-test.txt`.
+- **Commit at every green build** (Conventional Commits, `Refs: TASK-nnnn`). Dispatches die on rate limits;
+  uncommitted work is unrecorded work.
 - A run with anything SKIPPED is not a passing run — say so rather than reporting green.
 - **You never push, pull, merge, rebase or touch remotes.** No `git push` in any form (`-C`, `--force`, a refspec,
   an editor sync). Commit locally when your dispatch says to, and stop; the human pushes and opens the PR. On
@@ -72,6 +74,6 @@ Rules:
   owner; and the full account for the card's Log. `STATE.md`'s `## Decisions` and `## Known drift` are
   INDEXES, so an index line is one line, never a paragraph. `.agent/rules/governance.md` section 1.
 
-Report: files changed, contract impact, the counts from your filtered test run, anything you
+Report: files changed, contract impact, the counts from your build, format and unit runs, anything you
 deliberately left undone. Paste each command's summary line plus every failing line in full —
 never the whole log.
