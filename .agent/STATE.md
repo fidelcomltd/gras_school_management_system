@@ -206,12 +206,15 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0005b | Logo and signature uploads | backend-dev | queued (stub card) |
+| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **written in full 2026-09-21**, four stages; dispatches after TASK-0090 closes (both move the contract) |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-21 **HUMAN RULINGS: hosting is a VPS; file storage is Cloudinary; image library SkiaSharp.** TASK-0005b written in full, four stages;
+  Cloudinary as private (`authenticated`) store, API-proxied, processed locally first, assets immutable. → `decisions/2026-Q3.md`
+- 2026-09-21 **TASK-0090 carded and dispatched** — approve/return, `ResultSetSummaryDto.returnReason`; one ~400-line stage. → `tasks/TASK-0090.md`
 - 2026-09-21 **TASK-0089 closed** — client current against `584a4a3c…` (`2462299`); typed 422 unreachable via `ApiError`, readiness-screen card owns it. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0088 closed** — recompute triggers, row lock, readiness, submit; contract `584a4a3c…`, 78 paths. Scoped gate 1401/1401. → `decisions/2026-Q3.md`
 - 2026-09-21 **HUMAN DIRECTIVE: dev agents run no integration tests and no mutation proofs; the orchestrator does both once per card.**
@@ -803,6 +806,9 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-08-27 **Validation is a mediator pipeline behaviour, not section 6's endpoint filter.**
   *Trigger: ratify or revert. Owner: UNOWNED.* `ASSUMPTIONS.md` section 2.2.
 
+- 2026-09-21 **The head teacher's signature (and logo) will be held by Cloudinary, a third-party processor** — NDPA 2023 expects a processing
+  agreement and a note on transfer outside Nigeria. *Trigger: before the first real upload, or the NDPA retention card. Owner: human.*
+
 ### Live — blocked on the deployment decision (open question 5)
 
 One decision clears all four.
@@ -840,7 +846,7 @@ One decision clears all four.
 
 Live only. Resolved questions 1–4 and 6–14 are in `decisions/2026-Q3.md`.
 
-5. **Production database target** undecided; not blocking until deployment. Four live drift
+5. **Production hosting: a VPS (human, 2026-09-21); file storage Cloudinary.** Database placement on or off the VPS still undecided; not blocking until deployment. Four live drift
    triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
    decision clears all four.
 
