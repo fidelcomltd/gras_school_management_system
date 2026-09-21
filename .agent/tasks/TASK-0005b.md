@@ -4,7 +4,7 @@ Owner: backend-dev
 Depends on: TASK-0005a (done). Branch `task-0005b` is stacked on the branch current at dispatch.
 Contract impact: **additive. The delta below is APPROVED by the orchestrator (2026-09-21)** and extends the TASK-0005 approval in
 `decisions/2026-Q3-contract-deltas.md`. The orchestrator promotes once, after stage C. Dev agents never run `-Promote`.
-Status: **stage A done** (`d03906e`); **stage B1 dispatched 2026-09-21**.
+Status: **stages A and B1 done** (`d03906e`, `74680e7`); **stage B2 dispatched 2026-09-21**.
 Stages: FIVE dispatches (A, B1, B2, C, D). Each is ~400 hand-written lines, tests included (`governance.md` §2), and one stage is one dispatch.
 Agents have landed at ~1.7× their estimates, so B was split on 2026-09-21.
 Reads: `.agent/rules/contract.md`, `.agent/rules/wire.md`, `.agent/rules/gates.md` §1 (backend row: **no integration runs**);
@@ -52,9 +52,9 @@ privilege-checked endpoints. Publication (a later card) needs both.
 - [x] Re-encoding strips all metadata. A committed JPEG fixture carrying EXIF GPS comes out with none, proven by reading the output's metadata.
 - [x] PNG transparency survives. Logo derivatives come out at 200 and 64 px on the long edge, aspect kept. The signature is re-encoded but never resized.
 **Stage B1: orientation fix, store port, entity. The contract does not move.**
-- [ ] **EXIF orientation is applied BEFORE metadata is stripped** (review finding on stage A). Use `SKCodec.EncodedOrigin` and rotate or flip the pixels,
+- [x] **EXIF orientation is applied BEFORE metadata is stripped** (review finding on stage A). Use `SKCodec.EncodedOrigin` and rotate or flip the pixels,
       so a portrait phone photo comes out upright. Unit-test it with a fixture tagged with orientation 6 (rotate 90°), asserting the output's dimensions are swapped.
-- [ ] `ISchoolImageStore` with `PutAsync(bytes, contentType) → assetId` and `OpenAsync(assetId) → stream`, plus the in-memory fake.
+- [x] `ISchoolImageStore` with `PutAsync(bytes, contentType) → assetId` and `OpenAsync(assetId) → stream`, plus the in-memory fake.
       A `school_image` row holds kind, size variant, asset id, width, height, content type, and uploaded at/by. `school_profile` points at the
       current logo set and signature. There is a migration. The domain invariant (Amendment 4, below) lives on the entity.
 **Stage B2: upload routes (delta 1 and 3)**
@@ -96,3 +96,6 @@ and client regeneration (the orchestrator cards it after promotion).
 - 2026-09-21 written in full after the human ruled: Cloudinary on a VPS, SkiaSharp. Four stages.
 - 2026-09-21 Stage A `d03906e` (~668 lines). Orchestrator: fixtures independently parsed (JPEG IFD0 carries GPS pointer 0x8825; PNG has `eXIf`),
   processor tests 19/19, no vulnerable packages. Accepted. Review: EXIF orientation is lost by stripping → moved into B1. B split into B1/B2.
+- 2026-09-21 Stage B1 `74680e7` (~688 lines, over the stop again; the agent tallied only at the end). All 8 EXIF origins handled, case 6 fixture-proven
+  (dimensions AND marker pixel). Invariant on `SchoolProfile.SetCurrentLogo(null)`. Orchestrator: migration applied on the local container via
+  the Settings integration slice, 73/73. Accepted. Orientation cases 2-5, 7, 8 untested: drift.
