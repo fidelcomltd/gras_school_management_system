@@ -184,9 +184,12 @@ public static class PrivilegeRegistry
             Permits: "Run computation over a result set."),
         new(Privileges.Results.Submit, Scopable: true, Module: PrivilegeModule.Results,
             Permits: "Move a result set from Draft to Awaiting Approval."),
-        new(Privileges.Results.Approve, Scopable: false, Module: PrivilegeModule.Results,
+        // TASK-0090's approved contract delta scopes both routes by result set (like Compute/Submit
+        // above), so a school-wide OR an arm-scoped grant satisfies them — departing from spec 4.4.5's
+        // own table, which lists neither as scopable. See PrivilegeRegistryTests' own comment.
+        new(Privileges.Results.Approve, Scopable: true, Module: PrivilegeModule.Results,
             Permits: "Move a result set from Awaiting Approval to Approved."),
-        new(Privileges.Results.Return, Scopable: false, Module: PrivilegeModule.Results,
+        new(Privileges.Results.Return, Scopable: true, Module: PrivilegeModule.Results,
             Permits: "Return a result set to the class teacher with a reason."),
         new(Privileges.Results.Publish, Scopable: false, Module: PrivilegeModule.Results,
             Permits: "Publish an approved result set and write the configuration snapshot."),

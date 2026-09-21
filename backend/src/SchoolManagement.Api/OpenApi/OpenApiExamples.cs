@@ -2549,8 +2549,9 @@ internal static class OpenApiExamples
             }
             """,
 
-        [typeof(ReturnResultSetCommand)] = """
+        [typeof(ReturnResultSetCommand)] = $$"""
             {
+              "resultSetId": "{{ExampleResultSetId}}",
               "reason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
             }
             """,

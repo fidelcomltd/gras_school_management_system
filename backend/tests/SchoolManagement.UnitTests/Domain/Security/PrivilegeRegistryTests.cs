@@ -147,8 +147,12 @@ public sealed class PrivilegeRegistryTests
         ("result.remark.headteacher", false, PrivilegeModule.Results, "Write or edit the head teacher's remark."),
         ("result.compute", true, PrivilegeModule.Results, "Run computation over a result set."),
         ("result.submit", true, PrivilegeModule.Results, "Move a result set from Draft to Awaiting Approval."),
-        ("result.approve", false, PrivilegeModule.Results, "Move a result set from Awaiting Approval to Approved."),
-        ("result.return", false, PrivilegeModule.Results, "Return a result set to the class teacher with a reason."),
+        // NOT from spec 4.4.5, which lists neither as scopable: TASK-0090's approved contract delta
+        // scopes both by result set, like result.compute/result.submit just above, so a school-wide
+        // grant is not the only way to satisfy them. A third named, human-approved departure alongside
+        // the two TASK-0072 additions this class's own remarks describe.
+        ("result.approve", true, PrivilegeModule.Results, "Move a result set from Awaiting Approval to Approved."),
+        ("result.return", true, PrivilegeModule.Results, "Return a result set to the class teacher with a reason."),
         ("result.publish", false, PrivilegeModule.Results, "Publish an approved result set and write the configuration snapshot."),
         ("result.unpublish", false, PrivilegeModule.Results, "Withdraw a published result set from the parent portal."),
         ("result.annual.compute", false, PrivilegeModule.Results,
