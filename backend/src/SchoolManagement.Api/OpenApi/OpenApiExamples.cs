@@ -1009,7 +1009,8 @@ internal static class OpenApiExamples
                 "resultSet": {
                   "id": "{{ExampleResultSetId}}",
                   "state": "Draft",
-                  "needsRecompute": false
+                  "needsRecompute": false,
+                  "returnReason": null
                 },
                 "subjects": [
                   {
@@ -1824,7 +1825,8 @@ internal static class OpenApiExamples
             {
               "id": "{{ExampleResultSetId}}",
               "state": "Draft",
-              "needsRecompute": true
+              "needsRecompute": true,
+              "returnReason": null
             }
             """,
 
@@ -1852,7 +1854,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": true
+                "needsRecompute": true,
+                "returnReason": null
               },
               "components": [
                 {
@@ -1970,7 +1973,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": true
+                "needsRecompute": true,
+                "returnReason": null
               },
               "blocks": [
                 {
@@ -2091,7 +2095,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": true
+                "needsRecompute": true,
+                "returnReason": null
               },
               "domains": [
                 {
@@ -2187,7 +2192,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": true
+                "needsRecompute": true,
+                "returnReason": null
               },
               "timesSchoolOpened": 62,
               "rows": [
@@ -2247,7 +2253,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": true
+                "needsRecompute": true,
+                "returnReason": null
               },
               "rows": [
                 {
@@ -2449,7 +2456,8 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "Draft",
-                "needsRecompute": false
+                "needsRecompute": false,
+                "returnReason": null
               },
               "subjects": [
                 {
@@ -2522,9 +2530,39 @@ internal static class OpenApiExamples
               "resultSet": {
                 "id": "{{ExampleResultSetId}}",
                 "state": "AwaitingApproval",
-                "needsRecompute": false
+                "needsRecompute": false,
+                "returnReason": null
               },
               "submittedAt": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(ApproveResultSetResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Approved",
+                "needsRecompute": false,
+                "returnReason": null
+              },
+              "approvedAt": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(ReturnResultSetCommand)] = """
+            {
+              "reason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
+            }
+            """,
+
+        [typeof(ReturnResultSetResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "ReturnedForCorrection",
+                "needsRecompute": false,
+                "returnReason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
+              }
             }
             """,
     };

@@ -21,6 +21,12 @@ namespace SchoolManagement.Domain.Results;
 /// </remarks>
 public sealed class ResultSet : Entity<Guid>, IAuditableEntity
 {
+    /// <summary>Spec 6.7.8's floor for a return reason, trimmed, before it is rejected 422 (TASK-0090).</summary>
+    public const int ReturnReasonMinLength = 10;
+
+    /// <summary>Spec 6.7.3's <see cref="ReturnReason"/> column width, trimmed (TASK-0090).</summary>
+    public const int ReturnReasonMaxLength = 500;
+
     private ResultSet(Guid id, Guid armId, Guid termId)
         : base(id)
     {
@@ -199,5 +205,36 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
         SubmittedAtUtc = submittedAtUtc;
         SubmittedBy = submittedBy;
         ReturnReason = null;
+    }
+
+    /// <summary>
+    /// Moves Awaiting Approval to Approved (spec 6.7.8, 6.7.11; TASK-0090). The caller has already
+    /// checked <see cref="State"/> and <see cref="NeedsRecompute"/> — this entity trusts that, the
+    /// same posture <see cref="Submit"/> takes. Returns <see cref="Result"/>, not <see langword="void"/>
+    /// (card AC), so a future invariant can fail here without a signature change.
+    /// </summary>
+    public Result Approve(Guid? approvedBy, DateTimeOffset approvedAtUtc)
+    {
+        State = ResultSetState.Approved;
+        ApprovedAtUtc = approvedAtUtc;
+        ApprovedBy = approvedBy;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Moves Awaiting Approval or Approved to Returned for Correction (spec 6.7.8, 6.7.11; TASK-0090),
+    /// storing the head teacher's reason and reopening marks for the class teacher. A set can be
+    /// returned any number of times: a second return overwrites the reason, which is why this is
+    /// unconditional rather than guarded on the reason already being empty — the caller records each
+    /// call as its own audit event (spec 6.7.8: "each return is a separate audit event"). The caller
+    /// has already checked <see cref="State"/> and validated <paramref name="reason"/>'s bounds.
+    /// Returns <see cref="Result"/>, not <see langword="void"/> (card AC), the same reason as
+    /// <see cref="Approve"/>.
+    /// </summary>
+    public Result Return(string reason)
+    {
+        State = ResultSetState.ReturnedForCorrection;
+        ReturnReason = reason;
+        return Result.Success();
     }
 }

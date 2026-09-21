@@ -49,7 +49,7 @@ internal static class DevelopmentRatingProjection
         var resultSetDto = resultSet is null
             ? null
             : new ResultSetSummaryDto(
-                resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute);
+                resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute, resultSet.ReturnReason);
 
         return new DevelopmentRatingSheetDto(
             armId.ToString("D", CultureInfo.InvariantCulture),

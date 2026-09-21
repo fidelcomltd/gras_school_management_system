@@ -191,7 +191,8 @@ internal sealed class ResultSetReadinessEvaluator(
 
         var resultSetDto = resultSet is null
             ? null
-            : new ResultSetSummaryDto(resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute);
+            : new ResultSetSummaryDto(
+                resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute, resultSet.ReturnReason);
 
         return new ResultSetReadinessDto(
             arm.Id.ToString("D", CultureInfo.InvariantCulture),
