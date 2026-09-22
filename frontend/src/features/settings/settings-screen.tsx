@@ -1,96 +1,95 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
+import { cn } from '@/lib/utils/cn';
 import { useSettings } from './api';
-import { SchoolIdentityForm } from './components/school-identity-form';
-import type { SettingsIdentityGroupDto } from './types';
+import { useResultRules } from './api-groups';
+import { AssessmentPanel } from './components/assessment-panel';
+import { GradingPanel } from './components/grading-panel';
+import { IdentityPanel } from './components/identity-panel';
+import { RegNumberPanel } from './components/reg-number-panel';
+import { ResultRulesPanel } from './components/result-rules-panel';
 
-const IDENTITY_UPDATE_PRIVILEGE = 'settings.identity.update';
+const TABS = [
+  { id: 'identity', label: 'School' },
+  { id: 'regNumber', label: 'Registration numbers' },
+  { id: 'grading', label: 'Grading' },
+  { id: 'assessment', label: 'Assessment' },
+  { id: 'rules', label: 'Result rules' },
+] as const;
+
+type TabId = (typeof TABS)[number]['id'];
 
 /**
- * `/settings` — mounted inside `ProtectedLayout`'s `<Outlet/>`, behind
- * `RequirePrivilege privilege="settings.view"` (route already gates entry).
- *
- * Four required states (CONVENTIONS.md §11) for the `GET /settings` fetch:
- * loading, error, unauthorized, and success below. No distinct "empty" state —
- * like `LandingScreen`'s `me` fetch, `settings` is a single-object read that
- * is either present on success or absent as one of the other three.
+ * `/settings` (spec 6.2), behind `settings.view`. One tab per settings group; each group saves on its own with the
+ * version it was read at. Each editor is keyed by its group's version so a save starts again from the server's values.
  */
 export function SettingsScreen() {
   const settings = useSettings();
+  const rules = useResultRules();
   const me = useMe();
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [tab, setTab] = useState<TabId>('identity');
+  const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
-  if (settings.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading settings…</output>;
-  }
+  if (settings.isPending) return <LoadingState label="Loading settings…" />;
+  if (settings.isError) return <QueryErrorState error={settings.error} onRetry={() => void settings.refetch()} />;
+  const data = settings.data;
 
-  if (settings.isError) {
-    if (settings.error instanceof ApiError && settings.error.kind === 'unauthorized') {
-      // The route is already gated by `ProtectedLayout`; a 401 here means the
-      // session just ended mid-flight. `ProtectedLayout`'s own subscription
-      // is already navigating away — nothing to render here.
-      return null;
+  const panel = () => {
+    switch (tab) {
+      case 'identity':
+        return <IdentityPanel identity={data.identity} />;
+      case 'regNumber':
+        return (
+          <RegNumberPanel
+            key={`${data.regNumber.versionNumber}:${data.abbreviation.versionNumber}`}
+            settings={data}
+            canEditFormat={can('settings.regnumber.update')}
+            canEditAbbreviation={can('settings.abbreviation.update')}
+          />
+        );
+      case 'grading':
+        return <GradingPanel key={data.grading.versionNumber} grading={data.grading} canEdit={can('settings.grading.update')} />;
+      case 'assessment':
+        return <AssessmentPanel key={data.assessment.versionNumber} assessment={data.assessment} canEdit={can('settings.assessment.update')} />;
+      case 'rules':
+        if (rules.isPending) return <LoadingState label="Loading result rules…" />;
+        if (rules.isError) return <QueryErrorState error={rules.error} onRetry={() => void rules.refetch()} />;
+        return <ResultRulesPanel key={rules.data.versionNumber} rules={rules.data} canEdit={can('settings.resultrules.update')} />;
     }
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{settings.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void settings.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const { identity } = settings.data;
-  const canEdit = !!me.data && hasPrivilege(me.data, IDENTITY_UPDATE_PRIVILEGE);
+  };
 
   return (
-    <div className="flex max-w-xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">School settings</h1>
-        <p className="text-sm text-muted-foreground">
-          The school&apos;s identity, as printed on result sheets and pin slips.
-        </p>
+        <p className="text-sm text-muted-foreground">How the school appears on result sheets and pin slips, and how results are graded and computed.</p>
       </header>
 
-      {savedAt !== null ? (
-        <output className="rounded-md bg-success-subtle px-3 py-2 text-sm text-success">
-          Settings updated.
-        </output>
-      ) : null}
+      <div role="tablist" aria-label="Settings" className="flex flex-wrap gap-1 border-b border-border">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`settings-tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls="settings-panel"
+            className={cn(
+              '-mb-px border-b-2 px-3 py-2 text-sm font-medium',
+              tab === t.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {canEdit ? (
-        <SchoolIdentityForm identity={identity} onSaved={() => setSavedAt(Date.now())} />
-      ) : (
-        <ReadOnlyIdentity identity={identity} />
-      )}
+      <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${tab}`}>
+        {panel()}
+      </div>
     </div>
-  );
-}
-
-/** Read-only view for a caller who can see settings but lacks `settings.identity.update`. */
-function ReadOnlyIdentity({ identity }: { identity: SettingsIdentityGroupDto }) {
-  const rows: [string, string][] = [
-    ['School name', identity.schoolName],
-    ['Short name', identity.shortName],
-    ['Address', identity.address],
-    ['Phone', identity.phone],
-    ['Email', identity.email],
-    ['Motto', identity.motto ?? '—'],
-    ['Head teacher', identity.headTeacherName],
-  ];
-
-  return (
-    <dl className="flex flex-col gap-3">
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex flex-col gap-0.5">
-          <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-          <dd className="text-sm text-foreground">{value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
