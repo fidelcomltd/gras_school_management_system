@@ -34,6 +34,7 @@ internal static class PortalEndpoints
         portal.MapPost("/lookup", LookupAsync)
             .ExemptFromCsrfRequirement("Public portal: no signed-in session exists to ride, and a lookup needs a valid pin the attacker would already hold.");
         portal.MapGet("/terms", TermsAsync);
+        portal.MapGet("/result/{termId:guid}", ResultAsync);
         portal.MapPost("/end", EndAsync)
             .ExemptFromCsrfRequirement("The viewing cookie is SameSite=Strict, so a cross-site post arrives without it and ends nothing.");
         portal.MapGet("/logo", LogoAsync);
@@ -99,6 +100,27 @@ internal static class PortalEndpoints
             ? sessions.FirstOrDefault(session => session.UseId == useId) ?? sessions[^1]
             : sessions[^1];
         return Html(PortalHtml.Terms(branding, selected, sessions.Where(session => session.UseId != selected.UseId).ToList()));
+    }
+
+    private static async Task<IResult> ResultAsync(Guid termId, HttpContext http, ISender sender, CancellationToken cancellationToken)
+    {
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        Guid? useId = Guid.TryParse(http.Request.Query["u"], out var parsed) ? parsed : null;
+        var result = await sender.SendAsync(new GetPortalResultQuery(ReadTokens(http), useId, termId), cancellationToken).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return Html(PortalHtml.Message(branding, PortalCopy.ServerFault));
+        }
+
+        var view = result.Value;
+        return view.Status switch
+        {
+            PortalResultStatus.Shown => Html(PortalHtml.Result(branding, view.Sheet!, view.UseId!.Value)),
+            PortalResultStatus.NotReleased => Html(PortalHtml.Message(branding, PortalCopy.NotReleased(view.TermName ?? "This term's"))),
+            PortalResultStatus.BeingCorrected => Html(PortalHtml.Message(branding, PortalCopy.BeingCorrected)),
+            PortalResultStatus.NoResult => Html(PortalHtml.Message(branding, PortalCopy.NoResult)),
+            _ => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
+        };
     }
 
     private static async Task<IResult> EndAsync(HttpContext http, ISender sender, CancellationToken cancellationToken)

@@ -169,6 +169,100 @@ public sealed class PortalEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         (await ReadAsync(await GetAsync(client, "/portal/terms", cookie))).ShouldContain("Your session has ended");
     }
 
+    [Fact]
+    public async Task EndToEnd_APublishedResult_ShowsTheSnapshotsValuesOnThePortal()
+    {
+        RequireDatabase();
+        var school = await SeedSchoolAsync(published: false);
+        var pupil = school.Pupils[0];
+        var (admin, adminId) = await SignInAdminAsync();
+        Guid resultSetId;
+        string subjectName;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var resultSet = await context.ResultSets.SingleAsync(set => context.Enrolments.Any(enrolment => enrolment.PupilId == pupil.Id && enrolment.ArmId == set.ArmId), TestContext.Current.CancellationToken);
+            resultSetId = resultSet.Id;
+            var term = await context.Terms.SingleAsync(candidate => candidate.Id == resultSet.TermId, TestContext.Current.CancellationToken);
+            term.SetTimesSchoolOpened(60).IsSuccess.ShouldBeTrue();
+            term.UpdateSchedule(term.Name, term.StartDate, term.EndDate, term.EndDate.AddDays(21)).IsSuccess.ShouldBeTrue();
+            var arm = await context.Arms.SingleAsync(candidate => candidate.Id == resultSet.ArmId, TestContext.Current.CancellationToken);
+
+            subjectName = $"Mathematics {Guid.NewGuid():N}"[..20];
+            var subject = SchoolManagement.Domain.Subjects.Subject.Create(Guid.CreateVersion7(), subjectName, null, null).Value;
+            context.Add(subject);
+            context.Add(SchoolManagement.Domain.Subjects.SubjectMapping.Create(Guid.CreateVersion7(), subject.Id, arm.ClassLevelId, arm.SessionId, term.Id, 1).Value);
+
+            var components = await context.AssessmentComponents.AsNoTracking().OrderBy(component => component.DisplayOrder).ToListAsync(TestContext.Current.CancellationToken);
+            var marks = System.Text.Json.JsonSerializer.Serialize(components.Where(component => !component.IsExamination).ToDictionary(component => component.Id.ToString("D"), _ => 17));
+            context.Add(SubjectScore.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, term.Id, marks, null, examAbsent: true).Value);
+            context.Add(SubjectResultLine.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, 34, null, 34, "E", "Not Now", 1, false, false));
+            context.Add(PupilTermResult.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 1, 100, 34, 34.00m, "E", 1, false, 1, 1, false, 1));
+            context.Add(AttendanceEntry.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 55).Value);
+            context.Add(PupilRemark.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, RemarkKind.ClassTeacher, "A steady term.", adminId, "Mrs Adeyemi", DateTimeOffset.UtcNow).Value);
+            context.Add(PupilRemark.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, RemarkKind.HeadTeacher, "Keep working hard.", adminId, "Mr Bello", DateTimeOffset.UtcNow).Value);
+            resultSet.MarkComputed(null, DateTimeOffset.UtcNow, 1);
+
+            var profile = await context.Set<SchoolManagement.Domain.Settings.SchoolProfile>().SingleAsync(TestContext.Current.CancellationToken);
+            profile.SetCurrentLogo(Guid.CreateVersion7());
+            profile.SetCurrentSignature(Guid.CreateVersion7());
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        using (var publish = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/result-sets/{resultSetId}/publish"))
+        {
+            publish.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
+            admin.ApplyWithCsrf(publish);
+            var published = await Client.SendAsync(publish, TestContext.Current.CancellationToken);
+            published.StatusCode.ShouldBe(HttpStatusCode.OK, await published.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        }
+
+        var pin = await SeedPinAsync(school.SessionId, maxUses: 3);
+        using var client = NewClient();
+        var cookie = CookieFrom(await LookupAsync(client, pupil.Number, pin.Value));
+        var termId = await TermIdAsync(resultSetId);
+
+        var html = await ReadAsync(await GetAsync(client, $"/portal/result/{termId}", cookie));
+
+        html.ShouldContain(subjectName);
+        html.ShouldContain("ABS");
+        html.ShouldContain(">17<");
+        html.ShouldContain("34.00");
+        html.ShouldContain("Keep working hard.");
+        html.ShouldContain("A steady term.");
+        html.ShouldContain("Times present</dt><dd>55");
+        html.ShouldContain("Times absent</dt><dd>5");
+        html.ShouldContain(", First Term</dd>");
+        html.ShouldContain("Age</dt><dd>");
+    }
+
+    private async Task<Guid> TermIdAsync(Guid resultSetId)
+    {
+        await using var scope = Fixture.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().ResultSets.AsNoTracking()
+            .Where(set => set.Id == resultSetId).Select(set => set.TermId).SingleAsync(TestContext.Current.CancellationToken);
+    }
+
+    private async Task<(CookieJar Jar, Guid AccountId)> SignInAdminAsync()
+    {
+        var (accountId, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false, email: $"admin-{Guid.NewGuid():N}@example.com");
+        var jar = new CookieJar();
+        using (var csrf = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf"))
+        {
+            jar.Capture(await Client.SendAsync(csrf, TestContext.Current.CancellationToken));
+        }
+
+        using var signIn = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/sign-in")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new SchoolManagement.Application.Auth.SignIn.SignInCommand(email, AdminAccountSeeder.Password)),
+        };
+        jar.ApplyWithCsrf(signIn);
+        var response = await Client.SendAsync(signIn, TestContext.Current.CancellationToken);
+        jar.Capture(response);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return (jar, accountId);
+    }
+
     private HttpClient NewClient() =>
         Fixture.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
 

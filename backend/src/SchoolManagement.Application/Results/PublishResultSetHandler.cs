@@ -31,6 +31,9 @@ internal sealed class PublishResultSetHandler(
     IConfigVersionRepository configVersions,
     IResultSetReadinessEvaluator readinessEvaluator,
     IRequestHandler<GetSettingsQuery, Result<SettingsDto>> settingsQuery,
+    Subjects.SubjectsInEffectResolver subjectsInEffect,
+    Abstractions.Auth.IAdminAccountRepository adminAccounts,
+    IAcademicSessionRepository academicSessions,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -39,7 +42,8 @@ internal sealed class PublishResultSetHandler(
     /// <summary>Third Term is the term the annual result and promotion read (spec 6.2.8).</summary>
     private const int ThirdTermOrdinal = 3;
 
-    private static readonly JsonSerializerOptions SnapshotJson = new(JsonSerializerDefaults.Web);
+    // Enums as names, so a sheet reprinted years later never depends on enum ordering.
+    private static readonly JsonSerializerOptions SnapshotJson = new(JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
 
     /// <inheritdoc />
     public async Task<Result<PublishResultSetResponse>> HandleAsync(PublishResultSetCommand request, CancellationToken cancellationToken)
@@ -134,6 +138,16 @@ internal sealed class PublishResultSetHandler(
             ? Guid.Parse(latestVersion.Items[0].Id)
             : (Guid?)null;
 
+        // Appendix C.8 rule 2: a published sheet never reads live settings, so the subject list and the
+        // form teacher ("instructor, captured at publication", E.2/F.1) are frozen here too.
+        var subjectsResolution = await subjectsInEffect.ResolveAsync(arm.Id, term.Id, cancellationToken).ConfigureAwait(false);
+        var subjects = subjectsResolution.IsSuccess
+            ? subjectsResolution.Value.OrderBy(subject => subject.DisplayOrder).Select(subject => new { subject.SubjectId, subject.SubjectName, subject.DisplayOrder }).ToList()
+            : [];
+        var formTeacher = arm.FormTeacherAdminId is { } teacherId
+            ? await adminAccounts.FindReadOnlyByIdAsync(teacherId, cancellationToken).ConfigureAwait(false)
+            : null;
+
         var now = timeProvider.GetUtcNow();
         var snapshot = new
         {
@@ -147,8 +161,11 @@ internal sealed class PublishResultSetHandler(
             level = level is null ? null : new { level.Id, level.Name },
             section = section is null ? null : new { section.Id, section.Name, section.RatesTraits },
             arm = new { arm.Id, displayName = ArmDisplayName.Compose(level?.Name ?? string.Empty, arm.Label) },
-            term = new { term.Id, term.Name, term.Ordinal, term.NextResumptionDate, term.TimesSchoolOpened },
+            session = new { Id = term.SessionId, Name = (await academicSessions.FindReadOnlyByIdAsync(term.SessionId, cancellationToken).ConfigureAwait(false))?.Name },
+            term = new { term.Id, term.Name, term.Ordinal, term.StartDate, term.EndDate, term.NextResumptionDate, term.TimesSchoolOpened },
             pupilCount = resultSet.PupilCount,
+            subjects,
+            formTeacherName = formTeacher?.StaffName,
         };
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJson);
 

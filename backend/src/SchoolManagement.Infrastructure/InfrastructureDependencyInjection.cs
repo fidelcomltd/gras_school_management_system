@@ -167,6 +167,7 @@ public static class InfrastructureDependencyInjection
         services.AddOptions<Pins.PortalOptions>().Bind(configuration.GetSection(Pins.PortalOptions.SectionName));
         services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
         services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
+        services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();
         services.AddSingleton<Pins.PinMaintenanceService>();
         services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
