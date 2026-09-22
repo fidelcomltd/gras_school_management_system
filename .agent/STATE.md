@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `d1816d8c…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `b4bf1cf3…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `d1816d8c15b852eec0bd954aca311f735e0701b921ab98e30e2a58e58de20dbf`** · **84 paths** ·
-**201 schemas** · api version `v1` · moved 2026-09-22 by publication (§6.7.9).
-Previous: `905632799f5c…` / 83 paths / 200 schemas, TASK-0005b on 2026-09-22; before that `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `b4bf1cf369f2324a4c08ba27ac10d1c32728d741d1ff7fe7c9049c12f2cfb4c7`** · **86 paths** ·
+**203 schemas** · api version `v1` · moved 2026-09-22 by withdraw/reopen (§6.7.9).
+Previous: `d1816d8c15b8…` / 84 paths / 201 schemas, publication on 2026-09-22; before that `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Withdraw/reopen additive verified mechanically** (`jq`): +2 paths, +2 schemas, nothing else changed.
 
 **Publication additive verified mechanically** (`jq`): +1 path, +1 schema, nothing else changed.
 
@@ -220,6 +222,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Withdraw/reopen done** (§6.7.9): Super Admin, reason ≥10; reopen needs an active term; `result_set_snapshot` keeps every revision. Contract `b4bf1cf3…`.
 - 2026-09-22 **Publication done** (§6.7.9): `POST /result-sets/{id}/publish`, school-wide, snapshot written; contract `d1816d8c…`. Level-position re-check skipped: no sheet prints positions.
 - 2026-09-22 **LEAN MODE** (human): orchestrator codes directly. **TASK-0005b A–C done**: upload + serving, multipart antiforgery 500 fixed; contract `90563279…`; gate 1359/1359. Stage D (Cloudinary) left.
 - 2026-09-21 **TASK-0090 closed** — approve/return, school-wide; contract `e7113c87…`, 80 paths; gate 1384/1384. **The orchestrator's delta wrongly scoped both
