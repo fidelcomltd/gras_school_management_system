@@ -7,6 +7,7 @@ import { adminsRoutes } from '@/features/admins/admins-routes';
 import { armsRoutes } from '@/features/arms/arms-routes';
 import { authRoutes, publicAuthRoutes } from '@/features/auth/auth-routes';
 import { classesRoutes } from '@/features/classes/classes-routes';
+import { pupilsRoutes } from '@/features/pupils/pupils-routes';
 import { rolesRoutes } from '@/features/roles/roles-routes';
 import { sessionsRoutes } from '@/features/sessions/sessions-routes';
 import { settingsRoutes } from '@/features/settings/settings-routes';
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       ...classesRoutes,
       ...armsRoutes,
       ...admissionsRoutes,
+      ...pupilsRoutes,
       ...adminsRoutes,
       ...rolesRoutes,
     ],
