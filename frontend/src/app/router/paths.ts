@@ -25,6 +25,8 @@ export const paths = {
   results: '/results',
   marks: '/results/marks',
   classRecords: '/results/class',
+  pins: '/pins',
+  pinBatch: (id: string) => `/pins/${id}`,
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

@@ -6,7 +6,7 @@ import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
-import { LabelledSelect } from './components/labelled-select';
+import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { AttendancePanel, RatingsPanel, RemarksPanel } from './components/records-panels';
 import { useClassChoice } from './hooks/use-class-choice';
 

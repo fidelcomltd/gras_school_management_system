@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Results', to: paths.results, requires: 'result.view' },
   { label: 'Marks', to: paths.marks, requires: 'result.view' },
   { label: 'Class records', to: paths.classRecords, requires: 'result.view' },
+  { label: 'Pins', to: paths.pins, requires: 'pin.view' },
   { label: 'Admins', to: paths.admins, requires: 'admin.view' },
   { label: 'Roles', to: paths.roles, requires: 'role.view' },
   { label: 'Settings', to: paths.settings, requires: 'settings.view' },

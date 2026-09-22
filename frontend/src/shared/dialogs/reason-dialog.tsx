@@ -4,13 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/http';
 
-const MIN = 10;
 const MAX = 500;
 
-/** A reasoned transition (return for correction, withdraw a publication): 10 to 500 characters, as the server requires. */
+/**
+ * A reasoned action (return or withdraw results; revoke or reinstate a pin). The server's length rule is mirrored by
+ * `minLength` (10 for result transitions, 1 for pins) and a 500-character maximum.
+ */
 export function ReasonDialog({
   title,
   description,
+  minLength = 10,
   action,
   pending,
   error,
@@ -19,6 +22,7 @@ export function ReasonDialog({
 }: {
   title: string;
   description: string;
+  minLength?: number | undefined;
   action: string;
   pending: boolean;
   error: Error | null;
@@ -39,12 +43,12 @@ export function ReasonDialog({
           className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
-            if (length >= MIN && length <= MAX) onSubmit(reason.trim());
+            if (length >= minLength && length <= MAX) onSubmit(reason.trim());
           }}
         >
           <FormError message={error instanceof ApiError ? error.message : null} />
           <label htmlFor="transition-reason" className="text-sm font-medium text-foreground">
-            Reason ({MIN} to {MAX} characters)
+            {minLength > 1 ? `Reason (${minLength} to ${MAX} characters)` : 'Reason'}
           </label>
           <textarea
             id="transition-reason"
@@ -56,7 +60,7 @@ export function ReasonDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={length < MIN || length > MAX || pending}>
+            <Button type="submit" disabled={length < minLength || length > MAX || pending}>
               {pending ? 'Working…' : action}
             </Button>
           </DialogFooter>

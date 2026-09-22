@@ -4,7 +4,7 @@ import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/http';
 import { useComputeAnnual, useTransition, type Transition } from '../api-workflow';
-import { ReasonDialog } from './reason-dialog';
+import { ReasonDialog } from '@/shared/dialogs/reason-dialog';
 
 type ResultSetSummaryDto = components['schemas']['ResultSetSummaryDto'];
 

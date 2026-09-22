@@ -4,7 +4,7 @@ import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useReadiness } from './api-workflow';
-import { LabelledSelect } from './components/labelled-select';
+import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
 import { useClassChoice } from './hooks/use-class-choice';

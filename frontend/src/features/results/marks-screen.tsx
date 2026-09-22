@@ -6,7 +6,7 @@ import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useArmSubjects, useScoreSheet } from './api';
-import { LabelledSelect } from './components/labelled-select';
+import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ScoreSheetEditor } from './components/score-sheet-editor';
 import { VoidSheetDialog } from './components/void-sheet-dialog';
 import { useClassChoice } from './hooks/use-class-choice';
