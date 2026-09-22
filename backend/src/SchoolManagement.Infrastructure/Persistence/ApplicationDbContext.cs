@@ -179,6 +179,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     internal DbSet<ResultSetSnapshot> ResultSetSnapshots => Set<ResultSetSnapshot>();
 
+    internal DbSet<Domain.Pins.PinBatch> PinBatches => Set<Domain.Pins.PinBatch>();
+
+    internal DbSet<Domain.Pins.Pin> Pins => Set<Domain.Pins.Pin>();
+
     /// <summary>
     /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
     /// One row per pupil per subject per term (spec 09 §6.7.3).

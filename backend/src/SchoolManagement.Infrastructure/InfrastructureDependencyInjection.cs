@@ -150,6 +150,20 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<IValidateOptions<Argon2Options>, Argon2OptionsValidator>();
 
         services.AddScoped<IPasswordHasher, Argon2idPasswordHasher>();
+
+        // Spec 6.8.6: the pin HMAC and AES keys come from configuration (environment variables on the VPS), never the database.
+        var pinOptions = services
+            .AddOptions<Pins.PinSecretsOptions>()
+            .Bind(configuration.GetSection(Pins.PinSecretsOptions.SectionName));
+
+        if (validateOnStart)
+        {
+            pinOptions.ValidateOnStart();
+        }
+
+        services.AddSingleton<IValidateOptions<Pins.PinSecretsOptions>, Pins.PinSecretsOptionsValidator>();
+        services.AddSingleton<Application.Abstractions.Pins.IPinSecrets, Pins.PinSecrets>();
+        services.AddScoped<Application.Abstractions.Pins.IPinBatchRepository, Persistence.Repositories.PinBatchRepository>();
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
         services.AddScoped<IAdminSessionRepository, AdminSessionRepository>();
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();

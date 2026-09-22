@@ -8,6 +8,7 @@ using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -2581,6 +2582,114 @@ internal static class OpenApiExamples
                 "returnReason": null
               },
               "approvedAt": "{{CanonicalTimestamp}}"
+            }
+            """,
+
+        [typeof(PinBatchDto)] = $$"""
+            {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                }
+            """,
+
+        [typeof(PinSummaryDto)] = $$"""
+            {
+                  "id": "0192f0c4-9a10-7000-8000-000000000303",
+                  "prefix": "H7K2",
+                  "state": "Active",
+                  "useCount": 1,
+                  "maxUses": 3,
+                  "distinctPupilCount": 1,
+                  "stateReason": null
+                }
+            """,
+
+        [typeof(PinBatchDetailDto)] = $$"""
+            {
+              "batch": {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                },
+              "pins": [
+                {
+                  "id": "0192f0c4-9a10-7000-8000-000000000303",
+                  "prefix": "H7K2",
+                  "state": "Active",
+                  "useCount": 1,
+                  "maxUses": 3,
+                  "distinctPupilCount": 1,
+                  "stateReason": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(CursorPage<PinBatchDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                }
+              ],
+              "nextCursor": "0192f0c4-9a10-7000-8000-000000000301"
+            }
+            """,
+
+        [typeof(GeneratePinBatchCommand)] = """
+            {
+              "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+              "name": null,
+              "purposeNote": "Primary 3 and Primary 4 parents",
+              "pinCount": 120,
+              "pinLength": 10,
+              "maxUses": 3,
+              "confirmMaxUses": null
+            }
+            """,
+
+        [typeof(PinReasonRequest)] = """
+            {
+              "reason": "A sheet of slips went missing from the office."
             }
             """,
 

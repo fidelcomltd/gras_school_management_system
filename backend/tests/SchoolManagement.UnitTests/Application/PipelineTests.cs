@@ -193,6 +193,8 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<ISchoolImageRepository>());
         services.AddSingleton(Substitute.For<ISchoolImageProcessor>());
         services.AddSingleton(Substitute.For<ISchoolImageStore>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinBatchRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSecrets>());
 
         services.AddOptions<PipelineOptions>();
 

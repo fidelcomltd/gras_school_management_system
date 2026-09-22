@@ -149,6 +149,9 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 [$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.ConnectionString)}"] =
                     _connectionString,
 
+                // Spec 6.8.6's pin keys: fixed, obviously non-production development keys for tests.
+                ["Pins:AllowDevelopmentKeys"] = "true",
+
                 // Retries off: a transient-failure retry inside a test turns a genuine failure into a
                 // slow, confusing one.
                 [$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.MaxRetryCount)}"] = "0",
