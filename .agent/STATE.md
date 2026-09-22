@@ -173,7 +173,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **STALE against this hash** since 2026-09-22 (TASK-0005b); was current against `e7113c87…`. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** (2026-09-22, `1c9f402`); `No drift`, typecheck and lint clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -212,12 +212,13 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **A and B1 done** (`d03906e`, `74680e7`), **B2 dispatched** 2026-09-21; five stages (A, B1, B2, C, D) |
+| TASK-0005b | Logo and signature uploads (Cloudinary) | orchestrator | **A–C done 2026-09-22**; stage D (Cloudinary adapter) left, needs the human's keys for the smoke test |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **LEAN MODE** (human): orchestrator codes directly. **TASK-0005b A–C done**: upload + serving, multipart antiforgery 500 fixed; contract `90563279…`; gate 1359/1359. Stage D (Cloudinary) left.
 - 2026-09-21 **TASK-0090 closed** — approve/return, school-wide; contract `e7113c87…`, 80 paths; gate 1384/1384. **The orchestrator's delta wrongly scoped both
   routes; the agent widened the privileges to comply; review reverted it** — FOURTH orchestrator delta error. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0091 closed** — client current against `e7113c87…` (`be208a0`); verify 381/381. → `decisions/2026-Q3.md`
