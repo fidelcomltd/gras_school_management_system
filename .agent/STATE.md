@@ -220,6 +220,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Publication done** (§6.7.9): `POST /result-sets/{id}/publish`, school-wide, snapshot written; contract `d1816d8c…`. Level-position re-check skipped: no sheet prints positions.
 - 2026-09-22 **LEAN MODE** (human): orchestrator codes directly. **TASK-0005b A–C done**: upload + serving, multipart antiforgery 500 fixed; contract `90563279…`; gate 1359/1359. Stage D (Cloudinary) left.
 - 2026-09-21 **TASK-0090 closed** — approve/return, school-wide; contract `e7113c87…`, 80 paths; gate 1384/1384. **The orchestrator's delta wrongly scoped both
   routes; the agent widened the privileges to comply; review reverted it** — FOURTH orchestrator delta error. → `decisions/2026-Q3.md`
