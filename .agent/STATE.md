@@ -222,6 +222,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Human: keep pins UNBOUND** (§6.8.2, reconfirmed). **Withdraw/reopen gate 1466/1466.** **PDF library: QuestPDF** (Community licence).
 - 2026-09-22 **Withdraw/reopen done** (§6.7.9): Super Admin, reason ≥10; reopen needs an active term; `result_set_snapshot` keeps every revision. Contract `b4bf1cf3…`.
 - 2026-09-22 **Publication done** (§6.7.9): `POST /result-sets/{id}/publish`, school-wide, snapshot written; contract `d1816d8c…`. Level-position re-check skipped: no sheet prints positions.
 - 2026-09-22 **LEAN MODE** (human): orchestrator codes directly. **TASK-0005b A–C done**: upload + serving, multipart antiforgery 500 fixed; contract `90563279…`; gate 1359/1359. Stage D (Cloudinary) left.
