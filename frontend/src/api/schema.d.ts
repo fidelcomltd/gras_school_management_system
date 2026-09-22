@@ -1207,6 +1207,70 @@ export interface paths {
         patch: operations["UpdateSchoolIdentity"];
         trace?: never;
     };
+    "/api/v1/settings/identity/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the school logo
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 2 MB; minimum 300 by 300 pixels. Re-encoded to strip all metadata (EXIF orientation is applied to the pixels first, so a portrait phone photo stays upright), and stored at the original size plus 200 and 64 pixel derivatives. Repoints the current logo; the previous asset is never deleted, so a result published while it was current keeps rendering it. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadSchoolLogo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/identity/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current head teacher's signature
+         * @description Streams the current signature at its original size (spec 9.6). Same headers as the logo. `404 school_image.not_uploaded` before the first upload.
+         */
+        get: operations["GetHeadTeacherSignature"];
+        put?: never;
+        /**
+         * Upload the head teacher's signature
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadHeadTeacherSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/identity/logo/{size}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current school logo
+         * @description Streams the current logo at `original`, `200` or `64` pixels (spec 9.6: served only through a privilege-checked endpoint, never a public URL). `Content-Disposition: inline`, `nosniff`, `Cache-Control: private`. `404 school_image.not_uploaded` before the first upload.
+         */
+        get: operations["GetSchoolLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/reg-number": {
         parameters: {
             query?: never;
@@ -4689,6 +4753,12 @@ export interface components {
             traceId: string;
         };
         /**
+         * Format: binary
+         * @description One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic bytes, never by a declared content type or file name (spec 9.6) — neither is part of this contract.
+         * @example binary image content, sent as the multipart request's `file` part
+         */
+        IFormFile: string;
+        /**
          * @description The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.
          * @example {
          *       "schoolProfile": {
@@ -7203,6 +7273,44 @@ export interface components {
             };
         };
         /**
+         * @description One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body
+         *     of both `POST /settings/identity/logo` and `POST /settings/identity/signature`, and also
+         *     how SchoolImageDto? SettingsIdentityGroupDto.Logo/SchoolImageDto? SettingsIdentityGroupDto.Signature
+         *     report the current upload.
+         * @example {
+         *       "width": 512,
+         *       "height": 512,
+         *       "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *       "uploadedByName": "Chisom Maxwell"
+         *     }
+         */
+        SchoolImageDto: {
+            /**
+             * Format: int32
+             * @description The Original rendition's width, in pixels, after any EXIF orientation correction.
+             * @example 512
+             */
+            width: number | string;
+            /**
+             * Format: int32
+             * @description The Original rendition's height, in pixels, after any EXIF orientation correction.
+             * @example 512
+             */
+            height: number | string;
+            /**
+             * Format: date-time
+             * @description When this upload was made.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            uploadedAt: string;
+            /**
+             * @description The uploading administrator's staff name, or `null` when the account that
+             *     uploaded it can no longer be resolved.
+             * @example Chisom Maxwell
+             */
+            uploadedByName: null | string;
+        };
+        /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
          *     or a list of specific arms in a specific session."
          * @example ArmList
@@ -7864,7 +7972,14 @@ export interface components {
          *         "motto": "Excellence Through Character",
          *         "headTeacherName": "Chisom Maxwell",
          *         "timezone": "Africa/Lagos",
-         *         "versionNumber": 3
+         *         "versionNumber": 3,
+         *         "logo": {
+         *           "width": 512,
+         *           "height": 512,
+         *           "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *           "uploadedByName": "Chisom Maxwell"
+         *         },
+         *         "signature": null
          *       },
          *       "abbreviation": {
          *         "abbreviation": "GRAS",
@@ -8258,7 +8373,14 @@ export interface components {
          *       "motto": "Excellence Through Character",
          *       "headTeacherName": "Chisom Maxwell",
          *       "timezone": "Africa/Lagos",
-         *       "versionNumber": 3
+         *       "versionNumber": 3,
+         *       "logo": {
+         *         "width": 512,
+         *         "height": 512,
+         *         "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *         "uploadedByName": "Chisom Maxwell"
+         *       },
+         *       "signature": null
          *     }
          */
         SettingsIdentityGroupDto: {
@@ -8309,6 +8431,8 @@ export interface components {
              * @example 3
              */
             versionNumber: number | string;
+            logo: null | components["schemas"]["SchoolImageDto"];
+            signature: null | components["schemas"]["SchoolImageDto"];
         };
         /**
          * @description The rating-scales group, both inside SettingsDto and as
@@ -8510,6 +8634,12 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * Format: binary
+         * @description The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).
+         * @example binary PNG or JPEG bytes
+         */
+        Stream: string;
         /**
          * @description The wire shape of a Subject (spec 6.6.2, 6.6.7, 6.6.9).
          * @example {
@@ -16337,6 +16467,276 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadSchoolLogo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolImageDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetHeadTeacherSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["Stream"];
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadHeadTeacherSignature: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolImageDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSchoolLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                size: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["Stream"];
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
