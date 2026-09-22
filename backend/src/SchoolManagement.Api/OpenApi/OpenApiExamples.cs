@@ -145,7 +145,7 @@ internal static class OpenApiExamples
             }
             """,
 
-        [typeof(SettingsIdentityGroupDto)] = """
+        [typeof(SettingsIdentityGroupDto)] = $$"""
             {
               "schoolName": "Golden Royal Ark School",
               "shortName": "GRAS",
@@ -155,11 +155,34 @@ internal static class OpenApiExamples
               "motto": "Excellence Through Character",
               "headTeacherName": "Chisom Maxwell",
               "timezone": "Africa/Lagos",
-              "versionNumber": 3
+              "versionNumber": 3,
+              "logo": {
+                "width": 512,
+                "height": 512,
+                "uploadedAt": "{{CanonicalTimestamp}}",
+                "uploadedByName": "Chisom Maxwell"
+              },
+              "signature": null
             }
             """,
 
-        [typeof(SettingsDto)] = """
+        [typeof(SchoolImageDto)] = $$"""
+            {
+              "width": 512,
+              "height": 512,
+              "uploadedAt": "{{CanonicalTimestamp}}",
+              "uploadedByName": "Chisom Maxwell"
+            }
+            """,
+
+        // TASK-0005b stage B2: the multipart request body's own `file` part. A framework type — see
+        // DescriptionsByType's remarks below — whose schema is a bare `type: string, format: binary`,
+        // so its example is a JSON string rather than an object.
+        [typeof(Microsoft.AspNetCore.Http.IFormFile)] = """
+            "binary image content, sent as the multipart request's `file` part"
+            """,
+
+        [typeof(SettingsDto)] = $$"""
             {
               "identity": {
                 "schoolName": "Golden Royal Ark School",
@@ -170,7 +193,14 @@ internal static class OpenApiExamples
                 "motto": "Excellence Through Character",
                 "headTeacherName": "Chisom Maxwell",
                 "timezone": "Africa/Lagos",
-                "versionNumber": 3
+                "versionNumber": 3,
+                "logo": {
+                  "width": 512,
+                  "height": 512,
+                  "uploadedAt": "{{CanonicalTimestamp}}",
+                  "uploadedByName": "Chisom Maxwell"
+                },
+                "signature": null
               },
               "abbreviation": {
                 "abbreviation": "GRAS",
@@ -2601,6 +2631,12 @@ internal static class OpenApiExamples
             "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, " +
             "because every settings card adds its own section to the same snapshot shape. Read it as " +
             "an opaque object; do not assume today's set of keys is complete.",
+
+        // TASK-0005b stage B2: another framework type — see this dictionary's own remarks above.
+        [typeof(Microsoft.AspNetCore.Http.IFormFile)] =
+            "One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic " +
+            "bytes, never by a declared content type or file name (spec 9.6) — neither is part of this " +
+            "contract.",
     };
 
     /// <summary>

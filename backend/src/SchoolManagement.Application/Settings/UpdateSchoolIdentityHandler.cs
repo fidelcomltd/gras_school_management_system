@@ -30,6 +30,7 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
     ISchoolProfileRepository schoolProfileRepository,
     IConfigVersionRepository configVersionRepository,
     ISettingsSnapshotSource settingsSnapshotSource,
+    ISchoolImageRepository schoolImages,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -109,6 +110,10 @@ internal sealed class UpdateSchoolIdentityCommandHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(SettingsMapper.ToIdentityDto(profile));
+        // TASK-0005b stage B2: this save never touches either image, but the two now share this DTO.
+        var logo = await schoolImages.FindCurrentDtoAsync(profile.CurrentLogoGroupId, cancellationToken).ConfigureAwait(false);
+        var signature = await schoolImages.FindCurrentDtoAsync(profile.CurrentSignatureGroupId, cancellationToken).ConfigureAwait(false);
+
+        return Result.Success(SettingsMapper.ToIdentityDto(profile, logo, signature));
     }
 }

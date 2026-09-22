@@ -283,6 +283,9 @@ public static class InfrastructureDependencyInjection
         // process, matching a real store's behaviour closely enough for a fake.
         services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
 
+        // TASK-0005b stage B2: SchoolImage row persistence for the upload routes.
+        services.AddScoped<ISchoolImageRepository, SchoolImageRepository>();
+
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops
         // routing traffic here instead of restarting a container that is working fine.

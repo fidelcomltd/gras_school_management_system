@@ -1,6 +1,7 @@
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Settings;
 
@@ -15,7 +16,8 @@ internal sealed class GetSettingsQueryHandler(
     IRatingScaleRepository ratingScaleRepository,
     IDevelopmentDomainRepository developmentDomainRepository,
     ISectionRepository sectionRepository,
-    ITraitRepository traitRepository)
+    ITraitRepository traitRepository,
+    ISchoolImageRepository schoolImages)
     : IRequestHandler<GetSettingsQuery, Result<SettingsDto>>
 {
     /// <inheritdoc />
@@ -45,8 +47,12 @@ internal sealed class GetSettingsQueryHandler(
         var affectiveScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Affective)?.RatingScaleId ?? Guid.Empty;
         var psychomotorScaleId = traitBlocks.FirstOrDefault(block => block.Id == TraitDomain.Psychomotor)?.RatingScaleId ?? Guid.Empty;
 
+        // TASK-0005b stage B2: the identity group's own logo/signature summaries.
+        var logo = await schoolImages.FindCurrentDtoAsync(profile.CurrentLogoGroupId, cancellationToken).ConfigureAwait(false);
+        var signature = await schoolImages.FindCurrentDtoAsync(profile.CurrentSignatureGroupId, cancellationToken).ConfigureAwait(false);
+
         return Result.Success(new SettingsDto(
-            SettingsMapper.ToIdentityDto(profile),
+            SettingsMapper.ToIdentityDto(profile, logo, signature),
             SettingsMapper.ToAbbreviationDto(profile, issuedCount),
             SettingsMapper.ToRegNumberDto(profile),
             SettingsMapper.ToGradingDto(bands, profile.GradingVersionNumber),

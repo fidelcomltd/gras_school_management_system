@@ -188,6 +188,12 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<ISubjectMappingExceptionRepository>());
         services.AddSingleton(Substitute.For<ISubjectMappingMarkLookup>());
 
+        // TASK-0005b stage B2: the upload handlers depend on these three ports, implemented by
+        // Infrastructure — same treatment as every other repository/processor stubbed above.
+        services.AddSingleton(Substitute.For<ISchoolImageRepository>());
+        services.AddSingleton(Substitute.For<ISchoolImageProcessor>());
+        services.AddSingleton(Substitute.For<ISchoolImageStore>());
+
         services.AddOptions<PipelineOptions>();
 
         services.AddApplication();

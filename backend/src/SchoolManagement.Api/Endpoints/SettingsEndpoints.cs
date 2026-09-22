@@ -3,6 +3,7 @@ using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Idempotency;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Security;
@@ -38,6 +39,8 @@ public sealed class SettingsEndpoints : IEndpointModule
 
         MapGetSettings(settingsGroup);
         MapUpdateIdentity(settingsGroup);
+        MapUploadSchoolLogo(settingsGroup);
+        MapUploadSchoolSignature(settingsGroup);
         MapUpdateRegNumber(settingsGroup);
         MapGetRegNumberPreview(settingsGroup);
         MapUpdateAbbreviation(settingsGroup);
@@ -103,6 +106,75 @@ public sealed class SettingsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    /// <summary>Bytes over the processor's own cap that a multipart envelope's boundaries/headers may add.</summary>
+    private const long MultipartOverheadBytes = 64 * 1024;
+
+    private static void MapUploadSchoolLogo(RouteGroupBuilder group) =>
+        group.MapPost("/identity/logo", async (
+                IFormFile file,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var fileBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var result = await sender.SendAsync(new UploadSchoolLogoCommand(fileBytes), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.IdentityUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .Accepts<IFormFile>("multipart/form-data")
+            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxLogoBytes + MultipartOverheadBytes))
+            .WithName("UploadSchoolLogo")
+            .WithSummary("Upload the school logo")
+            .WithDescription(
+                "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; " +
+                "maximum 2 MB; minimum 300 by 300 pixels. Re-encoded to strip all metadata (EXIF " +
+                "orientation is applied to the pixels first, so a portrait phone photo stays upright), " +
+                "and stored at the original size plus 200 and 64 pixel derivatives. Repoints the " +
+                "current logo; the previous asset is never deleted, so a result published while it was " +
+                "current keeps rendering it. `Idempotency-Key` is REQUIRED.")
+            .Produces<SchoolImageDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUploadSchoolSignature(RouteGroupBuilder group) =>
+        group.MapPost("/identity/signature", async (
+                IFormFile file,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var fileBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var result = await sender.SendAsync(new UploadSchoolSignatureCommand(fileBytes), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Settings.IdentityUpdate)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .Accepts<IFormFile>("multipart/form-data")
+            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxSignatureBytes + MultipartOverheadBytes))
+            .WithName("UploadHeadTeacherSignature")
+            .WithSummary("Upload the head teacher's signature")
+            .WithDescription(
+                "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; " +
+                "maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded " +
+                "to strip all metadata but never resized. Repoints the current signature; the previous " +
+                "asset is never deleted. `Idempotency-Key` is REQUIRED.")
+            .Produces<SchoolImageDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return buffer.ToArray();
+    }
 
     private static void MapUpdateRegNumber(RouteGroupBuilder group) =>
         group.MapPatch("/reg-number", async (

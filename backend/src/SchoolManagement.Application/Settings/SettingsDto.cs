@@ -41,6 +41,11 @@ public sealed record SettingsDto(
 /// The identity group's current optimistic-concurrency pointer. Echo this back as
 /// <c>expectedVersion</c> on the next <c>PATCH</c>.
 /// </param>
+/// <param name="Logo">
+/// The current logo's summary (TASK-0005b stage B2), or <see langword="null"/> before the first
+/// upload. Fetch the actual pixels through the separate serving endpoints (stage C).
+/// </param>
+/// <param name="Signature">The current head teacher signature's summary, or <see langword="null"/> before the first upload.</param>
 public sealed record SettingsIdentityGroupDto(
     string SchoolName,
     string ShortName,
@@ -50,7 +55,24 @@ public sealed record SettingsIdentityGroupDto(
     string? Motto,
     string HeadTeacherName,
     string Timezone,
-    int VersionNumber);
+    int VersionNumber,
+    SchoolImageDto? Logo,
+    SchoolImageDto? Signature);
+
+/// <summary>
+/// One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body
+/// of both <c>POST /settings/identity/logo</c> and <c>POST /settings/identity/signature</c>, and also
+/// how <see cref="SettingsIdentityGroupDto.Logo"/>/<see cref="SettingsIdentityGroupDto.Signature"/>
+/// report the current upload.
+/// </summary>
+/// <param name="Width">The Original rendition's width, in pixels, after any EXIF orientation correction.</param>
+/// <param name="Height">The Original rendition's height, in pixels, after any EXIF orientation correction.</param>
+/// <param name="UploadedAt">When this upload was made.</param>
+/// <param name="UploadedByName">
+/// The uploading administrator's staff name, or <see langword="null"/> when the account that
+/// uploaded it can no longer be resolved.
+/// </param>
+public sealed record SchoolImageDto(int Width, int Height, DateTimeOffset UploadedAt, string? UploadedByName);
 
 /// <summary>
 /// The abbreviation group, both inside <see cref="SettingsDto"/> and as
