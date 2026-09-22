@@ -226,6 +226,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Portal 3a done** (§6.9): lookup, 30-min viewing sessions, blocks, spread control, 6.9.4 copies, 400 ms pad; no contract change. Global soft ceiling and the 5-pupils-per-hour address flag not built yet.
 - 2026-09-22 **Human: parent portal is server-rendered HTML from the .NET app** (no framework, works without JS, §6.9.8), and runs **in the same process on its own subdomain** (not a separate deployment; restricted DB role deferred). Pin printing gate 1381/1381.
 - 2026-09-22 **Pin printing done**: slips PDF (4/A4) + distribution list, QuestPDF 2026.9.0; nightly `PinMaintenanceService` purges ciphertext and marks exhausted batches. Print is a GET that writes: fetch + blob only.
 - 2026-09-22 **Pin batches done** (§6.8): generate/list/detail/distribute/revoke/reinstate; Argon2id (pin cost 4 MB/1 pass) + keyed HMAC + AES-GCM; 2000 pins ~34s. Contract `5d01b080…`.
@@ -757,6 +758,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-22 **Portal source address reads `RemoteIpAddress` directly.** Behind the VPS reverse proxy every parent shares the proxy's address, so the per-address block would hit everyone. *Trigger: deployment: configure ForwardedHeaders for the proxy. Owner: orchestrator.*
 - 2026-09-22 **Generating 2000 pins takes ~34s locally in one request.** *Trigger: deployment: set the reverse proxy read timeout above 60s, or make generation a background job. Owner: orchestrator.*
 - 2026-09-21 **EXIF orientations 2-5, 7 and 8 are implemented but untested** (only 1 and 6 have fixtures) in `SkiaSchoolImageProcessor`. *Trigger: a real
   upload comes out mirrored or rotated, or the next card touching that file. Owner: `backend-dev`.*
