@@ -8,6 +8,9 @@ import type { components } from '@/api/schema';
 export const SettingsKeys = {
   Get: 'settings.get',
   UpdateIdentity: 'settings.updateIdentity',
+  ResultRules: 'settings.resultRules',
+  RegPreview: 'settings.regPreview',
+  Image: 'settings.image',
 } as const;
 
 /**

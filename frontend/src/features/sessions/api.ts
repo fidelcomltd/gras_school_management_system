@@ -34,10 +34,11 @@ export function useSessions(state?: SessionState) {
 }
 
 /** Gated `session.view` server-side (403, not a shape this hook needs to know). */
-export function useSession(id: string) {
+export function useSession(id: string, enabled = true) {
   return useQuery({
     queryKey: [SessionsKeys.Detail, id],
     queryFn: ({ signal }) => apiGet(SESSION_PATH, undefined, { pathParams: { id }, signal }),
+    enabled: enabled && id !== '',
   });
 }
 

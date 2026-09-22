@@ -20,6 +20,14 @@ export const paths = {
   admissions: '/admissions',
   pupils: '/pupils',
   pupilDetail: (id: string) => `/pupils/${id}`,
+  subjects: '/subjects',
+  subjectMapping: '/subjects/mapping',
+  results: '/results',
+  marks: '/results/marks',
+  classRecords: '/results/class',
+  pins: '/pins',
+  audit: '/audit',
+  pinBatch: (id: string) => `/pins/${id}`,
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

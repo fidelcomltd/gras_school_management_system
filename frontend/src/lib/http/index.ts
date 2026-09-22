@@ -13,4 +13,5 @@ export {
   putRequest,
   type RequestOptions,
 } from './request';
+export { getFile, saveFile, type DownloadedFile } from './download';
 export { ensureCsrfToken } from './http-client';
