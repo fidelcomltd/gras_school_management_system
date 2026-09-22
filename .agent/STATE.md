@@ -226,6 +226,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Portal 3c done**: A4 result PDF (QuestPDF, same `ResultSheet` as the page; 58 KB for 14 subjects), disk-cached per (set, pupil, revision), `GET /portal/result/{term}/pdf` spends no use; `result_verification` token per pupil per revision issued at publish; public `/verify` + `/verify/{token}` (30/address/hour, initials only, figures only while current). QR via QRCoder 1.8.0 (MIT). Token spec conflict: 6.9.6 (22 chars, groups of 5) followed over C.7 (12, groups of 4). Verify page omits position (neither sheet prints one, §6.7.12 amendment); withdrawn-state copy is ours.
 - 2026-09-22 **Portal 3b done**: on-screen result from the snapshot via `ResultSheetBuilder` (shared with the coming PDF); snapshot now includes subjects, form teacher, session, term dates, string enums. Fee block not printed (fee notice not built).
 - 2026-09-22 **Portal 3a done** (§6.9): lookup, 30-min viewing sessions, blocks, spread control, 6.9.4 copies, 400 ms pad; no contract change. Global soft ceiling and the 5-pupils-per-hour address flag not built yet.
 - 2026-09-22 **Human: parent portal is server-rendered HTML from the .NET app** (no framework, works without JS, §6.9.8), and runs **in the same process on its own subdomain** (not a separate deployment; restricted DB role deferred). Pin printing gate 1381/1381.
@@ -759,6 +760,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-22 **Result PDF cache is never pruned and the QR needs `Portal__PublicUrl`.** Files are keyed by revision, so stale ones just accumulate (~60 KB each; a few hundred MB after years); without `Portal__PublicUrl` the sheet prints no QR or token. Also `/verify` partitions its rate limit on `RemoteIpAddress` (same proxy caveat as below). *Trigger: deployment: set `Portal__PublicUrl`/`Portal__PdfCacheDirectory`, add a prune to `PinMaintenanceService` if disk matters. Owner: orchestrator.*
 - 2026-09-22 **Portal source address reads `RemoteIpAddress` directly.** Behind the VPS reverse proxy every parent shares the proxy's address, so the per-address block would hit everyone. *Trigger: deployment: configure ForwardedHeaders for the proxy. Owner: orchestrator.*
 - 2026-09-22 **Generating 2000 pins takes ~34s locally in one request.** *Trigger: deployment: set the reverse proxy read timeout above 60s, or make generation a background job. Owner: orchestrator.*
 - 2026-09-21 **EXIF orientations 2-5, 7 and 8 are implemented but untested** (only 1 and 6 have fixtures) in `SkiaSchoolImageProcessor`. *Trigger: a real

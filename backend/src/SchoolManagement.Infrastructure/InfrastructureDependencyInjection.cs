@@ -168,6 +168,9 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
         services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
         services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();
+        services.AddScoped<Application.Abstractions.Results.IResultVerificationReader, Results.ResultVerificationReader>();
+        services.AddSingleton<Application.Abstractions.Results.IResultSheetPdfRenderer, Results.QuestPdfResultSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Results.IResultPdfCache, Results.DiskResultPdfCache>();
         services.AddSingleton<Pins.PinMaintenanceService>();
         services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();

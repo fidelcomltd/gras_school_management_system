@@ -82,7 +82,11 @@ public sealed record ResultSheet(
     string? TeacherComment,
     string? HeadTeacherComment,
     IReadOnlyList<SheetGradeKeyRow> GradeKey,
-    DateTimeOffset? IssuedAt);
+    DateTimeOffset? IssuedAt,
+    string? SchoolAddress = null,
+    string? SchoolMotto = null,
+    string? HeadTeacherName = null,
+    int RevisionNumber = 1);
 
 /// <summary>Builds a <see cref="ResultSheet"/> from <see cref="ResultSheetData"/>. Pure, so it is unit-tested directly.</summary>
 public static class ResultSheetBuilder
@@ -240,7 +244,11 @@ public static class ResultSheetBuilder
             data.TeacherComment,
             data.HeadTeacherComment,
             gradeKey,
-            data.PublishedAt);
+            data.PublishedAt,
+            TryGet(settings, "identity", "address")?.GetString(),
+            TryGet(settings, "identity", "motto")?.GetString(),
+            TryGet(settings, "identity", "headTeacherName")?.GetString(),
+            data.RevisionNumber);
     }
 
     /// <summary>Whole years at <paramref name="asOf"/> (6.5.3).</summary>

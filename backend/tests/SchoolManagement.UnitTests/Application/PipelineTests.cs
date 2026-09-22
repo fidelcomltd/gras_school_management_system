@@ -198,6 +198,9 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSlipRenderer>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Portal.IPortalRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultSheetReader>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultVerificationReader>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultSheetPdfRenderer>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultPdfCache>());
 
         services.AddOptions<PipelineOptions>();
 

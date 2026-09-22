@@ -70,6 +70,20 @@ internal sealed class ResultSetRepository(ApplicationDbContext context) : IResul
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public async Task IssueVerificationsAsync(ResultSet resultSet, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resultSet);
+        var issuedAt = resultSet.PublishedAtUtc ?? throw new InvalidOperationException("The result set has not been published.");
+        var setId = resultSet.Id;
+        var pupilIds = await context.PupilTermResults.AsNoTracking()
+            .Where(result => result.ResultSetId == setId)
+            .Select(result => result.PupilId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        context.ResultVerifications.AddRange(pupilIds.Select(pupilId => ResultVerification.Issue(setId, pupilId, resultSet.RevisionNumber, issuedAt)));
+    }
+
     public Task AddAsync(ResultSet resultSet, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resultSet);

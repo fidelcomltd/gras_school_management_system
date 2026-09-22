@@ -15,7 +15,7 @@ using SchoolManagement.IntegrationTests.Infrastructure;
 
 namespace SchoolManagement.IntegrationTests;
 
-/// <summary>Spec 6.9 portal part 3a: lookup, use counting, resume, the 6.9.4 copies, the spread control and the blocks.</summary>
+/// <summary>Spec 6.9 portal: lookup, use counting, resume, the 6.9.4 copies, the spread control, the blocks (3a); the sheet (3b); the PDF and verification (3c).</summary>
 public sealed class PortalEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     private static int _nextYear = 9300;
@@ -170,7 +170,7 @@ public sealed class PortalEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
-    public async Task EndToEnd_APublishedResult_ShowsTheSnapshotsValuesOnThePortal()
+    public async Task EndToEnd_APublishedResult_ShowsOnThePortal_DownloadsAsAPdf_AndVerifiesUntilWithdrawn()
     {
         RequireDatabase();
         var school = await SeedSchoolAsync(published: false);
@@ -234,6 +234,56 @@ public sealed class PortalEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         html.ShouldContain("Times absent</dt><dd>5");
         html.ShouldContain(", First Term</dd>");
         html.ShouldContain("Age</dt><dd>");
+        html.ShouldContain($"/portal/result/{termId:D}/pdf?u=");
+
+        // 3c: the PDF, twice (the second from cache), for the one use the lookup spent.
+        foreach (var _ in new[] { 1, 2 })
+        {
+            using var pdf = await GetAsync(client, $"/portal/result/{termId}/pdf", cookie);
+            pdf.StatusCode.ShouldBe(HttpStatusCode.OK);
+            pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+            pdf.Content.Headers.ContentDisposition!.FileNameStar!.ShouldMatch($"^{pupil.Number.Replace('/', '-')}_First-Term_[0-9]{{4}}-[0-9]{{4}}[.]pdf$");
+            var bytes = await pdf.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+            bytes.Length.ShouldBeLessThan(200 * 1024);
+            System.Text.Encoding.ASCII.GetString(bytes, 0, 5).ShouldBe("%PDF-");
+        }
+
+        (await PinAsync(pin.Id)).UseCount.ShouldBe(1);
+        using (var noSession = await GetAsync(client, $"/portal/result/{termId}/pdf", "gras_portal=nothing"))
+        {
+            noSession.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
+        }
+
+        // The public verification page: initials, never the full name; figures while current.
+        string token;
+        await using (var scope = Fixture.CreateScope())
+        {
+            token = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<ResultVerification>().AsNoTracking()
+                .Where(verification => verification.ResultSetId == resultSetId && verification.PupilId == pupil.Id)
+                .Select(verification => verification.Token).SingleAsync(TestContext.Current.CancellationToken);
+        }
+
+        using var visitor = NewClient();
+        var verified = await visitor.GetStringAsync(new Uri($"/verify?code={Uri.EscapeDataString(ResultVerification.Format(token).ToLowerInvariant())}", UriKind.Relative), TestContext.Current.CancellationToken);
+        verified.ShouldContain("Issued by");
+        verified.ShouldContain(pupil.Number);
+        verified.ShouldContain("34 of 100");
+        verified.ShouldContain("34.00");
+        verified.ShouldNotContain("Chidera");
+        verified.ShouldNotContain(subjectName);
+        (await visitor.GetStringAsync(new Uri("/verify/ABCDEFGHJKMNPQRSTUVWXY", UriKind.Relative), TestContext.Current.CancellationToken))
+            .ShouldContain("No result matches this code");
+
+        using (var withdraw = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/result-sets/{resultSetId}/withdraw"))
+        {
+            withdraw.Content = System.Net.Http.Json.JsonContent.Create(new { reason = "Mathematics marks were entered for the wrong class." });
+            admin.ApplyWithCsrf(withdraw);
+            (await Client.SendAsync(withdraw, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        var afterWithdrawal = await visitor.GetStringAsync(new Uri($"/verify/{token}", UriKind.Relative), TestContext.Current.CancellationToken);
+        afterWithdrawal.ShouldContain("withdrawn for correction");
+        afterWithdrawal.ShouldNotContain("34.00");
     }
 
     private async Task<Guid> TermIdAsync(Guid resultSetId)

@@ -14,6 +14,9 @@ internal sealed class PortalOptions
 
     /// <summary>e.g. <c>results.goldenroyalark.sch.ng</c>. Unset prints a generic line instead.</summary>
     public string? PublicUrl { get; set; }
+
+    /// <summary>Where generated result PDFs are cached. Unset uses the system temp directory.</summary>
+    public string? PdfCacheDirectory { get; set; }
 }
 
 /// <summary>

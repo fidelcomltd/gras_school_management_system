@@ -49,6 +49,12 @@ public interface IResultSetRepository
     /// <summary>Stages a publication's snapshot history row (spec 6.7.9). Does NOT commit.</summary>
     Task AddSnapshotAsync(ResultSetSnapshot snapshot, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Stages one fresh verification token per pupil with a computed result in the revision just published
+    /// (spec 6.9.6). Does NOT commit.
+    /// </summary>
+    Task IssueVerificationsAsync(ResultSet resultSet, CancellationToken cancellationToken);
+
     /// <summary>Stages a brand-new result set for insertion. Does NOT commit.</summary>
     Task AddAsync(ResultSet resultSet, CancellationToken cancellationToken);
 

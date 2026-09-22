@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Portal;
@@ -35,9 +36,23 @@ internal static class PortalEndpoints
             .ExemptFromCsrfRequirement("Public portal: no signed-in session exists to ride, and a lookup needs a valid pin the attacker would already hold.");
         portal.MapGet("/terms", TermsAsync);
         portal.MapGet("/result/{termId:guid}", ResultAsync);
+        portal.MapGet("/result/{termId:guid}/pdf", ResultPdfAsync);
         portal.MapPost("/end", EndAsync)
             .ExemptFromCsrfRequirement("The viewing cookie is SameSite=Strict, so a cross-site post arrives without it and ends nothing.");
         portal.MapGet("/logo", LogoAsync);
+
+        // Spec 6.9.9: public, no session, no pin; 30 requests per address per hour.
+        var verify = endpoints.MapGroup("/verify").AllowAnonymous().ExcludeFromDescription()
+            .RequireRateLimiting(RateLimitingOptions.VerifyPolicyName);
+        verify.AddEndpointFilter(async (context, next) =>
+        {
+            context.HttpContext.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+            context.HttpContext.Response.Headers.CacheControl = "no-store";
+            return await next(context).ConfigureAwait(false);
+        });
+        verify.MapGet(string.Empty, (HttpContext http, ISender sender, CancellationToken cancellationToken) =>
+            VerifyAsync(http.Request.Query["code"].ToString(), sender, cancellationToken));
+        verify.MapGet("/{token}", (string token, ISender sender, CancellationToken cancellationToken) => VerifyAsync(token, sender, cancellationToken));
 
         endpoints.MapGet("/robots.txt", () => Results.Text("User-agent: *\nDisallow: /portal\nDisallow: /verify\n", "text/plain"))
             .AllowAnonymous().ExcludeFromDescription();
@@ -113,15 +128,45 @@ internal static class PortalEndpoints
         }
 
         var view = result.Value;
-        return view.Status switch
+        return view.Status == PortalResultStatus.Shown
+            ? Html(PortalHtml.Result(branding, view.Sheet!, termId, view.UseId!.Value))
+            : StatusPage(branding, view);
+    }
+
+    // Spec 6.9.2 step 6: the same session checks as the page, and no additional use.
+    private static async Task<IResult> ResultPdfAsync(Guid termId, HttpContext http, ISender sender, CancellationToken cancellationToken)
+    {
+        Guid? useId = Guid.TryParse(http.Request.Query["u"], out var parsed) ? parsed : null;
+        var result = await sender.SendAsync(new GetPortalResultPdfQuery(ReadTokens(http), useId, termId), cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess && result.Value.File is { } file)
         {
-            PortalResultStatus.Shown => Html(PortalHtml.Result(branding, view.Sheet!, view.UseId!.Value)),
+            return Results.File(file.Content.ToArray(), "application/pdf", file.FileName);
+        }
+
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        return result.IsFailure ? Html(PortalHtml.Message(branding, PortalCopy.ServerFault)) : StatusPage(branding, result.Value.View);
+    }
+
+    private static async Task<IResult> VerifyAsync(string code, ISender sender, CancellationToken cancellationToken)
+    {
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return Html(PortalHtml.Verification(branding, null, null));
+        }
+
+        var result = await sender.SendAsync(new VerifyResultQuery(code.Length > 64 ? code[..64] : code), cancellationToken).ConfigureAwait(false);
+        return Html(PortalHtml.Verification(branding, code, result.IsSuccess ? result.Value : new ResultVerificationView(ResultVerificationStatus.Unknown)));
+    }
+
+    private static IResult StatusPage(PortalBranding branding, PortalResultView view) =>
+        view.Status switch
+        {
             PortalResultStatus.NotReleased => Html(PortalHtml.Message(branding, PortalCopy.NotReleased(view.TermName ?? "This term's"))),
             PortalResultStatus.BeingCorrected => Html(PortalHtml.Message(branding, PortalCopy.BeingCorrected)),
             PortalResultStatus.NoResult => Html(PortalHtml.Message(branding, PortalCopy.NoResult)),
             _ => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
         };
-    }
 
     private static async Task<IResult> EndAsync(HttpContext http, ISender sender, CancellationToken cancellationToken)
     {

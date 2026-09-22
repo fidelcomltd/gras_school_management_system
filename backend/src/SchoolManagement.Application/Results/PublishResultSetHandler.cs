@@ -177,6 +177,7 @@ internal sealed class PublishResultSetHandler(
         }
 
         await resultSets.AddSnapshotAsync(ResultSetSnapshot.For(resultSet), cancellationToken).ConfigureAwait(false);
+        await resultSets.IssueVerificationsAsync(resultSet, cancellationToken).ConfigureAwait(false);
 
         await auditSink.RecordAsync(
             Privileges.Results.Publish,

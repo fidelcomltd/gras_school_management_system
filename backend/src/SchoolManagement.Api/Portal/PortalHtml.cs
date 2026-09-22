@@ -91,7 +91,7 @@ internal static class PortalHtml
     }
 
     /// <summary>The result on screen (spec 6.9.2 step 5): one column for a narrow phone, same values as the PDF.</summary>
-    public static string Result(PortalBranding branding, ResultSheet sheet, Guid useId)
+    public static string Result(PortalBranding branding, ResultSheet sheet, Guid termId, Guid useId)
     {
         var body = new StringBuilder();
         if (sheet.RevisionNotice is { } notice)
@@ -186,8 +186,60 @@ internal static class PortalHtml
         }
 
         body.Append("</tbody></table></div></details>")
+            .Append(CultureInfo.InvariantCulture, $"<a class=\"button\" href=\"/portal/result/{termId:D}/pdf?u={useId:D}\">Download PDF</a>")
+            .Append("<p class=\"muted\">Downloading does not use up another of your pin's uses.</p>")
             .Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal/terms?u={useId:D}\">Back to terms</a>");
         return Page(branding, $"{sheet.TermName} result", body.ToString());
+    }
+
+    /// <summary>
+    /// The public verification page (spec 6.9.6): a code box, and for a found code only what the spec lists. Initials,
+    /// never the full name; figures only while the sheet's revision is the current one.
+    /// </summary>
+    public static string Verification(PortalBranding branding, string? code, ResultVerificationView? view)
+    {
+        var body = new StringBuilder();
+        if (view is not null)
+        {
+            body.Append(view.Status switch
+            {
+                ResultVerificationStatus.Unknown =>
+                    "<div class=\"notice revised\" role=\"status\"><h2>No result matches this code</h2><p>Check the code against the sheet and try again. The code is printed under the square barcode at the foot of the sheet.</p></div>",
+                ResultVerificationStatus.Revised =>
+                    string.Create(CultureInfo.InvariantCulture, $"<div class=\"notice revised\" role=\"status\"><strong>This result was revised on {Wat(view.RevisedAt):dd/MM/yyyy}. The sheet you are holding may be out of date.</strong></div>"),
+                ResultVerificationStatus.Withdrawn =>
+                    "<div class=\"notice revised\" role=\"status\"><strong>This result has been withdrawn for correction. The sheet you are holding may be out of date.</strong></div>",
+                _ => string.Empty,
+            });
+
+            if (view.Status != ResultVerificationStatus.Unknown)
+            {
+                var heading = view.Status == ResultVerificationStatus.Current ? $"Issued by {view.SchoolName}" : $"Originally issued by {view.SchoolName}";
+                body.Append(CultureInfo.InvariantCulture, $"<div class=\"notice\" role=\"status\"><h2>{E(heading)}</h2><dl>")
+                    .Append(CultureInfo.InvariantCulture, $"<dt>Pupil</dt><dd>{E(view.Initials ?? string.Empty)}</dd>")
+                    .Append(CultureInfo.InvariantCulture, $"<dt>Registration number</dt><dd>{E(view.RegistrationNumber ?? string.Empty)}</dd>")
+                    .Append(CultureInfo.InvariantCulture, $"<dt>Class</dt><dd>{E(view.ArmName ?? string.Empty)}</dd>")
+                    .Append(CultureInfo.InvariantCulture, $"<dt>Term</dt><dd>{E(view.TermName ?? string.Empty)}, {E(view.SessionName ?? string.Empty)}</dd>");
+                if (view.Status == ResultVerificationStatus.Current)
+                {
+                    body.Append(CultureInfo.InvariantCulture, $"<dt>Total obtained</dt><dd>{view.TotalObtained} of {view.TotalObtainable}</dd>")
+                        .Append(CultureInfo.InvariantCulture, $"<dt>Average</dt><dd>{view.Average?.ToString("0.00", CultureInfo.InvariantCulture)}</dd>")
+                        .Append(CultureInfo.InvariantCulture, $"<dt>Overall grade</dt><dd>{E(view.OverallGrade ?? string.Empty)}</dd>");
+                }
+
+                body.Append(CultureInfo.InvariantCulture, $"<dt>Date issued</dt><dd>{Wat(view.IssuedAt):dd/MM/yyyy}</dd></dl></div>");
+                if (view.Status == ResultVerificationStatus.Current)
+                {
+                    body.Append("<p class=\"muted\">If any of these figures differ from the sheet you are holding, the sheet has been altered.</p>");
+                }
+            }
+        }
+
+        body.Append("<form method=\"get\" action=\"/verify\" autocomplete=\"off\">")
+            .Append("<label for=\"code\">Verification code</label>")
+            .Append(CultureInfo.InvariantCulture, $"<input id=\"code\" name=\"code\" required maxlength=\"40\" autocapitalize=\"characters\" spellcheck=\"false\" value=\"{E(code ?? string.Empty)}\">")
+            .Append("<button type=\"submit\">Check</button></form>");
+        return Page(branding, "Verify a result sheet", body.ToString());
     }
 
     /// <summary>A copy block on its own page, e.g. the session-ended copy.</summary>
@@ -209,6 +261,8 @@ internal static class PortalHtml
     }
 
     private static string E(string value) => HtmlEncoder.Default.Encode(value);
+
+    private static DateTimeOffset? Wat(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromHours(1));
 }
 
 /// <summary>One of spec 6.9.4's parent-facing messages.</summary>

@@ -36,6 +36,7 @@
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="QuestPDF" />
+    <PackageReference Include="QRCoder" />
     <!-- Design-time only: enables `dotnet ef migrations add`. Not shipped at runtime. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

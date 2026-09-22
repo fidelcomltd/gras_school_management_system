@@ -33,7 +33,8 @@ public enum PortalResultStatus
 /// <param name="Sheet">Present when shown.</param>
 /// <param name="TermName">For the not-released copy.</param>
 /// <param name="UseId">The session it was opened in, for the page's links.</param>
-public sealed record PortalResultView(PortalResultStatus Status, ResultSheet? Sheet = null, string? TermName = null, Guid? UseId = null);
+/// <param name="PdfKey">Present when shown: identifies the sheet for the PDF cache and the verification token.</param>
+public sealed record PortalResultView(PortalResultStatus Status, ResultSheet? Sheet = null, string? TermName = null, Guid? UseId = null, ResultPdfKey? PdfKey = null);
 
 /// <summary>Spec 6.9.9 <c>GET /portal/result/{term_id}</c>, for the pupil the chosen session is bound to.</summary>
 /// <param name="Tokens">From the cookie.</param>
@@ -94,6 +95,7 @@ internal sealed class GetPortalResultHandler(IPortalRepository portal, IResultSh
             return Result.Success(new PortalResultView(PortalResultStatus.NoResult, TermName: term.TermName, UseId: session.Use.Id));
         }
 
-        return Result.Success(new PortalResultView(PortalResultStatus.Shown, sheet, term.TermName, session.Use.Id));
+        return Result.Success(new PortalResultView(
+            PortalResultStatus.Shown, sheet, term.TermName, session.Use.Id, new ResultPdfKey(data.ResultSetId, session.Use.PupilId, data.RevisionNumber)));
     }
 }
