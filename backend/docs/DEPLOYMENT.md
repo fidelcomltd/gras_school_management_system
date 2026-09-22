@@ -16,6 +16,24 @@ is nothing separate to deploy for the portal.
 
 ---
 
+## 0. If you are moving DNS to Netlify: copy the records FIRST
+
+Netlify DNS means delegating the whole domain by changing nameservers at Namecheap, and the new
+nameservers answer for **everything** — not just the records you added. Any record that exists at
+Namecheap and not at Netlify simply stops resolving when the delegation takes effect.
+
+The one that hurts: **MX records**. If the school receives email at `@goldenroyalark.com`, moving
+nameservers without copying the MX (and any SPF/DKIM/DMARC TXT) records silently stops mail
+delivery, and the bounces are not obvious for hours.
+
+So, in this order: list every existing record at Namecheap (A, CNAME, MX, TXT, SRV) → recreate them
+all in Netlify DNS, including `api` and `results` pointing at the VPS → only then change the
+nameservers. Keep the old records visible in another tab until resolution has moved; propagation is
+usually minutes but can take up to 48 hours.
+
+Staying on Namecheap DNS is also fine: point `app` at Netlify with a CNAME and keep the rest where
+it is. That avoids the email risk entirely, at the cost of managing records in two places.
+
 ## 1. Before you touch the server: the hostname rule
 
 Sign-in uses a `__Host-` prefixed session cookie with `SameSite=Lax`
@@ -199,6 +217,30 @@ sudo -u gras dotnet /opt/gras/api/SchoolManagement.Api.dll bootstrap-admin \
 
 It prints a temporary password to the terminal, once, and the account must change it at first
 sign-in. Run it in a session whose scrollback you can clear.
+
+## 6a. The admin web app on Netlify
+
+Build config is committed in [netlify.toml](../../netlify.toml) — base `frontend`, publish
+`frontend/dist`, the SPA fallback the router needs, and the four environment variables that are the
+same everywhere. Two things are NOT in it and must be set per site, because production and staging
+are two Netlify sites reading the same file:
+
+| | Production site | Staging site |
+|---|---|---|
+| `VITE_API_BASE_URL` | `https://api.goldenroyalark.com` | `https://staging-api.goldenroyalark.com` |
+| `VITE_APP_ENV` | `production` | `staging` |
+
+Vite bakes these into the bundle at build time, so a change needs a redeploy.
+
+**Add the custom domain before expecting sign-in to work.** On the Netlify-assigned
+`*.netlify.app` address the app loads and looks fine, but every sign-in fails: that origin is
+cross-site to the API, so the browser withholds the `__Host-` session cookie, and the API's CORS
+list does not contain it either. This is configuration, not a bug — do not go debugging auth over
+it. The app is only usable on `app.goldenroyalark.com`.
+
+Order that works: create the site, set the two variables to their FINAL values (even before the API
+exists), deploy, add the custom domain. The first deploy then only proves the build; the app starts
+working when the API comes up.
 
 ## 7. Staging on Render
 
