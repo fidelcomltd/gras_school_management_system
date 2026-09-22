@@ -136,6 +136,19 @@ export function hasPrivilege(session: AuthSession, privilege: string): boolean {
   return session.isSuperAdmin || session.effectivePrivileges.some((grant) => grant.privilege === privilege);
 }
 
+/**
+ * Whether `privilege` applies to one arm: a school-wide grant, or an arm-scoped grant naming it. For hiding controls
+ * a scoped caller cannot use (a class teacher only enters marks for their own arms); the backend still enforces it.
+ */
+export function hasPrivilegeInArm(session: AuthSession, privilege: string, armId: string): boolean {
+  return (
+    session.isSuperAdmin ||
+    session.effectivePrivileges.some(
+      (grant) => grant.privilege === privilege && (grant.scope === 'SchoolWide' || grant.armIds.includes(armId)),
+    )
+  );
+}
+
 /** Records the latest session state and (re)arms the keepalive from it. */
 export function setSession(session: AuthSession): void {
   current = session;
