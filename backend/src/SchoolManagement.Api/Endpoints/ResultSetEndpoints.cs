@@ -30,6 +30,7 @@ public sealed class ResultSetEndpoints : IEndpointModule
         MapSubmit(group);
         MapApprove(group);
         MapReturn(group);
+        MapPublish(group);
     }
 
     private static void MapCompute(RouteGroupBuilder group) =>
@@ -122,6 +123,37 @@ public sealed class ResultSetEndpoints : IEndpointModule
                 "— this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does not apply. " +
                 "`Idempotency-Key` is ACCEPTED, not required.")
             .Produces<ApproveResultSetResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapPublish(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/publish", async (
+                Guid resultSetId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new PublishResultSetCommand(resultSetId), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Publish)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("PublishResultSet")
+            .WithSummary("Publish a result set")
+            .WithDescription(
+                "Spec 6.7.9: school-wide. Moves Approved to Published, writes the configuration snapshot " +
+                "(settings, logo and signature references, level, section, arm and term as they stand now), " +
+                "and sets revisionNumber to 1 on first publication. Each precondition fails 409 with its own " +
+                "code and the spec's message: `result_set.not_approved`, `result_set.needs_recompute`, " +
+                "`result_set.head_teacher_remarks_missing`, `result_set.logo_missing`, " +
+                "`result_set.signature_missing`, `result_set.next_resumption_date_missing`, " +
+                "`result_set.times_school_opened_missing`, and (Third Term only) `result_set.core_subjects_missing`. " +
+                "404 for an unknown id. `Idempotency-Key` is REQUIRED (spec 9.8.2).")
+            .Produces<PublishResultSetResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)

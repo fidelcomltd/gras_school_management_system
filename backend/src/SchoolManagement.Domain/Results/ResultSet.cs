@@ -237,4 +237,26 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
         ReturnReason = reason;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Moves Approved to Published (spec 6.7.9). It writes the configuration snapshot and bumps
+    /// <see cref="RevisionNumber"/> (1 on first publication). The caller has already checked every
+    /// §6.7.9 precondition. The snapshot is written once and never overwritten, so a second call
+    /// without a withdrawal in between (not buildable today) is refused.
+    /// </summary>
+    public Result Publish(Guid? publishedBy, DateTimeOffset publishedAtUtc, string configSnapshotJson, Guid? configVersionId)
+    {
+        if (State != ResultSetState.Approved)
+        {
+            return Result.Failure(Error.Conflict("result_set.not_approved", $"This result set is {State} and cannot be published."));
+        }
+
+        State = ResultSetState.Published;
+        PublishedAtUtc = publishedAtUtc;
+        PublishedBy = publishedBy;
+        RevisionNumber++;
+        ConfigSnapshotJson = configSnapshotJson;
+        ConfigVersionId = configVersionId;
+        return Result.Success();
+    }
 }

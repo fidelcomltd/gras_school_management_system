@@ -24,6 +24,7 @@ public sealed class ResultSetEndpointsScopeTests
     [Theory]
     [InlineData("/result-sets/{resultSetId:guid}/approve", Privileges.Results.Approve)]
     [InlineData("/result-sets/{resultSetId:guid}/return", Privileges.Results.Return)]
+    [InlineData("/result-sets/{resultSetId:guid}/publish", Privileges.Results.Publish)]
     public void ApproveAndReturn_DeclareNoScopeParameter(string routePattern, string expectedPrivilege)
     {
         var builder = WebApplication.CreateBuilder();

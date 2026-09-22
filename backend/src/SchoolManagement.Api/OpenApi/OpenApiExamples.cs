@@ -2584,6 +2584,19 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(PublishResultSetResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Published",
+                "needsRecompute": false,
+                "returnReason": null
+              },
+              "publishedAt": "{{CanonicalTimestamp}}",
+              "revisionNumber": 1
+            }
+            """,
+
         [typeof(ReturnResultSetCommand)] = $$"""
             {
               "resultSetId": "{{ExampleResultSetId}}",
