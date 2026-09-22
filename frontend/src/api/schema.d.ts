@@ -199,6 +199,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms/{armId}/annual-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute an arm's annual cumulative results
+         * @description Spec 6.7.10: for every pupil with a result in the arm's Third Term set, the cumulative average over the terms they sat (simple or weighted per the result rules), its grade from the Third Term snapshot's bands, the annual position in this arm (pupils with one term are not ranked), per-subject means, and the proposed promotion outcome (6.3.7). Rewrites the rows each run, so it is idempotent. 409 names the first term that is not published; an earlier term the arm was never scored in is skipped rather than blocking. `Idempotency-Key` is accepted, not required.
+         */
+        post: operations["ComputeAnnualResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms": {
         parameters: {
             query?: never;
@@ -2961,6 +2981,60 @@ export interface components {
              * @example another horse battery staple 4
              */
             newPassword: string;
+        };
+        /**
+         * @description The 200 response.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "computedAt": "2027-07-24T10:00:00Z",
+         *       "pupilCount": 28,
+         *       "rankedCount": 27,
+         *       "proposedPromoted": 26,
+         *       "proposedRepeat": 2
+         *     }
+         */
+        ComputeAnnualResultsResponse: {
+            /**
+             * @description The arm computed.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Its session.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /**
+             * Format: date-time
+             * @description When this run happened.
+             * @example 2027-07-24T10:00:00Z
+             */
+            computedAt: string;
+            /**
+             * Format: int32
+             * @description Annual rows written.
+             * @example 28
+             */
+            pupilCount: number | string;
+            /**
+             * Format: int32
+             * @description Of those, ranked (two or more terms).
+             * @example 27
+             */
+            rankedCount: number | string;
+            /**
+             * Format: int32
+             * @description Rows proposing Promoted.
+             * @example 26
+             */
+            proposedPromoted: number | string;
+            /**
+             * Format: int32
+             * @description Rows proposing Repeat.
+             * @example 2
+             */
+            proposedRepeat: number | string;
         };
         /**
          * @description One computation flag (contract delta's `flags[]`) — response-body data, NOT a problem code, so its string ComputeResultSetFlagDto.Code is not dotted.
@@ -12059,6 +12133,101 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ComputeAnnualResults: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputeAnnualResultsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;

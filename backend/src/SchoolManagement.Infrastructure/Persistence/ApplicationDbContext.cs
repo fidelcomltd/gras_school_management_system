@@ -181,6 +181,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     internal DbSet<ResultVerification> ResultVerifications => Set<ResultVerification>();
 
+    internal DbSet<AnnualResult> AnnualResults => Set<AnnualResult>();
+
     internal DbSet<Domain.Pins.PinBatch> PinBatches => Set<Domain.Pins.PinBatch>();
 
     internal DbSet<Domain.Pins.Pin> Pins => Set<Domain.Pins.Pin>();

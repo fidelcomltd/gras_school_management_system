@@ -13,6 +13,7 @@ using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Results;
+using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
@@ -2394,6 +2395,17 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(ComputeAnnualResultsResponse)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "computedAt": "2027-07-24T10:00:00Z",
+              "pupilCount": 28,
+              "rankedCount": 27,
+              "proposedPromoted": 26,
+              "proposedRepeat": 2
+            }
+            """,
         [typeof(ComputeResultSetResponse)] = $$"""
             {
               "resultSetId": "{{ExampleResultSetId}}",

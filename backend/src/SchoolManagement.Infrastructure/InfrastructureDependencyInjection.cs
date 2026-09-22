@@ -250,6 +250,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();
         services.AddScoped<IPublishedResultsGate, PublishedResultsGate>();
         services.AddScoped<IResultSetRepository, ResultSetRepository>();
+        services.AddScoped<IAnnualResultRepository, AnnualResultRepository>();
 
         // TASK-0076 dispatch B: the score-sheet endpoints' own mark persistence.
         services.AddScoped<ISubjectScoreRepository, SubjectScoreRepository>();

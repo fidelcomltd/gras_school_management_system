@@ -115,10 +115,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `bb29ee1ebe04204c768df3e2c437fee613f532ff933a421a2775167caf92c2d1`** · **94 paths** ·
-**211 schemas** · api version `v1` · moved 2026-09-22 by pin printing (§6.8.9).
-Previous: `5d01b0800150…` / 92 paths / 211 schemas, pin batches on 2026-09-22; before that `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `0a74f0192c7371ed33c20df05c283b992a3383bc2c879cceebf246801b13be59`** · **95 paths** ·
+**212 schemas** · api version `v1` · moved 2026-09-22 by annual computation (§6.7.10).
+Previous: `bb29ee1ebe04…` / 94 paths / 211 schemas, pin printing on 2026-09-22; before that `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Annual computation additive verified mechanically** (`jq`): +1 path, +1 schema, nothing else changed.
 
 **Pin printing additive verified mechanically** (`jq`): +2 paths, no schema change.
 
@@ -226,6 +228,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Annual computation (3d-1) done**: `POST /arms/{armId}/annual-results` (`result.annual.compute`, unscoped privilege) writes `annual_result` per pupil of the final arm (pupils with a result in its Third Term set): cumulative average simple/weighted over terms sat (weights rescaled), grade from the Third Term snapshot bands, SharedPosition rank (single-term pupils unranked; `annual_pupil_count` = ranked count, not "complete three-term" count), subject means, proposed Promoted/Repeat (a core subject never taken does not count against). 8.4.9 figures reproduced. An unscored earlier term is skipped; an unpublished one blocks with the spec copy.
 - 2026-09-22 **Portal 3c done**: A4 result PDF (QuestPDF, same `ResultSheet` as the page; 58 KB for 14 subjects), disk-cached per (set, pupil, revision), `GET /portal/result/{term}/pdf` spends no use; `result_verification` token per pupil per revision issued at publish; public `/verify` + `/verify/{token}` (30/address/hour, initials only, figures only while current). QR via QRCoder 1.8.0 (MIT). Token spec conflict: 6.9.6 (22 chars, groups of 5) followed over C.7 (12, groups of 4). Verify page omits position (neither sheet prints one, §6.7.12 amendment); withdrawn-state copy is ours.
 - 2026-09-22 **Portal 3b done**: on-screen result from the snapshot via `ResultSheetBuilder` (shared with the coming PDF); snapshot now includes subjects, form teacher, session, term dates, string enums. Fee block not printed (fee notice not built).
 - 2026-09-22 **Portal 3a done** (§6.9): lookup, 30-min viewing sessions, blocks, spread control, 6.9.4 copies, 400 ms pad; no contract change. Global soft ceiling and the 5-pupils-per-hour address flag not built yet.
