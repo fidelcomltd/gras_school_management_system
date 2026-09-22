@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockMe } from '@/test/mock-me';
-import { renderWithProviders, screen, waitFor } from '@/test/render';
+import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { SettingsScreen } from './settings-screen';
@@ -68,6 +68,51 @@ describe('SettingsScreen groups', () => {
     await user.click(screen.getByRole('button', { name: 'Save result rules' }));
 
     await waitFor(() => expect(body).toMatchObject({ annualMethod: 'Weighted', weightFirst: 20 }));
+  });
+
+  it('rating scales: an added point is appended in order and existing ids are kept', async () => {
+    mockMe('settings.view', 'settings.ratingscales.update', 'level.view');
+    let body: { scales: { id: string | null; points: { id: string | null; pointCode: string; pointOrder: number }[] }[] } | undefined;
+    server.use(
+      http.put(apiUrl('/api/v1/settings/rating-scales'), async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const { user } = renderWithProviders(<SettingsScreen />);
+    await user.click(await screen.findByRole('tab', { name: 'Ratings' }));
+    const scaleSection = screen.getByRole('region', { name: 'Rating scales' });
+    await user.click(within(scaleSection).getAllByRole('button', { name: 'Add point' })[0] as HTMLElement);
+    const codes = within(scaleSection).getAllByLabelText(/point \d+ code/);
+    await user.type(codes[codes.length - 1] as HTMLElement, 'x');
+    await user.click(screen.getByRole('button', { name: 'Save rating scales' }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    const points = body?.scales[0]?.points ?? [];
+    expect(points[0]?.id).not.toBeNull();
+    expect(points[points.length - 1]).toEqual({ id: null, pointCode: 'X', pointLabel: '', pointOrder: points.length });
+  });
+
+  it('traits: a new psychomotor trait is numbered within its own block', async () => {
+    mockMe('settings.view', 'settings.traits.update', 'level.view');
+    let body: { traits: { id: string | null; domain: string; name: string; displayOrder: number }[] } | undefined;
+    server.use(
+      http.put(apiUrl('/api/v1/settings/traits'), async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const { user } = renderWithProviders(<SettingsScreen />);
+    await user.click(await screen.findByRole('tab', { name: 'Ratings' }));
+    const traits = screen.getByRole('region', { name: 'Traits' });
+    const psychomotor = within(traits).getByRole('group', { name: 'Psychomotor skills' });
+    await user.click(within(psychomotor).getByRole('button', { name: 'Add trait' }));
+    await user.type(within(psychomotor).getAllByLabelText('Psychomotor skills trait name').at(-1) as HTMLElement, 'Handwriting');
+    await user.click(screen.getByRole('button', { name: 'Save traits' }));
+
+    await waitFor(() => expect(body?.traits.find((t) => t.name === 'Handwriting')).toEqual({ id: null, domain: 'Psychomotor', name: 'Handwriting', displayOrder: 1, status: 'Active' }));
   });
 
   it('read-only without the group privilege', async () => {

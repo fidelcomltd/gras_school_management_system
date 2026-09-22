@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { useMe } from '@/features/auth/api';
+import { useSections } from '@/features/classes/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
 import { useSettings } from './api';
 import { useResultRules } from './api-groups';
 import { AssessmentPanel } from './components/assessment-panel';
+import { DevelopmentDomainsEditor } from './components/development-domains-editor';
 import { GradingPanel } from './components/grading-panel';
 import { IdentityPanel } from './components/identity-panel';
+import { RatingScalesEditor } from './components/rating-scales-editor';
 import { RegNumberPanel } from './components/reg-number-panel';
 import { ResultRulesPanel } from './components/result-rules-panel';
+import { TraitsEditor } from './components/traits-editor';
 
 const TABS = [
   { id: 'identity', label: 'School' },
@@ -17,6 +21,7 @@ const TABS = [
   { id: 'grading', label: 'Grading' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'rules', label: 'Result rules' },
+  { id: 'ratings', label: 'Ratings' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -28,6 +33,7 @@ type TabId = (typeof TABS)[number]['id'];
 export function SettingsScreen() {
   const settings = useSettings();
   const rules = useResultRules();
+  const sections = useSections();
   const me = useMe();
   const [tab, setTab] = useState<TabId>('identity');
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
@@ -57,6 +63,22 @@ export function SettingsScreen() {
         if (rules.isPending) return <LoadingState label="Loading result rules…" />;
         if (rules.isError) return <QueryErrorState error={rules.error} onRetry={() => void rules.refetch()} />;
         return <ResultRulesPanel key={rules.data.versionNumber} rules={rules.data} canEdit={can('settings.resultrules.update')} />;
+      case 'ratings': {
+        const scales = data.ratingScales.scales;
+        return (
+          <div className="flex max-w-3xl flex-col gap-8">
+            <RatingScalesEditor key={`scales:${data.ratingScales.versionNumber}`} group={data.ratingScales} canEdit={can('settings.ratingscales.update')} />
+            <TraitsEditor key={`traits:${data.traits.versionNumber}`} group={data.traits} scales={scales} canEdit={can('settings.traits.update')} />
+            <DevelopmentDomainsEditor
+              key={`domains:${data.developmentDomains.versionNumber}`}
+              group={data.developmentDomains}
+              sections={sections.data?.sections ?? []}
+              scales={scales}
+              canEdit={can('settings.developmentdomains.update')}
+            />
+          </div>
+        );
+      }
     }
   };
 
