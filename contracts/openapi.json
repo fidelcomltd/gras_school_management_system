@@ -9551,6 +9551,429 @@
         }
       }
     },
+    "/api/v1/settings/identity/logo": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Upload the school logo",
+        "description": "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 2 MB; minimum 300 by 300 pixels. Re-encoded to strip all metadata (EXIF orientation is applied to the pixels first, so a portrait phone photo stays upright), and stored at the original size plus 200 and 64 pixel derivatives. Repoints the current logo; the previous asset is never deleted, so a result published while it was current keeps rendering it. `Idempotency-Key` is REQUIRED.",
+        "operationId": "UploadSchoolLogo",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolImageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity/signature": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Upload the head teacher's signature",
+        "description": "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.",
+        "operationId": "UploadHeadTeacherSignature",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolImageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the current head teacher's signature",
+        "description": "Streams the current signature at its original size (spec 9.6). Same headers as the logo. `404 school_image.not_uploaded` before the first upload.",
+        "operationId": "GetHeadTeacherSignature",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity/logo/{size}": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the current school logo",
+        "description": "Streams the current logo at `original`, `200` or `64` pixels (spec 9.6: served only through a privilege-checked endpoint, never a public URL). `Content-Disposition: inline`, `nosniff`, `Cache-Control: private`. `404 school_image.not_uploaded` before the first upload.",
+        "operationId": "GetSchoolLogo",
+        "parameters": [
+          {
+            "name": "size",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^(original|200|64)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/reg-number": {
       "patch": {
         "tags": [
@@ -17554,6 +17977,12 @@
           }
         }
       },
+      "IFormFile": {
+        "type": "string",
+        "description": "One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic bytes, never by a declared content type or file name (spec 9.6) — neither is part of this contract.",
+        "format": "binary",
+        "example": "binary image content, sent as the multipart request's `file` part"
+      },
       "JsonElement": {
         "description": "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.",
         "example": {
@@ -20784,6 +21213,59 @@
           }
         }
       },
+      "SchoolImageDto": {
+        "required": [
+          "width",
+          "height",
+          "uploadedAt",
+          "uploadedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The Original rendition's width, in pixels, after any EXIF orientation correction.",
+            "format": "int32",
+            "example": 512
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The Original rendition's height, in pixels, after any EXIF orientation correction.",
+            "format": "int32",
+            "example": 512
+          },
+          "uploadedAt": {
+            "type": "string",
+            "description": "When this upload was made.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "uploadedByName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The uploading administrator's staff name, or `null` when the account that\nuploaded it can no longer be resolved.",
+            "example": "Chisom Maxwell"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body\nof both `POST /settings/identity/logo` and `POST /settings/identity/signature`, and also\nhow SchoolImageDto? SettingsIdentityGroupDto.Logo/SchoolImageDto? SettingsIdentityGroupDto.Signature\nreport the current upload.",
+        "example": {
+          "width": 512,
+          "height": 512,
+          "uploadedAt": "2026-08-03T09:30:00+00:00",
+          "uploadedByName": "Chisom Maxwell"
+        }
+      },
       "ScopeType": {
         "enum": [
           "SchoolWide",
@@ -21649,7 +22131,14 @@
             "motto": "Excellence Through Character",
             "headTeacherName": "Chisom Maxwell",
             "timezone": "Africa/Lagos",
-            "versionNumber": 3
+            "versionNumber": 3,
+            "logo": {
+              "width": 512,
+              "height": 512,
+              "uploadedAt": "2026-08-03T09:30:00+00:00",
+              "uploadedByName": "Chisom Maxwell"
+            },
+            "signature": null
           },
           "abbreviation": {
             "abbreviation": "GRAS",
@@ -22033,7 +22522,9 @@
           "motto",
           "headTeacherName",
           "timezone",
-          "versionNumber"
+          "versionNumber",
+          "logo",
+          "signature"
         ],
         "type": "object",
         "properties": {
@@ -22089,6 +22580,28 @@
             "description": "The identity group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next `PATCH`.",
             "format": "int32",
             "example": 3
+          },
+          "logo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The current logo's summary (TASK-0005b stage B2), or `null` before the first\nupload. Fetch the actual pixels through the separate serving endpoints (stage C).",
+                "$ref": "#/components/schemas/SchoolImageDto"
+              }
+            ]
+          },
+          "signature": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The current head teacher signature's summary, or `null` before the first upload.",
+                "$ref": "#/components/schemas/SchoolImageDto"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -22102,7 +22615,14 @@
           "motto": "Excellence Through Character",
           "headTeacherName": "Chisom Maxwell",
           "timezone": "Africa/Lagos",
-          "versionNumber": 3
+          "versionNumber": 3,
+          "logo": {
+            "width": 512,
+            "height": 512,
+            "uploadedAt": "2026-08-03T09:30:00+00:00",
+            "uploadedByName": "Chisom Maxwell"
+          },
+          "signature": null
         }
       },
       "SettingsRatingScaleGroupDto": {
@@ -22342,6 +22862,12 @@
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
         }
+      },
+      "Stream": {
+        "type": "string",
+        "description": "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).",
+        "format": "binary",
+        "example": "binary PNG or JPEG bytes"
       },
       "SubjectDto": {
         "required": [
