@@ -118,8 +118,16 @@ apart inside one account.
 **Smoke test — one command, no database or browser needed:**
 
 ```bash
-sudo -u gras env $(grep ^Cloudinary /etc/gras/api.env | xargs)   dotnet /opt/gras/api/SchoolManagement.Api.dll cloudinary-smoke-test
+cd /opt/gras/api
+sudo -u gras env ASPNETCORE_ENVIRONMENT=Production   $(sudo grep -E '^Cloudinary__' /etc/gras/api.env | xargs)   dotnet /opt/gras/api/SchoolManagement.Api.dll cloudinary-smoke-test
 ```
+
+Three details in that command are load-bearing: `sudo grep`, because `api.env` is root-only and a
+plain `grep` as the deploy user silently yields nothing (the test then runs with no credentials and
+fails confusingly); `cd /opt/gras/api`, because the content root comes from the working directory
+and `appsettings.Production.json` would not load from anywhere else; and
+`ASPNETCORE_ENVIRONMENT=Production`, for the same reason — without both, the asset lands under
+`gras/` instead of `gras/prod/`.
 
 It uploads a 73-byte PNG through the same store the endpoints use, reads it back through a signed
 URL, compares the bytes and exits non-zero with the reason if any step fails. It **refuses to pass**

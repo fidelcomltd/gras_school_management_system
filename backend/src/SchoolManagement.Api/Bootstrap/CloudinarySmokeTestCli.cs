@@ -56,9 +56,19 @@ internal static class CloudinarySmokeTestCli
             await Console.Error.WriteLineAsync(
                 $"The configured store is '{storeDescription}', not Cloudinary, so this proves nothing.")
                 .ConfigureAwait(false);
+            // Both causes are named, and neither is asserted: on a first deploy the likeliest one is
+            // a HALF-filled api.env (say a blank ApiSecret), which selects the fake just as the flag
+            // does. Telling the operator to remove a flag they never set would send them looking in
+            // the wrong file. This command runs without the startup validators (it needs no
+            // database), so CloudinaryOptionsValidator's precise "partially configured" message is
+            // not available here.
             await Console.Error.WriteLineAsync(
-                "Set Cloudinary__CloudName, Cloudinary__ApiKey and Cloudinary__ApiSecret, and remove " +
-                "Cloudinary:AllowInMemoryStore (it deliberately wins over configured credentials).")
+                "Either Cloudinary:AllowInMemoryStore is set (it deliberately wins over configured " +
+                "credentials), or CloudName/ApiKey/ApiSecret are not ALL filled in — one blank value " +
+                "is enough to fall back to the fake. Check all four in this host's configuration:")
+                .ConfigureAwait(false);
+            await Console.Error.WriteLineAsync(
+                "  grep -E '^Cloudinary' /etc/gras/api.env   # on the VPS, as root")
                 .ConfigureAwait(false);
 
             return 1;

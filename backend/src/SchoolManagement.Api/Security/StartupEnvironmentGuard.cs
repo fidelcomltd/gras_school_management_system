@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.Infrastructure.Settings;
 
 namespace SchoolManagement.Api.Security;
 
@@ -29,7 +30,8 @@ namespace SchoolManagement.Api.Security;
 internal sealed class StartupEnvironmentGuard(
     IHostEnvironment environment,
     IOptions<ApiAuthenticationOptions> authenticationOptions,
-    IOptions<DatabaseOptions> databaseOptions)
+    IOptions<DatabaseOptions> databaseOptions,
+    IOptions<CloudinaryOptions> cloudinaryOptions)
     : IHostedService
 {
     /// <inheritdoc />
@@ -52,6 +54,27 @@ internal sealed class StartupEnvironmentGuard(
                 "'Placeholder', which authenticates NOBODY: every protected endpoint would return 401. " +
                 "Choose and implement a real mechanism — that decision needs human sign-off per root " +
                 "CLAUDE.md §5 and is tracked in docs/ASSUMPTIONS.md.");
+        }
+
+        if (cloudinaryOptions.Value.AllowInMemoryStore)
+        {
+            // TASK-0005b stage D. This flag makes the in-memory image store win over configured
+            // credentials — deliberately, because the integration fixture sets it and the host it
+            // builds runs as Development, where Program.cs loads user-secrets (a developer with
+            // real credentials there would otherwise have the whole suite uploading to the school's
+            // live media library).
+            //
+            // The cost of that precedence is THIS failure mode: a deployed host carrying the flag
+            // over from appsettings.Development.template.json — where it ships as true — would boot
+            // perfectly, accept a logo upload, and lose it on the next restart, with no error
+            // anywhere. CloudinaryOptionsValidator cannot catch it, because with real credentials
+            // also present the configuration is entirely valid; it is only wrong FOR THIS
+            // ENVIRONMENT, which is exactly what this guard is for.
+            failures.Add(
+                $"'{CloudinaryOptions.SectionName}:{nameof(CloudinaryOptions.AllowInMemoryStore)}' is " +
+                "enabled, which stores uploaded logos and signatures in process memory: they are lost " +
+                "on every restart, and this flag takes precedence even when real Cloudinary " +
+                "credentials are configured. Remove it from this environment's configuration.");
         }
 
         if (databaseOptions.Value.EnableSensitiveDataLogging)
