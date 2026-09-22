@@ -84,8 +84,16 @@ internal sealed partial class GetPortalResultPdfHandler(
     [GeneratedRegex("[^A-Za-z0-9]+")]
     private static partial Regex UnsafeRun();
 
-    // The images named by the snapshot's upload groups, so a sheet reprinted later shows what was published.
-    private async Task<ReadOnlyMemory<byte>> ReadImageAsync(Guid? groupId, DomainSizeVariant variant, CancellationToken cancellationToken)
+    private Task<ReadOnlyMemory<byte>> ReadImageAsync(Guid? groupId, DomainSizeVariant variant, CancellationToken cancellationToken) =>
+        SnapshotImages.ReadAsync(schoolImages, imageStore, groupId, variant, cancellationToken);
+}
+
+/// <summary>Reads the images named by a snapshot's upload groups, so a sheet reprinted later shows what was published.</summary>
+internal static class SnapshotImages
+{
+    /// <summary>The rendition's bytes, or empty when there is no group or no such rendition.</summary>
+    public static async Task<ReadOnlyMemory<byte>> ReadAsync(
+        ISchoolImageRepository schoolImages, ISchoolImageStore imageStore, Guid? groupId, DomainSizeVariant variant, CancellationToken cancellationToken)
     {
         if (groupId is not { } id
             || await schoolImages.FindRenditionAsync(id, variant, cancellationToken).ConfigureAwait(false) is not { } rendition)

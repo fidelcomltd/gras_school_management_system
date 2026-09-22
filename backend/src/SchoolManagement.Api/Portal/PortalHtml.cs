@@ -75,7 +75,9 @@ internal static class PortalHtml
                 });
             }
 
-            body.Append("<li><span>Annual cumulative<em>After Third Term results</em></span></li></ul>");
+            body.Append(group.AnnualAvailable
+                ? string.Create(CultureInfo.InvariantCulture, $"<li><a href=\"/portal/annual/{group.SessionId:D}?u={session.UseId:D}\">Annual cumulative<strong>Available</strong></a></li></ul>")
+                : "<li><span>Annual cumulative<em>After Third Term results</em></span></li></ul>");
         }
 
         foreach (var other in others)
@@ -190,6 +192,71 @@ internal static class PortalHtml
             .Append("<p class=\"muted\">Downloading does not use up another of your pin's uses.</p>")
             .Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal/terms?u={useId:D}\">Back to terms</a>");
         return Page(branding, $"{sheet.TermName} result", body.ToString());
+    }
+
+    /// <summary>The annual cumulative result on screen (spec 6.7.10): the same values as its PDF.</summary>
+    public static string Annual(PortalBranding branding, AnnualSheet sheet, Guid sessionId, Guid useId)
+    {
+        var body = new StringBuilder();
+        body.Append("<div class=\"notice\"><dl>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Name</dt><dd>{E(sheet.PupilName)}</dd>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Class</dt><dd>{E(sheet.ClassName)}</dd>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Session</dt><dd>{E(sheet.AcademicYear)}</dd></dl></div>")
+            .Append(CultureInfo.InvariantCulture, $"<div class=\"notice\"><div class=\"muted\">Cumulative average</div><div class=\"big\">{sheet.CumulativeAverage.ToString("0.00", CultureInfo.InvariantCulture)}</div>")
+            .Append(CultureInfo.InvariantCulture, $"<div class=\"muted\">Cumulative grade: <strong>{E(sheet.CumulativeGrade)}</strong> ({E(sheet.CumulativeRemark)})</div>");
+        if (sheet.TermsCountedNote is { } note)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<div class=\"muted\">{E(note)}</div>");
+        }
+
+        body.Append("</div><h3>Subjects</h3><div class=\"scroll\"><table><thead><tr><th>Subject</th>");
+        foreach (var label in AnnualSheetBuilder.TermLabels)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<th>{E(label)}</th>");
+        }
+
+        body.Append("<th>Average</th><th>Grade</th></tr></thead><tbody>");
+        foreach (var subject in sheet.Subjects)
+        {
+            var marker = subject.TermsTaken < AnnualSheetBuilder.TermLabels.Count ? " *" : string.Empty;
+            body.Append(CultureInfo.InvariantCulture, $"<tr><td>{E(subject.Subject)}{marker}</td>");
+            foreach (var total in subject.TermTotals)
+            {
+                body.Append(CultureInfo.InvariantCulture, $"<td>{total}</td>");
+            }
+
+            body.Append(CultureInfo.InvariantCulture, $"<td><strong>{subject.Mean.ToString("0.00", CultureInfo.InvariantCulture)}</strong></td><td>{E(subject.Grade ?? string.Empty)}</td></tr>");
+        }
+
+        body.Append("<tr><th>Total obtained</th>");
+        foreach (var total in sheet.TermTotals)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<th>{total}</th>");
+        }
+
+        body.Append(CultureInfo.InvariantCulture, $"<th>{sheet.GrandTotal}</th><th></th></tr><tr><th>Average</th>");
+        foreach (var average in sheet.TermAverages)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<th>{average?.ToString("0.00", CultureInfo.InvariantCulture)}</th>");
+        }
+
+        body.Append(CultureInfo.InvariantCulture, $"<th>{sheet.CumulativeAverage.ToString("0.00", CultureInfo.InvariantCulture)}</th><th>{E(sheet.CumulativeGrade)}</th></tr></tbody></table></div>");
+        if (sheet.Subjects.Any(subject => subject.TermsTaken < AnnualSheetBuilder.TermLabels.Count))
+        {
+            body.Append("<p class=\"muted\">* Average of the terms in which the subject was taken.</p>");
+        }
+
+        body.Append("<details><summary>Grade key</summary><div class=\"scroll\"><table><tbody>");
+        foreach (var band in sheet.GradeKey)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<tr><td>{E(band.Grade)}</td><td>{E(band.Range)}</td><td>{E(band.Word)}</td></tr>");
+        }
+
+        body.Append("</tbody></table></div></details>")
+            .Append(CultureInfo.InvariantCulture, $"<a class=\"button\" href=\"/portal/annual/{sessionId:D}/pdf?u={useId:D}\">Download PDF</a>")
+            .Append("<p class=\"muted\">Downloading does not use up another of your pin's uses.</p>")
+            .Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal/terms?u={useId:D}\">Back to terms</a>");
+        return Page(branding, $"{sheet.AcademicYear} annual result", body.ToString());
     }
 
     /// <summary>
@@ -315,6 +382,10 @@ internal sealed record PortalCopy(string Heading, string Body, string? ButtonTex
 
     public static PortalCopy NotReleased(string termName) => new(
         $"{termName} results are not out yet", $"The school has not released {termName} results for this class.", "Back", "/portal/terms");
+
+    // Spec 6.7.10: "present but greyed with the label Available after Third Term results are released".
+    public static PortalCopy AnnualNotReady { get; } = new(
+        "The annual result is not out yet", "The annual result is available after Third Term results are released.", "Back", "/portal/terms");
 
     public static PortalCopy NoResult { get; } = new(
         "There is no result for this term",

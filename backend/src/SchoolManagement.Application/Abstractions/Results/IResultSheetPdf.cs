@@ -23,6 +23,9 @@ public interface IResultSheetPdfRenderer
 
     /// <summary>The PDF bytes.</summary>
     byte[] Render(ResultSheet sheet, ResultSheetPdfExtras extras);
+
+    /// <summary>The annual cumulative document (6.7.10): A4, same header and footer as the term sheet, no verification marks.</summary>
+    byte[] RenderAnnual(AnnualSheet sheet, ResultSheetPdfExtras extras);
 }
 
 /// <summary>Identifies one cached PDF: republication changes the revision, which is the invalidation (6.9.6).</summary>

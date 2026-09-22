@@ -169,6 +169,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
         services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();
         services.AddScoped<Application.Abstractions.Results.IResultVerificationReader, Results.ResultVerificationReader>();
+        services.AddScoped<Application.Abstractions.Results.IAnnualSheetReader, Results.AnnualSheetReader>();
         services.AddSingleton<Application.Abstractions.Results.IResultSheetPdfRenderer, Results.QuestPdfResultSheetRenderer>();
         services.AddSingleton<Application.Abstractions.Results.IResultPdfCache, Results.DiskResultPdfCache>();
         services.AddSingleton<Pins.PinMaintenanceService>();

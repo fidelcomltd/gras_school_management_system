@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SchoolManagement.Application.Abstractions.Pins;
 using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Enrolments;
+using SchoolManagement.Domain.Pins;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
@@ -13,10 +16,11 @@ using SchoolManagement.IntegrationTests.Infrastructure;
 
 namespace SchoolManagement.IntegrationTests;
 
-/// <summary>Spec 6.7.10: <c>POST /api/v1/arms/{armId}/annual-results</c> over three published terms (8.4.9's figures).</summary>
+/// <summary>Spec 6.7.10: <c>POST /api/v1/arms/{armId}/annual-results</c> over three published terms (8.4.9's figures), then the portal's annual page and PDF.</summary>
 public sealed class AnnualResultEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     private static int _nextYear = 9500;
+    private static int _nextSerial = 500;
 
     [Fact]
     public async Task Compute_AfterThreePublishedTerms_WritesTheCumulativeAverage_GradeAndProposal()
@@ -48,6 +52,33 @@ public sealed class AnnualResultEndpointsTests(ApiTestFixture fixture) : Integra
         (await PostAsync($"/api/v1/arms/{seeded.ArmId}/annual-results", jar)).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<AnnualResult>().CountAsync(result => result.PupilId == seeded.PupilId, TestContext.Current.CancellationToken))
             .ShouldBe(1);
+
+        // 3d-2: the parent sees it inside the viewing session, and downloads it for no extra use.
+        var pin = await SeedPinAsync(seeded.SessionId);
+        using var parent = Fixture.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        using var lookup = new HttpRequestMessage(HttpMethod.Post, "/portal/lookup")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["registrationNumber"] = seeded.Number, ["pin"] = pin.Value }),
+        };
+        var opened = await parent.SendAsync(lookup, TestContext.Current.CancellationToken);
+        opened.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        var cookie = opened.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("gras_portal=", StringComparison.Ordinal)).Split(';')[0];
+
+        (await GetPortalAsync(parent, "/portal/terms", cookie)).ShouldContain($"/portal/annual/{seeded.SessionId:D}?u=");
+        var page = await GetPortalAsync(parent, $"/portal/annual/{seeded.SessionId}", cookie);
+        page.ShouldContain("80.25");
+        page.ShouldContain("80.33");
+        page.ShouldContain("Very good");
+
+        using var download = new HttpRequestMessage(HttpMethod.Get, $"/portal/annual/{seeded.SessionId}/pdf");
+        download.Headers.Add("Cookie", cookie);
+        using var pdf = await parent.SendAsync(download, TestContext.Current.CancellationToken);
+        pdf.StatusCode.ShouldBe(HttpStatusCode.OK);
+        pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        pdf.Content.Headers.ContentDisposition!.FileNameStar!.ShouldContain("_Annual_");
+        (await pdf.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Length.ShouldBeLessThan(200 * 1024);
+        (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<Pin>().AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == pin.Id, TestContext.Current.CancellationToken)).UseCount.ShouldBe(1);
     }
 
     [Fact]
@@ -65,7 +96,7 @@ public sealed class AnnualResultEndpointsTests(ApiTestFixture fixture) : Integra
         problem.ShouldContain("are not published. Publish all three terms before computing annual results.");
     }
 
-    private sealed record Seeded(Guid ArmId, Guid PupilId);
+    private sealed record Seeded(Guid ArmId, Guid PupilId, Guid SessionId, string Number);
 
     private async Task<Seeded> SeedAsync(ResultSetState secondTermState)
     {
@@ -76,6 +107,7 @@ public sealed class AnnualResultEndpointsTests(ApiTestFixture fixture) : Integra
 
         var year = Interlocked.Increment(ref _nextYear);
         var session = AcademicSession.Create(Guid.CreateVersion7(), $"{year}/{year + 1}", new DateOnly(year, 9, 1), new DateOnly(year + 1, 7, 31)).Value;
+        session.Activate();
         context.Add(session);
         var arm = Arm.Create(Guid.CreateVersion7(), levelId, session.Id, "A", null, null).Value;
         context.Add(arm);
@@ -108,7 +140,34 @@ public sealed class AnnualResultEndpointsTests(ApiTestFixture fixture) : Integra
         }
 
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
-        return new Seeded(arm.Id, pupil.Id);
+        var number = $"GRAS/{year}/{Interlocked.Increment(ref _nextSerial):D4}";
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE pupils SET status = {nameof(PupilStatus.Active)}, registration_number = {number} WHERE id = {pupil.Id}",
+            TestContext.Current.CancellationToken);
+        return new Seeded(arm.Id, pupil.Id, session.Id, number);
+    }
+
+    private async Task<(Guid Id, string Value)> SeedPinAsync(Guid sessionId)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var value = PinValue.Generate(10);
+        var material = scope.ServiceProvider.GetRequiredService<IPinSecrets>().Protect(value);
+        var batch = PinBatch.Create(Guid.CreateVersion7(), sessionId, $"Batch {Guid.NewGuid():N}", null, 10, 3, 1, DateTimeOffset.UtcNow, null);
+        var pin = Pin.Create(Guid.CreateVersion7(), batch.Id, material.PinHash, material.LookupKey, value[..4], material.Ciphertext, 3);
+        context.Add(batch);
+        context.Add(pin);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return (pin.Id, value);
+    }
+
+    private static async Task<string> GetPortalAsync(HttpClient client, string url, string cookie)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("Cookie", cookie);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<CookieJar> SignInAdminAsync()

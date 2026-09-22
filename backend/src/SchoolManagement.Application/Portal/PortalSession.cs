@@ -1,6 +1,7 @@
 using FluentValidation;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Portal;
+using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pins;
 using SchoolManagement.Domain.Results;
@@ -29,7 +30,9 @@ public sealed record PortalTerm(Guid TermId, string TermName, PortalTermAvailabi
 /// <summary>A session's terms, newest session first.</summary>
 /// <param name="SessionName">e.g. 2026/2027.</param>
 /// <param name="Terms">In term order.</param>
-public sealed record PortalSessionTerms(string SessionName, IReadOnlyList<PortalTerm> Terms);
+/// <param name="SessionId">For the annual link.</param>
+/// <param name="AnnualAvailable">Third Term is published and the annual computation has run (6.7.10).</param>
+public sealed record PortalSessionTerms(string SessionName, IReadOnlyList<PortalTerm> Terms, Guid SessionId = default, bool AnnualAvailable = false);
 
 /// <summary>An open viewing session, as the term selector shows it.</summary>
 /// <param name="UseId">Opaque id; the page links carry it so a parent with two open sessions can switch.</param>
@@ -96,11 +99,15 @@ internal sealed class GetPortalSessionsHandler(IPortalRepository portal, TimePro
             }
 
             var terms = await portal.ListTermsAsync(found.Use.PupilId, cancellationToken).ConfigureAwait(false);
+            var annual = await portal.ListAnnualSessionIdsAsync(found.Use.PupilId, cancellationToken).ConfigureAwait(false);
             var grouped = terms
                 .GroupBy(term => (term.SessionId, term.SessionName))
                 .Select(group => new PortalSessionTerms(
                     group.Key.SessionName,
-                    group.OrderBy(term => term.TermOrdinal).Select(term => new PortalTerm(term.TermId, term.TermName, AvailabilityOf(term.ResultSetState))).ToList()))
+                    group.OrderBy(term => term.TermOrdinal).Select(term => new PortalTerm(term.TermId, term.TermName, AvailabilityOf(term.ResultSetState))).ToList(),
+                    group.Key.SessionId,
+                    annual.Contains(group.Key.SessionId)
+                        && group.Any(term => term.TermOrdinal == AnnualComputation.TermsInSession && term.ResultSetState == ResultSetState.Published)))
                 .ToList();
 
             sessions.Add(new PortalViewingSession(

@@ -60,39 +60,194 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             .GeneratePdf();
     }
 
+    public byte[] RenderAnnual(AnnualSheet sheet, ResultSheetPdfExtras extras)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        ArgumentNullException.ThrowIfNull(extras);
+        var logo = extras.Logo.IsEmpty ? null : extras.Logo.ToArray();
+        var signature = extras.Signature.IsEmpty ? null : extras.Signature.ToArray();
+
+        return Document.Create(document => document.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(Margin);
+                page.DefaultTextStyle(style => style.FontSize(8));
+                page.Header().Column(column =>
+                {
+                    SchoolBlock(column, sheet.SchoolName, sheet.SchoolMotto, sheet.SchoolAddress, "ANNUAL REPORT SHEET", logo);
+                    column.Item().PaddingTop(6).Border(0.75f).Padding(4).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(62);
+                            columns.RelativeColumn(3);
+                            columns.ConstantColumn(78);
+                            columns.RelativeColumn(2);
+                        });
+                        Field(table, "Name", sheet.PupilName, bold: true);
+                        Field(table, "Reg. no.", sheet.RegistrationNumber);
+                        Field(table, "Class", sheet.ClassName);
+                        Field(table, "Session", sheet.AcademicYear);
+                    });
+                });
+                page.Content().PaddingVertical(6).Column(column =>
+                {
+                    column.Spacing(7);
+                    column.Item().Element(item => AnnualSubjects(item, sheet));
+                    column.Item().Element(item => AnnualSummary(item, sheet));
+                    column.Item().ShowEntire().Row(row =>
+                    {
+                        row.Spacing(8);
+                        row.RelativeItem().AlignBottom().Column(signed => Signature(signed, sheet.HeadTeacherName, signature, sheet.ComputedAt));
+                        Stamp(row);
+                    });
+                    column.Item().Element(item => GradeKey(item, sheet.GradeKey));
+                });
+                page.Footer().Element(footer => Footer(footer, extras, null));
+            }))
+            .WithMetadata(new DocumentMetadata { Title = $"Annual result, {sheet.AcademicYear}", Author = sheet.SchoolName, Creator = sheet.SchoolName })
+            .WithSettings(new DocumentSettings { ImageRasterDpi = 200, ImageCompressionQuality = ImageCompressionQuality.High })
+            .GeneratePdf();
+    }
+
+    private static void AnnualSubjects(IContainer container, AnnualSheet sheet) =>
+        container.Column(column =>
+        {
+            column.Item().Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.RelativeColumn(4);
+                    foreach (var _ in AnnualSheetBuilder.TermLabels)
+                    {
+                        columns.RelativeColumn(1.3f);
+                    }
+
+                    columns.RelativeColumn(1.6f);
+                    columns.RelativeColumn(1);
+                });
+
+                table.Header(header =>
+                {
+                    HeadCell(header.Cell(), "SUBJECT", left: true);
+                    foreach (var label in AnnualSheetBuilder.TermLabels)
+                    {
+                        HeadCell(header.Cell(), $"{label}\n(100)");
+                    }
+
+                    HeadCell(header.Cell(), "ANNUAL\nAVERAGE");
+                    HeadCell(header.Cell(), "GRADE");
+                });
+
+                foreach (var subject in sheet.Subjects)
+                {
+                    BodyCell(table.Cell()).Text(subject.TermsTaken < AnnualSheetBuilder.TermLabels.Count ? $"{subject.Subject} *" : subject.Subject);
+                    foreach (var total in subject.TermTotals)
+                    {
+                        BodyCell(table.Cell()).AlignCenter().Text(total?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
+                    }
+
+                    BodyCell(table.Cell()).AlignCenter().Text(subject.Mean.ToString("0.00", CultureInfo.InvariantCulture)).Bold();
+                    BodyCell(table.Cell()).AlignCenter().Text(subject.Grade ?? string.Empty);
+                }
+            });
+
+            if (sheet.Subjects.Any(subject => subject.TermsTaken < AnnualSheetBuilder.TermLabels.Count))
+            {
+                column.Item().PaddingTop(2).Text("* Average of the terms in which the subject was taken.").FontSize(7);
+            }
+        });
+
+    private static void AnnualSummary(IContainer container, AnnualSheet sheet) =>
+        container.Column(column =>
+        {
+            column.Item().Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.RelativeColumn(4);
+                    foreach (var _ in AnnualSheetBuilder.TermLabels)
+                    {
+                        columns.RelativeColumn(1.3f);
+                    }
+
+                    columns.RelativeColumn(2.6f);
+                });
+
+                table.Header(header =>
+                {
+                    HeadCell(header.Cell(), string.Empty, left: true);
+                    foreach (var label in AnnualSheetBuilder.TermLabels)
+                    {
+                        HeadCell(header.Cell(), label);
+                    }
+
+                    HeadCell(header.Cell(), "FOR THE YEAR");
+                });
+
+                BodyCell(table.Cell()).Text("Total obtained").Bold();
+                foreach (var total in sheet.TermTotals)
+                {
+                    BodyCell(table.Cell()).AlignCenter().Text(total?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
+                }
+
+                BodyCell(table.Cell()).AlignCenter().Text(sheet.GrandTotal.ToString(CultureInfo.InvariantCulture)).Bold();
+                BodyCell(table.Cell()).Text("Average").Bold();
+                foreach (var average in sheet.TermAverages)
+                {
+                    BodyCell(table.Cell()).AlignCenter().Text(average?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty);
+                }
+
+                BodyCell(table.Cell()).AlignCenter().Text(sheet.CumulativeAverage.ToString("0.00", CultureInfo.InvariantCulture)).Bold();
+            });
+
+            column.Item().PaddingTop(4).Text(text =>
+            {
+                text.Span("Cumulative grade: ");
+                text.Span($"{sheet.CumulativeGrade} ({sheet.CumulativeRemark})").Bold();
+            });
+            if (sheet.TermsCountedNote is { } note)
+            {
+                column.Item().Text(note).Italic();
+            }
+        });
+
+    private static void SchoolBlock(ColumnDescriptor column, string schoolName, string? motto, string? address, string title, byte[]? logo) =>
+        column.Item().Row(row =>
+        {
+            if (logo is not null)
+            {
+                row.ConstantItem(52).Height(52).Image(logo).FitArea();
+                row.ConstantItem(8);
+            }
+
+            row.RelativeItem().AlignMiddle().Column(block =>
+            {
+                block.Item().AlignCenter().Text(schoolName.ToUpperInvariant()).Bold().FontSize(14);
+                if (motto is { Length: > 0 })
+                {
+                    block.Item().AlignCenter().Text(motto).Italic();
+                }
+
+                if (address is { Length: > 0 })
+                {
+                    block.Item().AlignCenter().Text(address.ReplaceLineEndings(", ")).FontSize(7.5f);
+                }
+
+                block.Item().PaddingTop(3).AlignCenter().Text(title).Bold().FontSize(10);
+            });
+
+            if (logo is not null)
+            {
+                row.ConstantItem(60); // balances the logo so the title stays centred
+            }
+        });
+
     private static void Header(IContainer container, ResultSheet sheet, byte[]? logo) =>
         container.Column(column =>
         {
-            column.Item().Row(row =>
-            {
-                if (logo is not null)
-                {
-                    row.ConstantItem(52).Height(52).Image(logo).FitArea();
-                    row.ConstantItem(8);
-                }
-
-                row.RelativeItem().AlignMiddle().Column(title =>
-                {
-                    title.Item().AlignCenter().Text(sheet.SchoolName.ToUpperInvariant()).Bold().FontSize(14);
-                    if (sheet.SchoolMotto is { Length: > 0 } motto)
-                    {
-                        title.Item().AlignCenter().Text(motto).Italic();
-                    }
-
-                    if (sheet.SchoolAddress is { Length: > 0 } address)
-                    {
-                        title.Item().AlignCenter().Text(address.ReplaceLineEndings(", ")).FontSize(7.5f);
-                    }
-
-                    title.Item().PaddingTop(3).AlignCenter()
-                        .Text(sheet.Section == SheetSection.Nursery ? "NURSERY REPORT SHEET" : "PUPIL'S REPORT SHEET").Bold().FontSize(10);
-                });
-
-                if (logo is not null)
-                {
-                    row.ConstantItem(60); // balances the logo so the title stays centred
-                }
-            });
+            SchoolBlock(column, sheet.SchoolName, sheet.SchoolMotto, sheet.SchoolAddress,
+                sheet.Section == SheetSection.Nursery ? "NURSERY REPORT SHEET" : "PUPIL'S REPORT SHEET", logo);
 
             column.Item().PaddingTop(6).Border(0.75f).Padding(4).Table(table =>
             {
@@ -186,7 +341,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
 
             // C.8 rule 5: the remarks and signature block is never split or orphaned.
             column.Item().ShowEntire().Element(item => Remarks(item, sheet, signature));
-            column.Item().Element(item => GradeKey(item, sheet));
+            column.Item().Element(item => GradeKey(item, sheet.GradeKey));
         });
 
     private static void Subjects(IContainer container, ResultSheet sheet) =>
@@ -297,34 +452,40 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
                 var primary = sheet.Section == SheetSection.Primary;
                 Remark(column, primary ? "Teacher's report" : "Teacher's comment", sheet.TeacherComment);
                 Remark(column, primary ? "Head teacher's report" : "Head teacher's comment", sheet.HeadTeacherComment);
-                column.Item().Row(signed =>
-                {
-                    signed.RelativeItem().Column(block =>
-                    {
-                        if (signature is not null)
-                        {
-                            block.Item().Height(28).AlignLeft().Image(signature).FitHeight();
-                        }
-                        else
-                        {
-                            block.Item().Height(28).BorderBottom(0.75f);
-                        }
-
-                        block.Item().Text(sheet.HeadTeacherName ?? "Head teacher").Bold();
-                        block.Item().Text("Head teacher").FontSize(7);
-                    });
-                    signed.ConstantItem(12);
-                    signed.RelativeItem().AlignBottom().Text(text =>
-                    {
-                        text.Span("Date issued: ");
-                        text.Span(sheet.IssuedAt is { } issued ? issued.ToOffset(TimeSpan.FromHours(1)).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty).Bold();
-                    });
-                });
+                Signature(column, sheet.HeadTeacherName, signature, sheet.IssuedAt);
             });
 
-            row.ConstantItem(StampSize).Height(StampSize).Border(0.5f).BorderColor(Colors.Grey.Lighten1)
-                .AlignBottom().AlignCenter().PaddingBottom(3).Text("School stamp").FontSize(6.5f).FontColor(Colors.Grey.Medium);
+            Stamp(row);
         });
+
+    private static void Signature(ColumnDescriptor column, string? headTeacherName, byte[]? signature, DateTimeOffset? issuedAt) =>
+        column.Item().Row(signed =>
+        {
+            signed.RelativeItem().Column(block =>
+            {
+                if (signature is not null)
+                {
+                    block.Item().Height(28).AlignLeft().Image(signature).FitHeight();
+                }
+                else
+                {
+                    block.Item().Height(28).BorderBottom(0.75f);
+                }
+
+                block.Item().Text(headTeacherName ?? "Head teacher").Bold();
+                block.Item().Text("Head teacher").FontSize(7);
+            });
+            signed.ConstantItem(12);
+            signed.RelativeItem().AlignBottom().Text(text =>
+            {
+                text.Span("Date issued: ");
+                text.Span(issuedAt is { } issued ? issued.ToOffset(TimeSpan.FromHours(1)).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty).Bold();
+            });
+        });
+
+    private static void Stamp(RowDescriptor row) =>
+        row.ConstantItem(StampSize).Height(StampSize).Border(0.5f).BorderColor(Colors.Grey.Lighten1)
+            .AlignBottom().AlignCenter().PaddingBottom(3).Text("School stamp").FontSize(6.5f).FontColor(Colors.Grey.Medium);
 
     private static void Remark(ColumnDescriptor column, string label, string? text) =>
         column.Item().Border(0.75f).Padding(4).MinHeight(30).Column(block =>
@@ -333,11 +494,11 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             block.Item().Text(text ?? string.Empty);
         });
 
-    private static void GradeKey(IContainer container, ResultSheet sheet) =>
+    private static void GradeKey(IContainer container, IReadOnlyList<SheetGradeKeyRow> gradeKey) =>
         container.Column(column =>
         {
             column.Item().Text("GRADE KEY").Bold().FontSize(7);
-            column.Item().Text(string.Join("    ", sheet.GradeKey.Select(band => $"{band.Grade}: {band.Range} {band.Word}"))).FontSize(7);
+            column.Item().Text(string.Join("    ", gradeKey.Select(band => $"{band.Grade}: {band.Range} {band.Word}"))).FontSize(7);
         });
 
     private static void Footer(IContainer container, ResultSheetPdfExtras extras, byte[]? qr) =>

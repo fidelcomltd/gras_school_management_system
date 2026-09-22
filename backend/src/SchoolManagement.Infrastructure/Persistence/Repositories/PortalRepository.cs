@@ -94,6 +94,14 @@ internal sealed class PortalRepository(ApplicationDbContext context) : IPortalRe
         return ids.ToHashSet();
     }
 
+    public async Task<IReadOnlySet<Guid>> ListAnnualSessionIdsAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        (await context.AnnualResults.AsNoTracking()
+            .Where(result => result.PupilId == pupilId)
+            .Select(result => result.SessionId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false))
+        .ToHashSet();
+
     public async Task<IReadOnlyList<PortalTermRow>> ListTermsAsync(Guid pupilId, CancellationToken cancellationToken)
     {
         var rows = await (

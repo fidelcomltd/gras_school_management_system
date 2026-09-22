@@ -39,6 +39,33 @@ public sealed class ResultSheetPdfTests
     }
 
     [Fact]
+    public void AnnualSheet_ReadsTheRowAndSnapshot_OrdersSubjects_AndRendersUnder200Kb()
+    {
+        var english = Guid.Parse("22222222-0000-7000-8000-000000000001");
+        var maths = Guid.Parse("22222222-0000-7000-8000-000000000002");
+        var french = Guid.Parse("22222222-0000-7000-8000-000000000003");
+        var row = AnnualResult.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, [null, 78.25m, 82.50m], [null, 313, 330], 643, 80.38m, "B", "Very good", 1, false, 27,
+            $$"""[{"subjectId":"{{french}}","termTotals":[null,60,null],"mean":60,"grade":"C","termsTaken":1},{"subjectId":"{{maths}}","termTotals":[null,71,80],"mean":75.5,"grade":"C","termsTaken":2},{"subjectId":"{{english}}","termTotals":[null,82,88],"mean":85,"grade":"B","termsTaken":2}]""",
+            PromotionOutcome.Promoted, DateTimeOffset.UtcNow);
+        var snapshot = $$$"""{"settings":{"identity":{"schoolName":"Golden Royal Ark School","headTeacherName":"Mrs N. Okonkwo"},"grading":{"bands":[{"gradeLetter":"B","lowerBound":80,"upperBound":89,"remark":"Very good","displayOrder":1}]}},"arm":{"displayName":"Primary 3A"},"session":{"name":"2026/2027"},"subjects":[{"subjectId":"{{{maths}}}","subjectName":"Mathematics","displayOrder":2},{"subjectId":"{{{english}}}","subjectName":"English","displayOrder":1}]}""";
+
+        var sheet = AnnualSheetBuilder.Build(new AnnualSheetData(row, snapshot, "Okafor", "Adaeze", "GRAS/2024/0087",
+            new Dictionary<Guid, string> { [english] = "English", [maths] = "Mathematics", [french] = "French" }))!;
+
+        sheet.Subjects.Select(subject => subject.Subject).ShouldBe(["English", "Mathematics", "French"]);
+        sheet.TermsCountedNote.ShouldBe("Cumulative average based on 2 of 3 terms.");
+        sheet.ClassName.ShouldBe("Primary 3A");
+        sheet.PupilName.ShouldBe("OKAFOR Adaeze");
+        AnnualSheetBuilder.Build(new AnnualSheetData(row, null, "Okafor", "Adaeze", "x", new Dictionary<Guid, string>())).ShouldBeNull();
+
+        var pdf = new QuestPdfResultSheetRenderer(Options.Create(new PortalOptions()))
+            .RenderAnnual(sheet, new ResultSheetPdfExtras(ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty, null, null, DateTimeOffset.UtcNow));
+        System.Text.Encoding.ASCII.GetString(pdf, 0, 5).ShouldBe("%PDF-");
+        pdf.Length.ShouldBeLessThan(200 * 1024);
+    }
+
+    [Fact]
     public void Tokens_PrintInGroupsOfFive() => ResultVerification.Format(Token).ShouldBe("ABCDE FGHJK MNPQR STUVW XY");
 
     [Fact]

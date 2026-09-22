@@ -55,6 +55,9 @@ public interface IPortalRepository
     /// <summary>The pupil's term rows across every session they were enrolled in, newest session first.</summary>
     Task<IReadOnlyList<PortalTermRow>> ListTermsAsync(Guid pupilId, CancellationToken cancellationToken);
 
+    /// <summary>The sessions in which the pupil has a computed annual result (spec 6.7.10).</summary>
+    Task<IReadOnlySet<Guid>> ListAnnualSessionIdsAsync(Guid pupilId, CancellationToken cancellationToken);
+
     /// <summary>A viewing session by its token hash, with its pin, or null. Tracked.</summary>
     Task<(PinUse Use, Pin Pin)?> FindUseAsync(string tokenHash, CancellationToken cancellationToken);
 

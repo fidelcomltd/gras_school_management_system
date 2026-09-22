@@ -37,6 +37,10 @@ internal static class PortalEndpoints
         portal.MapGet("/terms", TermsAsync);
         portal.MapGet("/result/{termId:guid}", ResultAsync);
         portal.MapGet("/result/{termId:guid}/pdf", ResultPdfAsync);
+        portal.MapGet("/annual/{sessionId:guid}", (Guid sessionId, HttpContext http, ISender sender, CancellationToken cancellationToken) =>
+            AnnualAsync(sessionId, asPdf: false, http, sender, cancellationToken));
+        portal.MapGet("/annual/{sessionId:guid}/pdf", (Guid sessionId, HttpContext http, ISender sender, CancellationToken cancellationToken) =>
+            AnnualAsync(sessionId, asPdf: true, http, sender, cancellationToken));
         portal.MapPost("/end", EndAsync)
             .ExemptFromCsrfRequirement("The viewing cookie is SameSite=Strict, so a cross-site post arrives without it and ends nothing.");
         portal.MapGet("/logo", LogoAsync);
@@ -145,6 +149,31 @@ internal static class PortalEndpoints
 
         var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
         return result.IsFailure ? Html(PortalHtml.Message(branding, PortalCopy.ServerFault)) : StatusPage(branding, result.Value.View);
+    }
+
+    // Spec 6.9.9 GET /portal/annual: inside the same viewing session, for no additional use (6.8.8).
+    private static async Task<IResult> AnnualAsync(Guid sessionId, bool asPdf, HttpContext http, ISender sender, CancellationToken cancellationToken)
+    {
+        Guid? useId = Guid.TryParse(http.Request.Query["u"], out var parsed) ? parsed : null;
+        var result = await sender.SendAsync(new GetPortalAnnualQuery(ReadTokens(http), useId, sessionId, asPdf), cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess && result.Value.File is { } file)
+        {
+            return Results.File(file.Content.ToArray(), "application/pdf", file.FileName);
+        }
+
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return Html(PortalHtml.Message(branding, PortalCopy.ServerFault));
+        }
+
+        var view = result.Value;
+        return view switch
+        {
+            { Status: PortalResultStatus.Shown, Sheet: { } sheet, UseId: { } use } => Html(PortalHtml.Annual(branding, sheet, sessionId, use)),
+            { Status: PortalResultStatus.SessionEnded } => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
+            _ => Html(PortalHtml.Message(branding, PortalCopy.AnnualNotReady)),
+        };
     }
 
     private static async Task<IResult> VerifyAsync(string code, ISender sender, CancellationToken cancellationToken)

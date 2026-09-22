@@ -57,21 +57,8 @@ internal sealed class GetPortalResultHandler(IPortalRepository portal, IResultSh
     public async Task<Result<PortalResultView>> HandleAsync(GetPortalResultQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var now = timeProvider.GetUtcNow();
-
-        (Domain.Portal.PinUse Use, Pin Pin)? chosen = null;
-        foreach (var token in request.Tokens)
-        {
-            if (await portal.FindUseAsync(PortalValues.HashToken(token), cancellationToken).ConfigureAwait(false) is { } found
-                && found.Use.IsOpenAt(now)
-                && found.Pin.State is not (PinState.Revoked or PinState.Suspended)
-                && (request.UseId is null || found.Use.Id == request.UseId))
-            {
-                chosen = found;
-            }
-        }
-
-        if (chosen is not { } session)
+        if (await PortalSessionResolver.ResolveAsync(portal, request.Tokens, request.UseId, timeProvider.GetUtcNow(), cancellationToken).ConfigureAwait(false)
+            is not { } session)
         {
             return Result.Success(new PortalResultView(PortalResultStatus.SessionEnded));
         }
@@ -97,5 +84,31 @@ internal sealed class GetPortalResultHandler(IPortalRepository portal, IResultSh
 
         return Result.Success(new PortalResultView(
             PortalResultStatus.Shown, sheet, term.TermName, session.Use.Id, new ResultPdfKey(data.ResultSetId, session.Use.PupilId, data.RevisionNumber)));
+    }
+}
+
+/// <summary>
+/// Picks the device's open viewing session: the one named by <c>useId</c>, else the most recent. Shared by every page that
+/// shows a pupil's results, so they can never disagree about who may see what.
+/// </summary>
+internal static class PortalSessionResolver
+{
+    /// <summary>The open, unrevoked, unsuspended session, or null.</summary>
+    public static async Task<(Domain.Portal.PinUse Use, Pin Pin)?> ResolveAsync(
+        IPortalRepository portal, IReadOnlyList<string> tokens, Guid? useId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        (Domain.Portal.PinUse Use, Pin Pin)? chosen = null;
+        foreach (var token in tokens)
+        {
+            if (await portal.FindUseAsync(PortalValues.HashToken(token), cancellationToken).ConfigureAwait(false) is { } found
+                && found.Use.IsOpenAt(now)
+                && found.Pin.State is not (PinState.Revoked or PinState.Suspended)
+                && (useId is null || found.Use.Id == useId))
+            {
+                chosen = found;
+            }
+        }
+
+        return chosen;
     }
 }
