@@ -93,6 +93,11 @@ internal sealed class SchoolProfileConfiguration : IEntityTypeConfiguration<Scho
         builder.Property(profile => profile.TraitsVersionNumber)
             .IsRequired();
 
+        // TASK-0005b stage B1: nullable until the first upload (6.2.2: the logo is not seeded).
+        // Points at SchoolImage.UploadGroupId, not an individual row id — see SchoolImage's remarks.
+        builder.Property(profile => profile.CurrentLogoGroupId);
+        builder.Property(profile => profile.CurrentSignatureGroupId);
+
         // Spec 6.2.2: the abbreviation is seeded `GRAS`; every other identity field is explicitly NOT
         // seeded ("Admin must supply") and so starts empty rather than a placeholder value that would
         // look like real data. Both version pointers start at 0 — "installed, never yet saved through
@@ -122,6 +127,8 @@ internal sealed class SchoolProfileConfiguration : IEntityTypeConfiguration<Scho
             RatingScalesVersionNumber = 0,
             DevelopmentDomainsVersionNumber = 0,
             TraitsVersionNumber = 0,
+            CurrentLogoGroupId = (Guid?)null,
+            CurrentSignatureGroupId = (Guid?)null,
         });
     }
 }

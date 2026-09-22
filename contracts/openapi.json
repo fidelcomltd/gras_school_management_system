@@ -1544,6 +1544,172 @@
         }
       }
     },
+    "/api/v1/arms/{armId}/annual-results": {
+      "post": {
+        "tags": [
+          "Annual results"
+        ],
+        "summary": "Compute an arm's annual cumulative results",
+        "description": "Spec 6.7.10: for every pupil with a result in the arm's Third Term set, the cumulative average over the terms they sat (simple or weighted per the result rules), its grade from the Third Term snapshot's bands, the annual position in this arm (pupils with one term are not ranked), per-subject means, and the proposed promotion outcome (6.3.7). Rewrites the rows each run, so it is idempotent. 409 names the first term that is not published; an earlier term the arm was never scored in is skipped rather than blocking. `Idempotency-Key` is accepted, not required.",
+        "operationId": "ComputeAnnualResults",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComputeAnnualResultsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/arms": {
       "get": {
         "tags": [
@@ -5257,6 +5423,1185 @@
         }
       }
     },
+    "/api/v1/pin-batches": {
+      "get": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "List pin batches",
+        "description": "Newest first, cursor-paged, with per-batch pin counts (spec 6.8.11). Optional `sessionId` and `state` filters.",
+        "operationId": "ListPinBatches",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PinBatchState"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPageOfPinBatchDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Generate a pin batch",
+        "description": "Spec 6.8.9. Pins are not tied to any pupil: any valid pin opens any registration number's published results. `pinCount` 1 to 2000; `pinLength` 10 to 16 (default 10); `maxUses` 1 to 100 (default 3). Above 10 uses, `confirmMaxUses` must repeat the number (spec 6.8.12). `name` defaults to the session and current term plus a sequence and must be unique in the session (409 `pin_batch.name_taken`). 409 `pin_batch.session_closed` for a closed session. `Idempotency-Key` is REQUIRED (spec 9.8.2).",
+        "operationId": "GeneratePinBatch",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratePinBatchCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinBatchDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pin-batches/{batchId}": {
+      "get": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Read a pin batch",
+        "description": "The batch with every pin's prefix, state, use count and distinct pupil count. Never a pin value (spec 6.8.13).",
+        "operationId": "GetPinBatch",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinBatchDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pin-batches/{batchId}/mark-distributed": {
+      "post": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Mark a pin batch distributed",
+        "description": "Generated or printed to active (spec 6.8.9 step 8). 409 `pin_batch.not_distributable` from any other state.",
+        "operationId": "MarkPinBatchDistributed",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinBatchDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pin-batches/{batchId}/revoke": {
+      "post": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Revoke a pin batch",
+        "description": "Revokes the batch and every pin in it in one transaction (spec 6.8.10). Reason required. 409 `pin_batch.already_revoked`.",
+        "operationId": "RevokePinBatch",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinBatchDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pin-batches/{batchId}/print": {
+      "get": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Print a pin batch's slips",
+        "description": "Spec 6.8.9 step 6: a PDF of every non-revoked pin, four slips to an A4 page with cut lines, the only place pin values are ever revealed. Moves the batch from generated to printed and writes an audit event, so fetch it and save the blob; never open it by top-level navigation. 410 `pin_batch.plaintext_purged` after the purge date; 409 `pin_batch.revoked`.",
+        "operationId": "PrintPinBatch",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pin-batches/{batchId}/distribution-list": {
+      "get": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Download a pin batch's distribution list",
+        "description": "Spec 6.8.9 step 7: a numbered sheet of each slip's four-character prefix, with blank columns for pupil name, class, guardian name and signature, filled in by hand. No pin values, so it stays available after the purge.",
+        "operationId": "GetPinDistributionList",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pins/{pinId}/revoke": {
+      "post": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Revoke one pin",
+        "description": "Reason required. 409 `pin.already_revoked`.",
+        "operationId": "RevokePin",
+        "parameters": [
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinSummaryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pins/{pinId}/reinstate": {
+      "post": {
+        "tags": [
+          "Pins"
+        ],
+        "summary": "Reinstate a suspended pin",
+        "description": "Clears a spread-control suspension (spec 6.8.13); reason required. 409 `pin.not_suspended` otherwise.",
+        "operationId": "ReinstatePin",
+        "parameters": [
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinSummaryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/privileges": {
       "get": {
         "tags": [
@@ -7262,6 +8607,479 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/result-sets/{resultSetId}/publish": {
+      "post": {
+        "tags": [
+          "Result sets"
+        ],
+        "summary": "Publish a result set",
+        "description": "Spec 6.7.9: school-wide. Moves Approved to Published, writes the configuration snapshot (settings, logo and signature references, level, section, arm and term as they stand now), and sets revisionNumber to 1 on first publication. Each precondition fails 409 with its own code and the spec's message: `result_set.not_approved`, `result_set.needs_recompute`, `result_set.head_teacher_remarks_missing`, `result_set.logo_missing`, `result_set.signature_missing`, `result_set.next_resumption_date_missing`, `result_set.times_school_opened_missing`, and (Third Term only) `result_set.core_subjects_missing`. 404 for an unknown id. `Idempotency-Key` is REQUIRED (spec 9.8.2).",
+        "operationId": "PublishResultSet",
+        "parameters": [
+          {
+            "name": "resultSetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResultSetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/result-sets/{resultSetId}/withdraw": {
+      "post": {
+        "tags": [
+          "Result sets"
+        ],
+        "summary": "Withdraw a published result set",
+        "description": "Spec 6.7.9: Super Admin only (`result.unpublish`), reason 10 to 500 characters (422 otherwise). Moves Published to Withdrawn, which removes it from the parent portal at once. The snapshot stays. 409 `result_set.not_published` from any other state; 404 for an unknown id.",
+        "operationId": "WithdrawResultSet",
+        "parameters": [
+          {
+            "name": "resultSetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawResultSetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultSetTransitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/result-sets/{resultSetId}/reopen": {
+      "post": {
+        "tags": [
+          "Result sets"
+        ],
+        "summary": "Reopen a withdrawn result set for correction",
+        "description": "Spec 6.7.9, 6.7.11: Withdrawn to Draft, marks editable, needsRecompute set; it then goes back through submission, approval and publication, and republishes as the next revision. Needs `result.unpublish` (Super Admin only, who also holds `result.score.enter`). 409 `result_set.term_not_active` unless the term is active; 409 `result_set.not_withdrawn` from any other state; 404 for an unknown id.",
+        "operationId": "ReopenResultSet",
+        "parameters": [
+          {
+            "name": "resultSetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultSetTransitionResponse"
                 }
               }
             }
@@ -9540,6 +11358,429 @@
                 }
               }
             },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity/logo": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Upload the school logo",
+        "description": "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 2 MB; minimum 300 by 300 pixels. Re-encoded to strip all metadata (EXIF orientation is applied to the pixels first, so a portrait phone photo stays upright), and stored at the original size plus 200 and 64 pixel derivatives. Repoints the current logo; the previous asset is never deleted, so a result published while it was current keeps rendering it. `Idempotency-Key` is REQUIRED.",
+        "operationId": "UploadSchoolLogo",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolImageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity/signature": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Upload the head teacher's signature",
+        "description": "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.",
+        "operationId": "UploadHeadTeacherSignature",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolImageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the current head teacher's signature",
+        "description": "Streams the current signature at its original size (spec 9.6). Same headers as the logo. `404 school_image.not_uploaded` before the first upload.",
+        "operationId": "GetHeadTeacherSignature",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/identity/logo/{size}": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read the current school logo",
+        "description": "Streams the current logo at `original`, `200` or `64` pixels (spec 9.6: served only through a privilege-checked endpoint, never a public URL). `Content-Disposition: inline`, `nosniff`, `Cache-Control: private`. `404 school_image.not_uploaded` before the first upload.",
+        "operationId": "GetSchoolLogo",
+        "parameters": [
+          {
+            "name": "size",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^(original|200|64)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14928,6 +17169,87 @@
           "newPassword": "another horse battery staple 4"
         }
       },
+      "ComputeAnnualResultsResponse": {
+        "required": [
+          "armId",
+          "sessionId",
+          "computedAt",
+          "pupilCount",
+          "rankedCount",
+          "proposedPromoted",
+          "proposedRepeat"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm computed.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Its session.",
+            "example": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073"
+          },
+          "computedAt": {
+            "type": "string",
+            "description": "When this run happened.",
+            "format": "date-time",
+            "example": "2027-07-24T10:00:00Z"
+          },
+          "pupilCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Annual rows written.",
+            "format": "int32",
+            "example": 28
+          },
+          "rankedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Of those, ranked (two or more terms).",
+            "format": "int32",
+            "example": 27
+          },
+          "proposedPromoted": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows proposing Promoted.",
+            "format": "int32",
+            "example": 26
+          },
+          "proposedRepeat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows proposing Repeat.",
+            "format": "int32",
+            "example": 2
+          }
+        },
+        "additionalProperties": false,
+        "description": "The 200 response.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+          "computedAt": "2027-07-24T10:00:00Z",
+          "pupilCount": 28,
+          "rankedCount": 27,
+          "proposedPromoted": 26,
+          "proposedRepeat": 2
+        }
+      },
       "ComputeResultSetFlagDto": {
         "required": [
           "code",
@@ -16312,6 +18634,73 @@
           "nextCursor": "BB8xMDE5MmYwYzQtN2MzZS03YTFiLTlmMmQtM2I4ZTVhNmMxZDQ2"
         }
       },
+      "CursorPageOfPinBatchDto": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PinBatchDto"
+            },
+            "description": "The page of items, newest first. Empty (never null) when there is nothing more to return.",
+            "example": [
+              {
+                "id": "0192f0c4-9a10-7000-8000-000000000301",
+                "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                "name": "2026/2027 First Term batch 1",
+                "purposeNote": "Primary 3 and Primary 4 parents",
+                "pinLength": 10,
+                "maxUses": 3,
+                "pinCount": 120,
+                "pinsUsed": 34,
+                "pinsExhausted": 2,
+                "pinsSuspended": 0,
+                "pinsRevoked": 0,
+                "state": "Active",
+                "generatedAt": "2026-08-03T09:30:00+00:00",
+                "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                "revokeReason": null
+              }
+            ]
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`null` when this is the last page.",
+            "example": "0192f0c4-9a10-7000-8000-000000000301"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the\nclient — it must be echoed back verbatim as the next request's cursor, and never parsed or\nconstructed by hand.",
+        "example": {
+          "items": [
+            {
+              "id": "0192f0c4-9a10-7000-8000-000000000301",
+              "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+              "name": "2026/2027 First Term batch 1",
+              "purposeNote": "Primary 3 and Primary 4 parents",
+              "pinLength": 10,
+              "maxUses": 3,
+              "pinCount": 120,
+              "pinsUsed": 34,
+              "pinsExhausted": 2,
+              "pinsSuspended": 0,
+              "pinsRevoked": 0,
+              "state": "Active",
+              "generatedAt": "2026-08-03T09:30:00+00:00",
+              "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+              "revokeReason": null
+            }
+          ],
+          "nextCursor": "0192f0c4-9a10-7000-8000-000000000301"
+        }
+      },
       "CursorPageOfPupilDto": {
         "required": [
           "items",
@@ -17347,6 +19736,95 @@
           "armIds": [ ]
         }
       },
+      "GeneratePinBatchCommand": {
+        "required": [
+          "sessionId",
+          "name",
+          "purposeNote",
+          "pinCount",
+          "pinLength",
+          "maxUses",
+          "confirmMaxUses"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Required; the session must not be closed.",
+            "format": "uuid",
+            "example": "0192f0c4-9a10-7000-8000-000000000302"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional; defaults to the session and current term plus a sequence."
+          },
+          "purposeNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional, up to 200 characters.",
+            "example": "Primary 3 and Primary 4 parents"
+          },
+          "pinCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "1 to 2000.",
+            "format": "int32",
+            "example": 120
+          },
+          "pinLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "10 to 16; default 10.",
+            "format": "int32",
+            "example": 10
+          },
+          "maxUses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "1 to 100; default 3. Above 10, ConfirmMaxUses must repeat it.",
+            "format": "int32",
+            "example": 3
+          },
+          "confirmMaxUses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "The typed-back confirmation spec 6.8.12 requires for a high maximum.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generates a batch (spec 6.8.9). Pins are not tied to any pupil.",
+        "example": {
+          "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+          "name": null,
+          "purposeNote": "Primary 3 and Primary 4 parents",
+          "pinCount": 120,
+          "pinLength": 10,
+          "maxUses": 3,
+          "confirmMaxUses": null
+        }
+      },
       "GradingBandDto": {
         "required": [
           "id",
@@ -17553,6 +20031,12 @@
             ]
           }
         }
+      },
+      "IFormFile": {
+        "type": "string",
+        "description": "One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic bytes, never by a declared content type or file name (spec 9.6) — neither is part of this contract.",
+        "format": "binary",
+        "example": "binary image content, sent as the multipart request's `file` part"
       },
       "JsonElement": {
         "description": "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.",
@@ -17782,6 +20266,342 @@
           "totalPages": 7,
           "hasNextPage": true,
           "hasPreviousPage": true
+        }
+      },
+      "PinBatchDetailDto": {
+        "required": [
+          "batch",
+          "pins"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "description": "The batch.",
+            "$ref": "#/components/schemas/PinBatchDto"
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PinSummaryDto"
+            },
+            "description": "Oldest first.",
+            "example": [
+              {
+                "id": "0192f0c4-9a10-7000-8000-000000000303",
+                "prefix": "H7K2",
+                "state": "Active",
+                "useCount": 1,
+                "maxUses": 3,
+                "distinctPupilCount": 1,
+                "stateReason": null
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "A batch with its pins.",
+        "example": {
+          "batch": {
+            "id": "0192f0c4-9a10-7000-8000-000000000301",
+            "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+            "name": "2026/2027 First Term batch 1",
+            "purposeNote": "Primary 3 and Primary 4 parents",
+            "pinLength": 10,
+            "maxUses": 3,
+            "pinCount": 120,
+            "pinsUsed": 34,
+            "pinsExhausted": 2,
+            "pinsSuspended": 0,
+            "pinsRevoked": 0,
+            "state": "Active",
+            "generatedAt": "2026-08-03T09:30:00+00:00",
+            "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+            "revokeReason": null
+          },
+          "pins": [
+            {
+              "id": "0192f0c4-9a10-7000-8000-000000000303",
+              "prefix": "H7K2",
+              "state": "Active",
+              "useCount": 1,
+              "maxUses": 3,
+              "distinctPupilCount": 1,
+              "stateReason": null
+            }
+          ]
+        }
+      },
+      "PinBatchDto": {
+        "required": [
+          "id",
+          "sessionId",
+          "name",
+          "purposeNote",
+          "pinLength",
+          "maxUses",
+          "pinCount",
+          "pinsUsed",
+          "pinsExhausted",
+          "pinsSuspended",
+          "pinsRevoked",
+          "state",
+          "generatedAt",
+          "plaintextPurgeAt",
+          "revokeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id.",
+            "example": "0192f0c4-9a10-7000-8000-000000000301"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session the pins are valid for.",
+            "example": "0192f0c4-9a10-7000-8000-000000000302"
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique within the session.",
+            "example": "2026/2027 First Term batch 1"
+          },
+          "purposeNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Informational; restricts nothing.",
+            "example": "Primary 3 and Primary 4 parents"
+          },
+          "pinLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Characters per pin.",
+            "format": "int32",
+            "example": 10
+          },
+          "maxUses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Uses per pin.",
+            "format": "int32",
+            "example": 3
+          },
+          "pinCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pins generated.",
+            "format": "int32",
+            "example": 120
+          },
+          "pinsUsed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pins used at least once.",
+            "format": "int32",
+            "example": 34
+          },
+          "pinsExhausted": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pins with no uses left.",
+            "format": "int32",
+            "example": 2
+          },
+          "pinsSuspended": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pins suspended by the spread control.",
+            "format": "int32",
+            "example": 0
+          },
+          "pinsRevoked": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pins revoked.",
+            "format": "int32",
+            "example": 0
+          },
+          "state": {
+            "description": "Spec 6.8.10.",
+            "$ref": "#/components/schemas/PinBatchState"
+          },
+          "generatedAt": {
+            "type": "string",
+            "description": "When generated.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "plaintextPurgeAt": {
+            "type": "string",
+            "description": "Reprinting is possible until this moment.",
+            "format": "date-time",
+            "example": "2026-09-02T09:30:00+00:00"
+          },
+          "revokeReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Set once revoked."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A batch as the list and detail views show it (spec 6.8.11). Never carries a pin value.",
+        "example": {
+          "id": "0192f0c4-9a10-7000-8000-000000000301",
+          "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+          "name": "2026/2027 First Term batch 1",
+          "purposeNote": "Primary 3 and Primary 4 parents",
+          "pinLength": 10,
+          "maxUses": 3,
+          "pinCount": 120,
+          "pinsUsed": 34,
+          "pinsExhausted": 2,
+          "pinsSuspended": 0,
+          "pinsRevoked": 0,
+          "state": "Active",
+          "generatedAt": "2026-08-03T09:30:00+00:00",
+          "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+          "revokeReason": null
+        }
+      },
+      "PinBatchState": {
+        "enum": [
+          "Generated",
+          "Printed",
+          "Active",
+          "Exhausted",
+          "Revoked"
+        ],
+        "description": "Spec 6.8.10's batch states.",
+        "example": "Active"
+      },
+      "PinReasonRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "1 to 500 characters once trimmed.",
+            "example": "A sheet of slips went missing from the office."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A reason, for every revoke and reinstate (spec 6.8.4, 6.8.13).",
+        "example": {
+          "reason": "A sheet of slips went missing from the office."
+        }
+      },
+      "PinState": {
+        "enum": [
+          "Unused",
+          "Active",
+          "Exhausted",
+          "Suspended",
+          "Revoked"
+        ],
+        "description": "Spec 6.8.5's pin states.",
+        "example": "Active"
+      },
+      "PinSummaryDto": {
+        "required": [
+          "id",
+          "prefix",
+          "state",
+          "useCount",
+          "maxUses",
+          "distinctPupilCount",
+          "stateReason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opaque id.",
+            "example": "0192f0c4-9a10-7000-8000-000000000303"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The first four characters, for identifying a slip read out over the telephone.",
+            "example": "H7K2"
+          },
+          "state": {
+            "description": "Spec 6.8.5.",
+            "$ref": "#/components/schemas/PinState"
+          },
+          "useCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Uses spent.",
+            "format": "int32",
+            "example": 1
+          },
+          "maxUses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Uses allowed.",
+            "format": "int32",
+            "example": 3
+          },
+          "distinctPupilCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Different pupils opened.",
+            "format": "int32",
+            "example": 1
+          },
+          "stateReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it was suspended or revoked."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One pin in a batch's detail view: its prefix and position, never its value (spec 6.8.13).",
+        "example": {
+          "id": "0192f0c4-9a10-7000-8000-000000000303",
+          "prefix": "H7K2",
+          "state": "Active",
+          "useCount": 1,
+          "maxUses": 3,
+          "distinctPupilCount": 1,
+          "stateReason": null
         }
       },
       "PingResponse": {
@@ -18043,6 +20863,48 @@
           "instance": "/api/v1/reference/records",
           "errorCode": "sample_record.label_taken",
           "traceId": "0af7651916cd43dd8448eb211c80319c"
+        }
+      },
+      "PublishResultSetResponse": {
+        "required": [
+          "resultSet",
+          "publishedAt",
+          "revisionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "resultSet": {
+            "description": "State Published.",
+            "$ref": "#/components/schemas/ResultSetSummaryDto"
+          },
+          "publishedAt": {
+            "type": "string",
+            "description": "When it became visible to parents.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "revisionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1 on first publication; later revisions follow a withdrawal.",
+            "format": "int32",
+            "example": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The published set.",
+        "example": {
+          "resultSet": {
+            "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+            "state": "Published",
+            "needsRecompute": false,
+            "returnReason": null
+          },
+          "publishedAt": "2026-08-03T09:30:00+00:00",
+          "revisionNumber": 1
         }
       },
       "PupilDto": {
@@ -19799,6 +22661,28 @@
           "returnReason": null
         }
       },
+      "ResultSetTransitionResponse": {
+        "required": [
+          "resultSet"
+        ],
+        "type": "object",
+        "properties": {
+          "resultSet": {
+            "description": "Its new state.",
+            "$ref": "#/components/schemas/ResultSetSummaryDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result set after a withdraw or reopen.",
+        "example": {
+          "resultSet": {
+            "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+            "state": "Withdrawn",
+            "needsRecompute": false,
+            "returnReason": null
+          }
+        }
+      },
       "ReturnResultSetCommand": {
         "required": [
           "resultSetId",
@@ -20784,6 +23668,59 @@
           }
         }
       },
+      "SchoolImageDto": {
+        "required": [
+          "width",
+          "height",
+          "uploadedAt",
+          "uploadedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The Original rendition's width, in pixels, after any EXIF orientation correction.",
+            "format": "int32",
+            "example": 512
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The Original rendition's height, in pixels, after any EXIF orientation correction.",
+            "format": "int32",
+            "example": 512
+          },
+          "uploadedAt": {
+            "type": "string",
+            "description": "When this upload was made.",
+            "format": "date-time",
+            "example": "2026-08-03T09:30:00+00:00"
+          },
+          "uploadedByName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The uploading administrator's staff name, or `null` when the account that\nuploaded it can no longer be resolved.",
+            "example": "Chisom Maxwell"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body\nof both `POST /settings/identity/logo` and `POST /settings/identity/signature`, and also\nhow SchoolImageDto? SettingsIdentityGroupDto.Logo/SchoolImageDto? SettingsIdentityGroupDto.Signature\nreport the current upload.",
+        "example": {
+          "width": 512,
+          "height": 512,
+          "uploadedAt": "2026-08-03T09:30:00+00:00",
+          "uploadedByName": "Chisom Maxwell"
+        }
+      },
       "ScopeType": {
         "enum": [
           "SchoolWide",
@@ -21649,7 +24586,14 @@
             "motto": "Excellence Through Character",
             "headTeacherName": "Chisom Maxwell",
             "timezone": "Africa/Lagos",
-            "versionNumber": 3
+            "versionNumber": 3,
+            "logo": {
+              "width": 512,
+              "height": 512,
+              "uploadedAt": "2026-08-03T09:30:00+00:00",
+              "uploadedByName": "Chisom Maxwell"
+            },
+            "signature": null
           },
           "abbreviation": {
             "abbreviation": "GRAS",
@@ -22033,7 +24977,9 @@
           "motto",
           "headTeacherName",
           "timezone",
-          "versionNumber"
+          "versionNumber",
+          "logo",
+          "signature"
         ],
         "type": "object",
         "properties": {
@@ -22089,6 +25035,28 @@
             "description": "The identity group's current optimistic-concurrency pointer. Echo this back as\n`expectedVersion` on the next `PATCH`.",
             "format": "int32",
             "example": 3
+          },
+          "logo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The current logo's summary (TASK-0005b stage B2), or `null` before the first\nupload. Fetch the actual pixels through the separate serving endpoints (stage C).",
+                "$ref": "#/components/schemas/SchoolImageDto"
+              }
+            ]
+          },
+          "signature": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The current head teacher signature's summary, or `null` before the first upload.",
+                "$ref": "#/components/schemas/SchoolImageDto"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -22102,7 +25070,14 @@
           "motto": "Excellence Through Character",
           "headTeacherName": "Chisom Maxwell",
           "timezone": "Africa/Lagos",
-          "versionNumber": 3
+          "versionNumber": 3,
+          "logo": {
+            "width": 512,
+            "height": 512,
+            "uploadedAt": "2026-08-03T09:30:00+00:00",
+            "uploadedByName": "Chisom Maxwell"
+          },
+          "signature": null
         }
       },
       "SettingsRatingScaleGroupDto": {
@@ -22342,6 +25317,12 @@
           "email": "admin@example.com",
           "password": "correct horse battery staple 9"
         }
+      },
+      "Stream": {
+        "type": "string",
+        "description": "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).",
+        "format": "binary",
+        "example": "binary PNG or JPEG bytes"
       },
       "SubjectDto": {
         "required": [
@@ -25025,6 +28006,24 @@
         "example": {
           "voidedCount": 27
         }
+      },
+      "WithdrawResultSetRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why the published result is being pulled, 10 to 500 characters once trimmed. Audited.",
+            "example": "Mathematics marks were entered for the wrong class. Withdrawing to correct them."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The request body for a withdrawal.",
+        "example": {
+          "reason": "Mathematics marks were entered for the wrong class. Withdrawing to correct them."
+        }
       }
     },
     "securitySchemes": {
@@ -25042,6 +28041,9 @@
     },
     {
       "name": "Admissions"
+    },
+    {
+      "name": "Annual results"
     },
     {
       "name": "Arms"
@@ -25066,6 +28068,9 @@
     },
     {
       "name": "Development ratings"
+    },
+    {
+      "name": "Pins"
     },
     {
       "name": "Privileges"

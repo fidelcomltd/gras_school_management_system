@@ -65,6 +65,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// <summary>TASK-0005a. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<ConfigVersion> ConfigVersions => Set<ConfigVersion>();
 
+    /// <summary>
+    /// TASK-0005b stage B1. Internal, not public: only this assembly's repositories may query it.
+    /// One row per stored rendition of the logo or signature — immutable, never deleted (see
+    /// <see cref="SchoolImage"/>'s remarks).
+    /// </summary>
+    internal DbSet<SchoolImage> SchoolImages => Set<SchoolImage>();
+
     /// <summary>TASK-0005c. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<RegistrationCounter> RegistrationCounters => Set<RegistrationCounter>();
 
@@ -169,6 +176,20 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// One row per arm per term (spec 09 §6.7.3).
     /// </summary>
     internal DbSet<ResultSet> ResultSets => Set<ResultSet>();
+
+    internal DbSet<ResultSetSnapshot> ResultSetSnapshots => Set<ResultSetSnapshot>();
+
+    internal DbSet<ResultVerification> ResultVerifications => Set<ResultVerification>();
+
+    internal DbSet<AnnualResult> AnnualResults => Set<AnnualResult>();
+
+    internal DbSet<Domain.Pins.PinBatch> PinBatches => Set<Domain.Pins.PinBatch>();
+
+    internal DbSet<Domain.Pins.Pin> Pins => Set<Domain.Pins.Pin>();
+
+    internal DbSet<Domain.Portal.PinUse> PinUses => Set<Domain.Portal.PinUse>();
+
+    internal DbSet<Domain.Portal.PortalAttempt> PortalAttempts => Set<Domain.Portal.PortalAttempt>();
 
     /// <summary>
     /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.

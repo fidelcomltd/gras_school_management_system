@@ -262,6 +262,17 @@ builder.Services.AddRateLimiter(rateLimiter =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
 
+    rateLimiter.AddPolicy(RateLimitingOptions.VerifyPolicyName, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = configured.VerifyPermitLimit,
+                Window = TimeSpan.FromSeconds(configured.VerifyWindowSeconds),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+
     // Deliberately generous and deliberately separate from the default policy — see
     // RateLimitingOptions.HealthPermitLimit's remarks for the numbers and the probe interval they
     // assume. Applied only to /health/ready (HealthEndpoints.cs); /health/live does no dependency
@@ -328,6 +339,9 @@ app.UseAuthorization();
 
 // ── Endpoints ────────────────────────────────────────────────────────────────────────────────
 app.MapHealthEndpoints();
+
+// The public parent portal (spec 6.9): server-rendered pages, outside /api and outside the contract.
+SchoolManagement.Api.Portal.PortalEndpoints.MapPortal(app);
 
 var versionSet = app.NewApiVersionSet()
     .HasApiVersion(new ApiVersion(1, 0))

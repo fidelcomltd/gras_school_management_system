@@ -129,6 +129,14 @@
     -->
     <PackageVersion Include="SkiaSharp" Version="4.152.1" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
+    <!--
+      Human ruling 2026-09-22: QuestPDF for every PDF (pin slips now; result sheets and portal PDFs later).
+      Community licence: free for organisations under USD 1M annual revenue, which a single school is.
+      Bundles its own native renderer for Linux, so the VPS needs nothing extra.
+    -->
+    <PackageVersion Include="QuestPDF" Version="2026.9.0" />
+    <!-- MIT. The result sheet's verification QR code (spec 6.9.6); PngByteQRCode has no System.Drawing dependency. -->
+    <PackageVersion Include="QRCoder" Version="1.8.0" />
   </ItemGroup>
 
   <ItemGroup Label="Health checks">

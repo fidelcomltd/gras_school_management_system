@@ -845,6 +845,297 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Pins.Pin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<string>("Ciphertext")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<int>("DistinctPupilCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("distinct_pupil_count");
+
+                    b.Property<string>("LookupKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("lookup_key");
+
+                    b.Property<int>("MaxUses")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_uses");
+
+                    b.Property<string>("PinHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("pin_hash");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("prefix");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StateReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("state_reason");
+
+                    b.Property<int>("UseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("use_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pin");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_pin_batch_id");
+
+                    b.HasIndex("LookupKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pin_lookup_key");
+
+                    b.HasIndex("Prefix")
+                        .HasDatabaseName("ix_pin_prefix");
+
+                    b.ToTable("pin", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pins.PinBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset>("GeneratedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("generated_at_utc");
+
+                    b.Property<Guid?>("GeneratedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generated_by");
+
+                    b.Property<int>("MaxUses")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_uses");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PinCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("pin_count");
+
+                    b.Property<int>("PinLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("pin_length");
+
+                    b.Property<DateTimeOffset>("PlaintextPurgeAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("plaintext_purge_at_utc");
+
+                    b.Property<string>("PurposeNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("purpose_note");
+
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("revoke_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pin_batch");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_pin_batch_session_id");
+
+                    b.ToTable("pin_batch", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Portal.PinUse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("ended_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<DateTimeOffset>("OpenedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("opened_at_utc");
+
+                    b.Property<Guid>("PinId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pin_id");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<string>("SourceAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_address");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<string>("ViewedJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("viewed_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pin_use");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_pin_use_pupil_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pin_use_token_hash");
+
+                    b.HasIndex("PinId", "OpenedAtUtc")
+                        .HasDatabaseName("ix_pin_use_pin_id_opened_at_utc");
+
+                    b.ToTable("pin_use", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Portal.PortalAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AttemptedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("attempted_at_utc");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("PinId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pin_id");
+
+                    b.Property<string>("PinPrefix")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("pin_prefix");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("registration_number");
+
+                    b.Property<string>("SourceAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_address");
+
+                    b.HasKey("Id")
+                        .HasName("pk_portal_attempt");
+
+                    b.HasIndex("PinId")
+                        .HasDatabaseName("ix_portal_attempt_pin_id");
+
+                    b.HasIndex("RegistrationNumber", "AttemptedAtUtc")
+                        .HasDatabaseName("ix_portal_attempt_registration_number_attempted_at_utc");
+
+                    b.HasIndex("SourceAddress", "AttemptedAtUtc")
+                        .HasDatabaseName("ix_portal_attempt_source_address_attempted_at_utc");
+
+                    b.ToTable("portal_attempt", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.Pupil", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1074,6 +1365,120 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("sample_records", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.AnnualResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("AnnualPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("annual_position");
+
+                    b.Property<bool>("AnnualPositionTied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("annual_position_tied");
+
+                    b.Property<int>("AnnualPupilCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("annual_pupil_count");
+
+                    b.Property<Guid>("ArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("arm_id");
+
+                    b.Property<DateTimeOffset>("ComputedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("computed_at_utc");
+
+                    b.Property<decimal>("CumulativeAverage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("cumulative_average");
+
+                    b.Property<string>("CumulativeGrade")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("cumulative_grade");
+
+                    b.Property<string>("CumulativeRemark")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("cumulative_remark");
+
+                    b.Property<decimal?>("FirstTermAverage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("first_term_average");
+
+                    b.Property<int?>("FirstTermTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("first_term_total");
+
+                    b.Property<int>("GrandTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("grand_total");
+
+                    b.Property<string>("ProposedOutcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("proposed_outcome");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<decimal?>("SecondTermAverage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("second_term_average");
+
+                    b.Property<int?>("SecondTermTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("second_term_total");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("SubjectsJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("subjects_json");
+
+                    b.Property<int>("TermsCounted")
+                        .HasColumnType("integer")
+                        .HasColumnName("terms_counted");
+
+                    b.Property<decimal?>("ThirdTermAverage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("third_term_average");
+
+                    b.Property<int?>("ThirdTermTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("third_term_total");
+
+                    b.HasKey("Id")
+                        .HasName("pk_annual_result");
+
+                    b.HasIndex("ArmId")
+                        .HasDatabaseName("ix_annual_result_arm_id");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_annual_result_pupil_id");
+
+                    b.HasIndex("SessionId", "PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_annual_result_session_id_pupil_id");
+
+                    b.ToTable("annual_result", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.AttendanceEntry", b =>
@@ -1524,6 +1929,89 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_result_set_term_id_state");
 
                     b.ToTable("result_set", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultSetSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ConfigVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("config_version_id");
+
+                    b.Property<DateTimeOffset>("PublishedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("published_at_utc");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision_number");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_set_snapshot");
+
+                    b.HasIndex("ResultSetId", "RevisionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_result_set_snapshot_result_set_id_revision_number");
+
+                    b.ToTable("result_set_snapshot", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("IssuedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("issued_at_utc");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision_number");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("character varying(22)")
+                        .HasColumnName("token");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_verification");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_result_verification_pupil_id");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ux_result_verification_token");
+
+                    b.HasIndex("ResultSetId", "PupilId", "RevisionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_result_verification_result_set_id_pupil_id_revision_number");
+
+                    b.ToTable("result_verification", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectArmStatistic", b =>
@@ -3172,6 +3660,80 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssetId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("HeightPixels")
+                        .HasColumnType("integer")
+                        .HasColumnName("height_pixels");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("SizeVariant")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("size_variant");
+
+                    b.Property<Guid>("UploadGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("upload_group_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<int>("WidthPixels")
+                        .HasColumnType("integer")
+                        .HasColumnName("width_pixels");
+
+                    b.HasKey("Id")
+                        .HasName("pk_school_image");
+
+                    b.HasIndex("UploadGroupId", "SizeVariant")
+                        .HasDatabaseName("ix_school_image_upload_group_id_size_variant");
+
+                    b.ToTable("school_image", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Settings.SchoolProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3197,6 +3759,14 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.Property<int>("AssessmentVersionNumber")
                         .HasColumnType("integer")
                         .HasColumnName("assessment_version_number");
+
+                    b.Property<Guid?>("CurrentLogoGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_logo_group_id");
+
+                    b.Property<Guid?>("CurrentSignatureGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_signature_group_id");
 
                     b.Property<int>("DevelopmentDomainsVersionNumber")
                         .HasColumnType("integer")
@@ -4083,6 +4653,43 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_enrolments_pupils_pupil_id");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Pins.Pin", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pins.PinBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pin_pin_batch_batch_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pins.PinBatch", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pin_batch_academic_sessions_session_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Portal.PinUse", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pins.Pin", null)
+                        .WithMany()
+                        .HasForeignKey("PinId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pin_use_pin_pin_id");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pin_use_pupils_pupil_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.PupilRegNumberHistory", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
@@ -4091,6 +4698,30 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pupil_reg_number_history_pupils_pupil_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.AnnualResult", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.Arm", null)
+                        .WithMany()
+                        .HasForeignKey("ArmId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_annual_result_arms_arm_id");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_annual_result_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_annual_result_academic_sessions_session_id");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.AttendanceEntry", b =>
@@ -4197,6 +4828,33 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_result_set_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultSetSnapshot", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_set_snapshot_result_set_result_set_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Results.ResultVerification", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_verification_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_verification_result_set_result_set_id");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Results.SubjectArmStatistic", b =>

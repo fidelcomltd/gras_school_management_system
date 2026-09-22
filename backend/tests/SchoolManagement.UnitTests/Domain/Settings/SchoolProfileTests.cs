@@ -121,4 +121,56 @@ public sealed class SchoolProfileTests
         profile.RegNumberVersionNumber.ShouldBe(2);
         profile.AbbreviationVersionNumber.ShouldBe(5); // Untouched — independent pointers.
     }
+
+    [Fact]
+    public void SetCurrentLogo_WithAGroupId_SetsThePointer()
+    {
+        var profile = SchoolProfile.CreateForTesting(Guid.CreateVersion7());
+        var groupId = Guid.CreateVersion7();
+
+        profile.SetCurrentLogo(groupId);
+
+        profile.CurrentLogoGroupId.ShouldBe(groupId);
+    }
+
+    [Fact]
+    public void SetCurrentLogo_WithNull_RefusesWithAmendment4sVerbatimMessage()
+    {
+        // Amendment 4 (decisions/2026-Q3-contract-deltas.md): there is no delete route (6.2.12 lists
+        // none, 6.2.2 confirms the logo is not seeded), so "removing the current logo with no
+        // replacement" is refused HERE, at the domain level, with 6.2.11's exact wording — proven
+        // directly, since no route exists to prove it through.
+        var profile = SchoolProfile.CreateForTesting(Guid.CreateVersion7());
+        profile.SetCurrentLogo(Guid.CreateVersion7());
+
+        var exception = Should.Throw<InvalidOperationException>(() => profile.SetCurrentLogo(null));
+
+        exception.Message.ShouldBe("A logo is required. Upload a replacement before removing the current one.");
+        exception.Message.ShouldBe(SchoolProfile.LogoRequiredMessage);
+    }
+
+    [Fact]
+    public void SetCurrentLogo_WithNull_NeverChangesTheExistingPointer()
+    {
+        var profile = SchoolProfile.CreateForTesting(Guid.CreateVersion7());
+        var groupId = Guid.CreateVersion7();
+        profile.SetCurrentLogo(groupId);
+
+        Should.Throw<InvalidOperationException>(() => profile.SetCurrentLogo(null));
+
+        profile.CurrentLogoGroupId.ShouldBe(groupId);
+    }
+
+    [Fact]
+    public void SetCurrentSignature_WithNull_IsAllowed()
+    {
+        // Unlike the logo, Amendment 4 names only the logo (spec 6.2.11); a missing signature is a
+        // PUBLICATION precondition (out of this card's scope), not a save-time refusal.
+        var profile = SchoolProfile.CreateForTesting(Guid.CreateVersion7());
+        profile.SetCurrentSignature(Guid.CreateVersion7());
+
+        Should.NotThrow(() => profile.SetCurrentSignature(null));
+
+        profile.CurrentSignatureGroupId.ShouldBeNull();
+    }
 }

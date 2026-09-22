@@ -21,6 +21,12 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
     private readonly ISchoolProfileRepository _schoolProfileRepository = Substitute.For<ISchoolProfileRepository>();
     private readonly IConfigVersionRepository _configVersionRepository = Substitute.For<IConfigVersionRepository>();
     private readonly ISettingsSnapshotSource _settingsSnapshotSource = Substitute.For<ISettingsSnapshotSource>();
+
+    // TASK-0005b stage B2: SettingsIdentityGroupDto now carries logo/signature too. Unconfigured here
+    // — every test's profile has null CurrentLogoGroupId/CurrentSignatureGroupId (CreateForTesting's
+    // default), so the handler never actually calls this repository.
+    private readonly ISchoolImageRepository _schoolImages = Substitute.For<ISchoolImageRepository>();
+
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly ISystemAuditSink _auditSink = Substitute.For<ISystemAuditSink>();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -43,6 +49,7 @@ public sealed class UpdateSchoolIdentityCommandHandlerTests
             _schoolProfileRepository,
             _configVersionRepository,
             _settingsSnapshotSource,
+            _schoolImages,
             _currentUser,
             _auditSink,
             _timeProvider);

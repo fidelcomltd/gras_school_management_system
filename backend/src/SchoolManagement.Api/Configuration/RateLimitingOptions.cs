@@ -39,6 +39,15 @@ public sealed class RateLimitingOptions
     /// </remarks>
     public int QueueLimit { get; set; }
 
+    /// <summary>The public result-verification page (spec 6.9.9): per address, 30 an hour by default.</summary>
+    public const string VerifyPolicyName = "verify";
+
+    /// <summary>Requests permitted per window under the verify policy. Default 30.</summary>
+    public int VerifyPermitLimit { get; set; } = 30;
+
+    /// <summary>Length of the verify policy's window, in seconds. Default 3600.</summary>
+    public int VerifyWindowSeconds { get; set; } = 3600;
+
     /// <summary>Requests permitted per window under the sensitive policy. Default 10.</summary>
     public int SensitivePermitLimit { get; set; } = 10;
 

@@ -8,10 +8,12 @@ using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Results;
+using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Application.Security.PrivilegeRegister;
 using SchoolManagement.Application.Security.Roles;
@@ -145,7 +147,7 @@ internal static class OpenApiExamples
             }
             """,
 
-        [typeof(SettingsIdentityGroupDto)] = """
+        [typeof(SettingsIdentityGroupDto)] = $$"""
             {
               "schoolName": "Golden Royal Ark School",
               "shortName": "GRAS",
@@ -155,11 +157,39 @@ internal static class OpenApiExamples
               "motto": "Excellence Through Character",
               "headTeacherName": "Chisom Maxwell",
               "timezone": "Africa/Lagos",
-              "versionNumber": 3
+              "versionNumber": 3,
+              "logo": {
+                "width": 512,
+                "height": 512,
+                "uploadedAt": "{{CanonicalTimestamp}}",
+                "uploadedByName": "Chisom Maxwell"
+              },
+              "signature": null
             }
             """,
 
-        [typeof(SettingsDto)] = """
+        [typeof(SchoolImageDto)] = $$"""
+            {
+              "width": 512,
+              "height": 512,
+              "uploadedAt": "{{CanonicalTimestamp}}",
+              "uploadedByName": "Chisom Maxwell"
+            }
+            """,
+
+        // TASK-0005b stage B2: the multipart request body's own `file` part. A framework type — see
+        // DescriptionsByType's remarks below — whose schema is a bare `type: string, format: binary`,
+        // so its example is a JSON string rather than an object.
+        [typeof(Microsoft.AspNetCore.Http.IFormFile)] = """
+            "binary image content, sent as the multipart request's `file` part"
+            """,
+
+        // TASK-0005b stage C: the image-serving responses' body. Same bare binary-string shape.
+        [typeof(Stream)] = """
+            "binary PNG or JPEG bytes"
+            """,
+
+        [typeof(SettingsDto)] = $$"""
             {
               "identity": {
                 "schoolName": "Golden Royal Ark School",
@@ -170,7 +200,14 @@ internal static class OpenApiExamples
                 "motto": "Excellence Through Character",
                 "headTeacherName": "Chisom Maxwell",
                 "timezone": "Africa/Lagos",
-                "versionNumber": 3
+                "versionNumber": 3,
+                "logo": {
+                  "width": 512,
+                  "height": 512,
+                  "uploadedAt": "{{CanonicalTimestamp}}",
+                  "uploadedByName": "Chisom Maxwell"
+                },
+                "signature": null
               },
               "abbreviation": {
                 "abbreviation": "GRAS",
@@ -2358,6 +2395,17 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(ComputeAnnualResultsResponse)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "sessionId": "{{ExampleSessionId}}",
+              "computedAt": "2027-07-24T10:00:00Z",
+              "pupilCount": 28,
+              "rankedCount": 27,
+              "proposedPromoted": 26,
+              "proposedRepeat": 2
+            }
+            """,
         [typeof(ComputeResultSetResponse)] = $$"""
             {
               "resultSetId": "{{ExampleResultSetId}}",
@@ -2549,6 +2597,144 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(PinBatchDto)] = $$"""
+            {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                }
+            """,
+
+        [typeof(PinSummaryDto)] = $$"""
+            {
+                  "id": "0192f0c4-9a10-7000-8000-000000000303",
+                  "prefix": "H7K2",
+                  "state": "Active",
+                  "useCount": 1,
+                  "maxUses": 3,
+                  "distinctPupilCount": 1,
+                  "stateReason": null
+                }
+            """,
+
+        [typeof(PinBatchDetailDto)] = $$"""
+            {
+              "batch": {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                },
+              "pins": [
+                {
+                  "id": "0192f0c4-9a10-7000-8000-000000000303",
+                  "prefix": "H7K2",
+                  "state": "Active",
+                  "useCount": 1,
+                  "maxUses": 3,
+                  "distinctPupilCount": 1,
+                  "stateReason": null
+                }
+              ]
+            }
+            """,
+
+        [typeof(CursorPage<PinBatchDto>)] = $$"""
+            {
+              "items": [
+                {
+                  "id": "0192f0c4-9a10-7000-8000-000000000301",
+                  "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+                  "name": "2026/2027 First Term batch 1",
+                  "purposeNote": "Primary 3 and Primary 4 parents",
+                  "pinLength": 10,
+                  "maxUses": 3,
+                  "pinCount": 120,
+                  "pinsUsed": 34,
+                  "pinsExhausted": 2,
+                  "pinsSuspended": 0,
+                  "pinsRevoked": 0,
+                  "state": "Active",
+                  "generatedAt": "{{CanonicalTimestamp}}",
+                  "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+                  "revokeReason": null
+                }
+              ],
+              "nextCursor": "0192f0c4-9a10-7000-8000-000000000301"
+            }
+            """,
+
+        [typeof(GeneratePinBatchCommand)] = """
+            {
+              "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+              "name": null,
+              "purposeNote": "Primary 3 and Primary 4 parents",
+              "pinCount": 120,
+              "pinLength": 10,
+              "maxUses": 3,
+              "confirmMaxUses": null
+            }
+            """,
+
+        [typeof(PinReasonRequest)] = """
+            {
+              "reason": "A sheet of slips went missing from the office."
+            }
+            """,
+
+        [typeof(PublishResultSetResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Published",
+                "needsRecompute": false,
+                "returnReason": null
+              },
+              "publishedAt": "{{CanonicalTimestamp}}",
+              "revisionNumber": 1
+            }
+            """,
+
+        [typeof(WithdrawResultSetRequest)] = """
+            {
+              "reason": "Mathematics marks were entered for the wrong class. Withdrawing to correct them."
+            }
+            """,
+
+        [typeof(ResultSetTransitionResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Withdrawn",
+                "needsRecompute": false,
+                "returnReason": null
+              }
+            }
+            """,
+
         [typeof(ReturnResultSetCommand)] = $$"""
             {
               "resultSetId": "{{ExampleResultSetId}}",
@@ -2601,6 +2787,17 @@ internal static class OpenApiExamples
             "The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, " +
             "because every settings card adds its own section to the same snapshot shape. Read it as " +
             "an opaque object; do not assume today's set of keys is complete.",
+
+        // TASK-0005b stage B2: another framework type — see this dictionary's own remarks above.
+        [typeof(Microsoft.AspNetCore.Http.IFormFile)] =
+            "One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic " +
+            "bytes, never by a declared content type or file name (spec 9.6) — neither is part of this " +
+            "contract.",
+
+        // TASK-0005b stage C: the image-serving responses' body.
+        [typeof(Stream)] =
+            "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this " +
+            "privilege-checked endpoint, never from a public URL (spec 9.6).",
     };
 
     /// <summary>

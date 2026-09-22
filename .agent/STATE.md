@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `e7113c87…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `bb29ee1e…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,23 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `e7113c87a76bbb4c1a387087448d468732b4b8ba20b845d877cbaf99922263df`** · **80 paths** ·
-**197 schemas** · api version `v1` · moved 2026-09-21 by TASK-0090 (approve and return, §6.7.8).
-Previous: `584a4a3c9d5c…` / 78 paths / 194 schemas, TASK-0088 on 2026-09-21; before that `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `0a74f0192c7371ed33c20df05c283b992a3383bc2c879cceebf246801b13be59`** · **95 paths** ·
+**212 schemas** · api version `v1` · moved 2026-09-22 by annual computation (§6.7.10).
+Previous: `bb29ee1ebe04…` / 94 paths / 211 schemas, pin printing on 2026-09-22; before that `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Annual computation additive verified mechanically** (`jq`): +1 path, +1 schema, nothing else changed.
+
+**Pin printing additive verified mechanically** (`jq`): +2 paths, no schema change.
+
+**Pins additive verified mechanically** (`jq`): +6 paths, +8 schemas, nothing else changed.
+
+**Withdraw/reopen additive verified mechanically** (`jq`): +2 paths, +2 schemas, nothing else changed.
+
+**Publication additive verified mechanically** (`jq`): +1 path, +1 schema, nothing else changed.
+
+**TASK-0005b additive verified mechanically** (`jq`): 3 paths + 3 schemas added, nothing removed, no path changed; `SettingsIdentityGroupDto`
+gains response-only `logo`/`signature` (in no request body: checked).
 
 **TASK-0090 additive verified MECHANICALLY by the orchestrator** (`jq`, description/example stripped): 2 paths and 3 schemas added, nothing removed,
 zero existing paths changed. ONE existing schema changed: `ResultSetSummaryDto` gains response-required nullable `returnReason`; it appears in no
@@ -170,7 +183,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** as of 2026-09-21 (TASK-0091). Orchestrator: `No drift`; verify 55/381, build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** (2026-09-22, `1c9f402`); `No drift`, typecheck and lint clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called
@@ -209,12 +222,27 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | backend-dev | **dispatchable 2026-09-19**: part 1 ruled (b), comparison in SQL |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
-| TASK-0005b | Logo and signature uploads (Cloudinary) | backend-dev | **stage A done** (`d03906e`), **B1 dispatched** 2026-09-21; five stages (A, B1, B2, C, D) |
+| TASK-0005b | Logo and signature uploads (Cloudinary) | orchestrator | **A–C done 2026-09-22**; stage D (Cloudinary adapter) left, needs the human's keys for the smoke test |
 
 Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Frontend F1 (pupils) done**: `/pupils` list (search on submit, status filter), create dialog (Section A+B, duplicate check before create, "Create anyway"), `/pupils/:id` detail with edit (dirty fields only) and reasoned number correction. New shared `components/feedback/query-states.tsx` (loading/error/form error). Admin frontend plan: F1 pupils, F2 subjects, F3 score entry, F4 ratings/attendance/remarks, F5 results workflow, F6 pins, F7 settings, F8 audit/templates.
+- 2026-09-22 **Human: school domain is goldenroyalark.com.** Portal runs on its own subdomain (exact name not yet chosen); `Portal__PublicUrl` (pin slips, QR) and the cookie domain derive from it.
+- 2026-09-22 **Portal 3d-2 done**: terms list links Annual Cumulative once computed and Third Term is still published; `/portal/annual/{sessionId}` page + `/pdf` ("ANNUAL REPORT SHEET", no use spent, cached per annual row id). Prints no position (F.7), no promotion status (only after a committed batch, C), no verification marks (6.9.6 names the term sheet only). Session resolution shared by term and annual views (`PortalSessionResolver`).
+- 2026-09-22 **Annual computation (3d-1) done**: `POST /arms/{armId}/annual-results` (`result.annual.compute`, unscoped privilege) writes `annual_result` per pupil of the final arm (pupils with a result in its Third Term set): cumulative average simple/weighted over terms sat (weights rescaled), grade from the Third Term snapshot bands, SharedPosition rank (single-term pupils unranked; `annual_pupil_count` = ranked count, not "complete three-term" count), subject means, proposed Promoted/Repeat (a core subject never taken does not count against). 8.4.9 figures reproduced. An unscored earlier term is skipped; an unpublished one blocks with the spec copy.
+- 2026-09-22 **Portal 3c done**: A4 result PDF (QuestPDF, same `ResultSheet` as the page; 58 KB for 14 subjects), disk-cached per (set, pupil, revision), `GET /portal/result/{term}/pdf` spends no use; `result_verification` token per pupil per revision issued at publish; public `/verify` + `/verify/{token}` (30/address/hour, initials only, figures only while current). QR via QRCoder 1.8.0 (MIT). Token spec conflict: 6.9.6 (22 chars, groups of 5) followed over C.7 (12, groups of 4). Verify page omits position (neither sheet prints one, §6.7.12 amendment); withdrawn-state copy is ours.
+- 2026-09-22 **Portal 3b done**: on-screen result from the snapshot via `ResultSheetBuilder` (shared with the coming PDF); snapshot now includes subjects, form teacher, session, term dates, string enums. Fee block not printed (fee notice not built).
+- 2026-09-22 **Portal 3a done** (§6.9): lookup, 30-min viewing sessions, blocks, spread control, 6.9.4 copies, 400 ms pad; no contract change. Global soft ceiling and the 5-pupils-per-hour address flag not built yet.
+- 2026-09-22 **Human: parent portal is server-rendered HTML from the .NET app** (no framework, works without JS, §6.9.8), and runs **in the same process on its own subdomain** (not a separate deployment; restricted DB role deferred). Pin printing gate 1381/1381.
+- 2026-09-22 **Pin printing done**: slips PDF (4/A4) + distribution list, QuestPDF 2026.9.0; nightly `PinMaintenanceService` purges ciphertext and marks exhausted batches. Print is a GET that writes: fetch + blob only.
+- 2026-09-22 **Pin batches done** (§6.8): generate/list/detail/distribute/revoke/reinstate; Argon2id (pin cost 4 MB/1 pass) + keyed HMAC + AES-GCM; 2000 pins ~34s. Contract `5d01b080…`.
+- 2026-09-22 **Human: prod = PostgreSQL + app on one Namecheap Pulsar VPS** (open question 5 resolved). **NDPA: not strict for this school**, not certifying; don't gate features on it.
+- 2026-09-22 **Human: keep pins UNBOUND** (§6.8.2, reconfirmed). **Withdraw/reopen gate 1466/1466.** **PDF library: QuestPDF** (Community licence).
+- 2026-09-22 **Withdraw/reopen done** (§6.7.9): Super Admin, reason ≥10; reopen needs an active term; `result_set_snapshot` keeps every revision. Contract `b4bf1cf3…`.
+- 2026-09-22 **Publication done** (§6.7.9): `POST /result-sets/{id}/publish`, school-wide, snapshot written; contract `d1816d8c…`. Level-position re-check skipped: no sheet prints positions.
+- 2026-09-22 **LEAN MODE** (human): orchestrator codes directly. **TASK-0005b A–C done**: upload + serving, multipart antiforgery 500 fixed; contract `90563279…`; gate 1359/1359. Stage D (Cloudinary) left.
 - 2026-09-21 **TASK-0090 closed** — approve/return, school-wide; contract `e7113c87…`, 80 paths; gate 1384/1384. **The orchestrator's delta wrongly scoped both
   routes; the agent widened the privileges to comply; review reverted it** — FOURTH orchestrator delta error. → `decisions/2026-Q3.md`
 - 2026-09-21 **TASK-0091 closed** — client current against `e7113c87…` (`be208a0`); verify 381/381. → `decisions/2026-Q3.md`
@@ -738,6 +766,11 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — defects and test gaps
 
+- 2026-09-22 **Result PDF cache is never pruned and the QR needs `Portal__PublicUrl`.** Files are keyed by revision, so stale ones just accumulate (~60 KB each; a few hundred MB after years); without `Portal__PublicUrl` the sheet prints no QR or token. Also `/verify` partitions its rate limit on `RemoteIpAddress` (same proxy caveat as below). *Trigger: deployment: set `Portal__PublicUrl`/`Portal__PdfCacheDirectory`, add a prune to `PinMaintenanceService` if disk matters. Owner: orchestrator.*
+- 2026-09-22 **Portal source address reads `RemoteIpAddress` directly.** Behind the VPS reverse proxy every parent shares the proxy's address, so the per-address block would hit everyone. *Trigger: deployment: configure ForwardedHeaders for the proxy. Owner: orchestrator.*
+- 2026-09-22 **Generating 2000 pins takes ~34s locally in one request.** *Trigger: deployment: set the reverse proxy read timeout above 60s, or make generation a background job. Owner: orchestrator.*
+- 2026-09-21 **EXIF orientations 2-5, 7 and 8 are implemented but untested** (only 1 and 6 have fixtures) in `SkiaSchoolImageProcessor`. *Trigger: a real
+  upload comes out mirrored or rotated, or the next card touching that file. Owner: `backend-dev`.*
 - 2026-09-21 **`admin-detail-screen.test.tsx` "suspend then reactivate" timed out at 5s in a loaded `verify` run** (380/381); passed 4/4 alone in ~3s.
   *Trigger: if it recurs, raise its timeout or find the slow await. Owner: `frontend-dev`.*
 - 2026-09-21 **`ApiError.problem` is one generic union, so `SubmitResultSet`'s typed 422 (`readiness`) is unreachable without a cast.** *Trigger: the
@@ -812,8 +845,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-08-27 **Validation is a mediator pipeline behaviour, not section 6's endpoint filter.**
   *Trigger: ratify or revert. Owner: UNOWNED.* `ASSUMPTIONS.md` section 2.2.
 
-- 2026-09-21 **The head teacher's signature (and logo) will be held by Cloudinary, a third-party processor** — NDPA 2023 expects a processing
-  agreement and a note on transfer outside Nigeria. *Trigger: before the first real upload, or the NDPA retention card. Owner: human.*
+- 2026-09-21 ~~**Signature and logo held by Cloudinary, a third-party processor (NDPA).**~~ **STRUCK 2026-09-22 by human**: NDPA certification is not sought; revisit if that changes.
 
 ### Live — blocked on the deployment decision (open question 5)
 
@@ -852,9 +884,9 @@ One decision clears all four.
 
 Live only. Resolved questions 1–4 and 6–14 are in `decisions/2026-Q3.md`.
 
-5. **Production hosting: a VPS (human, 2026-09-21); file storage Cloudinary.** Database placement on or off the VPS still undecided; not blocking until deployment. Four live drift
-   triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
-   decision clears all four.
+5. **RESOLVED 2026-09-22 (human): app and PostgreSQL on one Namecheap Pulsar VPS; files on Cloudinary.** The four deployment
+   drift items below are now decidable at deployment: DP key ring persisted on the VPS disk; `SameSite=Lax` holds if frontend and API
+   share the domain; cookie domain = the school's domain; separate DB roles per environment.
 
 ## How to read and append to this file
 

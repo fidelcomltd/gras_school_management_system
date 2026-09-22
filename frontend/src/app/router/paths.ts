@@ -18,6 +18,8 @@ export const paths = {
   arms: '/arms',
   armDetail: (id: string) => `/arms/${id}`,
   admissions: '/admissions',
+  pupils: '/pupils',
+  pupilDetail: (id: string) => `/pupils/${id}`,
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

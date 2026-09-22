@@ -199,6 +199,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms/{armId}/annual-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute an arm's annual cumulative results
+         * @description Spec 6.7.10: for every pupil with a result in the arm's Third Term set, the cumulative average over the terms they sat (simple or weighted per the result rules), its grade from the Third Term snapshot's bands, the annual position in this arm (pupils with one term are not ranked), per-subject means, and the proposed promotion outcome (6.3.7). Rewrites the rows each run, so it is idempotent. 409 names the first term that is not published; an earlier term the arm was never scored in is skipped rather than blocking. `Idempotency-Key` is accepted, not required.
+         */
+        post: operations["ComputeAnnualResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms": {
         parameters: {
             query?: never;
@@ -663,6 +683,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pin-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pin batches
+         * @description Newest first, cursor-paged, with per-batch pin counts (spec 6.8.11). Optional `sessionId` and `state` filters.
+         */
+        get: operations["ListPinBatches"];
+        put?: never;
+        /**
+         * Generate a pin batch
+         * @description Spec 6.8.9. Pins are not tied to any pupil: any valid pin opens any registration number's published results. `pinCount` 1 to 2000; `pinLength` 10 to 16 (default 10); `maxUses` 1 to 100 (default 3). Above 10 uses, `confirmMaxUses` must repeat the number (spec 6.8.12). `name` defaults to the session and current term plus a sequence and must be unique in the session (409 `pin_batch.name_taken`). 409 `pin_batch.session_closed` for a closed session. `Idempotency-Key` is REQUIRED (spec 9.8.2).
+         */
+        post: operations["GeneratePinBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pin-batches/{batchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a pin batch
+         * @description The batch with every pin's prefix, state, use count and distinct pupil count. Never a pin value (spec 6.8.13).
+         */
+        get: operations["GetPinBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pin-batches/{batchId}/mark-distributed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a pin batch distributed
+         * @description Generated or printed to active (spec 6.8.9 step 8). 409 `pin_batch.not_distributable` from any other state.
+         */
+        post: operations["MarkPinBatchDistributed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pin-batches/{batchId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a pin batch
+         * @description Revokes the batch and every pin in it in one transaction (spec 6.8.10). Reason required. 409 `pin_batch.already_revoked`.
+         */
+        post: operations["RevokePinBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pin-batches/{batchId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print a pin batch's slips
+         * @description Spec 6.8.9 step 6: a PDF of every non-revoked pin, four slips to an A4 page with cut lines, the only place pin values are ever revealed. Moves the batch from generated to printed and writes an audit event, so fetch it and save the blob; never open it by top-level navigation. 410 `pin_batch.plaintext_purged` after the purge date; 409 `pin_batch.revoked`.
+         */
+        get: operations["PrintPinBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pin-batches/{batchId}/distribution-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a pin batch's distribution list
+         * @description Spec 6.8.9 step 7: a numbered sheet of each slip's four-character prefix, with blank columns for pupil name, class, guardian name and signature, filled in by hand. No pin values, so it stays available after the purge.
+         */
+        get: operations["GetPinDistributionList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pins/{pinId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke one pin
+         * @description Reason required. 409 `pin.already_revoked`.
+         */
+        post: operations["RevokePin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pins/{pinId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reinstate a suspended pin
+         * @description Clears a spread-control suspension (spec 6.8.13); reason required. 409 `pin.not_suspended` otherwise.
+         */
+        post: operations["ReinstatePin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privileges": {
         parameters: {
             query?: never;
@@ -979,6 +1163,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/result-sets/{resultSetId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a result set
+         * @description Spec 6.7.9: school-wide. Moves Approved to Published, writes the configuration snapshot (settings, logo and signature references, level, section, arm and term as they stand now), and sets revisionNumber to 1 on first publication. Each precondition fails 409 with its own code and the spec's message: `result_set.not_approved`, `result_set.needs_recompute`, `result_set.head_teacher_remarks_missing`, `result_set.logo_missing`, `result_set.signature_missing`, `result_set.next_resumption_date_missing`, `result_set.times_school_opened_missing`, and (Third Term only) `result_set.core_subjects_missing`. 404 for an unknown id. `Idempotency-Key` is REQUIRED (spec 9.8.2).
+         */
+        post: operations["PublishResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/result-sets/{resultSetId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw a published result set
+         * @description Spec 6.7.9: Super Admin only (`result.unpublish`), reason 10 to 500 characters (422 otherwise). Moves Published to Withdrawn, which removes it from the parent portal at once. The snapshot stays. 409 `result_set.not_published` from any other state; 404 for an unknown id.
+         */
+        post: operations["WithdrawResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/result-sets/{resultSetId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a withdrawn result set for correction
+         * @description Spec 6.7.9, 6.7.11: Withdrawn to Draft, marks editable, needsRecompute set; it then goes back through submission, approval and publication, and republishes as the next revision. Needs `result.unpublish` (Super Admin only, who also holds `result.score.enter`). 409 `result_set.term_not_active` unless the term is active; 409 `result_set.not_withdrawn` from any other state; 404 for an unknown id.
+         */
+        post: operations["ReopenResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -1205,6 +1449,70 @@ export interface paths {
          * @description School name, short name, address, phone, email, motto, head teacher name (spec 6.2.3). `timezone` and `abbreviation` are not editable here — timezone is fixed, and the abbreviation has its own endpoint and its own optimistic-concurrency pointer. `expectedVersion` must match the identity group's current `versionNumber` (from `GET /settings`) or the save is rejected `409` before anything is written, and BOTH the winning and the losing attempt are recorded on the audit trail (spec 6.2.11).
          */
         patch: operations["UpdateSchoolIdentity"];
+        trace?: never;
+    };
+    "/api/v1/settings/identity/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the school logo
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 2 MB; minimum 300 by 300 pixels. Re-encoded to strip all metadata (EXIF orientation is applied to the pixels first, so a portrait phone photo stays upright), and stored at the original size plus 200 and 64 pixel derivatives. Repoints the current logo; the previous asset is never deleted, so a result published while it was current keeps rendering it. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadSchoolLogo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/identity/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current head teacher's signature
+         * @description Streams the current signature at its original size (spec 9.6). Same headers as the logo. `404 school_image.not_uploaded` before the first upload.
+         */
+        get: operations["GetHeadTeacherSignature"];
+        put?: never;
+        /**
+         * Upload the head teacher's signature
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadHeadTeacherSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/identity/logo/{size}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current school logo
+         * @description Streams the current logo at `original`, `200` or `64` pixels (spec 9.6: served only through a privilege-checked endpoint, never a public URL). `Content-Disposition: inline`, `nosniff`, `Cache-Control: private`. `404 school_image.not_uploaded` before the first upload.
+         */
+        get: operations["GetSchoolLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/settings/reg-number": {
@@ -2675,6 +2983,60 @@ export interface components {
             newPassword: string;
         };
         /**
+         * @description The 200 response.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "computedAt": "2027-07-24T10:00:00Z",
+         *       "pupilCount": 28,
+         *       "rankedCount": 27,
+         *       "proposedPromoted": 26,
+         *       "proposedRepeat": 2
+         *     }
+         */
+        ComputeAnnualResultsResponse: {
+            /**
+             * @description The arm computed.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Its session.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /**
+             * Format: date-time
+             * @description When this run happened.
+             * @example 2027-07-24T10:00:00Z
+             */
+            computedAt: string;
+            /**
+             * Format: int32
+             * @description Annual rows written.
+             * @example 28
+             */
+            pupilCount: number | string;
+            /**
+             * Format: int32
+             * @description Of those, ranked (two or more terms).
+             * @example 27
+             */
+            rankedCount: number | string;
+            /**
+             * Format: int32
+             * @description Rows proposing Promoted.
+             * @example 26
+             */
+            proposedPromoted: number | string;
+            /**
+             * Format: int32
+             * @description Rows proposing Repeat.
+             * @example 2
+             */
+            proposedRepeat: number | string;
+        };
+        /**
          * @description One computation flag (contract delta's `flags[]`) — response-body data, NOT a problem code, so its string ComputeResultSetFlagDto.Code is not dotted.
          * @example {
          *       "code": "no_examination_sat",
@@ -3723,6 +4085,63 @@ export interface components {
          * @example {
          *       "items": [
          *         {
+         *           "id": "0192f0c4-9a10-7000-8000-000000000301",
+         *           "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+         *           "name": "2026/2027 First Term batch 1",
+         *           "purposeNote": "Primary 3 and Primary 4 parents",
+         *           "pinLength": 10,
+         *           "maxUses": 3,
+         *           "pinCount": 120,
+         *           "pinsUsed": 34,
+         *           "pinsExhausted": 2,
+         *           "pinsSuspended": 0,
+         *           "pinsRevoked": 0,
+         *           "state": "Active",
+         *           "generatedAt": "2026-08-03T09:30:00+00:00",
+         *           "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+         *           "revokeReason": null
+         *         }
+         *       ],
+         *       "nextCursor": "0192f0c4-9a10-7000-8000-000000000301"
+         *     }
+         */
+        CursorPageOfPinBatchDto: {
+            /**
+             * @description The page of items, newest first. Empty (never null) when there is nothing more to return.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-9a10-7000-8000-000000000301",
+             *         "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+             *         "name": "2026/2027 First Term batch 1",
+             *         "purposeNote": "Primary 3 and Primary 4 parents",
+             *         "pinLength": 10,
+             *         "maxUses": 3,
+             *         "pinCount": 120,
+             *         "pinsUsed": 34,
+             *         "pinsExhausted": 2,
+             *         "pinsSuspended": 0,
+             *         "pinsRevoked": 0,
+             *         "state": "Active",
+             *         "generatedAt": "2026-08-03T09:30:00+00:00",
+             *         "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+             *         "revokeReason": null
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PinBatchDto"][];
+            /**
+             * @description `null` when this is the last page.
+             * @example 0192f0c4-9a10-7000-8000-000000000301
+             */
+            nextCursor: null | string;
+        };
+        /**
+         * @description The cursor-pagination response envelope (spec 9.5). string? CursorPage&lt;TItem&gt;.NextCursor is opaque to the
+         *     client — it must be echoed back verbatim as the next request's cursor, and never parsed or
+         *     constructed by hand.
+         * @example {
+         *       "items": [
+         *         {
          *           "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
          *           "registrationNumber": null,
          *           "surname": "Okafor",
@@ -4555,6 +4974,56 @@ export interface components {
             armIds: string[];
         };
         /**
+         * @description Generates a batch (spec 6.8.9). Pins are not tied to any pupil.
+         * @example {
+         *       "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+         *       "name": null,
+         *       "purposeNote": "Primary 3 and Primary 4 parents",
+         *       "pinCount": 120,
+         *       "pinLength": 10,
+         *       "maxUses": 3,
+         *       "confirmMaxUses": null
+         *     }
+         */
+        GeneratePinBatchCommand: {
+            /**
+             * Format: uuid
+             * @description Required; the session must not be closed.
+             * @example 0192f0c4-9a10-7000-8000-000000000302
+             */
+            sessionId: string;
+            /** @description Optional; defaults to the session and current term plus a sequence. */
+            name: null | string;
+            /**
+             * @description Optional, up to 200 characters.
+             * @example Primary 3 and Primary 4 parents
+             */
+            purposeNote: null | string;
+            /**
+             * Format: int32
+             * @description 1 to 2000.
+             * @example 120
+             */
+            pinCount: null | number | string;
+            /**
+             * Format: int32
+             * @description 10 to 16; default 10.
+             * @example 10
+             */
+            pinLength: null | number | string;
+            /**
+             * Format: int32
+             * @description 1 to 100; default 3. Above 10, ConfirmMaxUses must repeat it.
+             * @example 3
+             */
+            maxUses: null | number | string;
+            /**
+             * Format: int32
+             * @description The typed-back confirmation spec 6.8.12 requires for a high maximum.
+             */
+            confirmMaxUses: null | number | string;
+        };
+        /**
          * @description One band, both inside SettingsGradingGroupDto and inside SettingsDto's
          *     envelope. An element of an ORDERED ARRAY (6.2.13's durability requirement) — never a named field —
          *     sorted by `displayOrder` for printing; grade RESOLUTION sorts by `lowerBound` internally
@@ -4688,6 +5157,12 @@ export interface components {
             /** @description Correlation id for this specific response occurrence. Present on every error response; quote it when reporting a problem. */
             traceId: string;
         };
+        /**
+         * Format: binary
+         * @description One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic bytes, never by a declared content type or file name (spec 9.6) — neither is part of this contract.
+         * @example binary image content, sent as the multipart request's `file` part
+         */
+        IFormFile: string;
         /**
          * @description The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.
          * @example {
@@ -4867,6 +5342,229 @@ export interface components {
              * @example true
              */
             hasPreviousPage?: boolean;
+        };
+        /**
+         * @description A batch with its pins.
+         * @example {
+         *       "batch": {
+         *         "id": "0192f0c4-9a10-7000-8000-000000000301",
+         *         "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+         *         "name": "2026/2027 First Term batch 1",
+         *         "purposeNote": "Primary 3 and Primary 4 parents",
+         *         "pinLength": 10,
+         *         "maxUses": 3,
+         *         "pinCount": 120,
+         *         "pinsUsed": 34,
+         *         "pinsExhausted": 2,
+         *         "pinsSuspended": 0,
+         *         "pinsRevoked": 0,
+         *         "state": "Active",
+         *         "generatedAt": "2026-08-03T09:30:00+00:00",
+         *         "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+         *         "revokeReason": null
+         *       },
+         *       "pins": [
+         *         {
+         *           "id": "0192f0c4-9a10-7000-8000-000000000303",
+         *           "prefix": "H7K2",
+         *           "state": "Active",
+         *           "useCount": 1,
+         *           "maxUses": 3,
+         *           "distinctPupilCount": 1,
+         *           "stateReason": null
+         *         }
+         *       ]
+         *     }
+         */
+        PinBatchDetailDto: {
+            /** @description The batch. */
+            batch: components["schemas"]["PinBatchDto"];
+            /**
+             * @description Oldest first.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-9a10-7000-8000-000000000303",
+             *         "prefix": "H7K2",
+             *         "state": "Active",
+             *         "useCount": 1,
+             *         "maxUses": 3,
+             *         "distinctPupilCount": 1,
+             *         "stateReason": null
+             *       }
+             *     ]
+             */
+            pins: components["schemas"]["PinSummaryDto"][];
+        };
+        /**
+         * @description A batch as the list and detail views show it (spec 6.8.11). Never carries a pin value.
+         * @example {
+         *       "id": "0192f0c4-9a10-7000-8000-000000000301",
+         *       "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
+         *       "name": "2026/2027 First Term batch 1",
+         *       "purposeNote": "Primary 3 and Primary 4 parents",
+         *       "pinLength": 10,
+         *       "maxUses": 3,
+         *       "pinCount": 120,
+         *       "pinsUsed": 34,
+         *       "pinsExhausted": 2,
+         *       "pinsSuspended": 0,
+         *       "pinsRevoked": 0,
+         *       "state": "Active",
+         *       "generatedAt": "2026-08-03T09:30:00+00:00",
+         *       "plaintextPurgeAt": "2026-09-02T09:30:00+00:00",
+         *       "revokeReason": null
+         *     }
+         */
+        PinBatchDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-9a10-7000-8000-000000000301
+             */
+            id: string;
+            /**
+             * @description The session the pins are valid for.
+             * @example 0192f0c4-9a10-7000-8000-000000000302
+             */
+            sessionId: string;
+            /**
+             * @description Unique within the session.
+             * @example 2026/2027 First Term batch 1
+             */
+            name: string;
+            /**
+             * @description Informational; restricts nothing.
+             * @example Primary 3 and Primary 4 parents
+             */
+            purposeNote: null | string;
+            /**
+             * Format: int32
+             * @description Characters per pin.
+             * @example 10
+             */
+            pinLength: number | string;
+            /**
+             * Format: int32
+             * @description Uses per pin.
+             * @example 3
+             */
+            maxUses: number | string;
+            /**
+             * Format: int32
+             * @description Pins generated.
+             * @example 120
+             */
+            pinCount: number | string;
+            /**
+             * Format: int32
+             * @description Pins used at least once.
+             * @example 34
+             */
+            pinsUsed: number | string;
+            /**
+             * Format: int32
+             * @description Pins with no uses left.
+             * @example 2
+             */
+            pinsExhausted: number | string;
+            /**
+             * Format: int32
+             * @description Pins suspended by the spread control.
+             * @example 0
+             */
+            pinsSuspended: number | string;
+            /**
+             * Format: int32
+             * @description Pins revoked.
+             * @example 0
+             */
+            pinsRevoked: number | string;
+            /** @description Spec 6.8.10. */
+            state: components["schemas"]["PinBatchState"];
+            /**
+             * Format: date-time
+             * @description When generated.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            generatedAt: string;
+            /**
+             * Format: date-time
+             * @description Reprinting is possible until this moment.
+             * @example 2026-09-02T09:30:00+00:00
+             */
+            plaintextPurgeAt: string;
+            /** @description Set once revoked. */
+            revokeReason: null | string;
+        };
+        /**
+         * @description Spec 6.8.10's batch states.
+         * @example Active
+         * @enum {unknown}
+         */
+        PinBatchState: "Generated" | "Printed" | "Active" | "Exhausted" | "Revoked";
+        /**
+         * @description A reason, for every revoke and reinstate (spec 6.8.4, 6.8.13).
+         * @example {
+         *       "reason": "A sheet of slips went missing from the office."
+         *     }
+         */
+        PinReasonRequest: {
+            /**
+             * @description 1 to 500 characters once trimmed.
+             * @example A sheet of slips went missing from the office.
+             */
+            reason: string;
+        };
+        /**
+         * @description Spec 6.8.5's pin states.
+         * @example Active
+         * @enum {unknown}
+         */
+        PinState: "Unused" | "Active" | "Exhausted" | "Suspended" | "Revoked";
+        /**
+         * @description One pin in a batch's detail view: its prefix and position, never its value (spec 6.8.13).
+         * @example {
+         *       "id": "0192f0c4-9a10-7000-8000-000000000303",
+         *       "prefix": "H7K2",
+         *       "state": "Active",
+         *       "useCount": 1,
+         *       "maxUses": 3,
+         *       "distinctPupilCount": 1,
+         *       "stateReason": null
+         *     }
+         */
+        PinSummaryDto: {
+            /**
+             * @description Opaque id.
+             * @example 0192f0c4-9a10-7000-8000-000000000303
+             */
+            id: string;
+            /**
+             * @description The first four characters, for identifying a slip read out over the telephone.
+             * @example H7K2
+             */
+            prefix: string;
+            /** @description Spec 6.8.5. */
+            state: components["schemas"]["PinState"];
+            /**
+             * Format: int32
+             * @description Uses spent.
+             * @example 1
+             */
+            useCount: number | string;
+            /**
+             * Format: int32
+             * @description Uses allowed.
+             * @example 3
+             */
+            maxUses: number | string;
+            /**
+             * Format: int32
+             * @description Different pupils opened.
+             * @example 1
+             */
+            distinctPupilCount: number | string;
+            /** @description Why it was suspended or revoked. */
+            stateReason: null | string;
         };
         /**
          * @description Response to a PingQuery. Confirms the service is reachable and that its clock,
@@ -5068,6 +5766,35 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             lockedUntil?: string;
+        };
+        /**
+         * @description The published set.
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Published",
+         *         "needsRecompute": false,
+         *         "returnReason": null
+         *       },
+         *       "publishedAt": "2026-08-03T09:30:00+00:00",
+         *       "revisionNumber": 1
+         *     }
+         */
+        PublishResultSetResponse: {
+            /** @description State Published. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * Format: date-time
+             * @description When it became visible to parents.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            publishedAt: string;
+            /**
+             * Format: int32
+             * @description 1 on first publication; later revisions follow a withdrawal.
+             * @example 1
+             */
+            revisionNumber: number | string;
         };
         /**
          * @description The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates
@@ -6401,6 +7128,21 @@ export interface components {
             returnReason: null | string;
         };
         /**
+         * @description The result set after a withdraw or reopen.
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Withdrawn",
+         *         "needsRecompute": false,
+         *         "returnReason": null
+         *       }
+         *     }
+         */
+        ResultSetTransitionResponse: {
+            /** @description Its new state. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
+        };
+        /**
          * @description `POST /api/v1/result-sets/{resultSetId}/return` (spec 6.7.8, 6.7.11; TASK-0090's approved
          *             contract delta). Moves Awaiting Approval or Approved to Returned for Correction.
          * @example {
@@ -7203,6 +7945,44 @@ export interface components {
             };
         };
         /**
+         * @description One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body
+         *     of both `POST /settings/identity/logo` and `POST /settings/identity/signature`, and also
+         *     how SchoolImageDto? SettingsIdentityGroupDto.Logo/SchoolImageDto? SettingsIdentityGroupDto.Signature
+         *     report the current upload.
+         * @example {
+         *       "width": 512,
+         *       "height": 512,
+         *       "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *       "uploadedByName": "Chisom Maxwell"
+         *     }
+         */
+        SchoolImageDto: {
+            /**
+             * Format: int32
+             * @description The Original rendition's width, in pixels, after any EXIF orientation correction.
+             * @example 512
+             */
+            width: number | string;
+            /**
+             * Format: int32
+             * @description The Original rendition's height, in pixels, after any EXIF orientation correction.
+             * @example 512
+             */
+            height: number | string;
+            /**
+             * Format: date-time
+             * @description When this upload was made.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            uploadedAt: string;
+            /**
+             * @description The uploading administrator's staff name, or `null` when the account that
+             *     uploaded it can no longer be resolved.
+             * @example Chisom Maxwell
+             */
+            uploadedByName: null | string;
+        };
+        /**
          * @description How a role assignment's grant is bounded. Spec 4.2: "Scope is one of two things: school-wide,
          *     or a list of specific arms in a specific session."
          * @example ArmList
@@ -7864,7 +8644,14 @@ export interface components {
          *         "motto": "Excellence Through Character",
          *         "headTeacherName": "Chisom Maxwell",
          *         "timezone": "Africa/Lagos",
-         *         "versionNumber": 3
+         *         "versionNumber": 3,
+         *         "logo": {
+         *           "width": 512,
+         *           "height": 512,
+         *           "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *           "uploadedByName": "Chisom Maxwell"
+         *         },
+         *         "signature": null
          *       },
          *       "abbreviation": {
          *         "abbreviation": "GRAS",
@@ -8258,7 +9045,14 @@ export interface components {
          *       "motto": "Excellence Through Character",
          *       "headTeacherName": "Chisom Maxwell",
          *       "timezone": "Africa/Lagos",
-         *       "versionNumber": 3
+         *       "versionNumber": 3,
+         *       "logo": {
+         *         "width": 512,
+         *         "height": 512,
+         *         "uploadedAt": "2026-08-03T09:30:00+00:00",
+         *         "uploadedByName": "Chisom Maxwell"
+         *       },
+         *       "signature": null
          *     }
          */
         SettingsIdentityGroupDto: {
@@ -8309,6 +9103,8 @@ export interface components {
              * @example 3
              */
             versionNumber: number | string;
+            logo: null | components["schemas"]["SchoolImageDto"];
+            signature: null | components["schemas"]["SchoolImageDto"];
         };
         /**
          * @description The rating-scales group, both inside SettingsDto and as
@@ -8510,6 +9306,12 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * Format: binary
+         * @description The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).
+         * @example binary PNG or JPEG bytes
+         */
+        Stream: string;
         /**
          * @description The wire shape of a Subject (spec 6.6.2, 6.6.7, 6.6.9).
          * @example {
@@ -10404,6 +11206,19 @@ export interface components {
              */
             voidedCount: number | string;
         };
+        /**
+         * @description The request body for a withdrawal.
+         * @example {
+         *       "reason": "Mathematics marks were entered for the wrong class. Withdrawing to correct them."
+         *     }
+         */
+        WithdrawResultSetRequest: {
+            /**
+             * @description Why the published result is being pulled, 10 to 500 characters once trimmed. Audited.
+             * @example Mathematics marks were entered for the wrong class. Withdrawing to correct them.
+             */
+            reason: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -11318,6 +12133,101 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ComputeAnnualResults: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComputeAnnualResultsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
@@ -13675,6 +14585,737 @@ export interface operations {
             };
         };
     };
+    ListPinBatches: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                state?: components["schemas"]["PinBatchState"];
+                cursor?: string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPageOfPinBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GeneratePinBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratePinBatchCommand"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPinBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinBatchDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MarkPinBatchDistributed: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RevokePinBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrintPinBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPinDistributionList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RevokePin: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                pinId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReinstatePin: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                pinId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetPrivilegeRegister: {
         parameters: {
             query?: never;
@@ -14984,6 +16625,273 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    WithdrawResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawResultSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultSetTransitionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReopenResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultSetTransitionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Too Many Requests */
@@ -16337,6 +18245,276 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadSchoolLogo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolImageDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetHeadTeacherSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["Stream"];
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadHeadTeacherSignature: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolImageDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSchoolLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                size: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": components["schemas"]["Stream"];
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

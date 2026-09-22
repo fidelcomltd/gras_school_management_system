@@ -150,6 +150,30 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<IValidateOptions<Argon2Options>, Argon2OptionsValidator>();
 
         services.AddScoped<IPasswordHasher, Argon2idPasswordHasher>();
+
+        // Spec 6.8.6: the pin HMAC and AES keys come from configuration (environment variables on the VPS), never the database.
+        var pinOptions = services
+            .AddOptions<Pins.PinSecretsOptions>()
+            .Bind(configuration.GetSection(Pins.PinSecretsOptions.SectionName));
+
+        if (validateOnStart)
+        {
+            pinOptions.ValidateOnStart();
+        }
+
+        services.AddSingleton<IValidateOptions<Pins.PinSecretsOptions>, Pins.PinSecretsOptionsValidator>();
+        services.AddSingleton<Application.Abstractions.Pins.IPinSecrets, Pins.PinSecrets>();
+        services.AddScoped<Application.Abstractions.Pins.IPinBatchRepository, Persistence.Repositories.PinBatchRepository>();
+        services.AddOptions<Pins.PortalOptions>().Bind(configuration.GetSection(Pins.PortalOptions.SectionName));
+        services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
+        services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
+        services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();
+        services.AddScoped<Application.Abstractions.Results.IResultVerificationReader, Results.ResultVerificationReader>();
+        services.AddScoped<Application.Abstractions.Results.IAnnualSheetReader, Results.AnnualSheetReader>();
+        services.AddSingleton<Application.Abstractions.Results.IResultSheetPdfRenderer, Results.QuestPdfResultSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Results.IResultPdfCache, Results.DiskResultPdfCache>();
+        services.AddSingleton<Pins.PinMaintenanceService>();
+        services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
         services.AddScoped<IAdminSessionRepository, AdminSessionRepository>();
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();
@@ -227,6 +251,7 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<ISubjectScoreSessionLockLookup, SubjectScoreSessionLockLookup>();
         services.AddScoped<IPublishedResultsGate, PublishedResultsGate>();
         services.AddScoped<IResultSetRepository, ResultSetRepository>();
+        services.AddScoped<IAnnualResultRepository, AnnualResultRepository>();
 
         // TASK-0076 dispatch B: the score-sheet endpoints' own mark persistence.
         services.AddScoped<ISubjectScoreRepository, SubjectScoreRepository>();
@@ -274,6 +299,17 @@ public static class InfrastructureDependencyInjection
         // TASK-0005b stage A: logo/signature re-encoding. Stateless and thread-safe (each call
         // decodes and encodes its own bitmaps), so singleton rather than per-request.
         services.AddSingleton<ISchoolImageProcessor, SkiaSchoolImageProcessor>();
+
+        // TASK-0005b stage B1: PLACEHOLDER registration. The in-memory fake is registered
+        // unconditionally here because nothing consumes ISchoolImageStore yet (upload routes are
+        // stage B2); stage D replaces this with an environment-based choice between this fake (tests)
+        // and the real CloudinaryImageStore (everywhere else) — "tests never touch the network"
+        // (orchestrator design, 2026-09-21). Singleton so uploads persist for the lifetime of the
+        // process, matching a real store's behaviour closely enough for a fake.
+        services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+
+        // TASK-0005b stage B2: SchoolImage row persistence for the upload routes.
+        services.AddScoped<ISchoolImageRepository, SchoolImageRepository>();
 
         // Tagged "ready", so /health/ready fails when the database is unreachable while
         // /health/live keeps reporting the process itself as alive. An orchestrator then stops

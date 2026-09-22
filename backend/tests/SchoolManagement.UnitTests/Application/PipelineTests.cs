@@ -188,6 +188,22 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<ISubjectMappingExceptionRepository>());
         services.AddSingleton(Substitute.For<ISubjectMappingMarkLookup>());
 
+        // TASK-0005b stage B2: the upload handlers depend on these three ports, implemented by
+        // Infrastructure — same treatment as every other repository/processor stubbed above.
+        services.AddSingleton(Substitute.For<ISchoolImageRepository>());
+        services.AddSingleton(Substitute.For<ISchoolImageProcessor>());
+        services.AddSingleton(Substitute.For<ISchoolImageStore>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinBatchRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSecrets>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSlipRenderer>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Portal.IPortalRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultSheetReader>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultVerificationReader>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultSheetPdfRenderer>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IResultPdfCache>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IAnnualResultRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Results.IAnnualSheetReader>());
+
         services.AddOptions<PipelineOptions>();
 
         services.AddApplication();

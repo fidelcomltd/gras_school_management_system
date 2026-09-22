@@ -61,7 +61,14 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
             // Only where it will not break the interactive docs UI, which legitimately loads scripts
             // and styles. The docs endpoints are Development-only, so production always gets the
             // strict policy.
-            if (!IsDocumentationPath(httpContext.Request.Path))
+            if (httpContext.Request.Path.StartsWithSegments("/portal", StringComparison.OrdinalIgnoreCase)
+                || httpContext.Request.Path.StartsWithSegments("/verify", StringComparison.OrdinalIgnoreCase))
+            {
+                // The parent portal's HTML pages (spec 6.9): no scripts at all, the one inline stylesheet by hash,
+                // same-origin images and form posts only.
+                headers["Content-Security-Policy"] = Portal.PortalHtml.ContentSecurityPolicy;
+            }
+            else if (!IsDocumentationPath(httpContext.Request.Path))
             {
                 headers["Content-Security-Policy"] = ApiContentSecurityPolicy;
             }

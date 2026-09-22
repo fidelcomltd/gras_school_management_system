@@ -16,6 +16,7 @@ public sealed class ApiProblemTests
     [InlineData(ErrorType.Unauthenticated, 401)]
     [InlineData(ErrorType.Forbidden, 403)]
     [InlineData(ErrorType.Locked, 423)]
+    [InlineData(ErrorType.Gone, 410)]
     [InlineData(ErrorType.Failure, 500)]
     public void ToStatusCode_MapsEachCategory(ErrorType errorType, int expectedStatusCode)
     {

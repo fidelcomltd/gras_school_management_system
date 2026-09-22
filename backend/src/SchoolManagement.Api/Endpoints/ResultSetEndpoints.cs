@@ -30,6 +30,9 @@ public sealed class ResultSetEndpoints : IEndpointModule
         MapSubmit(group);
         MapApprove(group);
         MapReturn(group);
+        MapPublish(group);
+        MapWithdraw(group);
+        MapReopen(group);
     }
 
     private static void MapCompute(RouteGroupBuilder group) =>
@@ -122,6 +125,92 @@ public sealed class ResultSetEndpoints : IEndpointModule
                 "— this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does not apply. " +
                 "`Idempotency-Key` is ACCEPTED, not required.")
             .Produces<ApproveResultSetResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapPublish(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/publish", async (
+                Guid resultSetId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new PublishResultSetCommand(resultSetId), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Publish)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("PublishResultSet")
+            .WithSummary("Publish a result set")
+            .WithDescription(
+                "Spec 6.7.9: school-wide. Moves Approved to Published, writes the configuration snapshot " +
+                "(settings, logo and signature references, level, section, arm and term as they stand now), " +
+                "and sets revisionNumber to 1 on first publication. Each precondition fails 409 with its own " +
+                "code and the spec's message: `result_set.not_approved`, `result_set.needs_recompute`, " +
+                "`result_set.head_teacher_remarks_missing`, `result_set.logo_missing`, " +
+                "`result_set.signature_missing`, `result_set.next_resumption_date_missing`, " +
+                "`result_set.times_school_opened_missing`, and (Third Term only) `result_set.core_subjects_missing`. " +
+                "404 for an unknown id. `Idempotency-Key` is REQUIRED (spec 9.8.2).")
+            .Produces<PublishResultSetResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapWithdraw(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/withdraw", async (
+                Guid resultSetId,
+                WithdrawResultSetRequest body,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new WithdrawResultSetCommand(resultSetId, body.Reason), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Unpublish)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("WithdrawResultSet")
+            .WithSummary("Withdraw a published result set")
+            .WithDescription(
+                "Spec 6.7.9: Super Admin only (`result.unpublish`), reason 10 to 500 characters (422 otherwise). Moves " +
+                "Published to Withdrawn, which removes it from the parent portal at once. The snapshot stays. 409 " +
+                "`result_set.not_published` from any other state; 404 for an unknown id.")
+            .Produces<ResultSetTransitionResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapReopen(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/reopen", async (
+                Guid resultSetId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new ReopenResultSetCommand(resultSetId), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Unpublish)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("ReopenResultSet")
+            .WithSummary("Reopen a withdrawn result set for correction")
+            .WithDescription(
+                "Spec 6.7.9, 6.7.11: Withdrawn to Draft, marks editable, needsRecompute set; it then goes back through " +
+                "submission, approval and publication, and republishes as the next revision. Needs `result.unpublish` " +
+                "(Super Admin only, who also holds `result.score.enter`). 409 `result_set.term_not_active` unless the " +
+                "term is active; 409 `result_set.not_withdrawn` from any other state; 404 for an unknown id.")
+            .Produces<ResultSetTransitionResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)

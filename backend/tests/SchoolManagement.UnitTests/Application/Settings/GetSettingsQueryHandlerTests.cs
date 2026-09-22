@@ -1,6 +1,7 @@
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Settings;
@@ -22,6 +23,10 @@ public sealed class GetSettingsQueryHandlerTests
     private readonly ISectionRepository _sectionRepository = Substitute.For<ISectionRepository>();
     private readonly ITraitRepository _traitRepository = Substitute.For<ITraitRepository>();
 
+    // TASK-0005b stage B2: unconfigured — every test's profile has null CurrentLogoGroupId/
+    // CurrentSignatureGroupId (CreateForTesting's default), so the handler never calls this repository.
+    private readonly ISchoolImageRepository _schoolImages = Substitute.For<ISchoolImageRepository>();
+
     // Defaults set in the CONSTRUCTOR (runs once before each test method, per xUnit's per-test
     // instance model) so a test's own .Returns() setup — configured inside the test method body,
     // necessarily AFTER construction — always wins. Setting these same defaults inside CreateHandler()
@@ -41,7 +46,7 @@ public sealed class GetSettingsQueryHandlerTests
 
     private GetSettingsQueryHandler CreateHandler() =>
         new(_repository, _pupils, _gradingBandRepository, _assessmentComponentRepository, _ratingScaleRepository,
-            _developmentDomainRepository, _sectionRepository, _traitRepository);
+            _developmentDomainRepository, _sectionRepository, _traitRepository, _schoolImages);
 
     [Fact]
     public async Task HandleAsync_ReturnsTheIdentityGroupMappedFromTheProfile()

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -102,7 +103,9 @@ internal static class RequireIdempotencyKeyExtensions
 
             var caller = currentUser.UserId ?? AnonymousCaller;
             var command = context.Arguments.OfType<IBaseCommand>().FirstOrDefault();
-            var fingerprint = BuildFingerprint(httpContext, caller, command, jsonOptions);
+            var uploadedFile = context.Arguments.OfType<IFormFile>().FirstOrDefault();
+            var fingerprint = await BuildFingerprintAsync(
+                httpContext, caller, command, uploadedFile, jsonOptions, httpContext.RequestAborted).ConfigureAwait(false);
 
             var now = timeProvider.GetUtcNow();
             var retention = TimeSpan.FromHours(idempotencyOptions.RetentionHours);
@@ -147,21 +150,42 @@ internal static class RequireIdempotencyKeyExtensions
     }
 
     /// <summary>
-    /// Method + path + caller + the bound command serialised with the app's own JSON options — a
-    /// reused key submitted against a different payload changes this string and is therefore
-    /// classified <c>idempotency.key_conflict</c>, never replayed against an unrelated response.
+    /// Method + path + caller + the bound command serialised with the app's own JSON options, plus
+    /// (TASK-0005b) a SHA-256 of any uploaded file's bytes — a reused key submitted against a
+    /// different payload OR different bytes changes this string and is therefore classified
+    /// <c>idempotency.key_conflict</c>, never replayed against an unrelated response.
     /// </summary>
-    private static string BuildFingerprint(
+    /// <remarks>
+    /// <paramref name="uploadedFile"/> is read here to compute the hash and then left exactly as it
+    /// was: <c>IFormFile.OpenReadStream()</c> reopens the underlying buffered form data from the
+    /// start on every call, so the endpoint's own later read (which builds the actual command) is
+    /// unaffected. Before this method existed, a multipart body had NO command argument at all (the
+    /// endpoint binds a bare <see cref="IFormFile"/>, not an <see cref="IBaseCommand"/>), so the
+    /// fingerprint for every upload collapsed to the same method/path/caller triple regardless of the
+    /// file's content — the gap 0005b's approved delta named.
+    /// </remarks>
+    internal static async Task<string> BuildFingerprintAsync(
         HttpContext httpContext,
         string caller,
         IBaseCommand? command,
-        JsonSerializerOptions jsonOptions)
+        IFormFile? uploadedFile,
+        JsonSerializerOptions jsonOptions,
+        CancellationToken cancellationToken)
     {
         var bodyPart = command is null
             ? string.Empty
             : JsonSerializer.Serialize(command, command.GetType(), jsonOptions);
 
-        return string.Join('|', httpContext.Request.Method, httpContext.Request.Path.Value, caller, bodyPart);
+        var filePart = string.Empty;
+
+        if (uploadedFile is not null)
+        {
+            var stream = uploadedFile.OpenReadStream();
+            var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+            filePart = Convert.ToHexString(hash);
+        }
+
+        return string.Join('|', httpContext.Request.Method, httpContext.Request.Path.Value, caller, bodyPart, filePart);
     }
 
     /// <summary>

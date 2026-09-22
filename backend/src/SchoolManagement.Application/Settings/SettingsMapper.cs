@@ -7,8 +7,13 @@ namespace SchoolManagement.Application.Settings;
 /// <c>UpdateSchoolIdentityCommandHandler</c> cannot describe the same shape two different ways.</summary>
 internal static class SettingsMapper
 {
-    /// <summary>Maps <paramref name="profile"/>'s identity fields to the wire DTO.</summary>
-    public static SettingsIdentityGroupDto ToIdentityDto(SchoolProfile profile)
+    /// <summary>
+    /// Maps <paramref name="profile"/>'s identity fields to the wire DTO. <paramref name="logo"/> and
+    /// <paramref name="signature"/> are supplied by the caller (TASK-0005b stage B2) rather than
+    /// resolved here, since resolving either is an async repository read this synchronous mapper has
+    /// no access to.
+    /// </summary>
+    public static SettingsIdentityGroupDto ToIdentityDto(SchoolProfile profile, SchoolImageDto? logo, SchoolImageDto? signature)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -21,7 +26,9 @@ internal static class SettingsMapper
             profile.Motto,
             profile.HeadTeacherName,
             profile.Timezone,
-            profile.IdentityVersionNumber);
+            profile.IdentityVersionNumber,
+            logo,
+            signature);
     }
 
     /// <summary>

@@ -34,4 +34,7 @@ public enum ErrorType
     /// submitted password was correct — see <c>SignInCommandHandler</c>.
     /// </summary>
     Locked = 6,
+
+    /// <summary>The resource existed but is permanently gone (e.g. purged pin values, spec 6.8.13). Maps to HTTP 410.</summary>
+    Gone = 7,
 }
