@@ -226,6 +226,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Portal 3b done**: on-screen result from the snapshot via `ResultSheetBuilder` (shared with the coming PDF); snapshot now includes subjects, form teacher, session, term dates, string enums. Fee block not printed (fee notice not built).
 - 2026-09-22 **Portal 3a done** (§6.9): lookup, 30-min viewing sessions, blocks, spread control, 6.9.4 copies, 400 ms pad; no contract change. Global soft ceiling and the 5-pupils-per-hour address flag not built yet.
 - 2026-09-22 **Human: parent portal is server-rendered HTML from the .NET app** (no framework, works without JS, §6.9.8), and runs **in the same process on its own subdomain** (not a separate deployment; restricted DB role deferred). Pin printing gate 1381/1381.
 - 2026-09-22 **Pin printing done**: slips PDF (4/A4) + distribution list, QuestPDF 2026.9.0; nightly `PinMaintenanceService` purges ciphertext and marks exhausted batches. Print is a GET that writes: fetch + blob only.
