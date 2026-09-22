@@ -178,6 +178,98 @@ public sealed class PinEndpointsTests(ApiTestFixture fixture) : IntegrationTestB
         second.Items.Single().PinCount.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Print_ReturnsAPdfOfSlips_AndMovesTheBatchToPrinted()
+    {
+        RequireDatabase();
+        var (sessionId, jar) = await SeedAsync();
+        var batch = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 6 }));
+
+        var print = await GetAsync($"{BatchesUrl}/{batch.Id}/print", jar);
+
+        print.StatusCode.ShouldBe(HttpStatusCode.OK);
+        print.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        var bytes = await print.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+        System.Text.Encoding.ASCII.GetString(bytes, 0, 4).ShouldBe("%PDF");
+        if (Environment.GetEnvironmentVariable("PIN_PDF_OUT") is { Length: > 0 } outDir)
+        {
+            await File.WriteAllBytesAsync(Path.Combine(outDir, "slips.pdf"), bytes, TestContext.Current.CancellationToken);
+            await File.WriteAllBytesAsync(
+                Path.Combine(outDir, "distribution.pdf"),
+                await (await GetAsync($"{BatchesUrl}/{batch.Id}/distribution-list", jar)).Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken);
+        }
+
+        (await ReadAsync<PinBatchDetailDto>(await GetAsync($"{BatchesUrl}/{batch.Id}", jar))).Batch.State.ShouldBe(PinBatchState.Printed);
+
+        var list = await GetAsync($"{BatchesUrl}/{batch.Id}/distribution-list", jar);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        list.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+    }
+
+    [Fact]
+    public async Task Print_AfterThePurgeDate_Returns410_AndARevokedBatch_Returns409()
+    {
+        RequireDatabase();
+        var (sessionId, jar) = await SeedAsync();
+        var purged = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 1, name = "Old" }));
+        var revoked = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 1, name = "Lost" }));
+        (await PostAsync($"{BatchesUrl}/{revoked.Id}/revoke", jar, new { reason = "Lost sheet" })).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var batch = await context.Set<PinBatch>().SingleAsync(candidate => candidate.Id == Guid.Parse(purged.Id), TestContext.Current.CancellationToken);
+            typeof(PinBatch).GetProperty(nameof(PinBatch.PlaintextPurgeAtUtc))!.SetValue(batch, DateTimeOffset.UtcNow.AddMinutes(-1));
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var gone = await GetAsync($"{BatchesUrl}/{purged.Id}/print", jar);
+        gone.StatusCode.ShouldBe(HttpStatusCode.Gone);
+        using (var body = await ReadJsonAsync(gone))
+        {
+            body.RootElement.GetProperty("errorCode").GetString().ShouldBe("pin_batch.plaintext_purged");
+        }
+
+        (await GetAsync($"{BatchesUrl}/{revoked.Id}/print", jar)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await GetAsync($"{BatchesUrl}/{purged.Id}/distribution-list", jar)).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Maintenance_PurgesExpiredCiphertext_AndMarksDeadBatchesExhausted()
+    {
+        RequireDatabase();
+        var (sessionId, jar) = await SeedAsync();
+        var expiring = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 2, name = "Expiring" }));
+        var dead = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 1, name = "Dead" }));
+        var fresh = await ReadAsync<PinBatchDto>(await PostAsync(BatchesUrl, jar, new { sessionId, pinCount = 1, name = "Fresh" }));
+        var deadPinId = (await ReadAsync<PinBatchDetailDto>(await GetAsync($"{BatchesUrl}/{dead.Id}", jar))).Pins[0].Id;
+        (await PostAsync($"/api/v1/pins/{deadPinId}/revoke", jar, new { reason = "Damaged slip" })).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var batch = await context.Set<PinBatch>().SingleAsync(candidate => candidate.Id == Guid.Parse(expiring.Id), TestContext.Current.CancellationToken);
+            typeof(PinBatch).GetProperty(nameof(PinBatch.PlaintextPurgeAtUtc))!.SetValue(batch, DateTimeOffset.UtcNow.AddMinutes(-1));
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<SchoolManagement.Infrastructure.Pins.PinMaintenanceService>().RunOnceAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var verify = Fixture.CreateScope();
+        var db = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var pins = await db.Set<Pin>().AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);
+        pins.Where(pin => pin.BatchId == Guid.Parse(expiring.Id)).ShouldAllBe(pin => pin.Ciphertext == null);
+        pins.Where(pin => pin.BatchId == Guid.Parse(fresh.Id)).ShouldAllBe(pin => pin.Ciphertext != null);
+        (await db.Set<PinBatch>().AsNoTracking().SingleAsync(batch => batch.Id == Guid.Parse(dead.Id), TestContext.Current.CancellationToken))
+            .State.ShouldBe(PinBatchState.Exhausted);
+        (await db.Set<PinBatch>().AsNoTracking().SingleAsync(batch => batch.Id == Guid.Parse(fresh.Id), TestContext.Current.CancellationToken))
+            .State.ShouldBe(PinBatchState.Generated);
+    }
+
     private async Task<(Guid SessionId, CookieJar Jar)> SeedAsync()
     {
         var (_, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false, email: $"admin-{Guid.NewGuid():N}@example.com");

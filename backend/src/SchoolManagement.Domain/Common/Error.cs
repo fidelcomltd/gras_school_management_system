@@ -54,6 +54,10 @@ public record Error(string Code, string Description, ErrorType Type)
     /// when the response needs to carry <c>lockedUntil</c>.</summary>
     public static Error Locked(string code, string description) =>
         new(code, description, ErrorType.Locked);
+
+    /// <summary>Creates a permanently-gone failure (HTTP 410).</summary>
+    public static Error Gone(string code, string description) =>
+        new(code, description, ErrorType.Gone);
 }
 
 /// <summary>

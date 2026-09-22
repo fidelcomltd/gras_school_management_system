@@ -164,6 +164,10 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<IValidateOptions<Pins.PinSecretsOptions>, Pins.PinSecretsOptionsValidator>();
         services.AddSingleton<Application.Abstractions.Pins.IPinSecrets, Pins.PinSecrets>();
         services.AddScoped<Application.Abstractions.Pins.IPinBatchRepository, Persistence.Repositories.PinBatchRepository>();
+        services.AddOptions<Pins.PortalOptions>().Bind(configuration.GetSection(Pins.PortalOptions.SectionName));
+        services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
+        services.AddSingleton<Pins.PinMaintenanceService>();
+        services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());
         services.AddScoped<IAdminAccountRepository, AdminAccountRepository>();
         services.AddScoped<IAdminSessionRepository, AdminSessionRepository>();
         services.AddScoped<IAdminSessionAuthenticator, AdminSessionAuthenticator>();

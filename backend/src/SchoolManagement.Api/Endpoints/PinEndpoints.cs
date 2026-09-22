@@ -30,6 +30,8 @@ public sealed class PinEndpoints : IEndpointModule
         MapGet(batchGroup);
         MapMarkDistributed(batchGroup);
         MapRevokeBatch(batchGroup);
+        MapPrint(batchGroup);
+        MapDistributionList(batchGroup);
 
         var pinGroup = endpoints.MapGroup("/pins").WithTags(Tag);
         MapRevokePin(pinGroup);
@@ -141,6 +143,47 @@ public sealed class PinEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapPrint(RouteGroupBuilder group) =>
+        group.MapGet("/{batchId:guid}/print", async (Guid batchId, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new PrintPinBatchCommand(batchId), cancellationToken);
+                return result.Match(file => TypedResults.File(file.Content.ToArray(), "application/pdf", file.FileName));
+            })
+            .RequirePrivilege(Privileges.Pin.Print)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("PrintPinBatch")
+            .WithSummary("Print a pin batch's slips")
+            .WithDescription(
+                "Spec 6.8.9 step 6: a PDF of every non-revoked pin, four slips to an A4 page with cut lines, the only place pin " +
+                "values are ever revealed. Moves the batch from generated to printed and writes an audit event, so fetch it and " +
+                "save the blob; never open it by top-level navigation. 410 `pin_batch.plaintext_purged` after the purge date; " +
+                "409 `pin_batch.revoked`.")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status410Gone)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapDistributionList(RouteGroupBuilder group) =>
+        group.MapGet("/{batchId:guid}/distribution-list", async (Guid batchId, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetPinDistributionListQuery(batchId), cancellationToken);
+                return result.Match(file => TypedResults.File(file.Content.ToArray(), "application/pdf", file.FileName));
+            })
+            .RequirePrivilege(Privileges.Pin.View)
+            .WithName("GetPinDistributionList")
+            .WithSummary("Download a pin batch's distribution list")
+            .WithDescription(
+                "Spec 6.8.9 step 7: a numbered sheet of each slip's four-character prefix, with blank columns for pupil name, " +
+                "class, guardian name and signature, filled in by hand. No pin values, so it stays available after the purge.")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     private static void MapRevokePin(RouteGroupBuilder group) =>
