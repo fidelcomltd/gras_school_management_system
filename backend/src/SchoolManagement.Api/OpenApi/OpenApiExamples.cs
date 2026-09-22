@@ -2597,6 +2597,23 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(WithdrawResultSetRequest)] = """
+            {
+              "reason": "Mathematics marks were entered for the wrong class. Withdrawing to correct them."
+            }
+            """,
+
+        [typeof(ResultSetTransitionResponse)] = $$"""
+            {
+              "resultSet": {
+                "id": "{{ExampleResultSetId}}",
+                "state": "Withdrawn",
+                "needsRecompute": false,
+                "returnReason": null
+              }
+            }
+            """,
+
         [typeof(ReturnResultSetCommand)] = $$"""
             {
               "resultSetId": "{{ExampleResultSetId}}",

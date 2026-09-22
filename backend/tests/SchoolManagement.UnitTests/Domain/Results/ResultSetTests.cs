@@ -174,6 +174,27 @@ public sealed class ResultSetTests
         resultSet.ConfigSnapshotJson.ShouldBeNull();
     }
 
+    // Spec 6.7.9: Published -> Withdrawn -> Draft (needs recompute); each refused from any other state.
+    [Fact]
+    public void Withdraw_ThenReopen_ReturnsToDraftNeedingRecompute()
+    {
+        var resultSet = WithState(ResultSetState.Published);
+
+        resultSet.Withdraw().IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Withdrawn);
+
+        resultSet.Reopen().IsSuccess.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Withdraw_WhenNotPublished_AndReopen_WhenNotWithdrawn_AreRefused()
+    {
+        WithState(ResultSetState.Approved).Withdraw().IsFailure.ShouldBeTrue();
+        WithState(ResultSetState.Published).Reopen().IsFailure.ShouldBeTrue();
+    }
+
     // TASK-0090, AC 1: a set can be returned from either Awaiting Approval or Approved.
     [Theory]
     [InlineData(ResultSetState.AwaitingApproval)]

@@ -177,6 +177,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// </summary>
     internal DbSet<ResultSet> ResultSets => Set<ResultSet>();
 
+    internal DbSet<ResultSetSnapshot> ResultSetSnapshots => Set<ResultSetSnapshot>();
+
     /// <summary>
     /// TASK-0076 dispatch A. Internal, not public: only this assembly's repositories may query it.
     /// One row per pupil per subject per term (spec 09 §6.7.3).

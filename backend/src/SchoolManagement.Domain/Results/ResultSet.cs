@@ -240,9 +240,9 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
 
     /// <summary>
     /// Moves Approved to Published (spec 6.7.9). It writes the configuration snapshot and bumps
-    /// <see cref="RevisionNumber"/> (1 on first publication). The caller has already checked every
-    /// §6.7.9 precondition. The snapshot is written once and never overwritten, so a second call
-    /// without a withdrawal in between (not buildable today) is refused.
+    /// <see cref="RevisionNumber"/> (1 on first publication, 2 after a withdrawal and reopen). The caller has
+    /// already checked every §6.7.9 precondition and records a <see cref="ResultSetSnapshot"/> history row, so
+    /// <see cref="ConfigSnapshotJson"/> holds the current revision while every earlier one survives.
     /// </summary>
     public Result Publish(Guid? publishedBy, DateTimeOffset publishedAtUtc, string configSnapshotJson, Guid? configVersionId)
     {
@@ -257,6 +257,37 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
         RevisionNumber++;
         ConfigSnapshotJson = configSnapshotJson;
         ConfigVersionId = configVersionId;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Moves Published to Withdrawn (spec 6.7.9), which takes it off the parent portal at once. The snapshot and
+    /// its history row stay. The caller has validated the reason and records it on the audit event.
+    /// </summary>
+    public Result Withdraw()
+    {
+        if (State != ResultSetState.Published)
+        {
+            return Result.Failure(Error.Conflict("result_set.not_published", $"This result set is {State} and cannot be withdrawn."));
+        }
+
+        State = ResultSetState.Withdrawn;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Moves Withdrawn to Draft for correction (spec 6.7.9, 6.7.11). Marks become editable again and computation
+    /// must re-run, so <see cref="NeedsRecompute"/> is set. The caller checks the term is active.
+    /// </summary>
+    public Result Reopen()
+    {
+        if (State != ResultSetState.Withdrawn)
+        {
+            return Result.Failure(Error.Conflict("result_set.not_withdrawn", $"This result set is {State} and cannot be reopened."));
+        }
+
+        State = ResultSetState.Draft;
+        NeedsRecompute = true;
         return Result.Success();
     }
 }

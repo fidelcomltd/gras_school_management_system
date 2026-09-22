@@ -64,6 +64,12 @@ internal sealed class ResultSetRepository(ApplicationDbContext context) : IResul
         context.ResultSets.FirstOrDefaultAsync(resultSet => resultSet.Id == resultSetId, cancellationToken);
 
     /// <inheritdoc />
+    public Task AddSnapshotAsync(ResultSetSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        context.ResultSetSnapshots.Add(snapshot);
+        return Task.CompletedTask;
+    }
+
     public Task AddAsync(ResultSet resultSet, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resultSet);

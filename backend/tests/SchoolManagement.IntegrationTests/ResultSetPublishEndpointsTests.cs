@@ -109,6 +109,88 @@ public sealed class ResultSetPublishEndpointsTests(ApiTestFixture fixture) : Int
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Withdraw_Reopen_Republish_KeepsBothSnapshotsAndReachesRevisionTwo()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync();
+        (await PublishAsync(resultSetId, jar)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var withdraw = await PostAsync($"/api/v1/result-sets/{resultSetId}/withdraw", jar, new { reason = "Mathematics marks were entered for the wrong class." });
+        withdraw.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<ResultSetTransitionResponse>(withdraw)).ResultSet.State.ShouldBe(ResultSetState.Withdrawn);
+
+        var reopen = await PostAsync($"/api/v1/result-sets/{resultSetId}/reopen", jar, payload: null);
+        reopen.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var reopened = (await ReadAsync<ResultSetTransitionResponse>(reopen)).ResultSet;
+        reopened.State.ShouldBe(ResultSetState.Draft);
+        reopened.NeedsRecompute.ShouldBeTrue();
+
+        // Stand in for recompute, resubmit and re-approve, which have their own tests.
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var resultSet = await context.ResultSets.SingleAsync(r => r.Id == resultSetId, TestContext.Current.CancellationToken);
+            resultSet.MarkComputed(null, DateTimeOffset.UtcNow, pupilCount: 0);
+            typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var republish = await PublishAsync(resultSetId, jar);
+        republish.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<PublishResultSetResponse>(republish)).RevisionNumber.ShouldBe(2);
+
+        await using var verify = Fixture.CreateScope();
+        var snapshots = await verify.ServiceProvider.GetRequiredService<ApplicationDbContext>().Set<ResultSetSnapshot>()
+            .AsNoTracking().Where(snapshot => snapshot.ResultSetId == resultSetId)
+            .OrderBy(snapshot => snapshot.RevisionNumber).Select(snapshot => snapshot.RevisionNumber)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        snapshots.ShouldBe([1, 2]);
+    }
+
+    [Fact]
+    public async Task Withdraw_ASetThatIsNotPublished_Returns409()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync();
+
+        var response = await PostAsync($"/api/v1/result-sets/{resultSetId}/withdraw", jar, new { reason = "Pulling this before it was ever published." });
+
+        await ShouldFailAsync(response, "result_set.not_published");
+    }
+
+    [Fact]
+    public async Task Withdraw_WithAShortReason_Returns422()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync(state: ResultSetState.Published);
+
+        var response = await PostAsync($"/api/v1/result-sets/{resultSetId}/withdraw", jar, new { reason = "Too short" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Reopen_ASetThatIsNotWithdrawn_Returns409()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync(state: ResultSetState.Published, termActive: true);
+
+        await ShouldFailAsync(await PostAsync($"/api/v1/result-sets/{resultSetId}/reopen", jar, payload: null), "result_set.not_withdrawn");
+    }
+
+    [Fact]
+    public async Task Reopen_WhenTheTermIsNotActive_Returns409()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync(state: ResultSetState.Withdrawn, termActive: false);
+
+        await ShouldFailAsync(await PostAsync($"/api/v1/result-sets/{resultSetId}/reopen", jar, payload: null), "result_set.term_not_active");
+    }
+
+    private Task<HttpResponseMessage> PostAsync(string url, CookieJar jar, object? payload) =>
+        SendAsync(HttpMethod.Post, url, jar, payload is null ? null : JsonContent.Create(payload), csrf: true);
+
     private static async Task ShouldFailAsync(HttpResponseMessage response, string errorCode)
     {
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
@@ -121,7 +203,8 @@ public sealed class ResultSetPublishEndpointsTests(ApiTestFixture fixture) : Int
         bool needsRecompute = false,
         bool withImages = true,
         bool withResumptionDate = true,
-        int termOrdinal = 1)
+        int termOrdinal = 1,
+        bool termActive = true)
     {
         var (accountId, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false, email: $"admin-{Guid.NewGuid():N}@example.com");
 
@@ -140,6 +223,11 @@ public sealed class ResultSetPublishEndpointsTests(ApiTestFixture fixture) : Int
             var start = new DateOnly(year, 9, 1).AddMonths(4 * (termOrdinal - 1));
             var term = Term.Create(Guid.CreateVersion7(), session.Id, termOrdinal, $"Term {termOrdinal}", start, start.AddMonths(3)).Value;
             term.SetTimesSchoolOpened(58).IsSuccess.ShouldBeTrue();
+            if (termActive)
+            {
+                term.Open().IsSuccess.ShouldBeTrue();
+            }
+
             if (withResumptionDate)
             {
                 term.UpdateSchedule(term.Name, term.StartDate, term.EndDate, term.EndDate.AddDays(20)).IsSuccess.ShouldBeTrue();
