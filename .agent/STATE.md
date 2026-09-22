@@ -226,6 +226,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Human: parent portal is server-rendered HTML from the .NET app** (no framework, works without JS, §6.9.8), and runs **in the same process on its own subdomain** (not a separate deployment; restricted DB role deferred). Pin printing gate 1381/1381.
 - 2026-09-22 **Pin printing done**: slips PDF (4/A4) + distribution list, QuestPDF 2026.9.0; nightly `PinMaintenanceService` purges ciphertext and marks exhausted batches. Print is a GET that writes: fetch + blob only.
 - 2026-09-22 **Pin batches done** (§6.8): generate/list/detail/distribute/revoke/reinstate; Argon2id (pin cost 4 MB/1 pass) + keyed HMAC + AES-GCM; 2000 pins ~34s. Contract `5d01b080…`.
 - 2026-09-22 **Human: prod = PostgreSQL + app on one Namecheap Pulsar VPS** (open question 5 resolved). **NDPA: not strict for this school**, not certifying; don't gate features on it.
