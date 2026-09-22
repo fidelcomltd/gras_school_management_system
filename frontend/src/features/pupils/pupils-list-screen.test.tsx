@@ -1,10 +1,11 @@
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { mockMe } from '@/test/mock-me';
 import { renderWithProviders, screen, waitFor } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { PupilsListScreen } from './pupils-list-screen';
-import { mockMe, pupil } from './test-fixtures';
+import { pupil } from './test-fixtures';
 
 function renderScreen() {
   return renderWithProviders(

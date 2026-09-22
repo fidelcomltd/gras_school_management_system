@@ -20,6 +20,8 @@ export const paths = {
   admissions: '/admissions',
   pupils: '/pupils',
   pupilDetail: (id: string) => `/pupils/${id}`,
+  subjects: '/subjects',
+  subjectMapping: '/subjects/mapping',
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];
