@@ -228,6 +228,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Frontend F5 (results workflow) done**: `/results` readiness grid (marks Complete/part/—, ratings, attendance, both remarks), counters, blockers, needs-recompute warning, and the state-driven actions: compute, submit (disabled while blocked), approve, return (reason 10-500), publish (Idempotency-Key), withdraw (reason), reopen, and "Compute annual results" on a published Third Term. Each button needs its privilege.
 - 2026-09-22 **Frontend F4 (class records) done**: `/results/class` tabs — ratings (traits for a ratesTraits section, else development domains with comments), attendance (absent derived, capped at times opened), class and head teacher remarks (changed rows only, saved phrases, head teacher fill-empty; head teacher also edits while Awaiting approval/Approved). Tab editability follows the arm-scoped privilege.
 - 2026-09-22 **Frontend F3 (marks) done**: `/results/marks` term + class + subject pickers, whole-sheet grid (blank ≠ 0, ABS, live total, 0..max whole-number validation blocks save, version sent for 409), locked outside Draft/Returned, return reason shown, void with reason. `hasPrivilegeInArm` added so a class teacher sees only their arms. Keyboard-down navigation not built.
 - 2026-09-22 **Frontend F2 (subjects) done**: `/subjects` catalogue (create/edit/deactivate/delete) and `/subjects/mapping` grid per term (local edits, dry-run preview, apply; copy from another term; standard-list prefill; read-only when closed). Shared `shared/pickers/term-picker.tsx` + `use-term-choice.ts` (defaults to the active session/term, derived not stored); `test/mock-me.ts` promoted. Arm-level subject exceptions have no UI yet.
@@ -775,7 +776,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-09-22 **Generating 2000 pins takes ~34s locally in one request.** *Trigger: deployment: set the reverse proxy read timeout above 60s, or make generation a background job. Owner: orchestrator.*
 - 2026-09-21 **EXIF orientations 2-5, 7 and 8 are implemented but untested** (only 1 and 6 have fixtures) in `SkiaSchoolImageProcessor`. *Trigger: a real
   upload comes out mirrored or rotated, or the next card touching that file. Owner: `backend-dev`.*
-- 2026-09-21 **`admin-detail-screen.test.tsx` "suspend then reactivate" timed out at 5s in a loaded `verify` run** (380/381); passed 4/4 alone in ~3s.
+- 2026-09-21 **`admin-detail-screen.test.tsx` "suspend then reactivate" timed out at 5s in a loaded `verify` run** (380/381); passed 4/4 alone in ~3s. 2026-09-22: `bulk-create-arms-dialog.test.tsx` did the same once (402/404), both green alone and on the rerun. Both type through several fields; the fix is a 15s per-test timeout like `create-level-dialog.test.tsx`.
   *Trigger: if it recurs, raise its timeout or find the slow await. Owner: `frontend-dev`.*
 - 2026-09-21 **`ApiError.problem` is one generic union, so `SubmitResultSet`'s typed 422 (`readiness`) is unreachable without a cast.** *Trigger: the
   readiness-screen card. Owner: `frontend-dev`.*

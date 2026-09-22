@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Arms', to: paths.arms, requires: 'arm.view' },
   { label: 'Pupils', to: paths.pupils, requires: 'pupil.view' },
   { label: 'Subjects', to: paths.subjects, requires: 'subject.view' },
+  { label: 'Results', to: paths.results, requires: 'result.view' },
   { label: 'Marks', to: paths.marks, requires: 'result.view' },
   { label: 'Class records', to: paths.classRecords, requires: 'result.view' },
   { label: 'Admins', to: paths.admins, requires: 'admin.view' },
@@ -58,7 +59,7 @@ export function AuthenticatedShell({
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    end={item.to === paths.root}
+                    end={item.to === paths.root || item.to === paths.results}
                     className={({ isActive }) =>
                       cn(
                         'text-sm font-medium transition-colors',

@@ -22,6 +22,7 @@ export const paths = {
   pupilDetail: (id: string) => `/pupils/${id}`,
   subjects: '/subjects',
   subjectMapping: '/subjects/mapping',
+  results: '/results',
   marks: '/results/marks',
   classRecords: '/results/class',
 } as const;

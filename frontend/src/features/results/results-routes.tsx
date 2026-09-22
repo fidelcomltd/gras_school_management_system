@@ -2,9 +2,18 @@ import type { RouteObject } from 'react-router';
 import { RequirePrivilege } from '@/app/router/require-privilege';
 import { ClassRecordsScreen } from './class-records-screen';
 import { MarksScreen } from './marks-screen';
+import { ProgressScreen } from './progress-screen';
 
 /** This feature's slice of the route table, mounted inside `ProtectedLayout`'s `<Outlet/>`. */
 export const resultsRoutes: RouteObject[] = [
+  {
+    path: 'results',
+    element: (
+      <RequirePrivilege privilege="result.view">
+        <ProgressScreen />
+      </RequirePrivilege>
+    ),
+  },
   {
     path: 'results/marks',
     element: (
