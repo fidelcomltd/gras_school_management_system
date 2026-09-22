@@ -28,6 +28,8 @@ public sealed class ResultSetEndpoints : IEndpointModule
 
         MapCompute(group);
         MapSubmit(group);
+        MapApprove(group);
+        MapReturn(group);
     }
 
     private static void MapCompute(RouteGroupBuilder group) =>
@@ -90,6 +92,72 @@ public sealed class ResultSetEndpoints : IEndpointModule
             .Produces<ResultSetNotReadyProblemDetails>(StatusCodes.Status422UnprocessableEntity, "application/problem+json")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapApprove(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/approve", async (
+                Guid resultSetId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new ApproveResultSetCommand(resultSetId), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Approve)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("ApproveResultSet")
+            .WithSummary("Approve a result set")
+            .WithDescription(
+                "Spec 6.7.8/6.7.11 (TASK-0090, amended): school-wide only — approval is the " +
+                "separation the head teacher's sign-off exists for, so an arm-scoped grant (which " +
+                "would let a class teacher approve their own class) does not satisfy this. Moves " +
+                "Awaiting Approval to Approved, writing approvedAt/approvedBy. No body. 409 " +
+                "`result_set.not_awaiting_approval` from any other state. 409 " +
+                "`result_set.needs_recompute` when a settings save since the last computation has " +
+                "flagged this set (spec 6.2.9): \"Marks have changed since the last computation. Run " +
+                "computation again before approving.\" 404 `result_set.not_found` for an unknown id " +
+                "— this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does not apply. " +
+                "`Idempotency-Key` is ACCEPTED, not required.")
+            .Produces<ApproveResultSetResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapReturn(RouteGroupBuilder group) =>
+        group.MapPost("/{resultSetId:guid}/return", async (
+                Guid resultSetId,
+                ReturnResultSetCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { ResultSetId = resultSetId }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Results.Return)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: false)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("ReturnResultSet")
+            .WithSummary("Return a result set to the class teacher")
+            .WithDescription(
+                "Spec 6.7.8/6.7.11 (TASK-0090, amended): school-wide only — same separation as " +
+                "approval, and for the same reason. Moves Awaiting Approval or Approved to Returned " +
+                "for Correction, storing `reason` (trimmed, 10-500 characters, else 422) and " +
+                "reopening marks for the class teacher. A set can be returned any number of times; " +
+                "each return is its OWN audit event and overwrites any earlier reason. 409 " +
+                "`result_set.not_returnable` from any other state. 404 `result_set.not_found` for an " +
+                "unknown id — this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does " +
+                "not apply. `Idempotency-Key` is ACCEPTED, not required.")
+            .Produces<ReturnResultSetResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 }

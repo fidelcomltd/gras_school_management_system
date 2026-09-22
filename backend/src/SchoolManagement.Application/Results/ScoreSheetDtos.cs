@@ -12,7 +12,11 @@ public sealed record ScoreSheetComponentDto(string Id, string Label, int MaxMark
 /// <param name="Id">The result set's id.</param>
 /// <param name="State">Spec 6.7.11's six-member state machine.</param>
 /// <param name="NeedsRecompute">Whether the computed rows are stale.</param>
-public sealed record ResultSetSummaryDto(string Id, ResultSetState State, bool NeedsRecompute);
+/// <param name="ReturnReason">
+/// TASK-0090: set when a head teacher returns the set (spec 6.7.8), shown at the top of the class
+/// teacher's sheet. Cleared by the next submission. <see langword="null"/> otherwise.
+/// </param>
+public sealed record ResultSetSummaryDto(string Id, ResultSetState State, bool NeedsRecompute, string? ReturnReason);
 
 /// <summary>One pupil's row on the sheet (spec 6.7.4) — every active pupil in the arm, including one with no marks entered at all.</summary>
 /// <param name="PupilId">The pupil's id.</param>

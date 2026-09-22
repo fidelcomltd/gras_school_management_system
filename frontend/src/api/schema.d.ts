@@ -939,6 +939,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/result-sets/{resultSetId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a result set
+         * @description Spec 6.7.8/6.7.11 (TASK-0090, amended): school-wide only — approval is the separation the head teacher's sign-off exists for, so an arm-scoped grant (which would let a class teacher approve their own class) does not satisfy this. Moves Awaiting Approval to Approved, writing approvedAt/approvedBy. No body. 409 `result_set.not_awaiting_approval` from any other state. 409 `result_set.needs_recompute` when a settings save since the last computation has flagged this set (spec 6.2.9): "Marks have changed since the last computation. Run computation again before approving." 404 `result_set.not_found` for an unknown id — this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does not apply. `Idempotency-Key` is ACCEPTED, not required.
+         */
+        post: operations["ApproveResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/result-sets/{resultSetId}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Return a result set to the class teacher
+         * @description Spec 6.7.8/6.7.11 (TASK-0090, amended): school-wide only — same separation as approval, and for the same reason. Moves Awaiting Approval or Approved to Returned for Correction, storing `reason` (trimmed, 10-500 characters, else 422) and reopening marks for the class teacher. A set can be returned any number of times; each return is its OWN audit event and overwrites any earlier reason. 409 `result_set.not_returnable` from any other state. 404 `result_set.not_found` for an unknown id — this route is not scoped, so TASK-0071's 403-for-unknown-id ruling does not apply. `Idempotency-Key` is ACCEPTED, not required.
+         */
+        post: operations["ReturnResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -1983,6 +2023,28 @@ export interface components {
             headOfSchoolName: null | string;
         };
         /**
+         * @description The 200 response (contract delta item 1).
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Approved",
+         *         "needsRecompute": false,
+         *         "returnReason": null
+         *       },
+         *       "approvedAt": "2026-08-03T09:30:00+00:00"
+         *     }
+         */
+        ApproveResultSetResponse: {
+            /** @description The set's new state (Approved) and its other summary fields. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * Format: date-time
+             * @description When this approval was recorded.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            approvedAt: string;
+        };
+        /**
          * @description The wire shape of an Arm (spec 6.4.3, 6.4.9). One shape for the list item and the
          *     detail read — roster, subjects in effect, result-set states and the transfer log (spec 6.4.5) are
          *     out of scope until pupils, enrolments, subject mappings and results exist.
@@ -2226,7 +2288,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": true
+         *         "needsRecompute": true,
+         *         "returnReason": null
          *       },
          *       "timesSchoolOpened": 62,
          *       "rows": [
@@ -4284,7 +4347,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": true
+         *         "needsRecompute": true,
+         *         "returnReason": null
          *       },
          *       "domains": [
          *         {
@@ -5700,7 +5764,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": true
+         *         "needsRecompute": true,
+         *         "returnReason": null
          *       },
          *       "rows": [
          *         {
@@ -6020,7 +6085,8 @@ export interface components {
          *         "resultSet": {
          *           "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *           "state": "Draft",
-         *           "needsRecompute": false
+         *           "needsRecompute": false,
+         *           "returnReason": null
          *         },
          *         "subjects": [
          *           {
@@ -6120,7 +6186,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": false
+         *         "needsRecompute": false,
+         *         "returnReason": null
          *       },
          *       "subjects": [
          *         {
@@ -6310,7 +6377,8 @@ export interface components {
          * @example {
          *       "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *       "state": "Draft",
-         *       "needsRecompute": true
+         *       "needsRecompute": true,
+         *       "returnReason": null
          *     }
          */
         ResultSetSummaryDto: {
@@ -6326,6 +6394,48 @@ export interface components {
              * @example true
              */
             needsRecompute: boolean;
+            /**
+             * @description TASK-0090: set when a head teacher returns the set (spec 6.7.8), shown at the top of the class
+             *     teacher's sheet. Cleared by the next submission. `null` otherwise.
+             */
+            returnReason: null | string;
+        };
+        /**
+         * @description `POST /api/v1/result-sets/{resultSetId}/return` (spec 6.7.8, 6.7.11; TASK-0090's approved
+         *             contract delta). Moves Awaiting Approval or Approved to Returned for Correction.
+         * @example {
+         *       "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "reason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
+         *     }
+         */
+        ReturnResultSetCommand: {
+            /**
+             * Format: uuid
+             * @description The result set to return, from the route.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            resultSetId: string;
+            /**
+             * @description Trimmed to between int ResultSet.ReturnReasonMinLength and
+             *     int ResultSet.ReturnReasonMaxLength characters, else 422 (spec 6.7.8, 6.7.3).
+             * @example Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book.
+             */
+            reason: string;
+        };
+        /**
+         * @description The 200 response (contract delta item 2).
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "ReturnedForCorrection",
+         *         "needsRecompute": false,
+         *         "returnReason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
+         *       }
+         *     }
+         */
+        ReturnResultSetResponse: {
+            /** @description The set's new state (Returned for Correction) and its other summary fields. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
         };
         /**
          * @description Wire shape of a RoleAssignment (spec 6.1.5).
@@ -7136,7 +7246,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": true
+         *         "needsRecompute": true,
+         *         "returnReason": null
          *       },
          *       "components": [
          *         {
@@ -8725,7 +8836,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "AwaitingApproval",
-         *         "needsRecompute": false
+         *         "needsRecompute": false,
+         *         "returnReason": null
          *       },
          *       "submittedAt": "2026-08-03T09:30:00+00:00"
          *     }
@@ -9015,7 +9127,8 @@ export interface components {
          *       "resultSet": {
          *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
          *         "state": "Draft",
-         *         "needsRecompute": true
+         *         "needsRecompute": true,
+         *         "returnReason": null
          *       },
          *       "blocks": [
          *         {
@@ -14688,6 +14801,189 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ResultSetNotReadyProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReturnResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnResultSetCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Too Many Requests */

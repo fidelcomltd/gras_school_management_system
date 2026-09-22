@@ -115,6 +115,22 @@
     <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.3" />
   </ItemGroup>
 
+  <ItemGroup Label="Image processing">
+    <!--
+      TASK-0005b. Human ruling 2026-09-21: SkiaSharp (MIT), for re-encoding school logo and head
+      teacher signature uploads server-side — strips EXIF/eXIf metadata (spec 9.6) by decoding and
+      re-encoding rather than copying, and produces the 200px/64px logo derivatives. Chosen over
+      ImageSharp (dual-licensed, requires a paid license once revenue-generating) and over
+      System.Drawing.Common (Windows-only in practice; deprecated for cross-platform use).
+      SkiaSharp.NativeAssets.Linux.NoDependencies supplies statically-linked native binaries for the
+      VPS target (human ruling: hosting is a VPS) without requiring system libfontconfig/libEGL etc
+      to be present on the box — the plain SkiaSharp.NativeAssets.Linux package does not include
+      Linux native assets at all; a Linux native-asset package must be referenced explicitly.
+    -->
+    <PackageVersion Include="SkiaSharp" Version="4.152.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
+  </ItemGroup>
+
   <ItemGroup Label="Health checks">
     <!--
       AddDbContextCheck (from this package) attempts a real connection through the already-configured

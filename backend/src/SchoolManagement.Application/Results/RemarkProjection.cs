@@ -32,7 +32,7 @@ internal static class RemarkProjection
         var resultSetDto = resultSet is null
             ? null
             : new ResultSetSummaryDto(
-                resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute);
+                resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute, resultSet.ReturnReason);
 
         return new RemarkSheetDto(
             armId.ToString("D", CultureInfo.InvariantCulture),

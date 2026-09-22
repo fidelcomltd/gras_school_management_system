@@ -113,7 +113,7 @@ internal sealed class SubmitResultSetHandler(
             }).ConfigureAwait(false);
 
         var dto = new ResultSetSummaryDto(
-            resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute);
+            resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute, resultSet.ReturnReason);
 
         return Result.Success(new SubmitResultSetResponse(dto, now));
     }
