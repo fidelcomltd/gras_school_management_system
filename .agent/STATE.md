@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `5d01b080…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `bb29ee1e…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `5d01b0800150f44d57c35706fffd751da267e116c5ded9c309624ac4767a49b2`** · **92 paths** ·
-**211 schemas** · api version `v1` · moved 2026-09-22 by pin batches (§6.8).
-Previous: `b4bf1cf369f2…` / 86 paths / 203 schemas, withdraw/reopen on 2026-09-22; before that `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `bb29ee1ebe04204c768df3e2c437fee613f532ff933a421a2775167caf92c2d1`** · **94 paths** ·
+**211 schemas** · api version `v1` · moved 2026-09-22 by pin printing (§6.8.9).
+Previous: `5d01b0800150…` / 92 paths / 211 schemas, pin batches on 2026-09-22; before that `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Pin printing additive verified mechanically** (`jq`): +2 paths, no schema change.
 
 **Pins additive verified mechanically** (`jq`): +6 paths, +8 schemas, nothing else changed.
 
@@ -224,6 +226,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Pin printing done**: slips PDF (4/A4) + distribution list, QuestPDF 2026.9.0; nightly `PinMaintenanceService` purges ciphertext and marks exhausted batches. Print is a GET that writes: fetch + blob only.
 - 2026-09-22 **Pin batches done** (§6.8): generate/list/detail/distribute/revoke/reinstate; Argon2id (pin cost 4 MB/1 pass) + keyed HMAC + AES-GCM; 2000 pins ~34s. Contract `5d01b080…`.
 - 2026-09-22 **Human: prod = PostgreSQL + app on one Namecheap Pulsar VPS** (open question 5 resolved). **NDPA: not strict for this school**, not certifying; don't gate features on it.
 - 2026-09-22 **Human: keep pins UNBOUND** (§6.8.2, reconfirmed). **Withdraw/reopen gate 1466/1466.** **PDF library: QuestPDF** (Community licence).
