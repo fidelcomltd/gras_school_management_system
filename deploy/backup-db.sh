@@ -28,14 +28,21 @@ install -d -o root -g root -m 0700 "$BACKUP_DIR"
 
 # --format=custom, not plain SQL: it restores with pg_restore, compresses, and allows a single-table
 # restore, which is what is actually wanted when one import went wrong.
-sudo -u postgres pg_dump --format=custom --file="$ARCHIVE" "$DB"
+#
+# The dump goes to STDOUT and this script's own redirection writes the file. `pg_dump --file=` would
+# be the postgres user opening the path, and /var/backups/gras is root-only 0700 — so that form
+# fails with "permission denied" every night, and takes every deploy down with it (deploy.sh calls
+# this first). Redirecting means the file is created by root, which can write there.
+umask 077
+sudo -u postgres pg_dump --format=custom "$DB" > "$ARCHIVE"
 chmod 0600 "$ARCHIVE"
 
 printf 'wrote %s (%s)\n' "$ARCHIVE" "$(du -h "$ARCHIVE" | cut -f1)"
 
 # A dump that is silently empty is worse than no dump, because it looks like a backup. pg_restore
 # --list on the archive is the cheapest real check that the file is a readable dump with content.
-if ! sudo -u postgres pg_restore --list "$ARCHIVE" | grep -q 'TABLE DATA'; then
+# Read back as root, not as postgres: the archive is mode 0600 and owned by root.
+if ! pg_restore --list "$ARCHIVE" | grep -q 'TABLE DATA'; then
   echo "FAILED: $ARCHIVE contains no table data. Not pruning old backups." >&2
   exit 1
 fi

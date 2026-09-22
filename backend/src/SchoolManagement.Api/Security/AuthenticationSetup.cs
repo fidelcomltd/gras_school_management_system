@@ -104,11 +104,19 @@ public static class AuthenticationSetup
 
         var keyRingPath = configuration[$"{KeyRingOptions.SectionName}:{nameof(KeyRingOptions.KeyRingPath)}"];
 
-        if (!string.IsNullOrWhiteSpace(keyRingPath))
+        // Path.IsPathRooted mirrors KeyRingOptionsValidator's own check, and is applied BEFORE the
+        // path is used. Without it, a relative or malformed path would be touched here — during
+        // service registration, which also runs under build-time OpenAPI generation and the EF
+        // design-time tooling — and would throw a raw IOException from there, so the validator's
+        // explanatory message could never be reached. A bad path now reaches the validator, which
+        // fails the boot and says why.
+        //
+        // DirectoryInfo, not Directory.CreateDirectory: registration touches no disk. The
+        // provisioning script creates this directory with the right owner and mode 0700, and Data
+        // Protection creates it on first write if it is somehow absent.
+        if (!string.IsNullOrWhiteSpace(keyRingPath) && Path.IsPathRooted(keyRingPath.Trim()))
         {
-            // Created if absent: the deploy makes the directory with the right owner and mode, but a
-            // fresh box or a restored backup should not need a second manual step to boot.
-            dataProtection.PersistKeysToFileSystem(Directory.CreateDirectory(keyRingPath.Trim()));
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath.Trim()));
         }
 
         services.AddValidatedOptions<KeyRingOptions, KeyRingOptionsValidator>(

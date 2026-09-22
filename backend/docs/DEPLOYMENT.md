@@ -74,7 +74,9 @@ password from `/etc/gras/prod-db-password`. Nothing else in this system has that
 Root-owned, mode 0600, read by the systemd unit, never in git:
 
 ```
-Database__ConnectionString=Host=127.0.0.1;Port=5432;Database=gras_prod;Username=gras_prod;Password=...
+# Single-quoted: the value contains semicolons, and anything that reads this file as shell would
+# otherwise truncate it at the first one. systemd strips the quotes.
+Database__ConnectionString='Host=127.0.0.1;Port=5432;Database=gras_prod;Username=gras_prod;Password=...'
 Pins__LookupKey=<base64 of 32 bytes>
 Pins__EncryptionKey=<base64 of 32 bytes>
 Cloudinary__CloudName=...
@@ -140,10 +142,15 @@ And one sudoers rule, so the deploy user can run exactly the deploy and nothing 
 deployer ALL=(root) NOPASSWD: /usr/local/bin/gras-deploy /tmp/gras-release
 ```
 
-What a deploy does, in order: back up the database → apply migrations from a bundle built from the
-same commit → unpack the release into `/opt/gras/releases/<timestamp>` → swap the `/opt/gras/api`
-symlink → restart → poll `/health/ready` for 20 seconds. **If the migration fails, the previous
-version is still running and serving traffic**, because nothing has been swapped yet.
+What a deploy does, in order: back up the database → install the release into
+`/opt/gras/releases/<timestamp>` (root-owned, read-only) → apply migrations from a bundle built from
+the same commit, run as the `gras` user with the connection string passed through the environment
+rather than argv → swap the `/opt/gras/api` symlink → restart → poll `/health/ready` for 20
+seconds. **If the migration fails, the previous version is still running and serving traffic**,
+because the symlink has not moved.
+
+`/opt/gras/api` is a symlink, not a directory. Provisioning deliberately does not create it; the
+first deploy does.
 
 ### Rollback
 
@@ -151,9 +158,12 @@ Releases are kept as timestamped directories, three deep:
 
 ```bash
 ls /opt/gras/releases
-sudo ln -sfn /opt/gras/releases/<previous> /opt/gras/api
+sudo ln -sfn /opt/gras/releases/<previous> /opt/gras/api.new
+sudo mv -Tf /opt/gras/api.new /opt/gras/api
 sudo systemctl restart gras-api
 ```
+
+(Two steps so the swap is atomic — the same thing `deploy.sh` does.)
 
 That rolls back **code only**. A migration that has already run stays applied, which is why every
 deploy takes a `pre-deploy` dump first — see `/var/backups/gras`.
