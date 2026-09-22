@@ -300,13 +300,39 @@ public static class InfrastructureDependencyInjection
         // decodes and encodes its own bitmaps), so singleton rather than per-request.
         services.AddSingleton<ISchoolImageProcessor, SkiaSchoolImageProcessor>();
 
-        // TASK-0005b stage B1: PLACEHOLDER registration. The in-memory fake is registered
-        // unconditionally here because nothing consumes ISchoolImageStore yet (upload routes are
-        // stage B2); stage D replaces this with an environment-based choice between this fake (tests)
-        // and the real CloudinaryImageStore (everywhere else) — "tests never touch the network"
-        // (orchestrator design, 2026-09-21). Singleton so uploads persist for the lifetime of the
-        // process, matching a real store's behaviour closely enough for a fake.
-        services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+        // TASK-0005b stage D: which image store. Cloudinary whenever credentials are configured,
+        // the in-memory fake otherwise — and CloudinaryOptionsValidator refuses to start when
+        // neither holds, so a deployed host that is missing its credentials fails at boot instead
+        // of quietly accepting uploads it will lose on the next restart. Tests set
+        // Cloudinary:AllowInMemoryStore and never touch the network (orchestrator design,
+        // 2026-09-21).
+        var cloudinaryOptions = services
+            .AddOptions<CloudinaryOptions>()
+            .Bind(configuration.GetSection(CloudinaryOptions.SectionName));
+
+        if (validateOnStart)
+        {
+            cloudinaryOptions.ValidateOnStart();
+        }
+
+        services.AddSingleton<IValidateOptions<CloudinaryOptions>, CloudinaryOptionsValidator>();
+
+        var cloudinary = configuration
+            .GetSection(CloudinaryOptions.SectionName)
+            .Get<CloudinaryOptions>() ?? new CloudinaryOptions();
+
+        if (cloudinary.IsConfigured)
+        {
+            services.AddHttpClient(CloudinaryGateway.HttpClientName);
+            services.AddSingleton<ICloudinaryGateway, CloudinaryGateway>();
+            services.AddSingleton<ISchoolImageStore, CloudinaryImageStore>();
+        }
+        else
+        {
+            // Singleton so uploads persist for the lifetime of the process, matching a real store's
+            // behaviour closely enough for a fake.
+            services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+        }
 
         // TASK-0005b stage B2: SchoolImage row persistence for the upload routes.
         services.AddScoped<ISchoolImageRepository, SchoolImageRepository>();

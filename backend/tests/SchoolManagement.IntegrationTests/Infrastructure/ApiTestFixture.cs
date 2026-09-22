@@ -152,6 +152,9 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 // Spec 6.8.6's pin keys: fixed, obviously non-production development keys for tests.
                 ["Pins:AllowDevelopmentKeys"] = "true",
 
+                // TASK-0005b stage D: the in-process image store, so no test reaches Cloudinary.
+                ["Cloudinary:AllowInMemoryStore"] = "true",
+
                 // Retries off: a transient-failure retry inside a test turns a genuine failure into a
                 // slow, confusing one.
                 [$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.MaxRetryCount)}"] = "0",

@@ -100,7 +100,20 @@ builder.Services
     .AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsValidator>(
         builder.Configuration, RateLimitingOptions.SectionName, validateOnStart)
     .AddValidatedOptions<RequestLimitsOptions, RequestLimitsOptionsValidator>(
-        builder.Configuration, RequestLimitsOptions.SectionName, validateOnStart);
+        builder.Configuration, RequestLimitsOptions.SectionName, validateOnStart)
+    .AddValidatedOptions<ProxyOptions, ProxyOptionsValidator>(
+        builder.Configuration, ProxyOptions.SectionName, validateOnStart);
+
+// Reverse-proxy forwarding. Read here as a plain value (not only through IOptions) because the
+// pipeline below has to know whether to insert the middleware at all, before the container is used.
+var proxy = builder.Configuration
+    .GetSection(ProxyOptions.SectionName)
+    .Get<ProxyOptions>() ?? new ProxyOptions();
+
+if (proxy.Enabled)
+{
+    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(proxy.ApplyTo);
+}
 
 var pipelineOptions = builder.Services
     .AddOptions<PipelineOptions>()
@@ -298,6 +311,17 @@ var app = builder.Build();
 // FIRST. Everything below may throw, and an unhandled exception must become a ProblemDetails
 // response rather than a stack trace or a blank 500.
 app.UseExceptionHandler();
+
+// BEFORE EVERYTHING THAT READS THE CLIENT ADDRESS OR THE SCHEME (deployment readiness, 2026-09-22).
+// This rewrites HttpContext.Connection.RemoteIpAddress and Request.Scheme from the proxy's headers,
+// so it has to run ahead of every consumer: the HTTPS redirect below (which would otherwise see
+// `http` on a request that arrived over TLS and bounce it), request logging, the rate limiter's
+// partition key, the portal's per-address pin limits, and the audit trail's source_ip. Opt-in and
+// scoped to named proxies — see ProxyOptions for why the headers are not trusted by default.
+if (proxy.Enabled)
+{
+    app.UseForwardedHeaders();
+}
 
 // Before anything that logs or responds, so the correlation ID appears on error responses too.
 app.UseMiddleware<CorrelationIdMiddleware>();

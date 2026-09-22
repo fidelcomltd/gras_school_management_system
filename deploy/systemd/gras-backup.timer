@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the GRAS database backup nightly
+Documentation=https://github.com/maxcotech/school-management-proj/blob/main/backend/docs/DEPLOYMENT.md
+
+[Timer]
+# 00:30 UTC = 01:30 West Africa Time, the quietest hour for a Nigerian school. The box stays on
+# UTC (the app stores UTC throughout), so this is expressed in UTC deliberately.
+OnCalendar=*-*-* 00:30:00
+# If the box was off at 01:30, back up on the next boot rather than skipping a night.
+Persistent=true
+# Avoids every timer on the box firing on the same second.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

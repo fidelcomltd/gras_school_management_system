@@ -1,0 +1,14 @@
+# The Docker build context is `backend/`; everything the publish does not need stays out, both for
+# build speed and so no local secret file can be copied into an image by accident.
+**/bin/
+**/obj/
+**/artifacts/
+**/.vs/
+**/node_modules/
+**/*.user
+**/appsettings.Development.json
+**/appsettings.*.local.json
+frontend/
+product-specification/
+.agent/
+.git/

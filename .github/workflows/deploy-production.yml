@@ -1,0 +1,100 @@
+# Builds the API and deploys it to the production VPS.
+#
+# NOT triggered by a push. `workflow_dispatch` only, plus a required `production` environment, so a
+# deploy is always something a human asked for at a moment of their choosing — a school's results
+# portal should not restart because a docs commit landed on main. The gates in backend-ci.yml are
+# what decide whether main is deployABLE; this decides when it is deployED.
+#
+# The deploy logic itself lives in deploy/deploy.sh, ON the box. This workflow builds, ships and
+# calls it — so a hand-run deploy takes exactly the same path (deploy/DEPLOYMENT.md).
+
+name: deploy-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag or SHA to deploy'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never two deploys at once: the second would swap files under the first one's migration.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Holds the SSH secrets and (if configured) the reviewer requirement. The gate is the
+    # environment's own protection rules, not anything this file can assert.
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: backend/global.json
+
+      - name: Publish the API
+        working-directory: backend
+        run: |
+          dotnet publish src/SchoolManagement.Api/SchoolManagement.Api.csproj \
+            -c Release \
+            -o "$RUNNER_TEMP/release" \
+            /p:UseAppHost=false
+
+      - name: Build the migration bundle
+        working-directory: backend
+        # Built from the SAME commit as the app, so the schema and the code can never be a version
+        # apart. Self-contained, because the VPS has the ASP.NET Core runtime but no SDK and no EF
+        # tool. The connection string is supplied on the box at apply time, not here.
+        run: |
+          dotnet tool restore
+          dotnet tool run dotnet-ef migrations bundle \
+            --project src/SchoolManagement.Infrastructure \
+            --startup-project src/SchoolManagement.Api \
+            --configuration Release \
+            --self-contained \
+            --target-runtime linux-x64 \
+            --output "$RUNNER_TEMP/release/efbundle" \
+            --force
+
+      - name: Ship it to the VPS
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          # A pinned known_hosts entry, not StrictHostKeyChecking=no: without it this step would
+          # accept any host that answers on that address, which is the whole point of the check.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_deploy" \
+            "$RUNNER_TEMP/release/" \
+            "$SSH_USER@$SSH_HOST:/tmp/gras-release/"
+
+          # deploy.sh backs up the database, migrates, swaps the release, restarts and smoke-tests
+          # /health/ready — and exits non-zero with the journal tail if that fails, which fails this
+          # job. The sudoers entry that allows exactly this one command is in DEPLOYMENT.md.
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" \
+            "sudo /usr/local/bin/gras-deploy /tmp/gras-release"
+
+      - name: Clean up the key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy

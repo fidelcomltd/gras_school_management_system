@@ -139,6 +139,19 @@
     <PackageVersion Include="QRCoder" Version="1.8.0" />
   </ItemGroup>
 
+  <ItemGroup Label="File storage">
+    <!--
+      TASK-0005b stage D. Human ruling 2026-09-21: uploaded files live in Cloudinary. The official
+      SDK (MIT) rather than hand-rolled HTTP, because the two things this adapter needs from
+      Cloudinary are exactly the two that are easy to get subtly wrong by hand: the upload
+      signature, and the signed delivery URL for a `type: authenticated` asset. Only
+      CloudinaryGateway touches it; the rest of the codebase sees ISchoolImageStore.
+    -->
+    <PackageVersion Include="CloudinaryDotNet" Version="1.29.3" />
+    <!-- Typed HttpClient for fetching an authenticated asset's bytes back through the API. -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+  </ItemGroup>
+
   <ItemGroup Label="Health checks">
     <!--
       AddDbContextCheck (from this package) attempts a real connection through the already-configured

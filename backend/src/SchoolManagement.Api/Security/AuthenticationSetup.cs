@@ -87,17 +87,40 @@ public static class AuthenticationSetup
         // the same application — e.g. two container instances built from the same image but started
         // with a different working directory.
         //
-        // KEY PERSISTENCE IS DELIBERATELY NOT CONFIGURED HERE. With no explicit persistence provider,
-        // ASP.NET Core stores keys wherever its default applies for the current host (a local
-        // directory, or an ephemeral in-memory ring in some container/hosting scenarios) — meaning a
-        // second replica, or a restarted process without a mounted, persisted key path, will not share
-        // or retain keys. Every outstanding CSRF token becomes unverifiable when that happens (a
-        // clean, generic 403 csrf.invalid — not a security hole, just a forced re-fetch of
-        // /auth/csrf). This is genuinely a DEPLOYMENT decision (where keys live, whether there is more
-        // than one replica) and Open question 5 (production target) is unresolved, so it is tracked as
-        // accepted drift rather than guessed at here. Configure a persistence provider
-        // (`PersistKeysToFileSystem`, `PersistKeysToAzureBlobStorage`, etc.) once that decision lands.
-        services.AddDataProtection().SetApplicationName("SchoolManagement");
+        // KEY PERSISTENCE (deployment readiness, 2026-09-22 — closes the drift item this comment used
+        // to record). `DataProtection:KeyRingPath` names a directory the key ring is written to; on the
+        // VPS that is a root-only directory on local disk, which is the whole persistence story for a
+        // single-instance deployment. With no path configured, ASP.NET Core's own default applies (a
+        // per-user local directory, or an ephemeral in-memory ring in some container scenarios), so a
+        // restart may lose the ring. The blast radius of losing it is bounded and known: outstanding
+        // CSRF tokens stop verifying and clients re-fetch /auth/csrf (a clean 403 csrf.invalid).
+        // Sessions are database-backed and unaffected.
+        //
+        // NOT fail-fast, unlike the pin keys: an unset path degrades to "CSRF tokens do not survive a
+        // restart", which is a nuisance rather than a breach, and staging on a PaaS with an ephemeral
+        // filesystem has nowhere better to put them. It is logged at startup instead
+        // (DataProtectionKeyRingGuard).
+        var dataProtection = services.AddDataProtection().SetApplicationName("SchoolManagement");
+
+        var keyRingPath = configuration[$"{KeyRingOptions.SectionName}:{nameof(KeyRingOptions.KeyRingPath)}"];
+
+        if (!string.IsNullOrWhiteSpace(keyRingPath))
+        {
+            // Created if absent: the deploy makes the directory with the right owner and mode, but a
+            // fresh box or a restored backup should not need a second manual step to boot.
+            dataProtection.PersistKeysToFileSystem(Directory.CreateDirectory(keyRingPath.Trim()));
+        }
+
+        services.AddValidatedOptions<KeyRingOptions, KeyRingOptionsValidator>(
+            configuration,
+            KeyRingOptions.SectionName,
+            validateOnStart);
+
+        if (validateOnStart)
+        {
+            services.AddHostedService<DataProtectionKeyRingGuard>();
+        }
+
         services.AddSingleton<CsrfTokenService>();
         services.AddScoped<ICurrentSession, HttpCurrentSession>();
 

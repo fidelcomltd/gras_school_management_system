@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly GRAS database backup
+Documentation=https://github.com/maxcotech/school-management-proj/blob/main/backend/docs/DEPLOYMENT.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gras-backup-db --label nightly
+# Runs as root: it reads /etc/gras (mode 0700) and writes /var/backups/gras (mode 0700).
+User=root
+SyslogIdentifier=gras-backup

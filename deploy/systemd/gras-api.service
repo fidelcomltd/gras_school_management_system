@@ -1,0 +1,56 @@
+[Unit]
+Description=GRAS School Management API (and parent result portal)
+Documentation=https://github.com/maxcotech/school-management-proj/blob/main/backend/docs/DEPLOYMENT.md
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+# Type=simple, not notify: the app does not reference Microsoft.Extensions.Hosting.Systemd, so it
+# never calls sd_notify and systemd would wait out the whole start timeout before giving up.
+Type=simple
+User=gras
+Group=gras
+WorkingDirectory=/opt/gras/api
+ExecStart=/usr/bin/dotnet /opt/gras/api/SchoolManagement.Api.dll
+
+# Secrets and per-host settings. Root-owned, mode 0600, never in git — see docs/DEPLOYMENT.md.
+EnvironmentFile=/etc/gras/api.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# Kestrel listens on loopback ONLY: Nginx terminates TLS and is the single way in from outside.
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Environment=DOTNET_PrintTelemetryMessage=false
+Environment=DOTNET_NOLOGO=1
+
+# A crash loops rather than stopping for good, but backs off so a misconfiguration does not spin.
+Restart=always
+RestartSec=5
+
+# Journal only: Serilog writes to stdout and `journalctl -u gras-api` is the log.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gras-api
+
+# ── Hardening ────────────────────────────────────────────────────────────────────────────────
+# The app reads its own directory and writes to exactly two places: the Data Protection key ring
+# and the result-PDF cache. Everything else on the filesystem is read-only or invisible to it, so a
+# code-execution bug in an image or PDF path cannot reach the rest of the box.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/gras
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+
+# Sized for a 2 GB box shared with PostgreSQL: the service is stopped, not OOM-killed at random,
+# if it ever runs away.
+MemoryMax=900M
+
+[Install]
+WantedBy=multi-user.target
