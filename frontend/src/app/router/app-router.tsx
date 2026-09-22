@@ -5,6 +5,7 @@ import { NotFoundScreen } from '@/components/feedback/not-found-screen';
 import { admissionsRoutes } from '@/features/admissions/admissions-routes';
 import { adminsRoutes } from '@/features/admins/admins-routes';
 import { armsRoutes } from '@/features/arms/arms-routes';
+import { auditRoutes } from '@/features/audit/audit-routes';
 import { authRoutes, publicAuthRoutes } from '@/features/auth/auth-routes';
 import { classesRoutes } from '@/features/classes/classes-routes';
 import { pinsRoutes } from '@/features/pins/pins-routes';
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       ...subjectsRoutes,
       ...resultsRoutes,
       ...pinsRoutes,
+      ...auditRoutes,
       ...adminsRoutes,
       ...rolesRoutes,
     ],

@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Admins', to: paths.admins, requires: 'admin.view' },
   { label: 'Roles', to: paths.roles, requires: 'role.view' },
   { label: 'Settings', to: paths.settings, requires: 'settings.view' },
+  { label: 'Audit log', to: paths.audit, requires: 'audit.view' },
 ];
 
 export function AuthenticatedShell({

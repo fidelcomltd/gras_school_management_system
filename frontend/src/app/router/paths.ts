@@ -26,6 +26,7 @@ export const paths = {
   marks: '/results/marks',
   classRecords: '/results/class',
   pins: '/pins',
+  audit: '/audit',
   pinBatch: (id: string) => `/pins/${id}`,
 } as const;
 
