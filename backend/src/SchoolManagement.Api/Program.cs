@@ -11,6 +11,7 @@ using SchoolManagement.Api.Security;
 using SchoolManagement.Application;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Infrastructure;
@@ -75,6 +76,34 @@ if (args.Length > 0 && string.Equals(args[0], BootstrapAdminAccountCli.CommandNa
 
     return await BootstrapAdminAccountCli
         .RunAsync(args, bootstrapScope.ServiceProvider.GetRequiredService<ISender>())
+        .ConfigureAwait(false);
+}
+
+// TASK-0005b stage D's live check of the file store (deployment readiness, 2026-09-22). Dispatched
+// here for the same reason as bootstrap-admin above: before Kestrel, before any scheme, before any
+// endpoint, so it can never be reached over HTTP. It needs no database, so an unconfigured
+// connection string does not stop an operator from proving the Cloudinary credentials work.
+if (args.Length > 0 && string.Equals(args[0], CloudinarySmokeTestCli.CommandName, StringComparison.Ordinal))
+{
+    var smokeTestServices = new ServiceCollection();
+
+    smokeTestServices.AddLogging();
+    smokeTestServices.AddSingleton(TimeProvider.System);
+    smokeTestServices.AddInfrastructure(builder.Configuration, validateOnStart: false);
+
+#pragma warning disable ASP0000 // Building a ServiceProvider from application code.
+    // Justified for the same reason as the bootstrap command above: this is a stand-alone console
+    // command, not the web application.
+    await using var smokeTestProvider = smokeTestServices.BuildServiceProvider();
+#pragma warning restore ASP0000
+
+    var configuredStore = smokeTestProvider.GetRequiredService<ISchoolImageStore>();
+
+    // The implementation TYPE NAME is passed in rather than inspected inside the command: the
+    // concrete stores are internal to Infrastructure, and Api is allowed to touch Infrastructure
+    // only here, in the composition root (DependencyDirectionTests).
+    return await CloudinarySmokeTestCli
+        .RunAsync(configuredStore, configuredStore.GetType().Name)
         .ConfigureAwait(false);
 }
 

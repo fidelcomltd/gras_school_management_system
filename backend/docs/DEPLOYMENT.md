@@ -115,10 +115,23 @@ URL: the API fetches them with a signed URL and streams them back through its ow
 privilege-checked endpoint (spec 9.6). The `gras/prod` folder prefix keeps production and staging
 apart inside one account.
 
-**Smoke test, once, by hand:** sign in to the admin app, upload a school logo under Settings, then
-reload the page. The logo should render. Then `sudo systemctl restart gras-api` and reload again —
-if it still renders, the bytes are in Cloudinary and not in process memory. Check the Cloudinary
-media library for a new asset under `gras/prod/`.
+**Smoke test — one command, no database or browser needed:**
+
+```bash
+sudo -u gras env $(grep ^Cloudinary /etc/gras/api.env | xargs)   dotnet /opt/gras/api/SchoolManagement.Api.dll cloudinary-smoke-test
+```
+
+It uploads a 73-byte PNG through the same store the endpoints use, reads it back through a signed
+URL, compares the bytes and exits non-zero with the reason if any step fails. It **refuses to pass**
+against the in-memory store, so a green run cannot be a false one. It prints the asset id; delete it
+from the dashboard if you like.
+
+Run this before anything else depends on the box. The adapter was verified this way against the
+school's real account on 2026-09-22 (byte-identical round trip), so a failure here is this host's
+configuration, not the code.
+
+In the Cloudinary dashboard the new asset should show as **Authenticated**, not public. That is the
+privacy property spec 9.6 relies on, and it is worth one look the first time.
 
 ## 5. Deploy
 
