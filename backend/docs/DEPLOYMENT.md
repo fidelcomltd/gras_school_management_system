@@ -29,9 +29,10 @@ calling that API **does not** — the browser withholds the session cookie and e
 with no useful error. The same applies to staging: Render must serve a `goldenroyalark.com`
 subdomain, not `*.onrender.com`.
 
-Decide these four names before running anything, because two of them are expensive to change later:
+All four were confirmed by the school on 2026-09-22 and are what the committed configuration uses.
+Two of them are expensive to change later:
 
-| Name | Default in config | Changing it later costs |
+| Name | In config | Changing it later costs |
 |---|---|---|
 | API | `api.goldenroyalark.com` | a config change and a redeploy |
 | Parent portal | `results.goldenroyalark.com` | **every pin slip already printed** — it is printed on the slip and in the QR code |
