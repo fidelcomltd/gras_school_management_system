@@ -11,6 +11,7 @@ using SchoolManagement.Api.Security;
 using SchoolManagement.Application;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Behaviors;
 using SchoolManagement.Application.Idempotency;
 using SchoolManagement.Infrastructure;
@@ -78,6 +79,34 @@ if (args.Length > 0 && string.Equals(args[0], BootstrapAdminAccountCli.CommandNa
         .ConfigureAwait(false);
 }
 
+// TASK-0005b stage D's live check of the file store (deployment readiness, 2026-09-22). Dispatched
+// here for the same reason as bootstrap-admin above: before Kestrel, before any scheme, before any
+// endpoint, so it can never be reached over HTTP. It needs no database, so an unconfigured
+// connection string does not stop an operator from proving the Cloudinary credentials work.
+if (args.Length > 0 && string.Equals(args[0], CloudinarySmokeTestCli.CommandName, StringComparison.Ordinal))
+{
+    var smokeTestServices = new ServiceCollection();
+
+    smokeTestServices.AddLogging();
+    smokeTestServices.AddSingleton(TimeProvider.System);
+    smokeTestServices.AddInfrastructure(builder.Configuration, validateOnStart: false);
+
+#pragma warning disable ASP0000 // Building a ServiceProvider from application code.
+    // Justified for the same reason as the bootstrap command above: this is a stand-alone console
+    // command, not the web application.
+    await using var smokeTestProvider = smokeTestServices.BuildServiceProvider();
+#pragma warning restore ASP0000
+
+    var configuredStore = smokeTestProvider.GetRequiredService<ISchoolImageStore>();
+
+    // The implementation TYPE NAME is passed in rather than inspected inside the command: the
+    // concrete stores are internal to Infrastructure, and Api is allowed to touch Infrastructure
+    // only here, in the composition root (DependencyDirectionTests).
+    return await CloudinarySmokeTestCli
+        .RunAsync(configuredStore, configuredStore.GetType().Name)
+        .ConfigureAwait(false);
+}
+
 // Is this process running only to emit the OpenAPI document? Generation STARTS the host to read its
 // route metadata, so every ValidateOnStart check would otherwise demand a configured database and a
 // chosen identity provider just to produce a JSON file. In that mode the eager startup checks are not
@@ -100,7 +129,20 @@ builder.Services
     .AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsValidator>(
         builder.Configuration, RateLimitingOptions.SectionName, validateOnStart)
     .AddValidatedOptions<RequestLimitsOptions, RequestLimitsOptionsValidator>(
-        builder.Configuration, RequestLimitsOptions.SectionName, validateOnStart);
+        builder.Configuration, RequestLimitsOptions.SectionName, validateOnStart)
+    .AddValidatedOptions<ProxyOptions, ProxyOptionsValidator>(
+        builder.Configuration, ProxyOptions.SectionName, validateOnStart);
+
+// Reverse-proxy forwarding. Read here as a plain value (not only through IOptions) because the
+// pipeline below has to know whether to insert the middleware at all, before the container is used.
+var proxy = builder.Configuration
+    .GetSection(ProxyOptions.SectionName)
+    .Get<ProxyOptions>() ?? new ProxyOptions();
+
+if (proxy.Enabled)
+{
+    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(proxy.ApplyTo);
+}
 
 var pipelineOptions = builder.Services
     .AddOptions<PipelineOptions>()
@@ -298,6 +340,17 @@ var app = builder.Build();
 // FIRST. Everything below may throw, and an unhandled exception must become a ProblemDetails
 // response rather than a stack trace or a blank 500.
 app.UseExceptionHandler();
+
+// BEFORE EVERYTHING THAT READS THE CLIENT ADDRESS OR THE SCHEME (deployment readiness, 2026-09-22).
+// This rewrites HttpContext.Connection.RemoteIpAddress and Request.Scheme from the proxy's headers,
+// so it has to run ahead of every consumer: the HTTPS redirect below (which would otherwise see
+// `http` on a request that arrived over TLS and bounce it), request logging, the rate limiter's
+// partition key, the portal's per-address pin limits, and the audit trail's source_ip. Opt-in and
+// scoped to named proxies — see ProxyOptions for why the headers are not trusted by default.
+if (proxy.Enabled)
+{
+    app.UseForwardedHeaders();
+}
 
 // Before anything that logs or responds, so the correlation ID appears on error responses too.
 app.UseMiddleware<CorrelationIdMiddleware>();

@@ -300,13 +300,47 @@ public static class InfrastructureDependencyInjection
         // decodes and encodes its own bitmaps), so singleton rather than per-request.
         services.AddSingleton<ISchoolImageProcessor, SkiaSchoolImageProcessor>();
 
-        // TASK-0005b stage B1: PLACEHOLDER registration. The in-memory fake is registered
-        // unconditionally here because nothing consumes ISchoolImageStore yet (upload routes are
-        // stage B2); stage D replaces this with an environment-based choice between this fake (tests)
-        // and the real CloudinaryImageStore (everywhere else) — "tests never touch the network"
-        // (orchestrator design, 2026-09-21). Singleton so uploads persist for the lifetime of the
-        // process, matching a real store's behaviour closely enough for a fake.
-        services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+        // TASK-0005b stage D: which image store.
+        //
+        // PRECEDENCE, AND WHY THIS ORDER. `AllowInMemoryStore` wins over configured credentials,
+        // not the other way round. It is an explicit "this process must not touch the network", and
+        // the integration fixture sets it — but that fixture runs the host as Development, and
+        // Program.cs loads user-secrets in Development. So with credentials in a developer's
+        // user-secrets (the documented way to exercise the real store locally), checking
+        // IsConfigured first pointed the WHOLE integration suite at a live Cloudinary account:
+        // ~400 tests uploading to the school's real media library, from a fixture whose stated
+        // contract is "tests never touch the network" (orchestrator design, 2026-09-21).
+        //
+        // CloudinaryOptionsValidator still refuses to start when neither the flag nor a full set of
+        // credentials is present, so a deployed host missing its credentials fails at boot rather
+        // than quietly accepting uploads it will lose on the next restart.
+        var cloudinaryOptions = services
+            .AddOptions<CloudinaryOptions>()
+            .Bind(configuration.GetSection(CloudinaryOptions.SectionName));
+
+        if (validateOnStart)
+        {
+            cloudinaryOptions.ValidateOnStart();
+        }
+
+        services.AddSingleton<IValidateOptions<CloudinaryOptions>, CloudinaryOptionsValidator>();
+
+        var cloudinary = configuration
+            .GetSection(CloudinaryOptions.SectionName)
+            .Get<CloudinaryOptions>() ?? new CloudinaryOptions();
+
+        if (cloudinary.AllowInMemoryStore || !cloudinary.IsConfigured)
+        {
+            // Singleton so uploads persist for the lifetime of the process, matching a real store's
+            // behaviour closely enough for a fake.
+            services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
+        }
+        else
+        {
+            services.AddHttpClient(CloudinaryGateway.HttpClientName);
+            services.AddSingleton<ICloudinaryGateway, CloudinaryGateway>();
+            services.AddSingleton<ISchoolImageStore, CloudinaryImageStore>();
+        }
 
         // TASK-0005b stage B2: SchoolImage row persistence for the upload routes.
         services.AddScoped<ISchoolImageRepository, SchoolImageRepository>();

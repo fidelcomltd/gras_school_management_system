@@ -1,0 +1,71 @@
+# Netlify build for the admin web app (frontend/). The API and the parent portal are NOT here —
+# they run on the VPS (backend/docs/DEPLOYMENT.md).
+
+[build]
+  # The repository root holds backend/ as well, so the build is scoped to the frontend package.
+  base = "frontend"
+  command = "npm run build"
+  # Relative to `base`, so this is frontend/dist.
+  publish = "dist"
+
+[build.environment]
+  # PINNED, and must equal the version in .agent/STATE.md and both CI workflows. Changing one side
+  # alone is how this project has broken CI before (TASK-0024, TASK-0026).
+  NODE_VERSION = "22.21.0"
+
+  # Non-secret and identical in every deployed environment, so they live in git where they can be
+  # reviewed rather than in a dashboard nobody diffs. Everything VITE_-prefixed ships to the
+  # browser, so nothing secret can go here by definition.
+  VITE_APP_NAME = "Golden Royal Ark School Portal"
+  VITE_API_TIMEOUT_MS = "30000"
+  VITE_AUTH_EXPIRY_LEEWAY_SECONDS = "30"
+  VITE_ENABLE_DEV_TOOLS = "false"
+
+  # NOT SET HERE, ON PURPOSE: VITE_API_BASE_URL and VITE_APP_ENV. Production and staging are two
+  # Netlify sites built from this one repository, and both would read this same file — a value here
+  # would point the staging site at the production API. Each site sets those two in its own
+  # dashboard (Site configuration -> Environment variables):
+  #
+  #   production site:  VITE_API_BASE_URL = https://api.goldenroyalark.com
+  #                     VITE_APP_ENV      = production
+  #   staging site:     VITE_API_BASE_URL = https://staging-api.goldenroyalark.com
+  #                     VITE_APP_ENV      = staging
+  #
+  # Vite bakes these in AT BUILD TIME, so changing one needs a redeploy, not just a restart. All six
+  # variables are validated by src/config/env-values.ts at first load: a missing one is a blank page
+  # with a console error, not a silent default.
+
+# SPA FALLBACK — REQUIRED, NOT OPTIONAL. The app uses createBrowserRouter
+# (src/app/router/app-router.tsx), so /pupils, /results and every other route exist only in the
+# browser. Without this, a refresh or a pasted link on any route but "/" asks Netlify for a file
+# that was never built and gets its 404 page. status = 200 (a rewrite, not a redirect) so the URL
+# the user is on stays in the address bar for the router to read.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Vite fingerprints every file under assets/, so the content at a given URL never changes.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# index.html is the one file whose URL is stable and whose content changes on every deploy. Cached,
+# it would keep loading the previous build's fingerprinted bundles until the browser revalidated.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # The session cookie is host-locked to the API's own origin, so the risk here is the classic
+    # clickjacking/sniffing set rather than anything cookie-shaped. No CSP yet: one written blind
+    # would either break the app or be too loose to mean anything, and it needs a pass with the
+    # real bundle in front of it.
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

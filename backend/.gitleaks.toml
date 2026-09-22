@@ -124,6 +124,14 @@ regexes = [
   # path was later renamed/replaced). Restates the intent already on record for `ci_user`/
   # `ci_password` above, which never reached this rule for the Secret-target reason explained above.
   '''(?i)username\s*=\s*ci_user;password\s*=\s*ci_password\b''',
+
+  # Deployment readiness, 2026-09-22: deploy/provision-vps.sh writes /etc/gras/api.env from a
+  # heredoc, so the connection string it emits reads as `...;Password=$PROD_DB_PASSWORD` in the
+  # committed script. An UNQUOTED SHELL VARIABLE REFERENCE cannot be a credential — the value is
+  # generated on the server at provisioning time and never exists in the repository. Anchored to
+  # the `$NAME` shape (uppercase shell convention) rather than to the file, so the same suppression
+  # cannot quietly cover a literal password added to that script later.
+  '''(?i)password\s*=\s*\$[A-Z_][A-Z0-9_]*\b''',
 ]
 
 # TASK-0011 (2026-08-27), Family B — the default `generic-api-key` rule (from `useDefault`, not a

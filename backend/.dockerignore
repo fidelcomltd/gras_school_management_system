@@ -1,0 +1,16 @@
+# Docker build context is THIS directory (backend/), so the ignore file has to live here — at the
+# repository root it would simply not be read, and the exclusions below would all be silent no-ops.
+**/bin/
+**/obj/
+**/artifacts/
+**/.vs/
+**/*.user
+
+# Local secrets and local-only configuration. user-secrets live outside the repo, but an
+# appsettings.Development.json written by hand does not — and it must never reach an image.
+**/appsettings.Development.json
+**/appsettings.*.local.json
+
+# Tests are not needed to publish the API, and skipping them keeps the context small.
+tests/
+docs/

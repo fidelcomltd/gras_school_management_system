@@ -152,6 +152,18 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 // Spec 6.8.6's pin keys: fixed, obviously non-production development keys for tests.
                 ["Pins:AllowDevelopmentKeys"] = "true",
 
+                // TASK-0005b stage D: the in-process image store, so no test reaches Cloudinary.
+                ["Cloudinary:AllowInMemoryStore"] = "true",
+
+                // AND the credentials are blanked, because this host runs as Development and
+                // Program.cs loads user-secrets there — a developer exercising the real store
+                // locally (docs/DEPLOYMENT.md section 4) would otherwise have their live account in
+                // this configuration. Two independent reasons the fake is chosen, so neither the
+                // flag's precedence nor a user-secret can put the suite on the network on its own.
+                ["Cloudinary:CloudName"] = string.Empty,
+                ["Cloudinary:ApiKey"] = string.Empty,
+                ["Cloudinary:ApiSecret"] = string.Empty,
+
                 // Retries off: a transient-failure retry inside a test turns a genuine failure into a
                 // slow, confusing one.
                 [$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.MaxRetryCount)}"] = "0",

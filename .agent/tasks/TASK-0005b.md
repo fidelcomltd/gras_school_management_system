@@ -67,11 +67,11 @@ privilege-checked endpoints. Publication (a later card) needs both.
 - [ ] `OpenApiExamples.cs` has an example for each new schema. An architecture test asserts the multipart request and the image responses carry `content`
       (TASK-0049's trap).
 **Stage D: the Cloudinary adapter**
-- [ ] `CloudinaryImageStore` uses options `Cloudinary:CloudName`, `ApiKey` and `ApiSecret`, and a folder prefix per environment. The secrets come from environment
+- [x] `CloudinaryImageStore` uses options `Cloudinary:CloudName`, `ApiKey` and `ApiSecret`, and a folder prefix per environment. The secrets come from environment
       variables or user-secrets only, never `appsettings*.json`, and gitleaks stays green. Startup fails fast outside Development/Test when they are missing.
       DI picks the fake in tests and Cloudinary elsewhere.
-- [ ] Unit tests cover option validation and the upload parameters (`authenticated`, a generated public id, no overwrite) behind a thin seam over the SDK.
-- [ ] `backend/docs/` gets a short runbook: where the keys go on the VPS, and a manual smoke test the human runs once.
+- [x] Unit tests cover option validation and the upload parameters (`authenticated`, a generated public id, no overwrite) behind a thin seam over the SDK.
+- [x] `backend/docs/` gets a short runbook: where the keys go on the VPS, and a manual smoke test the human runs once.
 
 **Every stage:** you WRITE integration tests and make them compile, but do not run them. The orchestrator does. Build, format and the whole unit
 project must be green, and you commit at each green build.

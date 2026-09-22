@@ -54,4 +54,12 @@ internal static partial class ApiLog
         ILogger logger,
         int moduleCount,
         string moduleNames);
+
+    [LoggerMessage(
+        EventId = 2006,
+        Level = LogLevel.Warning,
+        Message = "DataProtection:KeyRingPath is not set in environment {EnvironmentName}. The key ring " +
+                  "may not survive a restart, and outstanding CSRF tokens would then need re-fetching " +
+                  "from GET /auth/csrf. Set it to a persisted directory on this host.")]
+    public static partial void DataProtectionKeyRingNotPersisted(ILogger logger, string environmentName);
 }

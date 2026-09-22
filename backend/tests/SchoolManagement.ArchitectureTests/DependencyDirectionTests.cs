@@ -110,7 +110,8 @@ public sealed class DependencyDirectionTests
         //   - Program.cs: the composition root. Its whole job is wiring Infrastructure's DI
         //     registrations together, which is the one place naming the assembly is the point.
         //   - StartupEnvironmentGuard: an IHostedService that inspects Infrastructure's DatabaseOptions
-        //     at StartAsync, before the host accepts traffic, to refuse an unsafe deployed configuration.
+        //     and CloudinaryOptions at StartAsync, before the host accepts traffic, to refuse an unsafe
+        //     deployed configuration.
         //     Same category as Program.cs — startup-time composition, not a handler on the pipeline —
         //     so it gets the same exemption rather than a port for a single boolean flag read once at
         //     boot. A second exemption here should raise the question of whether the rule needs
