@@ -129,6 +129,45 @@ public sealed class Pin : Entity<Guid>
         return Result.Success();
     }
 
+    /// <summary>Spec 6.9.3's spread control: more than this many distinct pupils in total suspends the pin.</summary>
+    public const int MaxDistinctPupils = 3;
+
+    /// <summary>Spec 6.9.3's spread control: more than this many distinct pupils within <see cref="SpreadWindow"/> suspends it.</summary>
+    public const int MaxDistinctPupilsInWindow = 2;
+
+    /// <summary>Spec 6.9.3.</summary>
+    public static readonly TimeSpan SpreadWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>Whether the pin can open a viewing session now (the portal checks the batch's session separately).</summary>
+    public bool IsUsable => State is PinState.Unused or PinState.Active && UseCount < MaxUses;
+
+    /// <summary>
+    /// Counts one use (spec 6.8.8). <paramref name="isNewPupil"/> raises the distinct pupil count. The pin becomes
+    /// Exhausted on its last use. The caller holds the row lock and has run the spread control.
+    /// </summary>
+    public void RecordUse(bool isNewPupil)
+    {
+        UseCount++;
+        if (isNewPupil)
+        {
+            DistinctPupilCount++;
+        }
+
+        State = UseCount >= MaxUses ? PinState.Exhausted : PinState.Active;
+    }
+
+    /// <summary>Set by the spread control (spec 6.9.3). Reversible by <see cref="Reinstate"/>.</summary>
+    public void Suspend(string reason)
+    {
+        if (State is PinState.Revoked or PinState.Suspended)
+        {
+            return;
+        }
+
+        State = PinState.Suspended;
+        StateReason = reason;
+    }
+
     /// <summary>Removes the reprint copy at the batch's purge date (spec 6.8.6).</summary>
     public void PurgeCiphertext() => Ciphertext = null;
 }

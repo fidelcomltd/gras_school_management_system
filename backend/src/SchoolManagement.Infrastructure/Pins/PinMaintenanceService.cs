@@ -41,6 +41,10 @@ internal sealed partial class PinMaintenanceService(
             .ExecuteUpdateAsync(setters => setters.SetProperty(batch => batch.State, PinBatchState.Exhausted), cancellationToken)
             .ConfigureAwait(false);
 
+        // Spec 6.9.3: portal attempt rows are kept 90 days.
+        var cutoff = now - Domain.Portal.PortalAttempt.Retention;
+        await context.PortalAttempts.Where(attempt => attempt.AttemptedAtUtc < cutoff).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+
         return (purged, exhausted);
     }
 

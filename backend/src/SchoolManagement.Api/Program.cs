@@ -329,6 +329,9 @@ app.UseAuthorization();
 // ── Endpoints ────────────────────────────────────────────────────────────────────────────────
 app.MapHealthEndpoints();
 
+// The public parent portal (spec 6.9): server-rendered pages, outside /api and outside the contract.
+SchoolManagement.Api.Portal.PortalEndpoints.MapPortal(app);
+
 var versionSet = app.NewApiVersionSet()
     .HasApiVersion(new ApiVersion(1, 0))
     .ReportApiVersions()
