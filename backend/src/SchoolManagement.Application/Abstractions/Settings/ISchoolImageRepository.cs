@@ -29,4 +29,11 @@ public interface ISchoolImageRepository
     /// (nothing uploaded yet) or — a data defect, since assets are never deleted — resolves to no row.
     /// </returns>
     Task<SchoolImageDto?> FindCurrentDtoAsync(Guid? uploadGroupId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The stored asset behind one rendition of an upload group, for the serving endpoints (TASK-0005b stage C).
+    /// <see langword="null"/> when the group has no rendition of that size (a signature has only the original).
+    /// </summary>
+    Task<SchoolImageRenditionRef?> FindRenditionAsync(
+        Guid uploadGroupId, Domain.Settings.SchoolImageSizeVariant sizeVariant, CancellationToken cancellationToken);
 }

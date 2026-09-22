@@ -182,6 +182,11 @@ internal static class OpenApiExamples
             "binary image content, sent as the multipart request's `file` part"
             """,
 
+        // TASK-0005b stage C: the image-serving responses' body. Same bare binary-string shape.
+        [typeof(Stream)] = """
+            "binary PNG or JPEG bytes"
+            """,
+
         [typeof(SettingsDto)] = $$"""
             {
               "identity": {
@@ -2637,6 +2642,11 @@ internal static class OpenApiExamples
             "One uploaded file, sent as a multipart/form-data part. Verified server-side by its magic " +
             "bytes, never by a declared content type or file name (spec 9.6) — neither is part of this " +
             "contract.",
+
+        // TASK-0005b stage C: the image-serving responses' body.
+        [typeof(Stream)] =
+            "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this " +
+            "privilege-checked endpoint, never from a public URL (spec 9.6).",
     };
 
     /// <summary>

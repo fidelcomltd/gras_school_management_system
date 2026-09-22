@@ -372,6 +372,30 @@ public sealed class OpenApiContractTests
         schema.GetProperty("type").GetString().ShouldBe("string");
     }
 
+    [Theory]
+    [InlineData("/api/v1/settings/identity/logo")]
+    [InlineData("/api/v1/settings/identity/signature")]
+    public void SchoolImageUpload_DeclaresAMultipartRequestBody(string path)
+    {
+        // TASK-0005b: TASK-0049's trap applies to request bodies too; pin the multipart shape.
+        var content = Document.GetProperty("paths").GetProperty(path).GetProperty("post")
+            .GetProperty("requestBody").GetProperty("content");
+
+        content.TryGetProperty("multipart/form-data", out _).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("/api/v1/settings/identity/logo/{size}")]
+    [InlineData("/api/v1/settings/identity/signature")]
+    public void SchoolImageServing_200Response_DeclaresImageContent(string path)
+    {
+        var content = Document.GetProperty("paths").GetProperty(path).GetProperty("get")
+            .GetProperty("responses").GetProperty("200").GetProperty("content");
+
+        content.TryGetProperty("image/png", out _).ShouldBeTrue();
+        content.TryGetProperty("image/jpeg", out _).ShouldBeTrue();
+    }
+
     [Fact]
     public void SubmitResultSet_422Response_DeclaresProblemJsonContentWithTheTypedSchema()
     {

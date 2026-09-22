@@ -7,6 +7,8 @@ using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Settings;
+using SchoolImageSizeVariant = SchoolManagement.Domain.Settings.SchoolImageSizeVariant;
 
 namespace SchoolManagement.Api.Endpoints;
 
@@ -41,6 +43,8 @@ public sealed class SettingsEndpoints : IEndpointModule
         MapUpdateIdentity(settingsGroup);
         MapUploadSchoolLogo(settingsGroup);
         MapUploadSchoolSignature(settingsGroup);
+        MapGetSchoolLogo(settingsGroup);
+        MapGetHeadTeacherSignature(settingsGroup);
         MapUpdateRegNumber(settingsGroup);
         MapGetRegNumberPreview(settingsGroup);
         MapUpdateAbbreviation(settingsGroup);
@@ -123,6 +127,9 @@ public sealed class SettingsEndpoints : IEndpointModule
             .RequirePrivilege(Privileges.Settings.IdentityUpdate)
             .RequireCsrfToken()
             .RequireIdempotencyKey(required: true)
+            // Our own CSRF filter (RequireCsrfToken) protects this route; ASP.NET's automatic IFormFile
+            // antiforgery requirement would otherwise throw (500) because no antiforgery middleware is registered.
+            .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
             .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxLogoBytes + MultipartOverheadBytes))
             .WithName("UploadSchoolLogo")
@@ -153,6 +160,9 @@ public sealed class SettingsEndpoints : IEndpointModule
             .RequirePrivilege(Privileges.Settings.IdentityUpdate)
             .RequireCsrfToken()
             .RequireIdempotencyKey(required: true)
+            // Our own CSRF filter (RequireCsrfToken) protects this route; ASP.NET's automatic IFormFile
+            // antiforgery requirement would otherwise throw (500) because no antiforgery middleware is registered.
+            .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
             .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxSignatureBytes + MultipartOverheadBytes))
             .WithName("UploadHeadTeacherSignature")
@@ -167,6 +177,64 @@ public sealed class SettingsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetSchoolLogo(RouteGroupBuilder group) =>
+        group.MapGet("/identity/logo/{size:regex(^(original|200|64)$)}", async (
+                string size,
+                ISender sender,
+                HttpContext httpContext,
+                CancellationToken cancellationToken) =>
+            {
+                var variant = size switch
+                {
+                    "200" => SchoolImageSizeVariant.Size200,
+                    "64" => SchoolImageSizeVariant.Size64,
+                    _ => SchoolImageSizeVariant.Original,
+                };
+                var result = await sender.SendAsync(new GetSchoolImageQuery(SchoolImageKind.Logo, variant), cancellationToken);
+                return result.Match(content => ServeImage(httpContext, content));
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetSchoolLogo")
+            .WithSummary("Read the current school logo")
+            .WithDescription(
+                "Streams the current logo at `original`, `200` or `64` pixels (spec 9.6: served only through a " +
+                "privilege-checked endpoint, never a public URL). `Content-Disposition: inline`, `nosniff`, " +
+                "`Cache-Control: private`. `404 school_image.not_uploaded` before the first upload.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/png", "image/jpeg")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapGetHeadTeacherSignature(RouteGroupBuilder group) =>
+        group.MapGet("/identity/signature", async (
+                ISender sender,
+                HttpContext httpContext,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(
+                    new GetSchoolImageQuery(SchoolImageKind.Signature, SchoolImageSizeVariant.Original), cancellationToken);
+                return result.Match(content => ServeImage(httpContext, content));
+            })
+            .RequirePrivilege(Privileges.Settings.View)
+            .WithName("GetHeadTeacherSignature")
+            .WithSummary("Read the current head teacher's signature")
+            .WithDescription(
+                "Streams the current signature at its original size (spec 9.6). Same headers as the logo. " +
+                "`404 school_image.not_uploaded` before the first upload.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/png", "image/jpeg")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static Microsoft.AspNetCore.Http.HttpResults.FileStreamHttpResult ServeImage(HttpContext httpContext, SchoolImageContent content)
+    {
+        httpContext.Response.Headers.CacheControl = "private";
+        httpContext.Response.Headers.ContentDisposition = $"inline; filename={content.FileName}";
+        return TypedResults.Stream(content.Content, content.ContentType);
+    }
 
     private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
     {

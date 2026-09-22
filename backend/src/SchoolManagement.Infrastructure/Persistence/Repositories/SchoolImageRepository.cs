@@ -52,4 +52,12 @@ internal sealed class SchoolImageRepository(ApplicationDbContext context) : ISch
 
         return new SchoolImageDto(original.WidthPixels, original.HeightPixels, original.CreatedAtUtc, uploadedByName);
     }
+
+    public Task<SchoolImageRenditionRef?> FindRenditionAsync(
+        Guid uploadGroupId, DomainSizeVariant sizeVariant, CancellationToken cancellationToken) =>
+        context.SchoolImages
+            .AsNoTracking()
+            .Where(image => image.UploadGroupId == uploadGroupId && image.SizeVariant == sizeVariant)
+            .Select(image => new SchoolImageRenditionRef(image.AssetId, image.ContentType))
+            .FirstOrDefaultAsync(cancellationToken);
 }
