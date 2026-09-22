@@ -222,6 +222,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-22 **Human: prod = PostgreSQL + app on one Namecheap Pulsar VPS** (open question 5 resolved). **NDPA: not strict for this school**, not certifying; don't gate features on it.
 - 2026-09-22 **Human: keep pins UNBOUND** (§6.8.2, reconfirmed). **Withdraw/reopen gate 1466/1466.** **PDF library: QuestPDF** (Community licence).
 - 2026-09-22 **Withdraw/reopen done** (§6.7.9): Super Admin, reason ≥10; reopen needs an active term; `result_set_snapshot` keeps every revision. Contract `b4bf1cf3…`.
 - 2026-09-22 **Publication done** (§6.7.9): `POST /result-sets/{id}/publish`, school-wide, snapshot written; contract `d1816d8c…`. Level-position re-check skipped: no sheet prints positions.
@@ -825,8 +826,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 - 2026-08-27 **Validation is a mediator pipeline behaviour, not section 6's endpoint filter.**
   *Trigger: ratify or revert. Owner: UNOWNED.* `ASSUMPTIONS.md` section 2.2.
 
-- 2026-09-21 **The head teacher's signature (and logo) will be held by Cloudinary, a third-party processor** — NDPA 2023 expects a processing
-  agreement and a note on transfer outside Nigeria. *Trigger: before the first real upload, or the NDPA retention card. Owner: human.*
+- 2026-09-21 ~~**Signature and logo held by Cloudinary, a third-party processor (NDPA).**~~ **STRUCK 2026-09-22 by human**: NDPA certification is not sought; revisit if that changes.
 
 ### Live — blocked on the deployment decision (open question 5)
 
@@ -865,9 +865,9 @@ One decision clears all four.
 
 Live only. Resolved questions 1–4 and 6–14 are in `decisions/2026-Q3.md`.
 
-5. **Production hosting: a VPS (human, 2026-09-21); file storage Cloudinary.** Database placement on or off the VPS still undecided; not blocking until deployment. Four live drift
-   triggers wait on it (DP key ring, `SameSite=Lax`, shared DB role, cookie domain) — one
-   decision clears all four.
+5. **RESOLVED 2026-09-22 (human): app and PostgreSQL on one Namecheap Pulsar VPS; files on Cloudinary.** The four deployment
+   drift items below are now decidable at deployment: DP key ring persisted on the VPS disk; `SameSite=Lax` holds if frontend and API
+   share the domain; cookie domain = the school's domain; separate DB roles per environment.
 
 ## How to read and append to this file
 
