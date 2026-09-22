@@ -1,6 +1,6 @@
 # Project State
 
-Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `90563279…`) · no size cap, see
+Last reconciled: 2026-09-21 by orchestrator (TASK-0088–0091 closed; TASK-0086 and TASK-0087 closed; contract `d1816d8c…`) · no size cap, see
 `## How to read and append to this file` at the bottom.
 
 **This is the ledger. Read it whole — it is meant to be cheap enough to. Then read ONLY what your
@@ -115,10 +115,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `905632799f5c1721a42ebcb1ae3da740c626d133294bd2cd0fe734ab7887a4ba`** · **83 paths** ·
-**200 schemas** · api version `v1` · moved 2026-09-22 by TASK-0005b (logo/signature upload and serving).
-Previous: `e7113c87a76b…` / 80 paths / 197 schemas, TASK-0090 on 2026-09-21; before that `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `d1816d8c15b852eec0bd954aca311f735e0701b921ab98e30e2a58e58de20dbf`** · **84 paths** ·
+**201 schemas** · api version `v1` · moved 2026-09-22 by publication (§6.7.9).
+Previous: `905632799f5c…` / 83 paths / 200 schemas, TASK-0005b on 2026-09-22; before that `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Publication additive verified mechanically** (`jq`): +1 path, +1 schema, nothing else changed.
 
 **TASK-0005b additive verified mechanically** (`jq`): 3 paths + 3 schemas added, nothing removed, no path changed; `SettingsIdentityGroupDto`
 gains response-only `logo`/`signature` (in no request body: checked).

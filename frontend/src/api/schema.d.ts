@@ -979,6 +979,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/result-sets/{resultSetId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a result set
+         * @description Spec 6.7.9: school-wide. Moves Approved to Published, writes the configuration snapshot (settings, logo and signature references, level, section, arm and term as they stand now), and sets revisionNumber to 1 on first publication. Each precondition fails 409 with its own code and the spec's message: `result_set.not_approved`, `result_set.needs_recompute`, `result_set.head_teacher_remarks_missing`, `result_set.logo_missing`, `result_set.signature_missing`, `result_set.next_resumption_date_missing`, `result_set.times_school_opened_missing`, and (Third Term only) `result_set.core_subjects_missing`. 404 for an unknown id. `Idempotency-Key` is REQUIRED (spec 9.8.2).
+         */
+        post: operations["PublishResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -5138,6 +5158,35 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             lockedUntil?: string;
+        };
+        /**
+         * @description The published set.
+         * @example {
+         *       "resultSet": {
+         *         "id": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *         "state": "Published",
+         *         "needsRecompute": false,
+         *         "returnReason": null
+         *       },
+         *       "publishedAt": "2026-08-03T09:30:00+00:00",
+         *       "revisionNumber": 1
+         *     }
+         */
+        PublishResultSetResponse: {
+            /** @description State Published. */
+            resultSet: components["schemas"]["ResultSetSummaryDto"];
+            /**
+             * Format: date-time
+             * @description When it became visible to parents.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            publishedAt: string;
+            /**
+             * Format: int32
+             * @description 1 on first publication; later revisions follow a withdrawal.
+             * @example 1
+             */
+            revisionNumber: number | string;
         };
         /**
          * @description The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates
@@ -15114,6 +15163,90 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishResultSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                resultSetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishResultSetResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Too Many Requests */
