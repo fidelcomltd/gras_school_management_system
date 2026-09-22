@@ -326,11 +326,6 @@ app.UseMiddleware<MustChangePasswordGateMiddleware>();
 
 app.UseAuthorization();
 
-// TASK-0005b: the two upload routes declare a tighter per-route body-size cap than the server-wide
-// default (RequestSizeLimitAttribute); this applies it to Kestrel before the endpoint's own model
-// binding reads the body. See the middleware's own remarks for why a filter cannot do this in time.
-app.UseMiddleware<EndpointRequestSizeLimitMiddleware>();
-
 // ── Endpoints ────────────────────────────────────────────────────────────────────────────────
 app.MapHealthEndpoints();
 
