@@ -23,6 +23,7 @@ export const paths = {
   subjects: '/subjects',
   subjectMapping: '/subjects/mapping',
   marks: '/results/marks',
+  classRecords: '/results/class',
 } as const;
 
 export type AppPath = (typeof paths)[keyof typeof paths];
