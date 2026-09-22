@@ -50,12 +50,21 @@ internal sealed class KeyRingOptionsValidator : IValidateOptions<KeyRingOptions>
             return ValidateOptionsResult.Success;
         }
 
-        // IsPathRooted, not IsPathFullyQualified: the latter is evaluated against the CURRENT
-        // platform's rules, so '/var/lib/gras/dataprotection-keys' — the production value — is
-        // "not fully qualified" on a Windows dev machine and this validator would reject the real
-        // configuration everywhere it is not already running. Rooted is what the failure mode
-        // actually needs ruling out: a relative path silently resolving against three different
-        // working directories.
+        // IsPathRooted, and DELIBERATELY EVALUATED AGAINST THE RUNNING PLATFORM. This value names a
+        // directory on THIS host, so "absolute" means absolute here, and the answer differs by
+        // platform in both directions: '/var/lib/gras/dataprotection-keys' (the production value) is
+        // rooted on Windows too, while 'C:\ProgramData\gras\keys' is NOT rooted on Linux — there it
+        // is an ordinary relative name containing a colon and backslashes, and accepting it would
+        // create a directory literally called 'C:\ProgramData\gras\keys' inside whatever the working
+        // directory happened to be. Rejecting it is therefore right, not a gap.
+        //
+        // IsPathFullyQualified was tried first and is wrong for the opposite reason: it calls the
+        // production Linux path "not fully qualified" on a Windows dev machine, so the real
+        // configuration failed validation everywhere it was not already running.
+        //
+        // Either way the failure mode being ruled out is the same one: a relative path silently
+        // resolving against three different working directories (the service, a local run, the EF
+        // tooling). See KeyRingOptionsValidatorTests for why its assertions are platform-aware.
         return Path.IsPathRooted(options.KeyRingPath.Trim())
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(
