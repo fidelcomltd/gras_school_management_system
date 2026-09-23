@@ -23,6 +23,7 @@ export function PupilsListScreen() {
   const me = useMe();
   const navigate = useNavigate();
   const canCreate = !!me.data && hasPrivilege(me.data, 'pupil.create');
+  const canImport = !!me.data && hasPrivilege(me.data, 'pupil.import');
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +32,14 @@ export function PupilsListScreen() {
           <h1 className="font-display text-2xl font-semibold text-foreground">Pupils</h1>
           <p className="text-sm text-muted-foreground">Every pupil on the register, current and past.</p>
         </div>
-        {canCreate ? <Button onClick={() => setShowCreate(true)}>New pupil</Button> : null}
+        <div className="flex gap-2">
+          {canImport ? (
+            <Button variant="outline" render={<Link to={paths.pupilImport} />}>
+              Import
+            </Button>
+          ) : null}
+          {canCreate ? <Button onClick={() => setShowCreate(true)}>New pupil</Button> : null}
+        </div>
       </header>
 
       <search>

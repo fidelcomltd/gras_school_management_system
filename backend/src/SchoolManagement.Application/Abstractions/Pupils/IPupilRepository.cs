@@ -115,4 +115,28 @@ public interface IPupilRepository
     /// </summary>
     Task<bool> ExistsByRegistrationNumberAsync(
         string registrationNumber, Guid excludingPupilId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Which of <paramref name="registrationNumbers"/> a pupil in ANY status already holds: the issuer's pre-check, so a
+    /// clash re-draws one serial instead of retrying a whole batch.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListTakenRegistrationNumbersAsync(
+        IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every pupil, in ANY status, born on one of <paramref name="datesOfBirth"/>: bulk import's register-duplicate check
+    /// (spec 6.5.13) in one query, matched on name in memory by the caller.
+    /// </summary>
+    Task<IReadOnlyList<PupilRegisterEntry>> ListByDatesOfBirthAsync(
+        IReadOnlyCollection<DateOnly> datesOfBirth, CancellationToken cancellationToken);
 }
+
+/// <summary>The fields bulk import's register-duplicate check needs.</summary>
+/// <param name="Id">The pupil.</param>
+/// <param name="Surname">As stored.</param>
+/// <param name="FirstName">As stored.</param>
+/// <param name="DateOfBirth">As stored.</param>
+/// <param name="RegistrationNumber">Null while pending.</param>
+/// <param name="Status">Its status.</param>
+public sealed record PupilRegisterEntry(
+    Guid Id, string Surname, string FirstName, DateOnly DateOfBirth, string? RegistrationNumber, PupilStatus Status);

@@ -6,6 +6,7 @@ using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pupils;
+using SchoolManagement.Application.Pupils.Import;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
 
@@ -36,7 +37,109 @@ public sealed class PupilEndpoints : IEndpointModule
         MapGet(group);
         MapUpdate(group);
         MapCorrectRegistrationNumber(group);
+        MapImportTemplate(group);
+        MapImportValidate(group);
+        MapImportCommit(group);
     }
+
+    private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /// <summary>Bytes over the processor's own cap that a multipart envelope's boundaries and fields may add.</summary>
+    private const long MultipartOverheadBytes = 64 * 1024;
+
+    private static void MapImportTemplate(RouteGroupBuilder group) =>
+        group.MapGet("/import/template", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetPupilImportTemplateQuery(), cancellationToken);
+                return result.Match(file => TypedResults.File(file.Content.ToArray(), XlsxContentType, file.FileName));
+            })
+            .RequirePrivilege(Privileges.Pupil.Import)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("GetPupilImportTemplate")
+            .WithSummary("Download the bulk-import template")
+            .WithDescription(
+                "Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet " +
+                "`Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, " +
+                "yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet " +
+                "`LGAs` lists every state's LGAs. With no active session the arm columns are empty.")
+            .Produces<Stream>(StatusCodes.Status200OK, XlsxContentType)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapImportValidate(RouteGroupBuilder group) =>
+        group.MapPost("/import/validate", async (
+                IFormFile file,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                var result = await sender.SendAsync(new ValidatePupilImportQuery(bytes), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.Import)
+            .RequireCsrfToken()
+            // Our own CSRF filter protects this route; ASP.NET's automatic IFormFile antiforgery check would otherwise 500.
+            .DisableAntiforgery()
+            .Accepts<IFormFile>("multipart/form-data")
+            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + MultipartOverheadBytes))
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("ValidatePupilImport")
+            .WithSummary("Validate a bulk-import file")
+            .WithDescription(
+                "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils). WRITES NOTHING. Returns every " +
+                "row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already " +
+                "on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or " +
+                "create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the " +
+                "file duplicating an earlier row are rejected. Whole-file problems are 422: `import.file_invalid`, " +
+                "`import.file_empty`, `import.too_many_rows`, `import.missing_columns`; 409 `import.no_active_session`.")
+            .Produces<PupilImportReportDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapImportCommit(RouteGroupBuilder group) =>
+        group.MapPost("/import/commit", async (
+                IFormFile file,
+                [FromForm] string fileSha256,
+                [FromForm] int[]? skipRows,
+                [FromForm] int[]? createRows,
+                [FromForm] bool? overrideCapacity,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                var command = new CommitPupilImportCommand(bytes, fileSha256, skipRows ?? [], createRows ?? [], overrideCapacity ?? false);
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Pupil.Import)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + MultipartOverheadBytes))
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("CommitPupilImport")
+            .WithSummary("Import a validated file")
+            .WithDescription(
+                "Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` " +
+                "(repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import " +
+                "past an arm's capacity (needs `arm.capacity.override`). The file is re-validated and imported ALL OR NOTHING: " +
+                "each pupil is created active, with a registration number issued in file order by the same counter as " +
+                "admission approval, an open enrolment, and an admission record with the declaration unsigned; health " +
+                "columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 " +
+                "`import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, " +
+                "`import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.")
+            .Produces<PupilImportResultDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     private static void MapCreate(RouteGroupBuilder group) =>
         group.MapPost(string.Empty, async (

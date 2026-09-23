@@ -46,6 +46,10 @@ public static class ApplicationDependencyInjection
         services.AddScoped<Pupils.Records.PupilRecordAccess>();
         services.AddScoped<Pupils.Records.AdmissionCompleteness>();
 
+        // Spec 6.5.10: the one registration-number issuance path, shared by admission approval and bulk import.
+        services.AddScoped<Settings.RegistrationNumberIssuer>();
+        services.AddScoped<Pupils.Import.PupilImportProcessor>();
+
         // TASK-0088 stage B: shared by GetResultSetReadinessHandler and SubmitResultSetHandler so the
         // submit 422's `readiness` body is computed by the SAME code as the GET (AC B6) — registered
         // behind its interface (unlike SubjectsInEffectResolver above) so the racing-concurrency
