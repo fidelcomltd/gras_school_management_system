@@ -17,10 +17,10 @@ const blankDays = (overrides: Record<number, Record<string, string>> = {}) =>
 
 const GRID = {
   armId: 'arm-1', termId: 't-1', weekNumber: 2, weekStartDate: '2027-01-11', weekEndDate: '2027-01-15', outsideTerm: false,
-  published: false, publishedAt: null, autoPublish: false,
+  published: false, publishedAt: null, autoPublish: false, locked: false,
   rows: [
     { pupilId: 'p-1', registrationNumber: 'GRAS/2026/0041', displayName: 'Bello Musa', onRoll: true, illnessDays: 2,
-      days: blankDays({ 0: { symptomsOfIllness: 'Cough' }, 1: { symptomsOfIllness: 'Cough' } }) },
+      days: blankDays({ 0: { symptomsOfIllness: 'Cough', behaviour: 'Quiet today' }, 1: { symptomsOfIllness: 'Cough' } }) },
     { pupilId: 'p-2', registrationNumber: 'GRAS/2026/0042', displayName: 'Okafor Chidera', onRoll: true, illnessDays: 0, days: blankDays() },
   ],
   weeks: [
@@ -75,7 +75,7 @@ describe('WeeklyScreen', () => {
     expect(await screen.findByText('All changes saved.')).toBeInTheDocument();
   });
 
-  it('fills a whole-class note down every pupil for one day, and marks a pupil unwell two days running', async () => {
+  it('fills a whole-class note down every pupil without a note that day, and marks a pupil unwell two days running', async () => {
     mockMe('weekly.view', 'weekly.enter');
     mockClass();
     let saved: SavedBody | undefined;
@@ -89,13 +89,11 @@ describe('WeeklyScreen', () => {
     const { user } = renderWithProviders(<WeeklyScreen />);
     expect(await screen.findByText('Unwell 2 days')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Behaviour for every pupil'), 'Class went on excursion');
-    await user.click(screen.getByRole('button', { name: 'Apply to every pupil' }));
+    await user.click(screen.getByRole('button', { name: 'Apply to every pupil without a note' }));
 
-    await waitFor(() => expect(saved?.cells).toHaveLength(2));
-    expect(saved?.cells.map((cell) => [cell.pupilId, cell.dayOfWeek, cell.value])).toEqual([
-      ['p-1', 'Monday', 'Class went on excursion'],
-      ['p-2', 'Monday', 'Class went on excursion'],
-    ]);
+    // Bello Musa already has a Monday note; a whole-class fact never overwrites it.
+    await waitFor(() => expect(saved?.cells.map((cell) => [cell.pupilId, cell.dayOfWeek, cell.value])).toEqual([['p-2', 'Monday', 'Class went on excursion']]));
+    expect(screen.getByLabelText('Behaviour, Monday, Bello Musa')).toHaveValue('Quiet today');
   });
 
   it("shows the server's refusal to publish an empty week, and is read-only without weekly.enter", async () => {
@@ -112,7 +110,7 @@ describe('WeeklyScreen', () => {
 
     const { user } = renderWithProviders(<WeeklyScreen />);
     expect(await screen.findByLabelText('Behaviour, Monday, Bello Musa')).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Apply to every pupil' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply to every pupil without a note' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Publish week' }));
 
     expect(await screen.findByText(/Nothing has been written for Week 2 yet/)).toBeInTheDocument();

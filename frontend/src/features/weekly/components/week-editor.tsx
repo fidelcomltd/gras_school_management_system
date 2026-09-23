@@ -45,6 +45,11 @@ export function WeekEditor({
 
   return (
     <div className="flex flex-col gap-4">
+      {grid.locked ? (
+        <output className="block rounded-md bg-muted px-3 py-2 text-sm text-foreground">
+          This term is closed, so its weekly notes can be read but no longer changed.
+        </output>
+      ) : null}
       {grid.outsideTerm ? (
         <output className="block rounded-md bg-accent/20 px-3 py-2 text-sm text-foreground">
           Week {weekNumber} falls outside the term's new dates. Its notes are kept.
@@ -120,8 +125,9 @@ export function WeekEditor({
 
       {draft.error ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Could not save: {draft.error} Your notes are kept on this page and will be retried.
-          <Button variant="outline" size="sm" onClick={draft.flush}>
+          Could not save: {draft.error}{' '}
+          {draft.stalled ? 'Your notes are kept on this page. Correct them and they will save.' : 'Your notes are kept on this page and will be retried.'}
+          <Button variant="outline" size="sm" onClick={draft.retry}>
             Retry now
           </Button>
         </div>

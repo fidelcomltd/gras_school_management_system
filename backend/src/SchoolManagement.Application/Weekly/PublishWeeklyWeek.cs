@@ -84,6 +84,12 @@ internal sealed class SetWeeklyPublicationHandler(
                 $"Nothing has been written for Week {request.WeekNumber} yet. Add at least one note before publishing."));
         }
 
+        // Spec 6.10.8: auto-publish removes a step; it must not overrule a teacher who published or hid this week by hand.
+        if (derived is not null && await weekly.FindSettingTrackedAsync(armId, cancellationToken).ConfigureAwait(false) is { AutoPublish: true } setting)
+        {
+            setting.MarkAutoPublished(derived.StartDate);
+        }
+
         var now = timeProvider.GetUtcNow();
         foreach (var report in reports)
         {

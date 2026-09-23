@@ -3,10 +3,10 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
-using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Weekly;
 using SchoolManagement.Domain.Common;
+using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Weekly;
 
 namespace SchoolManagement.Application.Weekly;
@@ -34,10 +34,11 @@ internal sealed class GetWeeklyGridQueryValidator : AbstractValidator<GetWeeklyG
 /// <summary>Handles <see cref="GetWeeklyGridQuery"/>.</summary>
 internal sealed class GetWeeklyGridHandler(
     IArmRepository arms,
+    IAcademicSessionRepository sessions,
     ITermRepository terms,
     IEnrolmentRepository enrolments,
-    IPupilRepository pupils,
     IWeeklyReportRepository weekly,
+    IWeeklyNameLookup names,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<GetWeeklyGridQuery, Result<WeeklyGridDto>>
@@ -81,13 +82,12 @@ internal sealed class GetWeeklyGridHandler(
 
         // A pupil who has notes here but has since left the arm keeps them, attributed to this arm (spec 6.10.10).
         var rosterIds = roster.Select(pupil => pupil.PupilId).ToHashSet();
-        foreach (var report in reports.Where(report => !rosterIds.Contains(report.PupilId)))
-        {
-            if (await pupils.FindReadOnlyByIdAsync(report.PupilId, cancellationToken).ConfigureAwait(false) is { } pupil)
-            {
-                rows.Add(Row(pupil.Id, pupil.RegistrationNumber, WeeklyProjection.DisplayName(pupil.Surname, pupil.FirstName, pupil.MiddleName), onRoll: false));
-            }
-        }
+        var leavers = await names.PupilsAsync(reports.Select(report => report.PupilId).Where(id => !rosterIds.Contains(id)).ToList(), cancellationToken)
+            .ConfigureAwait(false);
+        rows.AddRange(leavers.Select(pupil => Row(pupil.PupilId, pupil.RegistrationNumber, pupil.DisplayName, onRoll: false)));
+
+        var session = await sessions.FindReadOnlyByIdAsync(term.SessionId, cancellationToken).ConfigureAwait(false);
+        var locked = term.State == TermState.Closed || session is { State: SessionState.Closed };
 
         var phrases = currentUser.UserId is { } actor
             ? await weekly.ListPhrasesAsync(termId, actor, PhrasesPerField, cancellationToken).ConfigureAwait(false)
@@ -103,6 +103,7 @@ internal sealed class GetWeeklyGridHandler(
             week.Published,
             reports.Where(report => report.State == WeeklyReportState.Published).Max(report => report.PublishedAt),
             await weekly.IsAutoPublishAsync(armId, cancellationToken).ConfigureAwait(false),
+            locked,
             rows.OrderBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase).ThenBy(row => row.PupilId, StringComparer.Ordinal).ToList(),
             weeks,
             WeeklyProjection.Phrases(phrases)));

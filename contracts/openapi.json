@@ -29787,6 +29787,7 @@
           "published",
           "publishedAt",
           "autoPublish",
+          "locked",
           "rows",
           "weeks",
           "phrases"
@@ -29847,6 +29848,11 @@
           "autoPublish": {
             "type": "boolean",
             "description": "The arm publishes each week at 17:00 on its Friday.",
+            "example": false
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "The term or its session is closed: notes can be read but not written (409 on save).",
             "example": false
           },
           "rows": {
@@ -29916,6 +29922,7 @@
           "published": true,
           "publishedAt": "2026-08-03T09:30:00+00:00",
           "autoPublish": false,
+          "locked": false,
           "rows": [
             {
               "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",

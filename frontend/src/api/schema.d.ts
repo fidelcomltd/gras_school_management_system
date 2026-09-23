@@ -11968,6 +11968,7 @@ export interface components {
          *       "published": true,
          *       "publishedAt": "2026-08-03T09:30:00+00:00",
          *       "autoPublish": false,
+         *       "locked": false,
          *       "rows": [
          *         {
          *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
@@ -12078,6 +12079,11 @@ export interface components {
              * @example false
              */
             autoPublish: boolean;
+            /**
+             * @description The term or its session is closed: notes can be read but not written (409 on save).
+             * @example false
+             */
+            locked: boolean;
             /**
              * @description Every active pupil, plus any pupil with notes in this week who has since left, surname order.
              * @example [

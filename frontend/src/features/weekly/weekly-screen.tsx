@@ -35,7 +35,7 @@ export function WeeklyScreen() {
         key={`${scope}|${grid.data.weekNumber}`}
         grid={grid.data}
         queryKey={queryKey}
-        canEnter={!!me.data && hasPrivilegeInArm(me.data, 'weekly.enter', klass.armId)}
+        canEnter={!grid.data.locked && !!me.data && hasPrivilegeInArm(me.data, 'weekly.enter', klass.armId)}
         canPublish={!!me.data && hasPrivilegeInArm(me.data, 'weekly.publish', klass.armId)}
         accountId={me.data?.accountId}
       />

@@ -123,7 +123,10 @@ internal sealed class PortalRepository(ApplicationDbContext context) : IPortalRe
                     enrolment.EffectiveFrom,
                     ResultSetState = context.ResultSets.Where(set => set.ArmId == arm.Id && set.TermId == term.Id).Select(set => (Domain.Results.ResultSetState?)set.State).FirstOrDefault(),
                     WeeklyPublished = context.WeeklyReports.Any(report =>
-                        report.PupilId == pupilId && report.TermId == term.Id && report.State == Domain.Weekly.WeeklyReportState.Published),
+                        report.PupilId == pupilId && report.TermId == term.Id && report.State == Domain.Weekly.WeeklyReportState.Published
+                        && context.WeeklyReportDays.Any(day => day.WeeklyReportId == report.Id
+                            && (day.Behaviour != null || day.Performance != null || day.Dressing != null || day.HomeWork != null
+                                || day.Eating != null || day.SymptomsOfIllness != null || day.TeacherComment != null || day.ParentComment != null))),
                 })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);

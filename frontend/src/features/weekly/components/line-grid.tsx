@@ -35,7 +35,12 @@ export function LineGrid({
   const fillDown = (event: FormEvent) => {
     event.preventDefault();
     if (fillText.trim() === '') return;
-    draft.setMany(grid.rows.map((row) => ({ pupilId: row.pupilId, day: fillDay, field, value: fillText })));
+    // A whole-class fact never overwrites a note already written for one child, and never lands on a pupil who has left.
+    draft.setMany(
+      grid.rows
+        .filter((row) => row.onRoll && draft.value(row.pupilId, fillDay, field).trim() === '')
+        .map((row) => ({ pupilId: row.pupilId, day: fillDay, field, value: fillText })),
+    );
     setFillText('');
     draft.flushSoon();
   };
@@ -84,7 +89,7 @@ export function LineGrid({
             onChange={(event) => setFillText(event.target.value)}
           />
           <Button type="submit" variant="outline" size="sm" disabled={fillText.trim() === ''}>
-            Apply to every pupil
+            Apply to every pupil without a note
           </Button>
         </form>
       ) : null}

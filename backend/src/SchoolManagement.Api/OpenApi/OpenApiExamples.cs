@@ -2857,6 +2857,7 @@ internal static class OpenApiExamples
               "published": true,
               "publishedAt": "{{CanonicalTimestamp}}",
               "autoPublish": false,
+              "locked": false,
               "rows": [
                 {
                   "pupilId": "{{ExamplePupilId}}",

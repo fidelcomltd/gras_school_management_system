@@ -79,6 +79,7 @@ public sealed record WeeklyPhrasesDto(
 /// <param name="Published">Visible to parents.</param>
 /// <param name="PublishedAt">When it was published.</param>
 /// <param name="AutoPublish">The arm publishes each week at 17:00 on its Friday.</param>
+/// <param name="Locked">The term or its session is closed: notes can be read but not written (409 on save).</param>
 /// <param name="Rows">Every active pupil, plus any pupil with notes in this week who has since left, surname order.</param>
 /// <param name="Weeks">Every week of the term for this arm, for the week picker.</param>
 /// <param name="Phrases">The signed-in account's own phrases this term.</param>
@@ -92,6 +93,7 @@ public sealed record WeeklyGridDto(
     bool Published,
     DateTimeOffset? PublishedAt,
     bool AutoPublish,
+    bool Locked,
     IReadOnlyList<WeeklyGridRowDto> Rows,
     IReadOnlyList<WeeklyWeekSummaryDto> Weeks,
     WeeklyPhrasesDto Phrases);

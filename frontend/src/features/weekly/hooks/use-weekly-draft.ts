@@ -14,33 +14,52 @@ export interface WeeklyDraft {
   setMany: (cells: { pupilId: string; day: WeeklyDay; field: WeeklyField; value: string }[]) => void;
   isTooLong: (pupilId: string, day: WeeklyDay, field: WeeklyField) => boolean;
   flush: () => void;
+  /** Clears a stalled save and tries again now. */
+  retry: () => void;
   /** Saves after the next render, once a just-made change has landed (Fill down). */
   flushSoon: () => void;
   unsaved: number;
   saving: boolean;
-  /** The last save failure; the edits are kept and retried on the next tick (spec 9.8.2). */
+  /** The last save failure; the edits are kept (spec 9.8.2). */
   error: string | null;
+  /** True when retrying cannot help (a rejection, not a dropped connection): autosave waits for the next edit. */
+  stalled: boolean;
 }
 
 const MAX_BY_FIELD = Object.fromEntries(WEEKLY_FIELDS.map((meta) => [meta.field, meta.max])) as Record<WeeklyField, number>;
 
+/** A 4xx other than a conflict or throttling fails the same way again; a 409 (a concurrent first note) or a network fault may not. */
+const isPermanent = (failure: unknown) =>
+  failure instanceof ApiError &&
+  failure.status !== undefined &&
+  failure.status >= 400 &&
+  failure.status < 500 &&
+  failure.status !== 409 &&
+  failure.status !== 429;
+
 /**
  * Unsaved cells held on top of one week's grid. Saves are sparse — only the cells touched are sent — and on success the
- * saved values are written into the cached grid, so a refetch never races a teacher mid-sentence.
+ * saved values are written into the cached grid, so a refetch never races a teacher mid-sentence. Saves are promise-based,
+ * so the final save when the week is left still lands in the cache after the editor has unmounted, and an edit made while
+ * a save is in flight is sent as soon as it returns.
  */
 export function useWeeklyDraft(grid: WeeklyGridDto, queryKey: readonly unknown[]): WeeklyDraft {
   const queryClient = useQueryClient();
-  const { mutate, isPending } = useSaveWeeklyNotes(grid.armId);
+  const { mutateAsync, isPending } = useSaveWeeklyNotes(grid.armId);
   const queryKeyRef = useRef(queryKey);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [stalled, setStalled] = useState(false);
   const editsRef = useRef(edits);
+  const stalledRef = useRef(false);
   // Synced after each render; declared before the effects that flush, so they always read the committed edits.
   useEffect(() => {
     queryKeyRef.current = queryKey;
     editsRef.current = edits;
+    stalledRef.current = stalled;
   });
   const savingRef = useRef(false);
+  const againRef = useRef(false);
   const rowsById = new Map(grid.rows.map((row) => [row.pupilId, row]));
 
   const original = (pupilId: string, day: WeeklyDay, field: WeeklyField) => {
@@ -50,7 +69,8 @@ export function useWeeklyDraft(grid: WeeklyGridDto, queryKey: readonly unknown[]
 
   const value = (pupilId: string, day: WeeklyDay, field: WeeklyField) => edits[cellKey(pupilId, day, field)] ?? original(pupilId, day, field);
 
-  const setMany: WeeklyDraft['setMany'] = (cells) =>
+  const setMany: WeeklyDraft['setMany'] = (cells) => {
+    setStalled(false);
     setEdits((current) => {
       const next = { ...current };
       for (const cell of cells) {
@@ -60,13 +80,19 @@ export function useWeeklyDraft(grid: WeeklyGridDto, queryKey: readonly unknown[]
       }
       return next;
     });
+  };
 
   const isTooLong = (pupilId: string, day: WeeklyDay, field: WeeklyField) => value(pupilId, day, field).trim().length > MAX_BY_FIELD[field];
 
   const termId = grid.termId;
   const weekNumber = Number(grid.weekNumber);
+  const flushRef = useRef<() => void>(() => undefined);
   const flush = useCallback(() => {
-    if (savingRef.current) return;
+    if (savingRef.current) {
+      againRef.current = true; // Sent as soon as the save in flight returns.
+      return;
+    }
+    if (stalledRef.current) return;
     const snapshot = Object.entries(editsRef.current).filter(([key, text]) => {
       const field = key.split('|')[2] as WeeklyField;
       return text.trim().length <= MAX_BY_FIELD[field];
@@ -79,26 +105,33 @@ export function useWeeklyDraft(grid: WeeklyGridDto, queryKey: readonly unknown[]
     });
 
     savingRef.current = true;
-    mutate(
-      { termId, weekNumber, cells },
-      {
-        onSuccess: () => {
-          setError(null);
-          queryClient.setQueryData<WeeklyGridDto>(queryKeyRef.current, (cached) => (cached ? applyCells(cached, cells) : cached));
-          // Only drop an edit if it has not been typed over while the save was in flight.
-          setEdits((current) => {
-            const next = { ...current };
-            for (const [key, text] of snapshot) if (next[key] === text) delete next[key];
-            return next;
-          });
-        },
-        onError: (failure) => setError(failure instanceof ApiError ? failure.message : 'Could not save. Retrying shortly.'),
-        onSettled: () => {
-          savingRef.current = false;
-        },
-      },
-    );
-  }, [mutate, termId, weekNumber, queryClient]);
+    const save = async () => {
+      try {
+        await mutateAsync({ termId, weekNumber, cells });
+        setError(null);
+        queryClient.setQueryData<WeeklyGridDto>(queryKeyRef.current, (cached) => (cached ? applyCells(cached, cells) : cached));
+        // Only drop an edit if it has not been typed over while the save was in flight.
+        const remaining = { ...editsRef.current };
+        for (const [key, text] of snapshot) if (remaining[key] === text) delete remaining[key];
+        editsRef.current = remaining;
+        setEdits(remaining);
+      } catch (failure: unknown) {
+        setError(failure instanceof ApiError ? failure.message : 'Could not save. Retrying shortly.');
+        stalledRef.current = isPermanent(failure);
+        setStalled(stalledRef.current);
+      } finally {
+        savingRef.current = false;
+        if (againRef.current) {
+          againRef.current = false;
+          flushRef.current();
+        }
+      }
+    };
+    void save();
+  }, [mutateAsync, termId, weekNumber, queryClient]);
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
 
   // Every thirty seconds; and once more when the week is left, so switching weeks never drops a note.
   useEffect(() => {
@@ -128,10 +161,16 @@ export function useWeeklyDraft(grid: WeeklyGridDto, queryKey: readonly unknown[]
     setMany,
     isTooLong,
     flush,
+    retry: () => {
+      stalledRef.current = false;
+      setStalled(false);
+      flush();
+    },
     flushSoon: () => setFlushRequest((count) => count + 1),
     unsaved,
     saving: isPending,
     error,
+    stalled,
   };
 }
 

@@ -5,6 +5,7 @@ using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Portal;
+using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Api.Portal;
 
@@ -215,7 +216,7 @@ internal static class PortalEndpoints
         var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
         if (result.IsFailure)
         {
-            return Html(PortalHtml.Message(branding, PortalCopy.ServerFault));
+            return Html(PortalHtml.Message(branding, result.Error is ValidationError ? PortalCopy.WeeklyNotAvailable : PortalCopy.ServerFault));
         }
 
         return result.Value switch

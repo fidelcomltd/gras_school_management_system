@@ -34,8 +34,12 @@ internal sealed class WeeklyReportRepository(ApplicationDbContext context) : IWe
                         (day.Behaviour != null ? 1 : 0) + (day.Performance != null ? 1 : 0) + (day.Dressing != null ? 1 : 0) +
                         (day.HomeWork != null ? 1 : 0) + (day.Eating != null ? 1 : 0) + (day.SymptomsOfIllness != null ? 1 : 0) +
                         (day.TeacherComment != null ? 1 : 0) + (day.ParentComment != null ? 1 : 0)),
-                    EditedAt = report.ModifiedAtUtc ?? report.CreatedAtUtc,
-                    EditedBy = report.ModifiedBy ?? report.CreatedBy,
+                    // From the day rows: publishing stamps the report row, and "last edited" means who wrote notes.
+                    LastDay = context.WeeklyReportDays
+                        .Where(day => day.WeeklyReportId == report.Id)
+                        .OrderByDescending(day => day.ModifiedAtUtc ?? day.CreatedAtUtc)
+                        .Select(day => new { At = day.ModifiedAtUtc ?? day.CreatedAtUtc, By = day.ModifiedBy ?? day.CreatedBy })
+                        .FirstOrDefault(),
                 })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -44,11 +48,11 @@ internal sealed class WeeklyReportRepository(ApplicationDbContext context) : IWe
             .GroupBy(row => (row.ArmId, row.WeekNumber))
             .Select(group =>
             {
-                var latest = group.MaxBy(row => row.EditedAt)!;
+                var latest = group.Where(row => row.Filled > 0 && row.LastDay is not null).MaxBy(row => row.LastDay!.At)?.LastDay;
                 return new WeeklyArmWeekTotals(
                     group.Key.ArmId, group.Key.WeekNumber, group.Min(row => row.WeekStartDate), group.Min(row => row.WeekEndDate),
                     group.Count(row => row.Filled > 0), group.Sum(row => row.Filled), group.Any(row => row.Published),
-                    group.Any(row => row.Filled > 0) ? latest.EditedAt : null, group.Any(row => row.Filled > 0) ? latest.EditedBy : null);
+                    latest?.At, latest?.By);
             })
             .ToList();
     }
@@ -162,6 +166,40 @@ internal sealed class WeeklyReportRepository(ApplicationDbContext context) : IWe
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         return accounts.ToDictionary(account => account.Id.ToString("D", CultureInfo.InvariantCulture), account => account.StaffName, StringComparer.Ordinal);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<WeeklyPupilName>> PupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        if (pupilIds.Count == 0)
+        {
+            return [];
+        }
+
+        var pupils = await context.Pupils.AsNoTracking()
+            .Where(pupil => pupilIds.Contains(pupil.Id))
+            .Select(pupil => new { pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return pupils
+            .Select(pupil => new WeeklyPupilName(pupil.Id, pupil.RegistrationNumber, string.IsNullOrWhiteSpace(pupil.MiddleName) ? $"{pupil.Surname} {pupil.FirstName}" : $"{pupil.Surname} {pupil.FirstName} {pupil.MiddleName}"))
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, int>> RosterCountsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken)
+    {
+        // Same definition as IEnrolmentRepository.ListActiveRosterByArmAsync: an open enrolment of an Active pupil.
+        var counts = await (
+                from enrolment in context.Enrolments.AsNoTracking()
+                where armIds.Contains(enrolment.ArmId) && enrolment.EffectiveTo == null
+                join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                where pupil.Status == Domain.Pupils.PupilStatus.Active
+                group enrolment by enrolment.ArmId into arm
+                select new { ArmId = arm.Key, Count = arm.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return counts.ToDictionary(row => row.ArmId, row => row.Count);
     }
 
     private async Task<IReadOnlyList<WeeklyReportSnapshot>> SnapshotsAsync(IQueryable<WeeklyReport> query, CancellationToken cancellationToken)
