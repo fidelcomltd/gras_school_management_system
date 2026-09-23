@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
+import { CreatePupilDialog } from '@/features/pupils/components/create-pupil-dialog';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmissionsQueue } from '../api';
@@ -18,14 +21,16 @@ function pupilName(row: AdmissionQueueRow): string {
  * shape. Items render in the server's own order — no client-side `.sort()`.
  *
  * `missing` is rendered as prose ("Still needed: …"), never the raw array —
- * and it is a known partial view (sections A/I only; steps 2-8 have no
- * entity yet), so the screen says so once, above the list, rather than
- * implying each row's list is exhaustive.
+ * and it is a known partial view (sections A/I only), so the screen says so
+ * once, above the list; the full list is step 9 of the admission itself.
  */
 export function AdmissionQueueList() {
   const admissions = useAdmissionsQueue();
   const me = useMe();
   const canDecide = !!me.data && hasPrivilege(me.data, 'pupil.admission.approve');
+  const canCreate = !!me.data && hasPrivilege(me.data, 'pupil.create');
+  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
   const [approving, setApproving] = useState<AdmissionQueueRow | null>(null);
   const [declining, setDeclining] = useState<AdmissionQueueRow | null>(null);
 
@@ -47,15 +52,32 @@ export function AdmissionQueueList() {
     );
   }
 
+  const newAdmission = canCreate ? (
+    <>
+      <Button className="self-start" onClick={() => setCreating(true)}>
+        New admission
+      </Button>
+      {creating ? (
+        <CreatePupilDialog onClose={() => setCreating(false)} onCreated={(pupil) => void navigate(paths.admissionFlow(pupil.id, 2))} />
+      ) : null}
+    </>
+  ) : null;
+
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">No pending applications.</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        {newAdmission}
+        <p className="text-sm text-muted-foreground">No pending applications.</p>
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {newAdmission}
       <p className="text-xs text-muted-foreground">
-        "Still needed" reflects only what today's records can check (the assessment result and the
-        declaration signature) — a blank list is not a promise nothing else is outstanding.
+        "Still needed" shows only the assessment result and the declaration. Open an admission for the
+        full list: step 9 names every missing item.
       </p>
 
       <ul aria-label="Admissions queue" className="flex flex-col gap-2">
@@ -74,16 +96,21 @@ export function AdmissionQueueList() {
               ) : null}
             </div>
 
-            {canDecide ? (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setDeclining(row)}>
-                  Decline
-                </Button>
-                <Button size="sm" onClick={() => setApproving(row)}>
-                  Approve
-                </Button>
-              </div>
-            ) : null}
+            <div className="flex gap-2">
+              <Link to={paths.admissionFlow(row.id)} className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-primary hover:underline">
+                Continue
+              </Link>
+              {canDecide ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setDeclining(row)}>
+                    Decline
+                  </Button>
+                  <Button size="sm" onClick={() => setApproving(row)}>
+                    Approve
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>

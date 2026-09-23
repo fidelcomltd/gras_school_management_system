@@ -252,6 +252,12 @@ public static class Privileges
         public const string AdmissionApprove = "pupil.admission.approve";
 
         /// <summary>
+        /// Approve an admission whose health questions the parent declined to answer, with a reason (spec 6.5.16).
+        /// Not in spec 4.4's table: added by human ruling 2026-09-23.
+        /// </summary>
+        public const string AdmissionOverride = "pupil.admission.override";
+
+        /// <summary>
         /// Read the section F health block and the barred-persons list. Every read is audited.
         /// Scopable.
         /// </summary>

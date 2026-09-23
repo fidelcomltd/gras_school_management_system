@@ -128,6 +128,10 @@ public sealed class PipelineTests
         // TASK-0086 stage B: the remark-template handlers (Get/Create/Delete) depend on this port,
         // implemented by Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IRemarkTemplateRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Weekly.IWeeklyReportRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Weekly.IWeeklyNameLookup>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pupils.IPupilRecordRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Weekly.IWeeklySheetPdfRenderer>());
 
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.

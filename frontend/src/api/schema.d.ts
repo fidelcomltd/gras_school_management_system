@@ -170,7 +170,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a pending admission
-         * @description Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved).
+         * @description Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved). Also 422 `admission.incomplete` naming each missing step (contacts, the barred-persons answer, the health answers). Spec 6.5.16: when the ONLY gap is the unanswered health questions, `healthOverrideReason` (10-500 characters) approves anyway for a caller holding `pupil.admission.override` (403 `admission.override_forbidden` otherwise); audited, with the reason kept on the admission record rather than in the audit log.
          */
         post: operations["ApproveAdmission"];
         delete?: never;
@@ -949,6 +949,202 @@ export interface paths {
          * @description Spec 6.5.10, "Immutability and correction". Super Admin only (`pupil.regnumber.correct` is excluded from every other seeded role). The administrator TYPES the replacement number in full — nothing here composes one from settings, unlike admission approval's issuance. The new number must be unique against both the live `registrationNumber` column and every historical alias ever recorded (409 on either collision). The counter is NOT touched — a correction consumes no serial. The old number is written to a permanent history row with the reason, the actor and the timestamp, and is never deleted: a parent holding a pin slip printed with the old number still reaches this pupil (the portal lookup that reads it is a later card). Already-published result snapshots are not rewritten. `Idempotency-Key` is REQUIRED — a retry must not append a second, redundant history row. 404 when `id` names no pupil. 409 when this pupil has no registration number yet (still pending — approve the admission first).
          */
         post: operations["CorrectPupilRegistrationNumber"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a pupil's contacts
+         * @description Spec 6.5.5: father, mother, guardian and the two emergency contacts, as recorded. Needs `contact.view` over the pupil.
+         */
+        get: operations["GetPupilContacts"];
+        /**
+         * Save a pupil's contacts
+         * @description Spec 6.5.5: the whole set, one per role; a role left out is removed. Phones in either Nigerian form are stored as +234. Exactly one father, mother or guardian is the primary contact whenever any is recorded. 409 `contact.last_responsible_adult` when an active pupil would be left with no father, mother or guardian. Needs `contact.update` over the pupil.
+         */
+        put: operations["SavePupilContacts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/pickup-persons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the authorised pickup list
+         * @description Spec 6.5.6: in the parent's order. Needs `contact.view` over the pupil.
+         */
+        get: operations["GetPickupPersons"];
+        /**
+         * Save the authorised pickup list
+         * @description Spec 6.5.6: the whole list, replaced; empty is allowed. Needs `contact.update` over the pupil.
+         */
+        put: operations["SavePickupPersons"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/barred-persons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read who must not collect the pupil
+         * @description Spec 6.5.6: the most sensitive data in the system. Needs `pupil.safeguarding.view` over the pupil, and every read writes an audit event. `hasBarredPersons` null means the question has not been asked.
+         */
+        get: operations["GetBarredPersons"];
+        /**
+         * Answer the barred-persons question
+         * @description Spec 6.5.6: the explicit yes or no, with at least one name when yes and none when no. Needs `pupil.safeguarding.update` over the pupil. Names never enter the audit log.
+         */
+        put: operations["SaveBarredPersons"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a pupil's health and safety section
+         * @description Spec 6.5.7: section F. Needs `pupil.safeguarding.view` over the pupil; every read writes an audit event. A null answer means the question has not been asked, which is not the same as No.
+         */
+        get: operations["GetPupilHealth"];
+        /**
+         * Save a pupil's health and safety section
+         * @description Spec 6.5.7: the whole of section F. A detail is required where its question is Yes and cleared where No. Unanswered questions may stay null until approval. Needs `pupil.safeguarding.update` over the pupil.
+         */
+        put: operations["SavePupilHealth"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the admission document checklist
+         * @description Spec 6.5.8: always five rows in form order; a row never ticked reads as not received. Needs `pupil.view`.
+         */
+        get: operations["GetPupilDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/documents/{documentType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Tick or untick one checklist document
+         * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. Needs `pupil.document.manage` over the pupil.
+         */
+        put: operations["SavePupilDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an admission still lacks
+         * @description Spec 6.5.12: `blocking` items stop approval (contacts, the barred-persons answer, the three health answers, the declaration, a required assessment's outcome); `chased` items are tracked after approval. Each is keyed to its admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.
+         */
+        get: operations["GetAdmissionCompleteness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{termId}/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a term's derived weeks
+         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
+         */
+        get: operations["GetTermWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil's weekly reports for a term
+         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the handler so a pupil who has left (no open enrolment) is still readable school-wide.
+         */
+        get: operations["GetPupilWeekly"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2035,6 +2231,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/arms/{armId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's weekly grid for one week
+         * @description Spec 6.10.7/6.10.11: every active pupil (plus any pupil with notes in this week who has since left) by five weekdays, each day carrying all eight lines, in one response. Without `weekNumber` it opens the week containing today (Lagos). Also returns the term's week list with publication state (`weeks`), the arm's auto-publish option, and the caller's own phrase memory per line (`phrases`). `illnessDays` of 2 or more is the quiet marker of 6.10.6.
+         */
+        get: operations["GetWeeklyGrid"];
+        /**
+         * Save weekly notes, sparse
+         * @description Spec 6.10.11: bulk upsert of one week's grid in one transaction. Only the cells sent are touched, so a Fill down writes only what it filled; a null or blank `value` clears a line. The first note for a pupil creates their report with its five days. Last write wins (6.10.10), no version. Nothing is required and nothing is scored. 422 for a line over its limit (300, or 500 for the two comments) or a pupil neither on the roster nor holding notes in this arm's week; 409 `weekly.term_closed` / `weekly.session_closed`.
+         */
+        put: operations["SaveWeeklyNotes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/{weekNumber}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish one arm's week to parents
+         * @description Spec 6.10.8: per arm per week, no approval chain. Every pupil's report for the week becomes visible on the portal, and a report created later in a published week starts published. 409 `weekly.nothing_to_publish` when no pupil has any note. Idempotent.
+         */
+        post: operations["PublishWeeklyWeek"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/{weekNumber}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpublish one arm's week
+         * @description Spec 6.10.8: hides the week from parents again. No reason required. Idempotent.
+         */
+        post: operations["UnpublishWeeklyWeek"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn weekly auto-publish on or off for an arm
+         * @description Spec 6.10.8: off by default. When on, each week with at least one note is published automatically at 17:00 Lagos time on its Friday (caught up until Sunday if the server was down). A week the teacher unpublishes afterwards stays unpublished.
+         */
+        put: operations["UpdateWeeklySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/weekly-completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekly report completion, per arm per week
+         * @description Spec 6.10.12: one row per active arm per week of the term (or one week with `weekNumber`): pupils with any note, lines filled against lines available (pupils on roll x 5 days x 8 lines), published state, and the last edit. Bounded by arms x 20 weeks, so not paginated.
+         */
+        get: operations["GetWeeklyCompletionReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/weekly-illness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Illness observation summary for a term
+         * @description Spec 6.10.12: every pupil with `symptomsOfIllness` recorded on two or more days of the term, with the dates and the text. Health observation about a child, so it needs `report.view` AND `pupil.safeguarding.view`, both school-wide.
+         */
+        get: operations["GetWeeklyIllnessReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2173,6 +2493,63 @@ export interface components {
             createdAtUtc: string;
         };
         /**
+         * @description What an admission still lacks (spec 6.5.12): blocking items stop approval; chased items are tracked after the pupil is
+         *     active. The percentage is across the chased set only.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "blocking": [
+         *         {
+         *           "step": 5,
+         *           "code": "health.unanswered",
+         *           "message": "Answer all three health questions: allergy, medical condition, medication."
+         *         }
+         *       ],
+         *       "chased": [
+         *         {
+         *           "step": 7,
+         *           "code": "documents.BirthCertificate",
+         *           "message": "Birth certificate."
+         *         }
+         *       ],
+         *       "chasedPercent": 90
+         *     }
+         */
+        AdmissionCompletenessDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Required for approval.
+             * @example [
+             *       {
+             *         "step": 5,
+             *         "code": "health.unanswered",
+             *         "message": "Answer all three health questions: allergy, medical condition, medication."
+             *       }
+             *     ]
+             */
+            blocking: components["schemas"]["CompletenessItemDto"][];
+            /**
+             * @description Tracked, never blocking.
+             * @example [
+             *       {
+             *         "step": 7,
+             *         "code": "documents.BirthCertificate",
+             *         "message": "Birth certificate."
+             *       }
+             *     ]
+             */
+            chased: components["schemas"]["CompletenessItemDto"][];
+            /**
+             * Format: int32
+             * @description 0 to 100: how much of the chased set is present.
+             * @example 90
+             */
+            chasedPercent: number | string;
+        };
+        /**
          * @description Sections A, I and J of the admission form (spec 6.5.9) — nested inside `PupilDto.Admission`
          *     on `POST /pupils`'s response, and returned directly by `PATCH /admissions/{id}`.
          * @example {
@@ -2292,7 +2669,8 @@ export interface components {
          *       "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
          *       "assessmentResultRemarks": "Passed the entrance assessment.",
          *       "headOfSchoolConfirmed": true,
-         *       "headOfSchoolName": null
+         *       "headOfSchoolName": null,
+         *       "healthOverrideReason": null
          *     }
          */
         ApproveAdmissionCommand: {
@@ -2329,6 +2707,13 @@ export interface components {
              *     always wins over the default.
              */
             headOfSchoolName: null | string;
+            /**
+             * @description Spec 6.5.16: the parent declined to answer the health questions, and a holder of
+             *     `pupil.admission.override` approves anyway, saying why (10 to 500 characters). Waives ONLY the
+             *     unanswered health questions; every other blocking item still blocks. The approval is audited; the reason is kept on
+             *     the admission record, not in the audit log. Omit otherwise.
+             */
+            healthOverrideReason?: null | string;
         };
         /**
          * @description The 200 response (contract delta item 1).
@@ -2826,6 +3211,93 @@ export interface components {
             sessionAbsoluteExpiresAt: string;
         };
         /**
+         * @description One person barred from collecting the child.
+         * @example {
+         *       "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
+         *       "fullName": "John Doe",
+         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *     }
+         */
+        BarredPersonDto: {
+            /**
+             * @description The row.
+             * @example 0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39
+             */
+            id: string;
+            /**
+             * @description Required.
+             * @example John Doe
+             */
+            fullName: string;
+            /**
+             * @description Relevant information.
+             * @example Court order dated 03/02/2026; office holds a copy.
+             */
+            details: null | string;
+        };
+        /**
+         * @description One barred person as submitted.
+         * @example {
+         *       "fullName": "John Doe",
+         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *     }
+         */
+        BarredPersonInput: {
+            /**
+             * @description Required.
+             * @example John Doe
+             */
+            fullName: string;
+            /**
+             * @description Optional, at most 500 characters.
+             * @example Court order dated 03/02/2026; office holds a copy.
+             */
+            details: null | string;
+        };
+        /**
+         * @description Section E's exclusion question and its answer (spec 6.5.6). Safeguarding data: every read is audited.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "hasBarredPersons": true,
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
+         *           "fullName": "John Doe",
+         *           "details": "Court order dated 03/02/2026; office holds a copy."
+         *         }
+         *       ]
+         *     }
+         */
+        BarredPersonsDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null when never asked, which is not the same as No.
+             * @example true
+             */
+            hasBarredPersons: null | boolean;
+            /**
+             * @description Present only when the answer is yes.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
+             *         "fullName": "John Doe",
+             *         "details": "Court order dated 03/02/2026; office holds a copy."
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["BarredPersonDto"][];
+        };
+        /**
+         * @description A blood group (spec 6.5.7): A+, A-, B+, B-, AB+, AB-, O+ or O-, spelled out. Free text is not accepted.
+         * @example OPositive
+         * @enum {unknown}
+         */
+        BloodGroup: "APositive" | "ANegative" | "BPositive" | "BNegative" | "AbPositive" | "AbNegative" | "OPositive" | "ONegative" | null;
+        /**
          * @description `POST /api/v1/arms/bulk` (spec 6.4.3, 6.4.9): "Create arms for session" — an administrator
          *             opening a new session creates every level's rooms in one action instead of one form per level.
          *             Labels continue from each level's highest existing label (spec 6.4.8, same rule as
@@ -2981,6 +3453,32 @@ export interface components {
              * @example another horse battery staple 4
              */
             newPassword: string;
+        };
+        /**
+         * @description One missing item on an admission (spec 6.5.12), keyed to the step that fixes it.
+         * @example {
+         *       "step": 5,
+         *       "code": "health.unanswered",
+         *       "message": "Answer all three health questions: allergy, medical condition, medication."
+         *     }
+         */
+        CompletenessItemDto: {
+            /**
+             * Format: int32
+             * @description The admission-flow step, 1 to 9 (spec 6.5.11).
+             * @example 5
+             */
+            step: number | string;
+            /**
+             * @description Stable machine code.
+             * @example health.unanswered
+             */
+            code: string;
+            /**
+             * @description What is missing, in the office's words.
+             * @example Answer all three health questions: allergy, medical condition, medication.
+             */
+            message: string;
         };
         /**
          * @description The 200 response.
@@ -3215,6 +3713,12 @@ export interface components {
              */
             createdAtUtc: string;
         };
+        /**
+         * @description The five contact slots of the admission form (spec 6.5.5), sections C and D.
+         * @example Father
+         * @enum {unknown}
+         */
+        ContactRole: "Father" | "Mother" | "Guardian" | "EmergencyPrimary" | "EmergencyAlternate";
         /**
          * @description `POST /api/v1/subject-mappings/copy` (spec 6.6.5, 6.6.9): "Body carries source term and
          *             destination term." Additive only — this card's own judgement call (see the handler's remarks):
@@ -5024,6 +5528,12 @@ export interface components {
             confirmMaxUses: null | number | string;
         };
         /**
+         * @description A genotype (spec 6.5.7): AA, AS, SS, AC or SC.
+         * @example AA
+         * @enum {unknown}
+         */
+        Genotype: "AA" | "AS" | "SS" | "AC" | "SC" | null;
+        /**
          * @description One band, both inside SettingsGradingGroupDto and inside SettingsDto's
          *     envelope. An element of an ORDERED ARRAY (6.2.13's durability requirement) — never a named field —
          *     sorted by `displayOrder` for printing; grade RESOLUTION sorts by `lowerBound` internally
@@ -5342,6 +5852,95 @@ export interface components {
              * @example true
              */
             hasPreviousPage?: boolean;
+        };
+        /**
+         * @description One authorised pickup person (spec 6.5.6).
+         * @example {
+         *       "id": "0192f0c4-ae50-7d8d-b1af-5d0dc0f82928",
+         *       "fullName": "Chinedu Obi",
+         *       "relationship": "Driver",
+         *       "phone": "+2348021112222"
+         *     }
+         */
+        PickupPersonDto: {
+            /**
+             * @description The row.
+             * @example 0192f0c4-ae50-7d8d-b1af-5d0dc0f82928
+             */
+            id: string;
+            /**
+             * @description Two words minimum.
+             * @example Chinedu Obi
+             */
+            fullName: string;
+            /**
+             * @description Free text.
+             * @example Driver
+             */
+            relationship: string;
+            /**
+             * @description Canonical `+234` form.
+             * @example +2348021112222
+             */
+            phone: string;
+        };
+        /**
+         * @description One pickup person as submitted.
+         * @example {
+         *       "fullName": "Chinedu Obi",
+         *       "relationship": "Driver",
+         *       "phone": "08021112222"
+         *     }
+         */
+        PickupPersonInput: {
+            /**
+             * @description Two words minimum.
+             * @example Chinedu Obi
+             */
+            fullName: string;
+            /**
+             * @description Free text.
+             * @example Driver
+             */
+            relationship: string;
+            /**
+             * @description Nigerian format.
+             * @example 08021112222
+             */
+            phone: string;
+        };
+        /**
+         * @description The authorised pickup list, in the parent's order. Empty is allowed.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-ae50-7d8d-b1af-5d0dc0f82928",
+         *           "fullName": "Chinedu Obi",
+         *           "relationship": "Driver",
+         *           "phone": "+2348021112222"
+         *         }
+         *       ]
+         *     }
+         */
+        PickupPersonListDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description In order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-ae50-7d8d-b1af-5d0dc0f82928",
+             *         "fullName": "Chinedu Obi",
+             *         "relationship": "Driver",
+             *         "phone": "+2348021112222"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PickupPersonDto"][];
         };
         /**
          * @description A batch with its pins.
@@ -5797,6 +6396,327 @@ export interface components {
             revisionNumber: number | string;
         };
         /**
+         * @description One contact (spec 6.5.5).
+         * @example {
+         *       "id": "0192f0c4-8c3e-7b6b-9f8d-3beaafd60706",
+         *       "role": "Father",
+         *       "fullName": "Emeka Okafor",
+         *       "relationship": null,
+         *       "phone": "+2348031234567",
+         *       "whatsappNumber": "+2348031234567",
+         *       "occupation": "Engineer",
+         *       "email": null,
+         *       "isPrimaryContact": true
+         *     }
+         */
+        PupilContactDto: {
+            /**
+             * @description The contact.
+             * @example 0192f0c4-8c3e-7b6b-9f8d-3beaafd60706
+             */
+            id: string;
+            /** @description Which of the five slots. */
+            role: components["schemas"]["ContactRole"];
+            /**
+             * @description Two words minimum.
+             * @example Emeka Okafor
+             */
+            fullName: string;
+            /** @description Guardian and emergency roles only. */
+            relationship: null | string;
+            /**
+             * @description Canonical `+234` form.
+             * @example +2348031234567
+             */
+            phone: string;
+            /**
+             * @description Father and mother only.
+             * @example +2348031234567
+             */
+            whatsappNumber: null | string;
+            /**
+             * @description Father and mother only.
+             * @example Engineer
+             */
+            occupation: null | string;
+            /** @description Optional. */
+            email: null | string;
+            /**
+             * @description The person the school telephones first.
+             * @example true
+             */
+            isPrimaryContact: boolean;
+        };
+        /**
+         * @description One contact as submitted. Phones may be typed in either Nigerian form.
+         * @example {
+         *       "role": "Father",
+         *       "fullName": "Emeka Okafor",
+         *       "relationship": null,
+         *       "phone": "08031234567",
+         *       "whatsappNumber": "08031234567",
+         *       "occupation": "Engineer",
+         *       "email": null,
+         *       "isPrimaryContact": true
+         *     }
+         */
+        PupilContactInput: {
+            /** @description Which slot; each at most once. */
+            role: components["schemas"]["ContactRole"];
+            /**
+             * @description Two words minimum.
+             * @example Emeka Okafor
+             */
+            fullName: string;
+            /** @description Required for guardian and the emergency roles; ignored for father and mother. */
+            relationship: null | string;
+            /**
+             * @description Required on every contact.
+             * @example 08031234567
+             */
+            phone: string;
+            /**
+             * @description Father and mother only.
+             * @example 08031234567
+             */
+            whatsappNumber: null | string;
+            /**
+             * @description Father and mother only.
+             * @example Engineer
+             */
+            occupation: null | string;
+            /** @description Optional. */
+            email: null | string;
+            /**
+             * @description Exactly one, and a father, mother or guardian, whenever one exists.
+             * @example true
+             */
+            isPrimaryContact: boolean;
+        };
+        /**
+         * @description A pupil's contacts, in role order. At most five.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "items": [
+         *         {
+         *           "id": "0192f0c4-8c3e-7b6b-9f8d-3beaafd60706",
+         *           "role": "Father",
+         *           "fullName": "Emeka Okafor",
+         *           "relationship": null,
+         *           "phone": "+2348031234567",
+         *           "whatsappNumber": "+2348031234567",
+         *           "occupation": "Engineer",
+         *           "email": null,
+         *           "isPrimaryContact": true
+         *         },
+         *         {
+         *           "id": "0192f0c4-9d4f-7c7c-a09e-4cfcbfe71817",
+         *           "role": "EmergencyPrimary",
+         *           "fullName": "Ngozi Okafor",
+         *           "relationship": "Aunt",
+         *           "phone": "+2348059876543",
+         *           "whatsappNumber": null,
+         *           "occupation": null,
+         *           "email": null,
+         *           "isPrimaryContact": false
+         *         }
+         *       ]
+         *     }
+         */
+        PupilContactListDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Father, mother, guardian, then the two emergency contacts, as recorded.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-8c3e-7b6b-9f8d-3beaafd60706",
+             *         "role": "Father",
+             *         "fullName": "Emeka Okafor",
+             *         "relationship": null,
+             *         "phone": "+2348031234567",
+             *         "whatsappNumber": "+2348031234567",
+             *         "occupation": "Engineer",
+             *         "email": null,
+             *         "isPrimaryContact": true
+             *       },
+             *       {
+             *         "id": "0192f0c4-9d4f-7c7c-a09e-4cfcbfe71817",
+             *         "role": "EmergencyPrimary",
+             *         "fullName": "Ngozi Okafor",
+             *         "relationship": "Aunt",
+             *         "phone": "+2348059876543",
+             *         "whatsappNumber": null,
+             *         "occupation": null,
+             *         "email": null,
+             *         "isPrimaryContact": false
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PupilContactDto"][];
+        };
+        /**
+         * @description One checklist row (spec 6.5.8). A type never ticked reads as not received.
+         * @example {
+         *       "documentType": "BirthCertificate",
+         *       "otherLabel": null,
+         *       "received": true,
+         *       "receivedDate": "2026-09-14",
+         *       "remarks": "Photocopy; original seen."
+         *     }
+         */
+        PupilDocumentDto: {
+            /** @description Which document. */
+            documentType: components["schemas"]["PupilDocumentType"];
+            /** @description For the "Other" row. */
+            otherLabel: null | string;
+            /**
+             * @description The checkbox.
+             * @example true
+             */
+            received: boolean;
+            /**
+             * Format: date
+             * @description When it was received.
+             * @example 2026-09-14
+             */
+            receivedDate: null | string;
+            /**
+             * @description The Remarks column.
+             * @example Photocopy; original seen.
+             */
+            remarks: null | string;
+        };
+        /**
+         * @description The body of the document route: one row's state.
+         * @example {
+         *       "received": true,
+         *       "receivedDate": "2026-09-14",
+         *       "remarks": "Photocopy; original seen.",
+         *       "otherLabel": null
+         *     }
+         */
+        PupilDocumentInput: {
+            /**
+             * @description The checkbox.
+             * @example true
+             */
+            received: boolean;
+            /**
+             * Format: date
+             * @description Defaults to today when ticked.
+             * @example 2026-09-14
+             */
+            receivedDate: null | string;
+            /**
+             * @description Optional, at most 200 characters.
+             * @example Photocopy; original seen.
+             */
+            remarks: null | string;
+            /** @description Required when ticking the "Other" row. */
+            otherLabel: null | string;
+        };
+        /**
+         * @description The whole document checklist, always five rows in form order.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "items": [
+         *         {
+         *           "documentType": "BirthCertificate",
+         *           "otherLabel": null,
+         *           "received": true,
+         *           "receivedDate": "2026-09-14",
+         *           "remarks": "Photocopy; original seen."
+         *         },
+         *         {
+         *           "documentType": "PassportPhotograph",
+         *           "otherLabel": null,
+         *           "received": false,
+         *           "receivedDate": null,
+         *           "remarks": null
+         *         },
+         *         {
+         *           "documentType": "PreviousSchoolResult",
+         *           "otherLabel": null,
+         *           "received": false,
+         *           "receivedDate": null,
+         *           "remarks": null
+         *         },
+         *         {
+         *           "documentType": "TransferLetter",
+         *           "otherLabel": null,
+         *           "received": false,
+         *           "receivedDate": null,
+         *           "remarks": null
+         *         },
+         *         {
+         *           "documentType": "Other",
+         *           "otherLabel": null,
+         *           "received": false,
+         *           "receivedDate": null,
+         *           "remarks": null
+         *         }
+         *       ]
+         *     }
+         */
+        PupilDocumentListDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Birth certificate, passport photograph, previous school result, transfer letter, other.
+             * @example [
+             *       {
+             *         "documentType": "BirthCertificate",
+             *         "otherLabel": null,
+             *         "received": true,
+             *         "receivedDate": "2026-09-14",
+             *         "remarks": "Photocopy; original seen."
+             *       },
+             *       {
+             *         "documentType": "PassportPhotograph",
+             *         "otherLabel": null,
+             *         "received": false,
+             *         "receivedDate": null,
+             *         "remarks": null
+             *       },
+             *       {
+             *         "documentType": "PreviousSchoolResult",
+             *         "otherLabel": null,
+             *         "received": false,
+             *         "receivedDate": null,
+             *         "remarks": null
+             *       },
+             *       {
+             *         "documentType": "TransferLetter",
+             *         "otherLabel": null,
+             *         "received": false,
+             *         "receivedDate": null,
+             *         "remarks": null
+             *       },
+             *       {
+             *         "documentType": "Other",
+             *         "otherLabel": null,
+             *         "received": false,
+             *         "receivedDate": null,
+             *         "remarks": null
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["PupilDocumentDto"][];
+        };
+        /**
+         * @description Section H's checklist rows (spec 6.5.8), seeded from the form.
+         * @example BirthCertificate
+         * @enum {unknown}
+         */
+        PupilDocumentType: "BirthCertificate" | "PassportPhotograph" | "PreviousSchoolResult" | "TransferLetter" | "Other";
+        /**
          * @description The pupil read shape for this card: list, detail, the admissions queue and duplicate candidates
          *     all use this one DTO — 6.5.15's extra detail-view sections (contacts, health, enrolment history)
          *     and list-view completeness column do not exist yet (see the task card's own out-of-scope list),
@@ -5956,6 +6876,71 @@ export interface components {
             missing?: null | string[];
         };
         /**
+         * @description Section F (spec 6.5.7). Null answers mean "not asked yet". Safeguarding data: every read is audited.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "hasAllergy": true,
+         *       "allergyDetails": "Peanuts: severe. EpiPen in the office.",
+         *       "hasMedicalCondition": false,
+         *       "medicalConditionDetails": null,
+         *       "takesRegularMedication": false,
+         *       "medicationDetails": null,
+         *       "specialInstructions": "Vegetarian.",
+         *       "preferredHospital": "St. Charles Borromeo Hospital, Onitsha",
+         *       "hospitalPhone": "+2348037776666",
+         *       "bloodGroup": "OPositive",
+         *       "genotype": "AA"
+         *     }
+         */
+        PupilHealthDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Explicit yes or no, or null.
+             * @example true
+             */
+            hasAllergy: null | boolean;
+            /**
+             * @description Present where yes.
+             * @example Peanuts: severe. EpiPen in the office.
+             */
+            allergyDetails: null | string;
+            /**
+             * @description Explicit yes or no, or null.
+             * @example false
+             */
+            hasMedicalCondition: null | boolean;
+            /** @description Present where yes. */
+            medicalConditionDetails: null | string;
+            /**
+             * @description Explicit yes or no, or null.
+             * @example false
+             */
+            takesRegularMedication: null | boolean;
+            /** @description Present where yes. */
+            medicationDetails: null | string;
+            /**
+             * @description Diet, handling and anything else.
+             * @example Vegetarian.
+             */
+            specialInstructions: null | string;
+            /**
+             * @description Prompted, not required.
+             * @example St. Charles Borromeo Hospital, Onitsha
+             */
+            preferredHospital: null | string;
+            /**
+             * @description Canonical `+234` form.
+             * @example +2348037776666
+             */
+            hospitalPhone: null | string;
+            bloodGroup: null | components["schemas"]["BloodGroup"];
+            genotype: null | components["schemas"]["Genotype"];
+        };
+        /**
          * @description A Pupil's sex (spec 6.5.4). Required, no default.
          * @example Female
          * @enum {unknown}
@@ -5967,6 +6952,197 @@ export interface components {
          * @enum {unknown}
          */
         PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
+        /**
+         * @description One pupil's whole term, week by week (spec 6.10.11). Backs the per-pupil tab.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weeks": [
+         *         {
+         *           "weekNumber": 3,
+         *           "startDate": "2027-01-04",
+         *           "endDate": "2027-01-08",
+         *           "outsideTerm": false,
+         *           "armId": null,
+         *           "published": false,
+         *           "days": null
+         *         },
+         *         {
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "outsideTerm": false,
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "published": true,
+         *           "days": [
+         *             {
+         *               "dayOfWeek": "Monday",
+         *               "date": "2027-01-11",
+         *               "behaviour": "Calm and helpful",
+         *               "performance": "Finished her reading book",
+         *               "dressing": null,
+         *               "homeWork": "Returned, neat",
+         *               "eating": "Ate everything",
+         *               "symptomsOfIllness": null,
+         *               "teacherComment": "A lovely start to the week.",
+         *               "parentComment": null,
+         *               "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *               "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *               "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        PupilWeeklyTermDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description One row per week of the term, plus any outside-term week that holds notes.
+             * @example [
+             *       {
+             *         "weekNumber": 3,
+             *         "startDate": "2027-01-04",
+             *         "endDate": "2027-01-08",
+             *         "outsideTerm": false,
+             *         "armId": null,
+             *         "published": false,
+             *         "days": null
+             *       },
+             *       {
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "outsideTerm": false,
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "published": true,
+             *         "days": [
+             *           {
+             *             "dayOfWeek": "Monday",
+             *             "date": "2027-01-11",
+             *             "behaviour": "Calm and helpful",
+             *             "performance": "Finished her reading book",
+             *             "dressing": null,
+             *             "homeWork": "Returned, neat",
+             *             "eating": "Ate everything",
+             *             "symptomsOfIllness": null,
+             *             "teacherComment": "A lovely start to the week.",
+             *             "parentComment": null,
+             *             "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *             "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *             "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            weeks: components["schemas"]["PupilWeeklyWeekDto"][];
+        };
+        /**
+         * @description One week of a pupil's term.
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "published": true,
+         *       "days": [
+         *         {
+         *           "dayOfWeek": "Monday",
+         *           "date": "2027-01-11",
+         *           "behaviour": "Calm and helpful",
+         *           "performance": "Finished her reading book",
+         *           "dressing": null,
+         *           "homeWork": "Returned, neat",
+         *           "eating": "Ate everything",
+         *           "symptomsOfIllness": null,
+         *           "teacherComment": "A lovely start to the week.",
+         *           "parentComment": null,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        PupilWeeklyWeekDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * @description Holds notes but falls outside the term's current dates.
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description The arm the week is attributed to; null when nothing is written.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: null | string;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * @description Five days, or null when the pupil has no report for the week.
+             * @example [
+             *       {
+             *         "dayOfWeek": "Monday",
+             *         "date": "2027-01-11",
+             *         "behaviour": "Calm and helpful",
+             *         "performance": "Finished her reading book",
+             *         "dressing": null,
+             *         "homeWork": "Returned, neat",
+             *         "eating": "Ate everything",
+             *         "symptomsOfIllness": null,
+             *         "teacherComment": "A lovely start to the week.",
+             *         "parentComment": null,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            days: null | components["schemas"]["WeeklyDayDto"][];
+        };
         /**
          * @description One scale, both inside SettingsDto's envelope and as an element of SettingsRatingScaleGroupDto's `Scales` array (spec 6.2.13).
          * @example {
@@ -7426,6 +8602,33 @@ export interface components {
             timesPresent: null | number | string;
         };
         /**
+         * @description `PUT /api/v1/pupils/{pupilId}/barred-persons`: the explicit answer and, when yes, the names. A No clears any
+         *             names previously recorded; a Yes needs at least one.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "hasBarredPersons": false,
+         *       "persons": []
+         *     }
+         */
+        SaveBarredPersonsCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description The explicit answer.
+             * @example false
+             */
+            hasBarredPersons: boolean;
+            /**
+             * @description Required when the answer is yes; must be empty when no.
+             * @example []
+             */
+            persons: components["schemas"]["BarredPersonInput"][];
+        };
+        /**
          * @description `PUT /api/v1/arms/{armId}/class-teacher-remarks` (TASK-0086 stage A) — partial-save sheet
          *             write, one transaction. The first remark of either kind for an arm/term creates the result set
          *             (Draft), same convention as `SaveTraitRatingsCommand`.
@@ -7634,6 +8837,169 @@ export interface components {
              * @example Keep up the good work.
              */
             fillEmpty: null | string;
+        };
+        /**
+         * @description `PUT /api/v1/pupils/{pupilId}/pickup-persons`: the whole list, in the parent's order. Empty is allowed.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "persons": [
+         *         {
+         *           "fullName": "Chinedu Obi",
+         *           "relationship": "Driver",
+         *           "phone": "08021112222"
+         *         }
+         *       ]
+         *     }
+         */
+        SavePickupPersonsCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description In order.
+             * @example [
+             *       {
+             *         "fullName": "Chinedu Obi",
+             *         "relationship": "Driver",
+             *         "phone": "08021112222"
+             *       }
+             *     ]
+             */
+            persons: components["schemas"]["PickupPersonInput"][];
+        };
+        /**
+         * @description `PUT /api/v1/pupils/{pupilId}/contacts` (spec 6.5.5): the whole set of contacts, one per role. A role left out is
+         *             removed — except that an active pupil must always keep a father, mother or guardian (spec 9.4: the last responsible
+         *             adult is edited, never deleted). Saving a partial set is allowed while the admission is pending; approval enforces
+         *             the minimum (spec 6.5.12).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "contacts": [
+         *         {
+         *           "role": "Father",
+         *           "fullName": "Emeka Okafor",
+         *           "relationship": null,
+         *           "phone": "08031234567",
+         *           "whatsappNumber": "08031234567",
+         *           "occupation": "Engineer",
+         *           "email": null,
+         *           "isPrimaryContact": true
+         *         },
+         *         {
+         *           "role": "EmergencyPrimary",
+         *           "fullName": "Ngozi Okafor",
+         *           "relationship": "Aunt",
+         *           "phone": "08059876543",
+         *           "whatsappNumber": null,
+         *           "occupation": null,
+         *           "email": null,
+         *           "isPrimaryContact": false
+         *         }
+         *       ]
+         *     }
+         */
+        SavePupilContactsCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description At most one per role.
+             * @example [
+             *       {
+             *         "role": "Father",
+             *         "fullName": "Emeka Okafor",
+             *         "relationship": null,
+             *         "phone": "08031234567",
+             *         "whatsappNumber": "08031234567",
+             *         "occupation": "Engineer",
+             *         "email": null,
+             *         "isPrimaryContact": true
+             *       },
+             *       {
+             *         "role": "EmergencyPrimary",
+             *         "fullName": "Ngozi Okafor",
+             *         "relationship": "Aunt",
+             *         "phone": "08059876543",
+             *         "whatsappNumber": null,
+             *         "occupation": null,
+             *         "email": null,
+             *         "isPrimaryContact": false
+             *       }
+             *     ]
+             */
+            contacts: components["schemas"]["PupilContactInput"][];
+        };
+        /**
+         * @description `PUT /api/v1/pupils/{pupilId}/health`: the whole of section F. Unanswered questions may stay null until approval.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "hasAllergy": true,
+         *       "allergyDetails": "Peanuts: severe. EpiPen in the office.",
+         *       "hasMedicalCondition": false,
+         *       "medicalConditionDetails": null,
+         *       "takesRegularMedication": false,
+         *       "medicationDetails": null,
+         *       "specialInstructions": "Vegetarian.",
+         *       "preferredHospital": "St. Charles Borromeo Hospital, Onitsha",
+         *       "hospitalPhone": "08037776666",
+         *       "bloodGroup": "OPositive",
+         *       "genotype": "AA"
+         *     }
+         */
+        SavePupilHealthCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Yes, no, or not yet asked.
+             * @example true
+             */
+            hasAllergy: null | boolean;
+            /**
+             * @description Required where yes.
+             * @example Peanuts: severe. EpiPen in the office.
+             */
+            allergyDetails: null | string;
+            /**
+             * @description Yes, no, or not yet asked.
+             * @example false
+             */
+            hasMedicalCondition: null | boolean;
+            /** @description Required where yes. */
+            medicalConditionDetails: null | string;
+            /**
+             * @description Yes, no, or not yet asked.
+             * @example false
+             */
+            takesRegularMedication: null | boolean;
+            /** @description Required where yes. */
+            medicationDetails: null | string;
+            /**
+             * @description Optional.
+             * @example Vegetarian.
+             */
+            specialInstructions: null | string;
+            /**
+             * @description Optional, prompted.
+             * @example St. Charles Borromeo Hospital, Onitsha
+             */
+            preferredHospital: null | string;
+            /**
+             * @description Optional, Nigerian format.
+             * @example 08037776666
+             */
+            hospitalPhone: null | string;
+            bloodGroup: null | components["schemas"]["BloodGroup"];
+            genotype: null | components["schemas"]["Genotype"];
         };
         /**
          * @description One submitted row shared by `SaveClassTeacherRemarksCommand` and
@@ -7943,6 +9309,65 @@ export interface components {
             ratings: null | {
                 [key: string]: string;
             };
+        };
+        /**
+         * @description `PUT /api/v1/arms/{armId}/weekly` (spec 6.10.11): sparse bulk upsert of one week's grid, one transaction. Only the
+         *             cells sent are touched, so a Fill down writes only what it filled. Last write wins (spec 6.10.10); no version.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weekNumber": 4,
+         *       "cells": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "dayOfWeek": "Monday",
+         *           "field": "Eating",
+         *           "value": "Ate everything"
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "dayOfWeek": "Monday",
+         *           "field": "Eating",
+         *           "value": null
+         *         }
+         *       ]
+         *     }
+         */
+        SaveWeeklyNotesCommand: {
+            /**
+             * @description From the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * Format: int32
+             * @description The week.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * @description The cells to write.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "dayOfWeek": "Monday",
+             *         "field": "Eating",
+             *         "value": "Ate everything"
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "dayOfWeek": "Monday",
+             *         "field": "Eating",
+             *         "value": null
+             *       }
+             *     ]
+             */
+            cells: components["schemas"]["WeeklyCellInput"][];
         };
         /**
          * @description One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body
@@ -9735,6 +11160,75 @@ export interface components {
          */
         TermState: "Upcoming" | "Active" | "Closed";
         /**
+         * @description One derived week of a term (spec 6.10.3).
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15"
+         *     }
+         */
+        TermWeekDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+        };
+        /**
+         * @description A term's derived weeks. Bounded at 20, so not paginated.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "weekNumber": 1,
+         *           "startDate": "2026-12-21",
+         *           "endDate": "2026-12-25"
+         *         },
+         *         {
+         *           "weekNumber": 2,
+         *           "startDate": "2026-12-28",
+         *           "endDate": "2027-01-01"
+         *         }
+         *       ]
+         *     }
+         */
+        TermWeekListResponse: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description In order.
+             * @example [
+             *       {
+             *         "weekNumber": 1,
+             *         "startDate": "2026-12-21",
+             *         "endDate": "2026-12-25"
+             *       },
+             *       {
+             *         "weekNumber": 2,
+             *         "startDate": "2026-12-28",
+             *         "endDate": "2027-01-01"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["TermWeekDto"][];
+        };
+        /**
          * @description How a tied subject/annual total is broken for position ranking (spec 6.2.8). Stored as a string
          *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
          * @example SharedPosition
@@ -11160,6 +12654,25 @@ export interface components {
             reason: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/weekly/settings` (spec 6.10.8): the per-arm auto-publish option.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "autoPublish": true
+         *     }
+         */
+        UpdateWeeklySettingsCommand: {
+            /**
+             * @description From the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Publish each week automatically at 17:00 on its Friday.
+             * @example true
+             */
+            autoPublish: boolean;
+        };
+        /**
          * @description `POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved
          *             contract delta) — voids every non-voided mark for one arm, subject and term. Super Admin only,
          *             reason required. Used only to unwind an error.
@@ -11205,6 +12718,791 @@ export interface components {
              * @example 27
              */
             voidedCount: number | string;
+        };
+        /**
+         * @description One cell of the weekly grid: one line, one day, one pupil.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "dayOfWeek": "Monday",
+         *       "field": "Eating",
+         *       "value": "Ate everything"
+         *     }
+         */
+        WeeklyCellInput: {
+            /**
+             * @description On the arm's active roster, or already holding notes in this arm's week.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /** @description Monday to Friday. */
+            dayOfWeek: components["schemas"]["WeeklyDay"];
+            /** @description Which of the eight lines. */
+            field: components["schemas"]["WeeklyField"];
+            /**
+             * @description The text; null or blank clears the line.
+             * @example Ate everything
+             */
+            value: null | string;
+        };
+        /**
+         * @description The weekly report completion report for a term. Bounded by arms times 20 weeks, so not paginated.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armName": "Primary 2 Gold",
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "pupilsOnRoll": 28,
+         *           "pupilsWithNotes": 27,
+         *           "cellsFilled": 612,
+         *           "cellsAvailable": 1120,
+         *           "published": true,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyCompletionReportDto: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Arm name, then week.
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armName": "Primary 2 Gold",
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "pupilsOnRoll": 28,
+             *         "pupilsWithNotes": 27,
+             *         "cellsFilled": 612,
+             *         "cellsAvailable": 1120,
+             *         "published": true,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["WeeklyCompletionRowDto"][];
+        };
+        /**
+         * @description One arm's week on the completion report (spec 6.10.12).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2 Gold",
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "pupilsOnRoll": 28,
+         *       "pupilsWithNotes": 27,
+         *       "cellsFilled": 612,
+         *       "cellsAvailable": 1120,
+         *       "published": true,
+         *       "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *       "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *     }
+         */
+        WeeklyCompletionRowDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Level plus arm label.
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * Format: int32
+             * @description The week.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * Format: int32
+             * @description The arm's current active roster.
+             * @example 28
+             */
+            pupilsOnRoll: number | string;
+            /**
+             * Format: int32
+             * @description Pupils with at least one note.
+             * @example 27
+             */
+            pupilsWithNotes: number | string;
+            /**
+             * Format: int32
+             * @description Non-empty lines written.
+             * @example 612
+             */
+            cellsFilled: number | string;
+            /**
+             * Format: int32
+             * @description Pupils on roll times five days times eight lines.
+             * @example 1120
+             */
+            cellsAvailable: number | string;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: date-time
+             * @description The latest edit, or null.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastEditedAt: null | string;
+            /**
+             * @description Who made it.
+             * @example Mrs Adaeze Okonkwo
+             */
+            lastEditedBy: null | string;
+        };
+        /**
+         * @description The five school days of a weekly report (spec 6.10.6), Monday first.
+         * @example Monday
+         * @enum {unknown}
+         */
+        WeeklyDay: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday";
+        /**
+         * @description One day panel of a weekly report (spec 6.10.6): eight free-text lines, any of them null.
+         * @example {
+         *       "dayOfWeek": "Monday",
+         *       "date": "2027-01-11",
+         *       "behaviour": "Calm and helpful",
+         *       "performance": "Finished her reading book",
+         *       "dressing": null,
+         *       "homeWork": "Returned, neat",
+         *       "eating": "Ate everything",
+         *       "symptomsOfIllness": null,
+         *       "teacherComment": "A lovely start to the week.",
+         *       "parentComment": null,
+         *       "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *       "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *     }
+         */
+        WeeklyDayDto: {
+            /** @description Monday to Friday. */
+            dayOfWeek: components["schemas"]["WeeklyDay"];
+            /**
+             * Format: date
+             * @description The calendar date.
+             * @example 2027-01-11
+             */
+            date: string;
+            /**
+             * @description Behaviour line.
+             * @example Calm and helpful
+             */
+            behaviour: null | string;
+            /**
+             * @description Performance line.
+             * @example Finished her reading book
+             */
+            performance: null | string;
+            /** @description Dressing line. */
+            dressing: null | string;
+            /**
+             * @description Home Work line.
+             * @example Returned, neat
+             */
+            homeWork: null | string;
+            /**
+             * @description Eating line.
+             * @example Ate everything
+             */
+            eating: null | string;
+            /** @description Symptoms of illness line. */
+            symptomsOfIllness: null | string;
+            /**
+             * @description Teacher's Comment line.
+             * @example A lovely start to the week.
+             */
+            teacherComment: null | string;
+            /** @description Parent's Comment line, transcribed by staff. */
+            parentComment: null | string;
+            /**
+             * Format: date-time
+             * @description When this day was last written; null when never.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastEditedAt: null | string;
+            /**
+             * @description The account that last wrote it.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            lastEditedById: null | string;
+            /**
+             * @description That account's staff name. Spec 6.10.10 shows it beneath the cell when within the last hour.
+             * @example Mrs Adaeze Okonkwo
+             */
+            lastEditedBy: null | string;
+        };
+        /**
+         * @description The eight labelled lines of a day panel (spec 6.10.2), in the paper form's fixed order.
+         * @example Eating
+         * @enum {unknown}
+         */
+        WeeklyField: "Behaviour" | "Performance" | "Dressing" | "HomeWork" | "Eating" | "SymptomsOfIllness" | "TeacherComment" | "ParentComment";
+        /**
+         * @description One arm's weekly grid for one week (spec 6.10.7, 6.10.11): pupils down the side, weekdays across.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weekNumber": 4,
+         *       "weekStartDate": "2027-01-11",
+         *       "weekEndDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "published": true,
+         *       "publishedAt": "2026-08-03T09:30:00+00:00",
+         *       "autoPublish": false,
+         *       "locked": false,
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "onRoll": true,
+         *           "illnessDays": 0,
+         *           "days": [
+         *             {
+         *               "dayOfWeek": "Monday",
+         *               "date": "2027-01-11",
+         *               "behaviour": "Calm and helpful",
+         *               "performance": "Finished her reading book",
+         *               "dressing": null,
+         *               "homeWork": "Returned, neat",
+         *               "eating": "Ate everything",
+         *               "symptomsOfIllness": null,
+         *               "teacherComment": "A lovely start to the week.",
+         *               "parentComment": null,
+         *               "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *               "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *               "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "weeks": [
+         *         {
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "outsideTerm": false,
+         *           "published": true,
+         *           "pupilsWithNotes": 27
+         *         }
+         *       ],
+         *       "phrases": {
+         *         "behaviour": [
+         *           "Calm and helpful",
+         *           "Settled well"
+         *         ],
+         *         "performance": [
+         *           "Finished her reading book"
+         *         ],
+         *         "dressing": [],
+         *         "homeWork": [
+         *           "Returned, neat"
+         *         ],
+         *         "eating": [
+         *           "Ate everything",
+         *           "Ate half"
+         *         ],
+         *         "symptomsOfIllness": [],
+         *         "teacherComment": [
+         *           "A lovely start to the week."
+         *         ],
+         *         "parentComment": []
+         *       }
+         *     }
+         */
+        WeeklyGridDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * Format: int32
+             * @description The week shown.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description Its Monday.
+             * @example 2027-01-11
+             */
+            weekStartDate: string;
+            /**
+             * Format: date
+             * @description Its Friday.
+             * @example 2027-01-15
+             */
+            weekEndDate: string;
+            /**
+             * @description The week falls outside the term's current dates; its notes are retained.
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: date-time
+             * @description When it was published.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            publishedAt: null | string;
+            /**
+             * @description The arm publishes each week at 17:00 on its Friday.
+             * @example false
+             */
+            autoPublish: boolean;
+            /**
+             * @description The term or its session is closed: notes can be read but not written (409 on save).
+             * @example false
+             */
+            locked: boolean;
+            /**
+             * @description Every active pupil, plus any pupil with notes in this week who has since left, surname order.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "onRoll": true,
+             *         "illnessDays": 0,
+             *         "days": [
+             *           {
+             *             "dayOfWeek": "Monday",
+             *             "date": "2027-01-11",
+             *             "behaviour": "Calm and helpful",
+             *             "performance": "Finished her reading book",
+             *             "dressing": null,
+             *             "homeWork": "Returned, neat",
+             *             "eating": "Ate everything",
+             *             "symptomsOfIllness": null,
+             *             "teacherComment": "A lovely start to the week.",
+             *             "parentComment": null,
+             *             "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *             "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *             "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["WeeklyGridRowDto"][];
+            /**
+             * @description Every week of the term for this arm, for the week picker.
+             * @example [
+             *       {
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "outsideTerm": false,
+             *         "published": true,
+             *         "pupilsWithNotes": 27
+             *       }
+             *     ]
+             */
+            weeks: components["schemas"]["WeeklyWeekSummaryDto"][];
+            /** @description The signed-in account's own phrases this term. */
+            phrases: components["schemas"]["WeeklyPhrasesDto"];
+        };
+        /**
+         * @description One pupil's week on the arm grid.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "onRoll": true,
+         *       "illnessDays": 0,
+         *       "days": [
+         *         {
+         *           "dayOfWeek": "Monday",
+         *           "date": "2027-01-11",
+         *           "behaviour": "Calm and helpful",
+         *           "performance": "Finished her reading book",
+         *           "dressing": null,
+         *           "homeWork": "Returned, neat",
+         *           "eating": "Ate everything",
+         *           "symptomsOfIllness": null,
+         *           "teacherComment": "A lovely start to the week.",
+         *           "parentComment": null,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyGridRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description False for a pupil who has notes in this week but has since left the arm; still editable.
+             * @example true
+             */
+            onRoll: boolean;
+            /**
+             * Format: int32
+             * @description Days this week with a symptoms note. Two or more shows the quiet marker (spec 6.10.6).
+             * @example 0
+             */
+            illnessDays: number | string;
+            /**
+             * @description Always five, Monday first, blank where nothing is written.
+             * @example [
+             *       {
+             *         "dayOfWeek": "Monday",
+             *         "date": "2027-01-11",
+             *         "behaviour": "Calm and helpful",
+             *         "performance": "Finished her reading book",
+             *         "dressing": null,
+             *         "homeWork": "Returned, neat",
+             *         "eating": "Ate everything",
+             *         "symptomsOfIllness": null,
+             *         "teacherComment": "A lovely start to the week.",
+             *         "parentComment": null,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            days: components["schemas"]["WeeklyDayDto"][];
+        };
+        /**
+         * @description One recorded observation.
+         * @example {
+         *       "date": "2027-01-12",
+         *       "text": "Runny nose, sent home at noon"
+         *     }
+         */
+        WeeklyIllnessObservationDto: {
+            /**
+             * Format: date
+             * @description The day.
+             * @example 2027-01-12
+             */
+            date: string;
+            /**
+             * @description The symptoms line as written.
+             * @example Runny nose, sent home at noon
+             */
+            text: string;
+        };
+        /**
+         * @description The illness observation summary for a term. Health observation about children: safeguarding privilege only.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "armName": "Primary 2 Gold",
+         *           "observations": [
+         *             {
+         *               "date": "2027-01-12",
+         *               "text": "Runny nose, sent home at noon"
+         *             },
+         *             {
+         *               "date": "2027-01-13",
+         *               "text": "Still coughing"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyIllnessReportDto: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Pupil display name order.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "armName": "Primary 2 Gold",
+             *         "observations": [
+             *           {
+             *             "date": "2027-01-12",
+             *             "text": "Runny nose, sent home at noon"
+             *           },
+             *           {
+             *             "date": "2027-01-13",
+             *             "text": "Still coughing"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["WeeklyIllnessRowDto"][];
+        };
+        /**
+         * @description A pupil with symptoms recorded on two or more days of the term (spec 6.10.12).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "armName": "Primary 2 Gold",
+         *       "observations": [
+         *         {
+         *           "date": "2027-01-12",
+         *           "text": "Runny nose, sent home at noon"
+         *         },
+         *         {
+         *           "date": "2027-01-13",
+         *           "text": "Still coughing"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyIllnessRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description The arm of the latest observation.
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * @description In date order.
+             * @example [
+             *       {
+             *         "date": "2027-01-12",
+             *         "text": "Runny nose, sent home at noon"
+             *       },
+             *       {
+             *         "date": "2027-01-13",
+             *         "text": "Still coughing"
+             *       }
+             *     ]
+             */
+            observations: components["schemas"]["WeeklyIllnessObservationDto"][];
+        };
+        /**
+         * @description Phrase memory (spec 6.10.7): what the signed-in account already wrote this term per line, most recent first.
+         * @example {
+         *       "behaviour": [
+         *         "Calm and helpful",
+         *         "Settled well"
+         *       ],
+         *       "performance": [
+         *         "Finished her reading book"
+         *       ],
+         *       "dressing": [],
+         *       "homeWork": [
+         *         "Returned, neat"
+         *       ],
+         *       "eating": [
+         *         "Ate everything",
+         *         "Ate half"
+         *       ],
+         *       "symptomsOfIllness": [],
+         *       "teacherComment": [
+         *         "A lovely start to the week."
+         *       ],
+         *       "parentComment": []
+         *     }
+         */
+        WeeklyPhrasesDto: {
+            /**
+             * @description Behaviour line.
+             * @example [
+             *       "Calm and helpful",
+             *       "Settled well"
+             *     ]
+             */
+            behaviour: string[];
+            /**
+             * @description Performance line.
+             * @example [
+             *       "Finished her reading book"
+             *     ]
+             */
+            performance: string[];
+            /**
+             * @description Dressing line.
+             * @example []
+             */
+            dressing: string[];
+            /**
+             * @description Home Work line.
+             * @example [
+             *       "Returned, neat"
+             *     ]
+             */
+            homeWork: string[];
+            /**
+             * @description Eating line.
+             * @example [
+             *       "Ate everything",
+             *       "Ate half"
+             *     ]
+             */
+            eating: string[];
+            /**
+             * @description Symptoms of illness line.
+             * @example []
+             */
+            symptomsOfIllness: string[];
+            /**
+             * @description Teacher's Comment line.
+             * @example [
+             *       "A lovely start to the week."
+             *     ]
+             */
+            teacherComment: string[];
+            /**
+             * @description Parent's Comment line.
+             * @example []
+             */
+            parentComment: string[];
+        };
+        /**
+         * @description The body of the publish and unpublish routes.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639"
+         *     }
+         */
+        WeeklyPublicationRequest: {
+            /**
+             * @description The term the week belongs to.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+        };
+        /**
+         * @description An arm's weekly-report settings (spec 6.10.8).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "autoPublish": true
+         *     }
+         */
+        WeeklySettingsDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Publish each week automatically at 17:00 on its Friday.
+             * @example true
+             */
+            autoPublish: boolean;
+        };
+        /**
+         * @description One week of the term, as the arm sees it.
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "published": true,
+         *       "pupilsWithNotes": 27
+         *     }
+         */
+        WeeklyWeekSummaryDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * @description The week holds notes but falls outside the term's current dates (spec 6.10.10).
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: int32
+             * @description Pupils with at least one note.
+             * @example 27
+             */
+            pupilsWithNotes: number | string;
         };
         /**
          * @description The request body for a withdrawal.
@@ -15807,6 +18105,870 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilContactListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SavePupilContacts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePupilContactsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilContactListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPickupPersons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupPersonListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SavePickupPersons: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePickupPersonsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupPersonListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBarredPersons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BarredPersonsDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveBarredPersons: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveBarredPersonsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BarredPersonsDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilHealthDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SavePupilHealth: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePupilHealthCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilHealthDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDocumentListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SavePupilDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+                documentType: components["schemas"]["PupilDocumentType"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PupilDocumentInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDocumentListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionCompleteness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCompletenessDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTermWeeks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermWeekListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilWeekly: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -20985,6 +24147,550 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyGrid: {
+        parameters: {
+            query: {
+                termId: string;
+                weekNumber?: number | string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveWeeklyNotes: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWeeklyNotesCommand"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishWeeklyWeek: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+                weekNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPublicationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyWeekSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnpublishWeeklyWeek: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+                weekNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPublicationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyWeekSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateWeeklySettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWeeklySettingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklySettingsDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyCompletionReport: {
+        parameters: {
+            query: {
+                termId: string;
+                weekNumber?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyCompletionReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyIllnessReport: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyIllnessReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

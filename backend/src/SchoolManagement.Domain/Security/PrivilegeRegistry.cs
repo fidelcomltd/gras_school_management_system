@@ -128,6 +128,10 @@ public static class PrivilegeRegistry
             Permits: "Correct a wrongly issued registration number."),
         new(Privileges.Pupil.AdmissionApprove, Scopable: false, Module: PrivilegeModule.PupilsAndSubjects,
             Permits: "Approve a pending admission, moving it to active and issuing the registration number, per 6.5.11."),
+
+        // NOT from spec 4.4's table: human ruling 2026-09-23 gives spec 6.5.16's head-teacher override its own privilege.
+        new(Privileges.Pupil.AdmissionOverride, Scopable: false, Module: PrivilegeModule.PupilsAndSubjects,
+            Permits: "Approve an admission whose health questions the parent declined to answer, with a recorded reason, per 6.5.16."),
         new(Privileges.Pupil.SafeguardingView, Scopable: true, Module: PrivilegeModule.PupilsAndSubjects,
             Permits: "Read the section F health block and the barred-persons list, per 6.5.6 and 6.5.7. Every read is audited. Deliberately withheld from the Bursar and the Auditor."),
         new(Privileges.Pupil.SafeguardingUpdate, Scopable: true, Module: PrivilegeModule.PupilsAndSubjects,

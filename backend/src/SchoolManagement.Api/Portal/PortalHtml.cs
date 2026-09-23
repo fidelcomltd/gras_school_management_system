@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
+using SchoolManagement.Application.Abstractions.Weekly;
 using SchoolManagement.Application.Portal;
 using SchoolManagement.Application.Results.Sheets;
+using SchoolManagement.Domain.Weekly;
 
 namespace SchoolManagement.Api.Portal;
 
@@ -24,7 +26,20 @@ internal static class PortalHtml
         ".scroll{overflow-x:auto;background:#fff;border:1px solid #d0d0d0;border-radius:8px}table{border-collapse:collapse;width:100%;font-size:14px}" +
         "th,td{padding:7px 8px;border-bottom:1px solid #e3e3e3;text-align:center}th:first-child,td:first-child{text-align:left}th{background:#f0f0f0;font-weight:600}" +
         "dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}dt{color:#555}dd{margin:0;font-weight:600}.big{font-size:22px;font-weight:700}" +
+        ".week{flex-direction:column;align-items:flex-start;justify-content:center}.week small{color:#555;font-size:14px}.day h3{margin:0 0 8px}.day dl{grid-template-columns:1fr}.day dd{font-weight:400;margin-bottom:6px}" +
         "details{margin-top:16px}summary{min-height:44px;padding:10px 0;font-weight:600;cursor:pointer}.revised{border-left-color:#8a5a00}";
+
+    private static readonly (WeeklyField Field, string Label)[] WeeklyLines =
+    [
+        (WeeklyField.Behaviour, "Behaviour"),
+        (WeeklyField.Performance, "Performance"),
+        (WeeklyField.Dressing, "Dressing"),
+        (WeeklyField.HomeWork, "Home Work"),
+        (WeeklyField.Eating, "Eating"),
+        (WeeklyField.SymptomsOfIllness, "Symptoms of illness"),
+        (WeeklyField.TeacherComment, "Teacher's Comment"),
+        (WeeklyField.ParentComment, "Parent's Comment"),
+    ];
 
     /// <summary>Scripts blocked outright; the inline stylesheet allowed only by its hash.</summary>
     public static readonly string ContentSecurityPolicy =
@@ -73,6 +88,11 @@ internal static class PortalHtml
                         $"<li><span>{E(term.TermName)}<em>Being corrected</em></span></li>",
                     _ => $"<li><span>{E(term.TermName)}<em>Not yet released</em></span></li>",
                 });
+
+                // Spec 6.10.9: each term gains a second row for its weekly reports.
+                body.Append(term.WeeklyAvailable
+                    ? string.Create(CultureInfo.InvariantCulture, $"<li><a href=\"/portal/weekly/{term.TermId:D}?u={session.UseId:D}\">{E(term.TermName)} weekly reports<strong>Available</strong></a></li>")
+                    : $"<li><span>{E(term.TermName)} weekly reports<em>Not available yet</em></span></li>");
             }
 
             body.Append(group.AnnualAvailable
@@ -90,6 +110,68 @@ internal static class PortalHtml
         body.Append(CultureInfo.InvariantCulture, $"<p class=\"muted\">For security this page closes at {session.ExpiresAt.ToOffset(TimeSpan.FromHours(1)):HH:mm} (30 minutes after you opened it).</p>");
         body.Append("<form method=\"post\" action=\"/portal/end\"><button type=\"submit\" class=\"secondary\">Finish (for shared phones)</button></form>");
         return Page(branding, "Results", body.ToString());
+    }
+
+    /// <summary>
+    /// The week list for a term (spec 6.10.9): one row per week, numbered and dated. Unpublished and empty weeks stay
+    /// visible, disabled, labelled Not available, because a parent who cannot see Week 7 at all assumes the site is broken.
+    /// </summary>
+    public static string WeeklyList(PortalBranding branding, PortalWeeklyList list, Guid termId)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        var body = new StringBuilder();
+        body.Append(CultureInfo.InvariantCulture, $"<div class=\"notice\"><h2>{E(list.TermName ?? string.Empty)} weekly reports</h2><div class=\"muted\">{E(list.SessionName ?? string.Empty)}</div></div><ul>");
+        foreach (var week in list.Weeks ?? [])
+        {
+            var label = string.Create(CultureInfo.InvariantCulture, $"Week {week.WeekNumber}: {week.StartDate:dd/MM/yyyy} to {week.EndDate:dd/MM/yyyy}");
+            var preview = week.Preview is { } text ? $"<small>{E(text)}</small>" : string.Empty;
+            body.Append(week.Available
+                ? string.Create(CultureInfo.InvariantCulture, $"<li><a class=\"week\" href=\"/portal/weekly/{termId:D}/{week.WeekNumber}?u={list.UseId:D}\"><span class=\"label\">{E(label)}</span>{preview}</a></li>")
+                : $"<li><span>{E(label)}<em>Not available</em></span></li>");
+        }
+
+        body.Append(CultureInfo.InvariantCulture, $"</ul><a class=\"button secondary\" href=\"/portal/terms?u={list.UseId:D}\">Back</a>");
+        return Page(branding, "Weekly reports", body.ToString());
+    }
+
+    /// <summary>
+    /// One week on screen (spec 6.10.9): the five day panels in the paper form's order and wording, one card per day. Empty
+    /// lines are omitted from a card, because a phone screen of eight empty labels is noise; the PDF keeps every line.
+    /// </summary>
+    public static string WeeklyWeek(PortalBranding branding, WeeklySheet sheet, Guid termId, Guid useId)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        var body = new StringBuilder();
+        body.Append("<div class=\"notice\"><dl>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Name</dt><dd>{E(sheet.PupilName)}</dd>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Class</dt><dd>{E(sheet.ClassName)}</dd>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Week</dt><dd>Week {sheet.WeekNumber}: {sheet.StartDate:dd/MM/yyyy} to {sheet.EndDate:dd/MM/yyyy}</dd>")
+            .Append(CultureInfo.InvariantCulture, $"<dt>Term</dt><dd>{E(sheet.TermName)}, {E(sheet.SessionName)}</dd></dl></div>");
+        foreach (var day in sheet.Days)
+        {
+            body.Append(CultureInfo.InvariantCulture, $"<div class=\"notice day\"><h3>{day.Day} <span class=\"muted\">{day.Date:dd/MM/yyyy}</span></h3>");
+            var lines = WeeklyLines.Where(line => day.Get(line.Field) is not null).ToList();
+            if (lines.Count == 0)
+            {
+                body.Append("<p class=\"muted\">Nothing written for this day.</p>");
+            }
+            else
+            {
+                body.Append("<dl>");
+                foreach (var (field, label) in lines)
+                {
+                    body.Append(CultureInfo.InvariantCulture, $"<dt>{label}</dt><dd>{E(day.Get(field)!)}</dd>");
+                }
+
+                body.Append("</dl>");
+            }
+
+            body.Append("</div>");
+        }
+
+        body.Append(CultureInfo.InvariantCulture, $"<a class=\"button\" href=\"/portal/weekly/{termId:D}/{sheet.WeekNumber}/pdf?u={useId:D}\">Download PDF</a>")
+            .Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal/weekly/{termId:D}?u={useId:D}\">All weeks</a>");
+        return Page(branding, "Weekly report", body.ToString());
     }
 
     /// <summary>The result on screen (spec 6.9.2 step 5): one column for a narrow phone, same values as the PDF.</summary>
@@ -398,6 +480,10 @@ internal sealed record PortalCopy(string Heading, string Body, string? ButtonTex
         "The school has taken this result down to correct it. A corrected copy will be available shortly. Please check again in a day or two.",
         "Back",
         "/portal/terms");
+
+    // Appendix G.4 rule 4: an unpublished or empty week does not render.
+    public static PortalCopy WeeklyNotAvailable { get; } = new(
+        "This week is not available", "The school has not released a weekly report for this week yet.", "Back", "/portal/terms");
 
     public static PortalCopy ServerFault { get; } = new(
         "Something went wrong on our side",

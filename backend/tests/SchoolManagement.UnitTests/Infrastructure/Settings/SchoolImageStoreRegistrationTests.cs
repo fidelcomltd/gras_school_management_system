@@ -36,9 +36,10 @@ public sealed class SchoolImageStoreRegistrationTests
         var services = new ServiceCollection();
         services.AddInfrastructure(configuration, validateOnStart: false);
 
-        var descriptor = services.Last(service => service.ServiceType == typeof(ISchoolImageStore));
-
-        return descriptor.ImplementationType!;
+        // Resolve a real instance: the choice is made from the bound options at resolution time, so
+        // inspecting the registration descriptor would prove nothing (drift 2026-09-23).
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<ISchoolImageStore>().GetType();
     }
 
     [Fact]
@@ -66,11 +67,37 @@ public sealed class SchoolImageStoreRegistrationTests
     }
 
     [Fact]
+    public void ConfigurationAddedAfterRegistration_StillDecides()
+    {
+        // The integration host's order: services are registered from user-secrets alone, then the
+        // fixture's overrides arrive. The flag must still win.
+        var source = new Dictionary<string, string?>
+        {
+            ["Cloudinary:CloudName"] = "cloud",
+            ["Cloudinary:ApiKey"] = "key",
+            ["Cloudinary:ApiSecret"] = "secret",
+        };
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(source).Build();
+        var services = new ServiceCollection();
+        services.AddInfrastructure(configuration, validateOnStart: false);
+        configuration["Cloudinary:AllowInMemoryStore"] = "true";
+        configuration["Cloudinary:CloudName"] = string.Empty;
+        configuration["Cloudinary:ApiKey"] = string.Empty;
+        configuration["Cloudinary:ApiSecret"] = string.Empty;
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredService<ISchoolImageStore>().GetType().Name.ShouldBe("InMemorySchoolImageStore");
+    }
+
+    [Fact]
     public void NoCredentialsAndNoFlag_FallsBackToTheFake_AndTheValidatorRefusesTheBoot()
     {
         // Registration cannot throw (it also runs under build-time OpenAPI generation), so the
         // refusal is the validator's job — see CloudinaryOptionsValidatorTests. What matters here
         // is that nothing tries to reach Cloudinary without credentials.
-        ResolveStoreImplementation().Name.ShouldBe("InMemorySchoolImageStore");
+        // Resolving reads the bound options, which runs the validator: a host with neither the flag nor credentials
+        // cannot obtain a store at all, let alone reach Cloudinary.
+        Should.Throw<Microsoft.Extensions.Options.OptionsValidationException>(() => ResolveStoreImplementation());
     }
 }

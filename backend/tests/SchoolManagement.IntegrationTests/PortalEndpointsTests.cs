@@ -286,6 +286,58 @@ public sealed class PortalEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         afterWithdrawal.ShouldNotContain("34.00");
     }
 
+    [Fact]
+    public async Task Weekly_APublishedWeek_ShowsOnThePortal_OpensAndDownloads_WithoutSpendingAUse_WhileADraftWeekStaysHidden()
+    {
+        RequireDatabase();
+        var school = await SeedSchoolAsync(published: true);
+        var pupil = school.Pupils[0];
+        Guid termId;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var term = await context.Terms.AsNoTracking().SingleAsync(candidate => candidate.SessionId == school.SessionId, TestContext.Current.CancellationToken);
+            termId = term.Id;
+            var armId = (await context.Enrolments.AsNoTracking().SingleAsync(enrolment => enrolment.PupilId == pupil.Id, TestContext.Current.CancellationToken)).ArmId;
+            var weeks = SchoolManagement.Domain.Weekly.TermWeeks.Derive(term.StartDate, term.EndDate);
+
+            var published = SchoolManagement.Domain.Weekly.WeeklyReport.Create(
+                Guid.CreateVersion7(), pupil.Id, armId, term.Id, weeks[1], weekIsPublished: false, null).Value;
+            published.SetNote(SchoolManagement.Domain.Weekly.WeeklyDay.Monday, SchoolManagement.Domain.Weekly.WeeklyField.Eating, "Ate everything");
+            published.SetNote(SchoolManagement.Domain.Weekly.WeeklyDay.Friday, SchoolManagement.Domain.Weekly.WeeklyField.TeacherComment, "A settled, happy week.");
+            published.Publish(DateTimeOffset.UtcNow, null);
+            var draft = SchoolManagement.Domain.Weekly.WeeklyReport.Create(
+                Guid.CreateVersion7(), pupil.Id, armId, term.Id, weeks[2], weekIsPublished: false, null).Value;
+            draft.SetNote(SchoolManagement.Domain.Weekly.WeeklyDay.Monday, SchoolManagement.Domain.Weekly.WeeklyField.Behaviour, "Draft only");
+            context.AddRange(published, draft);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var pin = await SeedPinAsync(school.SessionId, maxUses: 3);
+        using var client = NewClient();
+        var cookie = CookieFrom(await LookupAsync(client, pupil.TypedLoosely, pin.TypedLoosely));
+
+        (await ReadAsync(await GetAsync(client, "/portal/terms", cookie))).ShouldContain($"/portal/weekly/{termId:D}");
+
+        var list = await ReadAsync(await GetAsync(client, $"/portal/weekly/{termId:D}", cookie));
+        list.ShouldContain($"/portal/weekly/{termId:D}/2");
+        list.ShouldContain("A settled, happy week.");
+        list.ShouldNotContain($"/portal/weekly/{termId:D}/3");
+        list.ShouldContain("Not available");
+
+        var week = await ReadAsync(await GetAsync(client, $"/portal/weekly/{termId:D}/2", cookie));
+        week.ShouldContain("Ate everything");
+        week.ShouldNotContain("Home Work"); // Empty lines are omitted on screen.
+
+        (await ReadAsync(await GetAsync(client, $"/portal/weekly/{termId:D}/3", cookie))).ShouldNotContain("Draft only");
+
+        var pdf = await GetAsync(client, $"/portal/weekly/{termId:D}/2/pdf", cookie);
+        pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        pdf.Content.Headers.ContentDisposition!.FileName!.ShouldContain("_Week-02_First-Term_");
+
+        (await PinAsync(pin.Id)).UseCount.ShouldBe(1);
+    }
+
     private async Task<Guid> TermIdAsync(Guid resultSetId)
     {
         await using var scope = Fixture.CreateScope();

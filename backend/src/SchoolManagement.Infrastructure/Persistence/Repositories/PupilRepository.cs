@@ -42,6 +42,10 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         context.Pupils.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(pupil => pupil.Id == id, cancellationToken);
 
     /// <inheritdoc />
+    public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
+        context.Pupils.AnyAsync(pupil => pupil.Id == id, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<CursorPage<PupilDto>> ListAsync(
         PupilStatus? status,
         string? search,

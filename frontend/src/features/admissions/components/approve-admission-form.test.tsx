@@ -95,6 +95,31 @@ describe('ApproveAdmissionForm — one Idempotency-Key per dialog opening', () =
   });
 });
 
+describe('ApproveAdmissionForm — a refusal is not a dropped response', () => {
+  it('draws a fresh key after a 4xx, so the corrected retry is not answered from the stored refusal', async () => {
+    mockArms();
+    const keys: (string | null)[] = [];
+    server.use(
+      http.post(apiUrl('/api/v1/admissions/:id/approve'), ({ request }) => {
+        keys.push(request.headers.get('Idempotency-Key'));
+        return keys.length === 1
+          ? problemResponse(422)
+          : HttpResponse.json({ ...pupil(), status: 'Active', registrationNumber: 'GRAS/2026/0042' });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderForm();
+    await fillAndCheck(user);
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(keys).toHaveLength(1));
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(keys).toHaveLength(2));
+
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+});
+
 describe('ApproveAdmissionForm — success', () => {
   it('shows the issued registration number without navigating away', async () => {
     mockArms();
