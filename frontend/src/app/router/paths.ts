@@ -20,6 +20,7 @@ export const paths = {
   admissions: '/admissions',
   admissionFlow: (id: string, step?: number) => `/admissions/${id}${step ? `?step=${step}` : ''}`,
   pupils: '/pupils',
+  pupilImport: '/pupils/import',
   pupilDetail: (id: string) => `/pupils/${id}`,
   subjects: '/subjects',
   subjectMapping: '/subjects/mapping',

@@ -115,10 +115,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `2fc484bf76724e55adb788e8df8c0d9f0e5c6d3d53a23700aefcd84cfb0b7506`** · **110 paths** ·
-**256 schemas** · api version `v1` · moved 2026-09-23 by the admission health override (§6.5.16); re-promoted after its review for description text only (`ac7ed393…` → `2fc484bf…`, verified: no path or schema differs once descriptions are stripped).
-Previous: `9c7d96f34365…` / 110 / 256, admissions sections C-F/H on 2026-09-23; `1e89286e9a96…` / 103 paths / 233 schemas, weekly reports on 2026-09-23; before that `0a74f0192c73…` (annual computation), `bb29ee1ebe04…` (pin printing), `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `467ac28eb684e61a0fe30ac21711e38a1ea3144ed77574be9346ec8dd7956e64`** · **113 paths** ·
+**264 schemas** · api version `v1` · moved 2026-09-23 by bulk pupil import (§6.5.13).
+Previous: `2fc484bf7672…` / 110 / 256, the admission health override (§6.5.16) on 2026-09-23; `9c7d96f34365…` / 110 / 256, admissions sections C-F/H on 2026-09-23; `1e89286e9a96…` / 103 paths / 233 schemas, weekly reports on 2026-09-23; before that `0a74f0192c73…` (annual computation), `bb29ee1ebe04…` (pin printing), `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Bulk import additive verified mechanically** (`jq` with `MSYS_NO_PATHCONV=1`, `tr -d '\r'`, description/example/examples stripped, non-null probe on `/pupils/{id}` and `PupilDto`): +3 paths (`/pupils/import/template`, `/validate`, `/commit`), +8 schemas (`PupilImport*Dto`, `PupilImportRowOutcome`), 0 removed, 0 existing paths or schemas changed.
 
 **Health override additive verified mechanically** (`jq` with `MSYS_NO_PATHCONV=1`, description/example stripped, probe non-null): 0 paths/schemas added or removed; the one changed schema is `ApproveAdmissionCommand`, gaining OPTIONAL nullable `healthOverrideReason` (not in `required`); the approve path differs in description text only.
 

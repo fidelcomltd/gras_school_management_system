@@ -398,6 +398,31 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<PupilRegisterEntry>> ListByDatesOfBirthAsync(
+        IReadOnlyCollection<DateOnly> datesOfBirth, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(datesOfBirth);
+
+        if (datesOfBirth.Count == 0)
+        {
+            return [];
+        }
+
+        var dates = datesOfBirth.ToArray();
+
+        // IgnoreQueryFilters: every status, as FindDuplicatesAsync — a pending admission for the same child is exactly what to catch.
+        return await context.Pupils
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(pupil => dates.Contains(pupil.DateOfBirth))
+            .OrderBy(pupil => pupil.CreatedAtUtc)
+            .Select(pupil => new PupilRegisterEntry(
+                pupil.Id, pupil.Surname, pupil.FirstName, pupil.DateOfBirth, pupil.RegistrationNumber, pupil.Status))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public Task<int> CountByRegistrationNumberPrefixAsync(string abbreviationPrefix, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(abbreviationPrefix);

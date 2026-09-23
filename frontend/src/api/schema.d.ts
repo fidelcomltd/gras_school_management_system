@@ -955,6 +955,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pupils/import/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the bulk-import template
+         * @description Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet `Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet `LGAs` lists every state's LGAs. With no active session the arm columns are empty.
+         */
+        get: operations["GetPupilImportTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/import/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate a bulk-import file
+         * @description Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils). WRITES NOTHING. Returns every row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the file duplicating an earlier row are rejected. Whole-file problems are 422: `import.file_invalid`, `import.file_empty`, `import.too_many_rows`, `import.missing_columns`; 409 `import.no_active_session`.
+         */
+        post: operations["ValidatePupilImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a validated file
+         * @description Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` (repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import past an arm's capacity (needs `arm.capacity.override`). The file is re-validated and imported ALL OR NOTHING: each pupil is created active, with a registration number issued in file order by the same counter as admission approval, an open enrolment, and an admission record with the declaration unsigned; health columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 `import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, `import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CommitPupilImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils/{pupilId}/contacts": {
         parameters: {
             query?: never;
@@ -6941,6 +7001,347 @@ export interface components {
             genotype: null | components["schemas"]["Genotype"];
         };
         /**
+         * @description An arm the file would take over its capacity (spec 6.4.6: a warning, overridable with `arm.capacity.override`).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2C",
+         *       "capacity": 30,
+         *       "currentCount": 28,
+         *       "importCount": 4
+         *     }
+         */
+        PupilImportCapacityWarningDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Its display name.
+             * @example Primary 2C
+             */
+            armName: string;
+            /**
+             * Format: int32
+             * @description Its capacity.
+             * @example 30
+             */
+            capacity: number | string;
+            /**
+             * Format: int32
+             * @description Pupils enrolled now.
+             * @example 28
+             */
+            currentCount: number | string;
+            /**
+             * Format: int32
+             * @description Rows in this file for it.
+             * @example 4
+             */
+            importCount: number | string;
+        };
+        /**
+         * @description One problem with a row.
+         * @example {
+         *       "column": "Date of Birth",
+         *       "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+         *     }
+         */
+        PupilImportIssueDto: {
+            /**
+             * @description The template column it concerns.
+             * @example Date of Birth
+             */
+            column: string;
+            /**
+             * @description What is wrong and how to fix it.
+             * @example 03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018.
+             */
+            message: string;
+        };
+        /**
+         * @description A pupil already on the register that a row appears to duplicate.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2024/0007",
+         *       "status": "Active",
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "dateOfBirth": "2020-05-03"
+         *     }
+         */
+        PupilImportRegisterMatchDto: {
+            /**
+             * @description The existing pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null while that pupil is pending.
+             * @example GRAS/2024/0007
+             */
+            registrationNumber: null | string;
+            /** @description Its status. */
+            status: components["schemas"]["PupilStatus"];
+            /**
+             * @description Its surname.
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description Its first name.
+             * @example Chidera
+             */
+            firstName: string;
+            /**
+             * Format: date
+             * @description Its date of birth.
+             * @example 2020-05-03
+             */
+            dateOfBirth: string;
+        };
+        /**
+         * @description The validation report (spec 6.5.13): every data row with its outcome, plus per-arm capacity warnings. Health answers
+         *     are never echoed back.
+         * @example {
+         *       "fileSha256": "9f2c0d6b1e4a7c3f8d5e2b0a6c9f1e4d7b3a8c5f2e9d6b0a3c7f1e4d8b2a5c9f",
+         *       "totalRows": 2,
+         *       "acceptedCount": 1,
+         *       "rejectedCount": 1,
+         *       "registerMatchCount": 0,
+         *       "rows": [
+         *         {
+         *           "sheetRow": 2,
+         *           "surname": "Okafor",
+         *           "firstName": "Chidera",
+         *           "dateOfBirth": "2020-05-03",
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armName": "Primary 2C",
+         *           "outcome": "Accepted",
+         *           "errors": [],
+         *           "registerMatches": []
+         *         },
+         *         {
+         *           "sheetRow": 3,
+         *           "surname": "Bello",
+         *           "firstName": "Amina",
+         *           "dateOfBirth": null,
+         *           "armId": null,
+         *           "armName": null,
+         *           "outcome": "Rejected",
+         *           "errors": [
+         *             {
+         *               "column": "Date of Birth",
+         *               "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+         *             }
+         *           ],
+         *           "registerMatches": []
+         *         }
+         *       ],
+         *       "capacityWarnings": []
+         *     }
+         */
+        PupilImportReportDto: {
+            /**
+             * @description The uploaded file's SHA-256, hex. Commit must send it back, so decisions cannot land on another file.
+             * @example 9f2c0d6b1e4a7c3f8d5e2b0a6c9f1e4d7b3a8c5f2e9d6b0a3c7f1e4d8b2a5c9f
+             */
+            fileSha256: string;
+            /**
+             * Format: int32
+             * @description Data rows in the file.
+             * @example 2
+             */
+            totalRows: number | string;
+            /**
+             * Format: int32
+             * @description Rows with no error.
+             * @example 1
+             */
+            acceptedCount: number | string;
+            /**
+             * Format: int32
+             * @description Rows with at least one error.
+             * @example 1
+             */
+            rejectedCount: number | string;
+            /**
+             * Format: int32
+             * @description Accepted rows matching a pupil already on the register; each needs skip or create.
+             * @example 0
+             */
+            registerMatchCount: number | string;
+            /**
+             * @description Every data row, in file order.
+             * @example [
+             *       {
+             *         "sheetRow": 2,
+             *         "surname": "Okafor",
+             *         "firstName": "Chidera",
+             *         "dateOfBirth": "2020-05-03",
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armName": "Primary 2C",
+             *         "outcome": "Accepted",
+             *         "errors": [],
+             *         "registerMatches": []
+             *       },
+             *       {
+             *         "sheetRow": 3,
+             *         "surname": "Bello",
+             *         "firstName": "Amina",
+             *         "dateOfBirth": null,
+             *         "armId": null,
+             *         "armName": null,
+             *         "outcome": "Rejected",
+             *         "errors": [
+             *           {
+             *             "column": "Date of Birth",
+             *             "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+             *           }
+             *         ],
+             *         "registerMatches": []
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["PupilImportRowDto"][];
+            /**
+             * @description Arms this file would take over capacity, counting every accepted row.
+             * @example []
+             */
+            capacityWarnings: components["schemas"]["PupilImportCapacityWarningDto"][];
+        };
+        /**
+         * @description What a commit created.
+         * @example {
+         *       "importedCount": 1,
+         *       "skippedCount": 0,
+         *       "pupils": [
+         *         {
+         *           "sheetRow": 2,
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041"
+         *         }
+         *       ]
+         *     }
+         */
+        PupilImportResultDto: {
+            /**
+             * Format: int32
+             * @description Pupils created.
+             * @example 1
+             */
+            importedCount: number | string;
+            /**
+             * Format: int32
+             * @description Rows skipped by decision.
+             * @example 0
+             */
+            skippedCount: number | string;
+            /**
+             * @description Each created pupil, in file order, which is registration-number order.
+             * @example [
+             *       {
+             *         "sheetRow": 2,
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041"
+             *       }
+             *     ]
+             */
+            pupils: components["schemas"]["PupilImportedDto"][];
+        };
+        /**
+         * @description One data row of the report.
+         * @example {
+         *       "sheetRow": 2,
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "dateOfBirth": "2020-05-03",
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2C",
+         *       "outcome": "Accepted",
+         *       "errors": [],
+         *       "registerMatches": []
+         *     }
+         */
+        PupilImportRowDto: {
+            /**
+             * Format: int32
+             * @description The spreadsheet row number (the header is row 1).
+             * @example 2
+             */
+            sheetRow: number | string;
+            /**
+             * @description As typed, when present.
+             * @example Okafor
+             */
+            surname: null | string;
+            /**
+             * @description As typed, when present.
+             * @example Chidera
+             */
+            firstName: null | string;
+            /**
+             * Format: date
+             * @description When it could be read.
+             * @example 2020-05-03
+             */
+            dateOfBirth: null | string;
+            /**
+             * @description The resolved arm, when it could be.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: null | string;
+            /**
+             * @description The resolved arm's display name.
+             * @example Primary 2C
+             */
+            armName: null | string;
+            /** @description Accepted or rejected. */
+            outcome: components["schemas"]["PupilImportRowOutcome"];
+            /**
+             * @description Why the row is rejected: one entry per problem, each naming its column.
+             * @example []
+             */
+            errors: components["schemas"]["PupilImportIssueDto"][];
+            /**
+             * @description Existing pupils with the same surname, first name and date of birth. A warning, not an error.
+             * @example []
+             */
+            registerMatches: components["schemas"]["PupilImportRegisterMatchDto"][];
+        };
+        /**
+         * @description Whether a row can be imported.
+         * @example Accepted
+         * @enum {unknown}
+         */
+        PupilImportRowOutcome: "Accepted" | "Rejected";
+        /**
+         * @description One created pupil.
+         * @example {
+         *       "sheetRow": 2,
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041"
+         *     }
+         */
+        PupilImportedDto: {
+            /**
+             * Format: int32
+             * @description Its row in the file.
+             * @example 2
+             */
+            sheetRow: number | string;
+            /**
+             * @description The new pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description The number issued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: string;
+        };
+        /**
          * @description A Pupil's sex (spec 6.5.4). Required, no default.
          * @example Female
          * @enum {unknown}
@@ -10733,7 +11134,7 @@ export interface components {
         };
         /**
          * Format: binary
-         * @description The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).
+         * @description The raw file bytes: an image, a PDF or an XLSX workbook, as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).
          * @example binary PNG or JPEG bytes
          */
         Stream: string;
@@ -18080,6 +18481,243 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilImportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ValidatePupilImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilImportReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Payload Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CommitPupilImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                } & {
+                    fileSha256: string;
+                } & {
+                    skipRows?: (number | string)[];
+                } & {
+                    createRows?: (number | string)[];
+                } & {
+                    overrideCapacity?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilImportResultDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Payload Too Large */
+            413: {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
