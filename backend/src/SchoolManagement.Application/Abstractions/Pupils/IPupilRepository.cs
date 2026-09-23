@@ -26,6 +26,9 @@ public interface IPupilRepository
     /// <summary>Loads a read-only pupil by id, for a query. Same pending-inclusion rule as <see cref="FindTrackedByIdAsync"/>.</summary>
     Task<Pupil?> FindReadOnlyByIdAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>Whether a (non-deleted) pupil has this id: one indexed probe, for authorisation's scope resolution.</summary>
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>
     /// Cursor-paged, filtered list (spec 6.5.15). Excludes <see cref="PupilStatus.Pending"/> UNLESS
     /// <paramref name="status"/> is explicitly <see cref="PupilStatus.Pending"/> — the structural

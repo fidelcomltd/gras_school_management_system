@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPatch, apiPost } from '@/api/client';
+import { RecordKeys } from './records/api';
 import {
   PupilsKeys,
   type CorrectRegistrationNumberCommand,
@@ -70,6 +71,8 @@ export function useUpdatePupil(id: string) {
     onSuccess: (pupil) => {
       queryClient.setQueryData([PupilsKeys.Detail, id], pupil);
       void queryClient.invalidateQueries({ queryKey: [PupilsKeys.List] });
+      // Previous school and other information are chased items (spec 6.5.12).
+      void queryClient.invalidateQueries({ queryKey: [RecordKeys.Completeness, id] });
     },
   });
 }

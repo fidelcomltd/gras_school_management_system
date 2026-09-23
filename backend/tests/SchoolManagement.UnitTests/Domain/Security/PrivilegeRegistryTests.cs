@@ -112,6 +112,9 @@ public sealed class PrivilegeRegistryTests
         ("pupil.regnumber.correct", false, PrivilegeModule.PupilsAndSubjects, "Correct a wrongly issued registration number."),
         ("pupil.admission.approve", false, PrivilegeModule.PupilsAndSubjects,
             "Approve a pending admission, moving it to active and issuing the registration number, per 6.5.11."),
+        // NOT from spec 4.4: human ruling 2026-09-23 (spec 6.5.16's head-teacher override).
+        ("pupil.admission.override", false, PrivilegeModule.PupilsAndSubjects,
+            "Approve an admission whose health questions the parent declined to answer, with a recorded reason, per 6.5.16."),
         ("pupil.safeguarding.view", true, PrivilegeModule.PupilsAndSubjects,
             "Read the section F health block and the barred-persons list, per 6.5.6 and 6.5.7. Every read is audited. Deliberately withheld from the Bursar and the Auditor."),
         ("pupil.safeguarding.update", true, PrivilegeModule.PupilsAndSubjects, "Edit the health block and the barred-persons list."),
@@ -168,16 +171,17 @@ public sealed class PrivilegeRegistryTests
     ];
 
     [Fact]
-    public void TheRegisterHasExactlyNinetyThreeSpecPrivilegesPlusTwoApprovedAdditions()
+    public void TheRegisterHasExactlyNinetyThreeSpecPrivilegesPlusThreeApprovedAdditions()
     {
         // Spec 4.4 itself still enumerates exactly 93: 15 + 10 + 18 + 27 + 16 + 7. TASK-0072 stage 1
         // and stage 2b each added one privilege beyond that table (settings.ratingscales.update,
         // settings.developmentdomains.update) by human-approved product decision, not spec revision —
         // see the two entries' own comments above. 95 is therefore the correct total, not a rounding
         // of 93; if a future spec revision folds these into 4.4.2 directly, this comment (and the
-        // "NOT from spec" comments above) is what should be deleted, not the count.
-        ExpectedFromSpec.Length.ShouldBe(95, "the transcription above is wrong, not the production code");
-        PrivilegeRegistry.All.Count.ShouldBe(95);
+        // "NOT from spec" comments above) is what should be deleted, not the count. The human ruling of
+        // 2026-09-23 added a third, pupil.admission.override (spec 6.5.16), so 96.
+        ExpectedFromSpec.Length.ShouldBe(96, "the transcription above is wrong, not the production code");
+        PrivilegeRegistry.All.Count.ShouldBe(96);
     }
 
     [Fact]

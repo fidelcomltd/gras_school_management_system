@@ -1,6 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from '@/api/client';
-import { AdmissionsKeys, type ApproveAdmissionCommand, type DeclineAdmissionCommand } from './types';
+import { apiGet, apiPatch, apiPost } from '@/api/client';
+import { PupilsKeys } from '@/features/pupils/types';
+import { RecordKeys } from '@/features/pupils/records/api';
+import { AdmissionsKeys, type ApproveAdmissionCommand, type DeclineAdmissionCommand, type UpdateAdmissionRecordCommand } from './types';
 
 /** One hook per endpoint, per CONVENTIONS.md §4 / `src/features/README.md`. */
 
@@ -38,6 +40,22 @@ export function useAdmissionRecord(id: string) {
 }
 
 /**
+ * `PATCH /api/v1/admissions/{id}` (spec 6.5.11 step 8): a `null` field is left unchanged, so a step sends only its own
+ * fields. Gated `pupil.update`.
+ */
+export function useUpdateAdmissionRecord(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Omit<UpdateAdmissionRecordCommand, 'id'>) => apiPatch(ADMISSION_PATH, { id, ...payload }, { pathParams: { id } }),
+    onSuccess: (record) => {
+      queryClient.setQueryData([AdmissionsKeys.Record, id], record);
+      void queryClient.invalidateQueries({ queryKey: [RecordKeys.Completeness, id] });
+      void queryClient.invalidateQueries({ queryKey: [AdmissionsKeys.Queue] });
+    },
+  });
+}
+
+/**
  * Gated `pupil.admission.approve`. `Idempotency-Key` REQUIRED on this route —
  * the caller generates ONE key per dialog opening (`crypto.randomUUID()`)
  * and reuses it across a double-click or a retry after a dropped response;
@@ -49,8 +67,10 @@ export function useApproveAdmission() {
     mutationKey: [AdmissionsKeys.Approve],
     mutationFn: ({ id, idempotencyKey, ...command }: ApproveAdmissionCommand & { idempotencyKey: string }) =>
       apiPost(ADMISSION_APPROVE_PATH, { id, ...command }, { pathParams: { id }, idempotencyKey }),
-    onSuccess: () => {
+    onSuccess: (pupil) => {
+      queryClient.setQueryData([PupilsKeys.Detail, pupil.id], pupil);
       void queryClient.invalidateQueries({ queryKey: [AdmissionsKeys.Queue] });
+      void queryClient.invalidateQueries({ queryKey: [PupilsKeys.List] });
     },
   });
 }

@@ -138,7 +138,8 @@ public static class SeededRoles
     /// <c>pupil.safeguarding.view</c>, <c>pupil.safeguarding.update</c>,
     /// <c>pupil.admission.approve</c>, <c>weekly.view</c>, <c>weekly.enter</c>, <c>weekly.publish</c>,
     /// <c>arm.view</c>, <c>subject.view</c>, <c>session.view</c>, <c>level.view</c>,
-    /// <c>settings.view</c>, <c>pin.view</c>, <c>report.*</c>." 25 codes.
+    /// <c>settings.view</c>, <c>pin.view</c>, <c>report.*</c>." 25 codes, plus <c>pupil.admission.override</c>
+    /// (human ruling 2026-09-23, spec 6.5.16: "the head teacher ... can approve with a reason"): 26.
     /// </summary>
     public static readonly IReadOnlyList<string> HeadTeacherPrivileges = Sorted(
     [
@@ -146,7 +147,7 @@ public static class SeededRoles
         Privileges.Results.Approve, Privileges.Results.Return, Privileges.Results.Publish,
         Privileges.Results.AnnualCompute, Privileges.Results.Print, Privileges.Promotion.Decide,
         Privileges.Pupil.View, Privileges.Contact.View, Privileges.Pupil.SafeguardingView,
-        Privileges.Pupil.SafeguardingUpdate, Privileges.Pupil.AdmissionApprove,
+        Privileges.Pupil.SafeguardingUpdate, Privileges.Pupil.AdmissionApprove, Privileges.Pupil.AdmissionOverride,
         Privileges.Weekly.View, Privileges.Weekly.Enter, Privileges.Weekly.Publish,
         Privileges.Arm.View, Privileges.Subject.View, Privileges.Session.View, Privileges.Level.View,
         Privileges.Settings.View, Privileges.Pin.View,

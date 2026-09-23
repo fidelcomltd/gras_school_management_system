@@ -4,6 +4,7 @@ import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/http';
+import { cn } from '@/lib/utils/cn';
 import { useUpdatePupil } from '../api';
 import { biographicalSchema, type BiographicalFormValues } from '../pupil-schema';
 import type { PupilDto } from '../types';
@@ -15,6 +16,32 @@ import { BiographicalFields } from './biographical-fields';
  * correction.
  */
 export function EditPupilDialog({ pupil, onClose }: { pupil: PupilDto; onClose: () => void }) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit pupil</DialogTitle>
+        </DialogHeader>
+        <PupilInfoForm pupil={pupil} onSaved={onClose} onCancel={onClose} className="max-h-[70vh] overflow-y-auto" />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The section B form itself: the edit dialog's body, and step 2 of the admission flow. */
+export function PupilInfoForm({
+  pupil,
+  onSaved,
+  onCancel,
+  submitLabel = 'Save changes',
+  className,
+}: {
+  pupil: PupilDto;
+  onSaved: () => void;
+  onCancel?: () => void;
+  submitLabel?: string;
+  className?: string;
+}) {
   const update = useUpdatePupil(pupil.id);
   const form = useForm<BiographicalFormValues>({
     resolver: zodResolver(biographicalSchema),
@@ -55,32 +82,31 @@ export function EditPupilDialog({ pupil, onClose }: { pupil: PupilDto; onClose: 
         otherInformation: changed('otherInformation'),
         registrationNumber: null,
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          form.reset(values);
+          onSaved();
+        },
+      },
     );
   });
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit pupil</DialogTitle>
-        </DialogHeader>
-
-        <FormProvider {...form}>
-          <form onSubmit={onSubmit} className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto" noValidate>
-            <FormError message={update.error instanceof ApiError ? update.error.message : null} />
-            <BiographicalFields />
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={update.isPending || !form.formState.isDirty}>
-                {update.isPending ? 'Saving…' : 'Save changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </FormProvider>
-      </DialogContent>
-    </Dialog>
+    <FormProvider {...form}>
+      <form onSubmit={onSubmit} className={cn('flex flex-col gap-5', className)} noValidate>
+        <FormError message={update.error instanceof ApiError ? update.error.message : null} />
+        <BiographicalFields />
+        <DialogFooter>
+          {onCancel ? (
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+          ) : null}
+          <Button type="submit" disabled={update.isPending || !form.formState.isDirty}>
+            {update.isPending ? 'Saving…' : submitLabel}
+          </Button>
+        </DialogFooter>
+      </form>
+    </FormProvider>
   );
 }

@@ -1770,7 +1770,8 @@ internal static class OpenApiExamples
               "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
               "assessmentResultRemarks": "Passed the entrance assessment.",
               "headOfSchoolConfirmed": true,
-              "headOfSchoolName": null
+              "headOfSchoolName": null,
+              "healthOverrideReason": null
             }
             """,
 

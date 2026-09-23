@@ -1,6 +1,8 @@
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Authorization;
+using SchoolManagement.Domain.Pupils;
 
 namespace SchoolManagement.UnitTests.Application.Authorization;
 
@@ -12,7 +14,9 @@ public sealed class ScopeResolverTests
     private readonly IPupilArmOfRecordLookup _pupilArmLookup = Substitute.For<IPupilArmOfRecordLookup>();
     private readonly IResultSetArmLookup _resultSetArmLookup = Substitute.For<IResultSetArmLookup>();
 
-    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup);
+    private readonly IPupilRepository _pupils = Substitute.For<IPupilRepository>();
+
+    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup, _pupils);
 
     [Fact]
     public async Task ArmKind_ResolvesDirectlyToTheSuppliedId()
@@ -53,7 +57,23 @@ public sealed class ScopeResolverTests
     }
 
     [Fact]
-    public async Task PupilKind_WhenTheLookupFindsNoOpenEnrolment_IsUnresolvable()
+    public async Task PupilKind_AnExistingPupilWithNoOpenEnrolment_RequiresSchoolWide()
+    {
+        // A pending admission or a leaver: real, but in no arm (human ruling 2026-09-23).
+        var pupil = Pupil.Create(
+            Guid.CreateVersion7(), "Okafor", "Chidi", null, PupilSex.Male, new DateOnly(2019, 3, 1), new DateOnly(2026, 9, 1),
+            "Nigerian", "Anambra", "Awka South", "12 Zik Avenue", previousSchool: null, previousClass: null, otherInformation: null).Value;
+        _pupilArmLookup.GetArmIdAsync(pupil.Id, Arg.Any<CancellationToken>()).Returns((Guid?)null);
+        _pupils.ExistsAsync(pupil.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var resolution = await CreateResolver().ResolveAsync(
+            ScopeParameterKind.Pupil, pupil.Id, TestContext.Current.CancellationToken);
+
+        resolution.ShouldBeOfType<ScopeResolution.RequiresSchoolWide>();
+    }
+
+    [Fact]
+    public async Task PupilKind_AnIdNamingNoPupil_IsUnresolvable()
     {
         var pupilId = Guid.CreateVersion7();
         _pupilArmLookup.GetArmIdAsync(pupilId, Arg.Any<CancellationToken>()).Returns((Guid?)null);

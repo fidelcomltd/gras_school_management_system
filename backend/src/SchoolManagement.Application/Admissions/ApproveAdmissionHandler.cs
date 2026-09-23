@@ -231,11 +231,30 @@ internal sealed class ApproveAdmissionCommandHandler(
         // Blocking conditions from steps 3 to 5 (spec 6.5.12): contacts, the barred-persons answer, the health answers.
         // The declaration and assessment were checked just above against this command's own unsaved changes.
         var missing = await completeness.BlockingSectionsAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
-        if (missing.Count > 0)
+
+        // Spec 6.5.16: a parent who declines the health questions leaves the record pending; the head teacher
+        // "can approve with a reason". Only the health gap is waivable, and only by pupil.admission.override.
+        var healthOverridden = request.HealthOverrideReason is not null
+            && missing.Count > 0
+            && missing.All(item => item.Code == Pupils.Records.AdmissionCompleteness.HealthUnansweredCode);
+        if (missing.Count > 0 && !healthOverridden)
         {
             return Result.Failure<PupilDto>(Error.Validation(
                 "admission.incomplete",
                 "This admission is not complete. " + string.Join(" ", missing.Select(item => $"Step {item.Step}: {item.Message}"))));
+        }
+
+        if (healthOverridden)
+        {
+            var grants = await effectivePrivilegeProvider
+                .GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
+                .ConfigureAwait(false);
+            if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.AdmissionOverride) != PupilAccessScope.SchoolWide)
+            {
+                return Result.Failure<PupilDto>(Error.Forbidden(
+                    "admission.override_forbidden",
+                    "Approving without the health answers needs the admission override privilege. Ask the head teacher."));
+            }
         }
 
         var actorId = currentUser.UserId is { } actorIdText && Guid.TryParse(actorIdText, out var parsedActorId)
@@ -244,6 +263,10 @@ internal sealed class ApproveAdmissionCommandHandler(
         var now = timeProvider.GetUtcNow();
 
         record.RecordApproval(actorId, now);
+        if (healthOverridden)
+        {
+            record.RecordHealthOverride(request.HealthOverrideReason!);
+        }
 
         var approveResult = pupil.Approve();
 
@@ -319,6 +342,22 @@ internal sealed class ApproveAdmissionCommandHandler(
             },
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
+
+        if (healthOverridden)
+        {
+            // A distinct event, as the capacity override is: who waived the health answers. The reason itself stays on the
+            // admission record, because it may describe the child's health (audit readers need not hold safeguarding view).
+            await auditSink.RecordAsync(
+                Privileges.Pupil.AdmissionOverride,
+                PupilEntityType,
+                pupil.Id.ToString("D", CultureInfo.InvariantCulture),
+                metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["waived"] = Pupils.Records.AdmissionCompleteness.HealthUnansweredCode,
+                },
+                actorAdminId: currentUser.UserId,
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var admissionDto = AdmissionRecordMapper.ToDto(record, level?.Name);
 

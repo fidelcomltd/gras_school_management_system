@@ -30,3 +30,4 @@ export type AdmissionQueueRow = components['schemas']['PupilDto'];
 export type AdmissionRecordDto = components['schemas']['AdmissionRecordDto'];
 export type ApproveAdmissionCommand = components['schemas']['ApproveAdmissionCommand'];
 export type DeclineAdmissionCommand = components['schemas']['DeclineAdmissionCommand'];
+export type UpdateAdmissionRecordCommand = components['schemas']['UpdateAdmissionRecordCommand'];

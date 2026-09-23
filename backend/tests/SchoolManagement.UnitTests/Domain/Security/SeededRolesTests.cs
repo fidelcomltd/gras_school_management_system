@@ -45,11 +45,11 @@ public sealed class SeededRolesTests
         // Spec 4.5: "Every privilege in the register. Not editable." SuperAdminPrivileges is built
         // from PrivilegeRegistry.All itself (a projection, not its own transcription — see the type's
         // remarks), so this count tracks the register's actual size, currently spec 4.4's 93 plus the
-        // two TASK-0072 additions (settings.ratingscales.update, settings.developmentdomains.update)
+        // two TASK-0072 additions (settings.ratingscales.update, settings.developmentdomains.update) and pupil.admission.override
         // PrivilegeRegistryTests documents are not in spec 4.4's own table.
         var everyRegisteredCode = PrivilegeRegistry.All.Select(definition => definition.Code).ToArray();
 
-        SeededRoles.SuperAdminPrivileges.Count.ShouldBe(95);
+        SeededRoles.SuperAdminPrivileges.Count.ShouldBe(96);
         Sorted(SeededRoles.SuperAdminPrivileges).ShouldBe(Sorted(everyRegisteredCode));
     }
 
@@ -103,14 +103,14 @@ public sealed class SeededRolesTests
             Privileges.Results.Approve, Privileges.Results.Return, Privileges.Results.Publish,
             Privileges.Results.AnnualCompute, Privileges.Results.Print, Privileges.Promotion.Decide,
             Privileges.Pupil.View, Privileges.Contact.View, Privileges.Pupil.SafeguardingView,
-            Privileges.Pupil.SafeguardingUpdate, Privileges.Pupil.AdmissionApprove,
+            Privileges.Pupil.SafeguardingUpdate, Privileges.Pupil.AdmissionApprove, Privileges.Pupil.AdmissionOverride,
             Privileges.Weekly.View, Privileges.Weekly.Enter, Privileges.Weekly.Publish,
             Privileges.Arm.View, Privileges.Subject.View, Privileges.Session.View, Privileges.Level.View,
             Privileges.Settings.View, Privileges.Pin.View,
             Privileges.Report.View, Privileges.Report.Export,
         ];
 
-        expected.Length.ShouldBe(25);
+        expected.Length.ShouldBe(26);
         Sorted(SeededRoles.HeadTeacherPrivileges).ShouldBe(Sorted(expected));
 
         // Head Teacher never enters marks (spec 4.1) and never generates pins.

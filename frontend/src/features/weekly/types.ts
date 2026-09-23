@@ -1,4 +1,5 @@
 import type { components } from '@/api/schema';
+import { formatDate } from '@/shared/format/date';
 
 type S = components['schemas'];
 
@@ -61,8 +62,4 @@ export function weekLabel(week: { weekNumber: number | string; startDate: string
   return `Week ${week.weekNumber}: ${formatDate(week.startDate)} to ${formatDate(week.endDate)}`;
 }
 
-/** An ISO date as DD/MM/YYYY. */
-export function formatDate(iso: string) {
-  const [year, month, day] = iso.split('-');
-  return `${day ?? ''}/${month ?? ''}/${year ?? ''}`;
-}
+export { formatDate };

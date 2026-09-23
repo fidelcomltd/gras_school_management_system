@@ -33,6 +33,9 @@ public sealed class AdmissionRecord : Entity<Guid>, IAuditableEntity
     /// <summary>Spec 6.5.9: <c>head_of_school_name</c> is <c>String 120</c>.</summary>
     public const int HeadOfSchoolNameMaxLength = 120;
 
+    /// <summary>Spec 6.5.16's override reason, 10 to 500 characters (human ruling 2026-09-23).</summary>
+    public const int HealthOverrideReasonMaxLength = 500;
+
     private AdmissionRecord(
         Guid id,
         Guid pupilId,
@@ -117,6 +120,12 @@ public sealed class AdmissionRecord : Entity<Guid>, IAuditableEntity
 
     /// <summary>Section J. Written by admission approval only (TASK-0051) — always <see langword="null"/> within this card.</summary>
     public DateTimeOffset? ApprovedAt { get; private set; }
+
+    /// <summary>
+    /// Spec 6.5.16: why the admission was approved with the health questions unanswered. Held here, never in audit metadata,
+    /// because it may describe the child's health; read it with the safeguarding privilege, as the health block is.
+    /// </summary>
+    public string? HealthOverrideReason { get; private set; }
 
     /// <summary>Section J's second signature block. Defaults false.</summary>
     public bool HeadOfSchoolConfirmed { get; private set; }
@@ -388,6 +397,13 @@ public sealed class AdmissionRecord : Entity<Guid>, IAuditableEntity
     {
         ApprovedBy = approvedBy;
         ApprovedAt = approvedAt;
+    }
+
+    /// <summary>Records spec 6.5.16's reason for approving with the health answers missing. The caller has checked the privilege.</summary>
+    public void RecordHealthOverride(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        HealthOverrideReason = reason.Trim();
     }
 
     private static Error DateInFutureError(string code, string fieldLabel, DateOnly value) =>

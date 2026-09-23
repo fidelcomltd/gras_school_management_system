@@ -119,6 +119,9 @@ internal sealed class GetAdmissionCompletenessHandler(PupilRecordAccess access, 
 /// </summary>
 internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdmissionRecordRepository admissions)
 {
+    /// <summary>The blocking item a parent's declined health answers leave; the only one <c>pupil.admission.override</c> can waive (spec 6.5.16).</summary>
+    public const string HealthUnansweredCode = "health.unanswered";
+
     /// <summary>
     /// Only the blocking items of steps 3 to 5 (contacts, the barred answer, health) — what approval checks on top of its
     /// own declaration and assessment rules, without reading the chased set it would discard.
@@ -195,7 +198,7 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
         Block(!contacts.Any(contact => contact.Role == ContactRole.EmergencyPrimary), 3, "contacts.emergency_primary", "Add the primary emergency contact.");
         Block(hasAdult && !contacts.Any(contact => contact.IsPrimaryContact), 3, "contacts.primary", "Mark one parent or guardian as the primary contact.");
         Block(barred is null, 4, "collection.barred_unanswered", "Answer whether anyone must not collect the child.");
-        Block(health is not { IsAnswered: true }, 5, "health.unanswered", "Answer all three health questions: allergy, medical condition, medication.");
+        Block(health is not { IsAnswered: true }, 5, HealthUnansweredCode, "Answer all three health questions: allergy, medical condition, medication.");
         return blocking;
     }
 }
