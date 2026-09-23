@@ -11,6 +11,7 @@ import { classesRoutes } from '@/features/classes/classes-routes';
 import { pinsRoutes } from '@/features/pins/pins-routes';
 import { pupilsRoutes } from '@/features/pupils/pupils-routes';
 import { resultsRoutes } from '@/features/results/results-routes';
+import { weeklyRoutes } from '@/features/weekly/weekly-routes';
 import { subjectsRoutes } from '@/features/subjects/subjects-routes';
 import { rolesRoutes } from '@/features/roles/roles-routes';
 import { sessionsRoutes } from '@/features/sessions/sessions-routes';
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       ...pupilsRoutes,
       ...subjectsRoutes,
       ...resultsRoutes,
+      ...weeklyRoutes,
       ...pinsRoutes,
       ...auditRoutes,
       ...adminsRoutes,

@@ -2035,6 +2035,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/terms/{termId}/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a term's derived weeks
+         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
+         */
+        get: operations["GetTermWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil's weekly reports for a term
+         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab.
+         */
+        get: operations["GetPupilWeekly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one arm's weekly grid for one week
+         * @description Spec 6.10.7/6.10.11: every active pupil (plus any pupil with notes in this week who has since left) by five weekdays, each day carrying all eight lines, in one response. Without `weekNumber` it opens the week containing today (Lagos). Also returns the term's week list with publication state (`weeks`), the arm's auto-publish option, and the caller's own phrase memory per line (`phrases`). `illnessDays` of 2 or more is the quiet marker of 6.10.6.
+         */
+        get: operations["GetWeeklyGrid"];
+        /**
+         * Save weekly notes, sparse
+         * @description Spec 6.10.11: bulk upsert of one week's grid in one transaction. Only the cells sent are touched, so a Fill down writes only what it filled; a null or blank `value` clears a line. The first note for a pupil creates their report with its five days. Last write wins (6.10.10), no version. Nothing is required and nothing is scored. 422 for a line over its limit (300, or 500 for the two comments) or a pupil neither on the roster nor holding notes in this arm's week; 409 `weekly.term_closed` / `weekly.session_closed`.
+         */
+        put: operations["SaveWeeklyNotes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/{weekNumber}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish one arm's week to parents
+         * @description Spec 6.10.8: per arm per week, no approval chain. Every pupil's report for the week becomes visible on the portal, and a report created later in a published week starts published. 409 `weekly.nothing_to_publish` when no pupil has any note. Idempotent.
+         */
+        post: operations["PublishWeeklyWeek"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/{weekNumber}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpublish one arm's week
+         * @description Spec 6.10.8: hides the week from parents again. No reason required. Idempotent.
+         */
+        post: operations["UnpublishWeeklyWeek"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/weekly/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn weekly auto-publish on or off for an arm
+         * @description Spec 6.10.8: off by default. When on, each week with at least one note is published automatically at 17:00 Lagos time on its Friday (caught up until Sunday if the server was down). A week the teacher unpublishes afterwards stays unpublished.
+         */
+        put: operations["UpdateWeeklySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/weekly-completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekly report completion, per arm per week
+         * @description Spec 6.10.12: one row per active arm per week of the term (or one week with `weekNumber`): pupils with any note, lines filled against lines available (pupils on roll x 5 days x 8 lines), published state, and the last edit. Bounded by arms x 20 weeks, so not paginated.
+         */
+        get: operations["GetWeeklyCompletionReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/weekly-illness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Illness observation summary for a term
+         * @description Spec 6.10.12: every pupil with `symptomsOfIllness` recorded on two or more days of the term, with the dates and the text. Health observation about a child, so it needs `report.view` AND `pupil.safeguarding.view`, both school-wide.
+         */
+        get: operations["GetWeeklyIllnessReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5968,6 +6132,197 @@ export interface components {
          */
         PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
         /**
+         * @description One pupil's whole term, week by week (spec 6.10.11). Backs the per-pupil tab.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weeks": [
+         *         {
+         *           "weekNumber": 3,
+         *           "startDate": "2027-01-04",
+         *           "endDate": "2027-01-08",
+         *           "outsideTerm": false,
+         *           "armId": null,
+         *           "published": false,
+         *           "days": null
+         *         },
+         *         {
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "outsideTerm": false,
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "published": true,
+         *           "days": [
+         *             {
+         *               "dayOfWeek": "Monday",
+         *               "date": "2027-01-11",
+         *               "behaviour": "Calm and helpful",
+         *               "performance": "Finished her reading book",
+         *               "dressing": null,
+         *               "homeWork": "Returned, neat",
+         *               "eating": "Ate everything",
+         *               "symptomsOfIllness": null,
+         *               "teacherComment": "A lovely start to the week.",
+         *               "parentComment": null,
+         *               "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *               "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *               "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        PupilWeeklyTermDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description One row per week of the term, plus any outside-term week that holds notes.
+             * @example [
+             *       {
+             *         "weekNumber": 3,
+             *         "startDate": "2027-01-04",
+             *         "endDate": "2027-01-08",
+             *         "outsideTerm": false,
+             *         "armId": null,
+             *         "published": false,
+             *         "days": null
+             *       },
+             *       {
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "outsideTerm": false,
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "published": true,
+             *         "days": [
+             *           {
+             *             "dayOfWeek": "Monday",
+             *             "date": "2027-01-11",
+             *             "behaviour": "Calm and helpful",
+             *             "performance": "Finished her reading book",
+             *             "dressing": null,
+             *             "homeWork": "Returned, neat",
+             *             "eating": "Ate everything",
+             *             "symptomsOfIllness": null,
+             *             "teacherComment": "A lovely start to the week.",
+             *             "parentComment": null,
+             *             "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *             "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *             "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            weeks: components["schemas"]["PupilWeeklyWeekDto"][];
+        };
+        /**
+         * @description One week of a pupil's term.
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "published": true,
+         *       "days": [
+         *         {
+         *           "dayOfWeek": "Monday",
+         *           "date": "2027-01-11",
+         *           "behaviour": "Calm and helpful",
+         *           "performance": "Finished her reading book",
+         *           "dressing": null,
+         *           "homeWork": "Returned, neat",
+         *           "eating": "Ate everything",
+         *           "symptomsOfIllness": null,
+         *           "teacherComment": "A lovely start to the week.",
+         *           "parentComment": null,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        PupilWeeklyWeekDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * @description Holds notes but falls outside the term's current dates.
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description The arm the week is attributed to; null when nothing is written.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: null | string;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * @description Five days, or null when the pupil has no report for the week.
+             * @example [
+             *       {
+             *         "dayOfWeek": "Monday",
+             *         "date": "2027-01-11",
+             *         "behaviour": "Calm and helpful",
+             *         "performance": "Finished her reading book",
+             *         "dressing": null,
+             *         "homeWork": "Returned, neat",
+             *         "eating": "Ate everything",
+             *         "symptomsOfIllness": null,
+             *         "teacherComment": "A lovely start to the week.",
+             *         "parentComment": null,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            days: null | components["schemas"]["WeeklyDayDto"][];
+        };
+        /**
          * @description One scale, both inside SettingsDto's envelope and as an element of SettingsRatingScaleGroupDto's `Scales` array (spec 6.2.13).
          * @example {
          *       "id": "0192f0c4-e1a5-7f00-8f11-2c3d4e5f6601",
@@ -7945,6 +8300,65 @@ export interface components {
             };
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/weekly` (spec 6.10.11): sparse bulk upsert of one week's grid, one transaction. Only the
+         *             cells sent are touched, so a Fill down writes only what it filled. Last write wins (spec 6.10.10); no version.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weekNumber": 4,
+         *       "cells": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "dayOfWeek": "Monday",
+         *           "field": "Eating",
+         *           "value": "Ate everything"
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "dayOfWeek": "Monday",
+         *           "field": "Eating",
+         *           "value": null
+         *         }
+         *       ]
+         *     }
+         */
+        SaveWeeklyNotesCommand: {
+            /**
+             * @description From the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * Format: int32
+             * @description The week.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * @description The cells to write.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "dayOfWeek": "Monday",
+             *         "field": "Eating",
+             *         "value": "Ate everything"
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "dayOfWeek": "Monday",
+             *         "field": "Eating",
+             *         "value": null
+             *       }
+             *     ]
+             */
+            cells: components["schemas"]["WeeklyCellInput"][];
+        };
+        /**
          * @description One current logo or signature upload's summary (TASK-0005b stage B2; spec 9.6) — the success body
          *     of both `POST /settings/identity/logo` and `POST /settings/identity/signature`, and also
          *     how SchoolImageDto? SettingsIdentityGroupDto.Logo/SchoolImageDto? SettingsIdentityGroupDto.Signature
@@ -9735,6 +10149,75 @@ export interface components {
          */
         TermState: "Upcoming" | "Active" | "Closed";
         /**
+         * @description One derived week of a term (spec 6.10.3).
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15"
+         *     }
+         */
+        TermWeekDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+        };
+        /**
+         * @description A term's derived weeks. Bounded at 20, so not paginated.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "weekNumber": 1,
+         *           "startDate": "2026-12-21",
+         *           "endDate": "2026-12-25"
+         *         },
+         *         {
+         *           "weekNumber": 2,
+         *           "startDate": "2026-12-28",
+         *           "endDate": "2027-01-01"
+         *         }
+         *       ]
+         *     }
+         */
+        TermWeekListResponse: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description In order.
+             * @example [
+             *       {
+             *         "weekNumber": 1,
+             *         "startDate": "2026-12-21",
+             *         "endDate": "2026-12-25"
+             *       },
+             *       {
+             *         "weekNumber": 2,
+             *         "startDate": "2026-12-28",
+             *         "endDate": "2027-01-01"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["TermWeekDto"][];
+        };
+        /**
          * @description How a tied subject/annual total is broken for position ranking (spec 6.2.8). Stored as a string
          *     (`ResultRulesConfiguration.HasConversion&lt;string&gt;()`).
          * @example SharedPosition
@@ -11160,6 +11643,25 @@ export interface components {
             reason: null | string;
         };
         /**
+         * @description `PUT /api/v1/arms/{armId}/weekly/settings` (spec 6.10.8): the per-arm auto-publish option.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "autoPublish": true
+         *     }
+         */
+        UpdateWeeklySettingsCommand: {
+            /**
+             * @description From the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Publish each week automatically at 17:00 on its Friday.
+             * @example true
+             */
+            autoPublish: boolean;
+        };
+        /**
          * @description `POST /api/v1/arms/{armId}/score-sheets/void` (spec 6.7.4, 6.7.11; TASK-0076's approved
          *             contract delta) — voids every non-voided mark for one arm, subject and term. Super Admin only,
          *             reason required. Used only to unwind an error.
@@ -11205,6 +11707,785 @@ export interface components {
              * @example 27
              */
             voidedCount: number | string;
+        };
+        /**
+         * @description One cell of the weekly grid: one line, one day, one pupil.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "dayOfWeek": "Monday",
+         *       "field": "Eating",
+         *       "value": "Ate everything"
+         *     }
+         */
+        WeeklyCellInput: {
+            /**
+             * @description On the arm's active roster, or already holding notes in this arm's week.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /** @description Monday to Friday. */
+            dayOfWeek: components["schemas"]["WeeklyDay"];
+            /** @description Which of the eight lines. */
+            field: components["schemas"]["WeeklyField"];
+            /**
+             * @description The text; null or blank clears the line.
+             * @example Ate everything
+             */
+            value: null | string;
+        };
+        /**
+         * @description The weekly report completion report for a term. Bounded by arms times 20 weeks, so not paginated.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armName": "Primary 2 Gold",
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "pupilsOnRoll": 28,
+         *           "pupilsWithNotes": 27,
+         *           "cellsFilled": 612,
+         *           "cellsAvailable": 1120,
+         *           "published": true,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyCompletionReportDto: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Arm name, then week.
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armName": "Primary 2 Gold",
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "pupilsOnRoll": 28,
+             *         "pupilsWithNotes": 27,
+             *         "cellsFilled": 612,
+             *         "cellsAvailable": 1120,
+             *         "published": true,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["WeeklyCompletionRowDto"][];
+        };
+        /**
+         * @description One arm's week on the completion report (spec 6.10.12).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2 Gold",
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "pupilsOnRoll": 28,
+         *       "pupilsWithNotes": 27,
+         *       "cellsFilled": 612,
+         *       "cellsAvailable": 1120,
+         *       "published": true,
+         *       "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *       "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *     }
+         */
+        WeeklyCompletionRowDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Level plus arm label.
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * Format: int32
+             * @description The week.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * Format: int32
+             * @description The arm's current active roster.
+             * @example 28
+             */
+            pupilsOnRoll: number | string;
+            /**
+             * Format: int32
+             * @description Pupils with at least one note.
+             * @example 27
+             */
+            pupilsWithNotes: number | string;
+            /**
+             * Format: int32
+             * @description Non-empty lines written.
+             * @example 612
+             */
+            cellsFilled: number | string;
+            /**
+             * Format: int32
+             * @description Pupils on roll times five days times eight lines.
+             * @example 1120
+             */
+            cellsAvailable: number | string;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: date-time
+             * @description The latest edit, or null.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastEditedAt: null | string;
+            /**
+             * @description Who made it.
+             * @example Mrs Adaeze Okonkwo
+             */
+            lastEditedBy: null | string;
+        };
+        /**
+         * @description The five school days of a weekly report (spec 6.10.6), Monday first.
+         * @example Monday
+         * @enum {unknown}
+         */
+        WeeklyDay: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday";
+        /**
+         * @description One day panel of a weekly report (spec 6.10.6): eight free-text lines, any of them null.
+         * @example {
+         *       "dayOfWeek": "Monday",
+         *       "date": "2027-01-11",
+         *       "behaviour": "Calm and helpful",
+         *       "performance": "Finished her reading book",
+         *       "dressing": null,
+         *       "homeWork": "Returned, neat",
+         *       "eating": "Ate everything",
+         *       "symptomsOfIllness": null,
+         *       "teacherComment": "A lovely start to the week.",
+         *       "parentComment": null,
+         *       "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *       "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *     }
+         */
+        WeeklyDayDto: {
+            /** @description Monday to Friday. */
+            dayOfWeek: components["schemas"]["WeeklyDay"];
+            /**
+             * Format: date
+             * @description The calendar date.
+             * @example 2027-01-11
+             */
+            date: string;
+            /**
+             * @description Behaviour line.
+             * @example Calm and helpful
+             */
+            behaviour: null | string;
+            /**
+             * @description Performance line.
+             * @example Finished her reading book
+             */
+            performance: null | string;
+            /** @description Dressing line. */
+            dressing: null | string;
+            /**
+             * @description Home Work line.
+             * @example Returned, neat
+             */
+            homeWork: null | string;
+            /**
+             * @description Eating line.
+             * @example Ate everything
+             */
+            eating: null | string;
+            /** @description Symptoms of illness line. */
+            symptomsOfIllness: null | string;
+            /**
+             * @description Teacher's Comment line.
+             * @example A lovely start to the week.
+             */
+            teacherComment: null | string;
+            /** @description Parent's Comment line, transcribed by staff. */
+            parentComment: null | string;
+            /**
+             * Format: date-time
+             * @description When this day was last written; null when never.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            lastEditedAt: null | string;
+            /**
+             * @description The account that last wrote it.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            lastEditedById: null | string;
+            /**
+             * @description That account's staff name. Spec 6.10.10 shows it beneath the cell when within the last hour.
+             * @example Mrs Adaeze Okonkwo
+             */
+            lastEditedBy: null | string;
+        };
+        /**
+         * @description The eight labelled lines of a day panel (spec 6.10.2), in the paper form's fixed order.
+         * @example Eating
+         * @enum {unknown}
+         */
+        WeeklyField: "Behaviour" | "Performance" | "Dressing" | "HomeWork" | "Eating" | "SymptomsOfIllness" | "TeacherComment" | "ParentComment";
+        /**
+         * @description One arm's weekly grid for one week (spec 6.10.7, 6.10.11): pupils down the side, weekdays across.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "weekNumber": 4,
+         *       "weekStartDate": "2027-01-11",
+         *       "weekEndDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "published": true,
+         *       "publishedAt": "2026-08-03T09:30:00+00:00",
+         *       "autoPublish": false,
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "onRoll": true,
+         *           "illnessDays": 0,
+         *           "days": [
+         *             {
+         *               "dayOfWeek": "Monday",
+         *               "date": "2027-01-11",
+         *               "behaviour": "Calm and helpful",
+         *               "performance": "Finished her reading book",
+         *               "dressing": null,
+         *               "homeWork": "Returned, neat",
+         *               "eating": "Ate everything",
+         *               "symptomsOfIllness": null,
+         *               "teacherComment": "A lovely start to the week.",
+         *               "parentComment": null,
+         *               "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *               "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *               "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *             }
+         *           ]
+         *         }
+         *       ],
+         *       "weeks": [
+         *         {
+         *           "weekNumber": 4,
+         *           "startDate": "2027-01-11",
+         *           "endDate": "2027-01-15",
+         *           "outsideTerm": false,
+         *           "published": true,
+         *           "pupilsWithNotes": 27
+         *         }
+         *       ],
+         *       "phrases": {
+         *         "behaviour": [
+         *           "Calm and helpful",
+         *           "Settled well"
+         *         ],
+         *         "performance": [
+         *           "Finished her reading book"
+         *         ],
+         *         "dressing": [],
+         *         "homeWork": [
+         *           "Returned, neat"
+         *         ],
+         *         "eating": [
+         *           "Ate everything",
+         *           "Ate half"
+         *         ],
+         *         "symptomsOfIllness": [],
+         *         "teacherComment": [
+         *           "A lovely start to the week."
+         *         ],
+         *         "parentComment": []
+         *       }
+         *     }
+         */
+        WeeklyGridDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * Format: int32
+             * @description The week shown.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description Its Monday.
+             * @example 2027-01-11
+             */
+            weekStartDate: string;
+            /**
+             * Format: date
+             * @description Its Friday.
+             * @example 2027-01-15
+             */
+            weekEndDate: string;
+            /**
+             * @description The week falls outside the term's current dates; its notes are retained.
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: date-time
+             * @description When it was published.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            publishedAt: null | string;
+            /**
+             * @description The arm publishes each week at 17:00 on its Friday.
+             * @example false
+             */
+            autoPublish: boolean;
+            /**
+             * @description Every active pupil, plus any pupil with notes in this week who has since left, surname order.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "onRoll": true,
+             *         "illnessDays": 0,
+             *         "days": [
+             *           {
+             *             "dayOfWeek": "Monday",
+             *             "date": "2027-01-11",
+             *             "behaviour": "Calm and helpful",
+             *             "performance": "Finished her reading book",
+             *             "dressing": null,
+             *             "homeWork": "Returned, neat",
+             *             "eating": "Ate everything",
+             *             "symptomsOfIllness": null,
+             *             "teacherComment": "A lovely start to the week.",
+             *             "parentComment": null,
+             *             "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *             "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *             "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["WeeklyGridRowDto"][];
+            /**
+             * @description Every week of the term for this arm, for the week picker.
+             * @example [
+             *       {
+             *         "weekNumber": 4,
+             *         "startDate": "2027-01-11",
+             *         "endDate": "2027-01-15",
+             *         "outsideTerm": false,
+             *         "published": true,
+             *         "pupilsWithNotes": 27
+             *       }
+             *     ]
+             */
+            weeks: components["schemas"]["WeeklyWeekSummaryDto"][];
+            /** @description The signed-in account's own phrases this term. */
+            phrases: components["schemas"]["WeeklyPhrasesDto"];
+        };
+        /**
+         * @description One pupil's week on the arm grid.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "onRoll": true,
+         *       "illnessDays": 0,
+         *       "days": [
+         *         {
+         *           "dayOfWeek": "Monday",
+         *           "date": "2027-01-11",
+         *           "behaviour": "Calm and helpful",
+         *           "performance": "Finished her reading book",
+         *           "dressing": null,
+         *           "homeWork": "Returned, neat",
+         *           "eating": "Ate everything",
+         *           "symptomsOfIllness": null,
+         *           "teacherComment": "A lovely start to the week.",
+         *           "parentComment": null,
+         *           "lastEditedAt": "2026-08-03T09:30:00+00:00",
+         *           "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "lastEditedBy": "Mrs Adaeze Okonkwo"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyGridRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description False for a pupil who has notes in this week but has since left the arm; still editable.
+             * @example true
+             */
+            onRoll: boolean;
+            /**
+             * Format: int32
+             * @description Days this week with a symptoms note. Two or more shows the quiet marker (spec 6.10.6).
+             * @example 0
+             */
+            illnessDays: number | string;
+            /**
+             * @description Always five, Monday first, blank where nothing is written.
+             * @example [
+             *       {
+             *         "dayOfWeek": "Monday",
+             *         "date": "2027-01-11",
+             *         "behaviour": "Calm and helpful",
+             *         "performance": "Finished her reading book",
+             *         "dressing": null,
+             *         "homeWork": "Returned, neat",
+             *         "eating": "Ate everything",
+             *         "symptomsOfIllness": null,
+             *         "teacherComment": "A lovely start to the week.",
+             *         "parentComment": null,
+             *         "lastEditedAt": "2026-08-03T09:30:00+00:00",
+             *         "lastEditedById": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "lastEditedBy": "Mrs Adaeze Okonkwo"
+             *       }
+             *     ]
+             */
+            days: components["schemas"]["WeeklyDayDto"][];
+        };
+        /**
+         * @description One recorded observation.
+         * @example {
+         *       "date": "2027-01-12",
+         *       "text": "Runny nose, sent home at noon"
+         *     }
+         */
+        WeeklyIllnessObservationDto: {
+            /**
+             * Format: date
+             * @description The day.
+             * @example 2027-01-12
+             */
+            date: string;
+            /**
+             * @description The symptoms line as written.
+             * @example Runny nose, sent home at noon
+             */
+            text: string;
+        };
+        /**
+         * @description The illness observation summary for a term. Health observation about children: safeguarding privilege only.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "items": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "armName": "Primary 2 Gold",
+         *           "observations": [
+         *             {
+         *               "date": "2027-01-12",
+         *               "text": "Runny nose, sent home at noon"
+         *             },
+         *             {
+         *               "date": "2027-01-13",
+         *               "text": "Still coughing"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyIllnessReportDto: {
+            /**
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Pupil display name order.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "armName": "Primary 2 Gold",
+             *         "observations": [
+             *           {
+             *             "date": "2027-01-12",
+             *             "text": "Runny nose, sent home at noon"
+             *           },
+             *           {
+             *             "date": "2027-01-13",
+             *             "text": "Still coughing"
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            items: components["schemas"]["WeeklyIllnessRowDto"][];
+        };
+        /**
+         * @description A pupil with symptoms recorded on two or more days of the term (spec 6.10.12).
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "armName": "Primary 2 Gold",
+         *       "observations": [
+         *         {
+         *           "date": "2027-01-12",
+         *           "text": "Runny nose, sent home at noon"
+         *         },
+         *         {
+         *           "date": "2027-01-13",
+         *           "text": "Still coughing"
+         *         }
+         *       ]
+         *     }
+         */
+        WeeklyIllnessRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Null only if unissued.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description "Surname First Middle".
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description The arm of the latest observation.
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * @description In date order.
+             * @example [
+             *       {
+             *         "date": "2027-01-12",
+             *         "text": "Runny nose, sent home at noon"
+             *       },
+             *       {
+             *         "date": "2027-01-13",
+             *         "text": "Still coughing"
+             *       }
+             *     ]
+             */
+            observations: components["schemas"]["WeeklyIllnessObservationDto"][];
+        };
+        /**
+         * @description Phrase memory (spec 6.10.7): what the signed-in account already wrote this term per line, most recent first.
+         * @example {
+         *       "behaviour": [
+         *         "Calm and helpful",
+         *         "Settled well"
+         *       ],
+         *       "performance": [
+         *         "Finished her reading book"
+         *       ],
+         *       "dressing": [],
+         *       "homeWork": [
+         *         "Returned, neat"
+         *       ],
+         *       "eating": [
+         *         "Ate everything",
+         *         "Ate half"
+         *       ],
+         *       "symptomsOfIllness": [],
+         *       "teacherComment": [
+         *         "A lovely start to the week."
+         *       ],
+         *       "parentComment": []
+         *     }
+         */
+        WeeklyPhrasesDto: {
+            /**
+             * @description Behaviour line.
+             * @example [
+             *       "Calm and helpful",
+             *       "Settled well"
+             *     ]
+             */
+            behaviour: string[];
+            /**
+             * @description Performance line.
+             * @example [
+             *       "Finished her reading book"
+             *     ]
+             */
+            performance: string[];
+            /**
+             * @description Dressing line.
+             * @example []
+             */
+            dressing: string[];
+            /**
+             * @description Home Work line.
+             * @example [
+             *       "Returned, neat"
+             *     ]
+             */
+            homeWork: string[];
+            /**
+             * @description Eating line.
+             * @example [
+             *       "Ate everything",
+             *       "Ate half"
+             *     ]
+             */
+            eating: string[];
+            /**
+             * @description Symptoms of illness line.
+             * @example []
+             */
+            symptomsOfIllness: string[];
+            /**
+             * @description Teacher's Comment line.
+             * @example [
+             *       "A lovely start to the week."
+             *     ]
+             */
+            teacherComment: string[];
+            /**
+             * @description Parent's Comment line.
+             * @example []
+             */
+            parentComment: string[];
+        };
+        /**
+         * @description The body of the publish and unpublish routes.
+         * @example {
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639"
+         *     }
+         */
+        WeeklyPublicationRequest: {
+            /**
+             * @description The term the week belongs to.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+        };
+        /**
+         * @description An arm's weekly-report settings (spec 6.10.8).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "autoPublish": true
+         *     }
+         */
+        WeeklySettingsDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Publish each week automatically at 17:00 on its Friday.
+             * @example true
+             */
+            autoPublish: boolean;
+        };
+        /**
+         * @description One week of the term, as the arm sees it.
+         * @example {
+         *       "weekNumber": 4,
+         *       "startDate": "2027-01-11",
+         *       "endDate": "2027-01-15",
+         *       "outsideTerm": false,
+         *       "published": true,
+         *       "pupilsWithNotes": 27
+         *     }
+         */
+        WeeklyWeekSummaryDto: {
+            /**
+             * Format: int32
+             * @description 1 to 20.
+             * @example 4
+             */
+            weekNumber: number | string;
+            /**
+             * Format: date
+             * @description The Monday.
+             * @example 2027-01-11
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The Friday.
+             * @example 2027-01-15
+             */
+            endDate: string;
+            /**
+             * @description The week holds notes but falls outside the term's current dates (spec 6.10.10).
+             * @example false
+             */
+            outsideTerm: boolean;
+            /**
+             * @description Visible to parents.
+             * @example true
+             */
+            published: boolean;
+            /**
+             * Format: int32
+             * @description Pupils with at least one note.
+             * @example 27
+             */
+            pupilsWithNotes: number | string;
         };
         /**
          * @description The request body for a withdrawal.
@@ -20985,6 +22266,686 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTermWeeks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermWeekListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilWeekly: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyGrid: {
+        parameters: {
+            query: {
+                termId: string;
+                weekNumber?: number | string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveWeeklyNotes: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWeeklyNotesCommand"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishWeeklyWeek: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+                weekNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPublicationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyWeekSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnpublishWeeklyWeek: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+                weekNumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPublicationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyWeekSummaryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateWeeklySettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWeeklySettingsCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklySettingsDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyCompletionReport: {
+        parameters: {
+            query: {
+                termId: string;
+                weekNumber?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyCompletionReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWeeklyIllnessReport: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyIllnessReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
