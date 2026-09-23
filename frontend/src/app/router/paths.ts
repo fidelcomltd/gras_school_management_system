@@ -21,6 +21,7 @@ export const paths = {
   admissionFlow: (id: string, step?: number) => `/admissions/${id}${step ? `?step=${step}` : ''}`,
   pupils: '/pupils',
   pupilImport: '/pupils/import',
+  incompleteRecords: '/reports/incomplete-records',
   pupilDetail: (id: string) => `/pupils/${id}`,
   subjects: '/subjects',
   subjectMapping: '/subjects/mapping',

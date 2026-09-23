@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Classes', to: paths.classes, requires: 'level.view' },
   { label: 'Arms', to: paths.arms, requires: 'arm.view' },
   { label: 'Pupils', to: paths.pupils, requires: 'pupil.view' },
+  { label: 'Incomplete records', to: paths.incompleteRecords, requires: 'report.view' },
   { label: 'Subjects', to: paths.subjects, requires: 'subject.view' },
   { label: 'Results', to: paths.results, requires: 'result.view' },
   { label: 'Marks', to: paths.marks, requires: 'result.view' },

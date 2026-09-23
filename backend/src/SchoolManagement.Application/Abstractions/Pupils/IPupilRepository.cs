@@ -117,6 +117,12 @@ public interface IPupilRepository
         string registrationNumber, Guid excludingPupilId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Every ACTIVE pupil with an open enrolment in an arm of <paramref name="sessionId"/>, read-only, with that arm: the
+    /// incomplete-records report's population (spec 6.5.12).
+    /// </summary>
+    Task<IReadOnlyList<(Pupil Pupil, Guid ArmId)>> ListActiveEnrolledInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Which of <paramref name="registrationNumbers"/> a pupil in ANY status already holds: the issuer's pre-check, so a
     /// clash re-draws one serial instead of retrying a whole batch.
     /// </summary>
