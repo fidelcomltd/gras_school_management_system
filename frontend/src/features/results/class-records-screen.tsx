@@ -8,7 +8,7 @@ import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { AttendancePanel, RatingsPanel, RemarksPanel } from './components/records-panels';
-import { useClassChoice } from './hooks/use-class-choice';
+import { useClassChoice } from '@/shared/pickers/use-class-choice';
 
 const TABS = [
   { id: 'ratings', label: 'Ratings', privilege: 'result.trait.enter' },

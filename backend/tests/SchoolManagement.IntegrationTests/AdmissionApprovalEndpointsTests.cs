@@ -339,6 +339,28 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
     }
 
     [Fact]
+    public async Task Approve_ContactsHealthAndTheBarredQuestionMissing_Returns422NamingEachStep()
+    {
+        RequireDatabase();
+
+        var (sessionId, _, levelId, armId) = await SeedActiveSessionTermAndArmAsync(new DateOnly(2026, 9, 1));
+        var (pupilId, _) = await SeedApprovableAdmissionAsync(
+            "Sections", "Missing", sessionId, levelId, new DateOnly(2026, 9, 10), sectionsComplete: false);
+
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.AdmissionApprove], sessionId);
+
+        var response = await ApproveAsync(pupilId, jar, armId, key: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("admission.incomplete");
+        var detail = document.RootElement.GetProperty("detail").GetString() ?? string.Empty;
+        detail.ShouldContain("Step 3");
+        detail.ShouldContain("Step 4");
+        detail.ShouldContain("Step 5");
+    }
+
+    [Fact]
     public async Task Approve_HeadOfSchoolConfirmedFalse_Returns422()
     {
         RequireDatabase();
@@ -608,7 +630,8 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
         Guid classLevelId,
         DateOnly dateAdmitted,
         bool assessmentRequired = false,
-        bool declarationSigned = true)
+        bool declarationSigned = true,
+        bool sectionsComplete = true)
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -629,6 +652,19 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
 
         context.Add(pupil);
         context.Add(record);
+        if (sectionsComplete)
+        {
+            // Spec 6.5.12's other blocking items: a responsible adult as primary contact, the primary emergency
+            // contact, the barred-persons answer and the three health answers.
+            var father = PupilContact.Create(Guid.CreateVersion7(), pupil.Id, ContactRole.Father);
+            father.Apply("Test Parent", null, "08031234567", null, null, null, isPrimary: true).IsSuccess.ShouldBeTrue();
+            var emergency = PupilContact.Create(Guid.CreateVersion7(), pupil.Id, ContactRole.EmergencyPrimary);
+            emergency.Apply("Test Relative", "Aunt", "08059876543", null, null, null, isPrimary: false).IsSuccess.ShouldBeTrue();
+            var health = PupilHealth.Create(pupil.Id);
+            health.Apply(false, null, false, null, false, null, null, null, null, null, null).IsSuccess.ShouldBeTrue();
+            context.AddRange(father, emergency, health, BarredPersonAnswer.Create(pupil.Id, hasBarredPersons: false));
+        }
+
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return (pupil.Id, record.Id);

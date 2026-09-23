@@ -33,6 +33,9 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     restoreMocks: true,
+    // 5 s (the default) timed out 2-10 user-event-heavy tests per full run once the machine was busy; several
+    // suites had already raised it by hand. A hang still fails, only later (drift 2026-09-23).
+    testTimeout: 15_000,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Hermetic test environment: the suite must not depend on a developer's
     // untracked `frontend/.env`. These are the same six VITE_* variables

@@ -248,6 +248,15 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// </summary>
     internal DbSet<PupilTermResult> PupilTermResults => Set<PupilTermResult>();
 
+    /// <summary>Weekly report sheets, one per pupil per week (spec 6.10.5).</summary>
+    internal DbSet<Domain.Weekly.WeeklyReport> WeeklyReports => Set<Domain.Weekly.WeeklyReport>();
+
+    /// <summary>Weekly report day panels, five per report (spec 6.10.6).</summary>
+    internal DbSet<Domain.Weekly.WeeklyReportDay> WeeklyReportDays => Set<Domain.Weekly.WeeklyReportDay>();
+
+    /// <summary>Per-arm weekly settings: the auto-publish option (spec 6.10.8).</summary>
+    internal DbSet<Domain.Weekly.ArmWeeklySetting> ArmWeeklySettings => Set<Domain.Weekly.ArmWeeklySetting>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -25,6 +25,8 @@ export const paths = {
   results: '/results',
   marks: '/results/marks',
   classRecords: '/results/class',
+  weekly: '/weekly',
+  weeklyCompletion: '/weekly/completion',
   pins: '/pins',
   audit: '/audit',
   pinBatch: (id: string) => `/pins/${id}`,

@@ -25,7 +25,8 @@ public enum PortalTermAvailability
 /// <param name="TermId">The term.</param>
 /// <param name="TermName">e.g. First Term.</param>
 /// <param name="Availability">Its label.</param>
-public sealed record PortalTerm(Guid TermId, string TermName, PortalTermAvailability Availability);
+/// <param name="WeeklyAvailable">Spec 6.10.9: at least one week of weekly reports is published.</param>
+public sealed record PortalTerm(Guid TermId, string TermName, PortalTermAvailability Availability, bool WeeklyAvailable = false);
 
 /// <summary>A session's terms, newest session first.</summary>
 /// <param name="SessionName">e.g. 2026/2027.</param>
@@ -104,7 +105,7 @@ internal sealed class GetPortalSessionsHandler(IPortalRepository portal, TimePro
                 .GroupBy(term => (term.SessionId, term.SessionName))
                 .Select(group => new PortalSessionTerms(
                     group.Key.SessionName,
-                    group.OrderBy(term => term.TermOrdinal).Select(term => new PortalTerm(term.TermId, term.TermName, AvailabilityOf(term.ResultSetState))).ToList(),
+                    group.OrderBy(term => term.TermOrdinal).Select(term => new PortalTerm(term.TermId, term.TermName, AvailabilityOf(term.ResultSetState), term.WeeklyPublished)).ToList(),
                     group.Key.SessionId,
                     annual.Contains(group.Key.SessionId)
                         && group.Any(term => term.TermOrdinal == AnnualComputation.TermsInSession && term.ResultSetState == ResultSetState.Published)))

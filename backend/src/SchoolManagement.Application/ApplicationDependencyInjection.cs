@@ -42,6 +42,10 @@ public static class ApplicationDependencyInjection
         // GetArmSubjectsHandler, ListSubjectsHandler and, later, the result-computation engine.
         services.AddScoped<Subjects.SubjectsInEffectResolver>();
 
+        // Spec 6.5.5-6.5.8: the in-handler privilege check for a pupil's sub-records (see its remarks).
+        services.AddScoped<Pupils.Records.PupilRecordAccess>();
+        services.AddScoped<Pupils.Records.AdmissionCompleteness>();
+
         // TASK-0088 stage B: shared by GetResultSetReadinessHandler and SubmitResultSetHandler so the
         // submit 422's `readiness` body is computed by the SAME code as the GET (AC B6) — registered
         // behind its interface (unlike SubjectsInEffectResolver above) so the racing-concurrency

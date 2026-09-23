@@ -20,7 +20,9 @@ public sealed record PortalPupil(Guid PupilId, PupilStatus Status, string Regist
 /// <param name="TermName">e.g. First Term.</param>
 /// <param name="TermOrdinal">1 to 3.</param>
 /// <param name="ResultSetState">The pupil's arm's result set that term, or null when none exists.</param>
-public sealed record PortalTermRow(Guid SessionId, string SessionName, Guid TermId, string TermName, int TermOrdinal, ResultSetState? ResultSetState);
+/// <param name="WeeklyPublished">At least one of the pupil's weekly reports that term is published (spec 6.10.9).</param>
+public sealed record PortalTermRow(
+    Guid SessionId, string SessionName, Guid TermId, string TermName, int TermOrdinal, ResultSetState? ResultSetState, bool WeeklyPublished = false);
 
 /// <summary>Persistence port for the parent portal. Everything here is narrow on purpose (spec 6.9.8).</summary>
 public interface IPortalRepository
