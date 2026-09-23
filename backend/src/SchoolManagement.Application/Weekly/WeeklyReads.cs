@@ -1,7 +1,6 @@
 using FluentValidation;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Messaging;
-using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Weekly;
 using SchoolManagement.Domain.Classes;
@@ -26,17 +25,24 @@ internal sealed class GetPupilWeeklyQueryValidator : AbstractValidator<GetPupilW
 }
 
 /// <summary>Handles <see cref="GetPupilWeeklyQuery"/>.</summary>
-internal sealed class GetPupilWeeklyHandler(IPupilRepository pupils, ITermRepository terms, IWeeklyReportRepository weekly)
+/// <remarks>
+/// The privilege is checked here rather than by a route-level pupil scope, which cannot resolve a pupil with no open
+/// enrolment and would refuse even a school-wide grant for a leaver whose earlier weeks still exist.
+/// </remarks>
+internal sealed class GetPupilWeeklyHandler(Pupils.Records.PupilRecordAccess access, ITermRepository terms, IWeeklyReportRepository weekly)
     : IRequestHandler<GetPupilWeeklyQuery, Result<PupilWeeklyTermDto>>
 {
     /// <inheritdoc />
     public async Task<Result<PupilWeeklyTermDto>> HandleAsync(GetPupilWeeklyQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (await pupils.FindReadOnlyByIdAsync(Guid.Parse(request.PupilId), cancellationToken).ConfigureAwait(false) is not { } pupil)
+        var allowed = await access.CheckAsync(Guid.Parse(request.PupilId), Domain.Security.Privileges.Weekly.View, cancellationToken).ConfigureAwait(false);
+        if (allowed.IsFailure)
         {
-            return Result.Failure<PupilWeeklyTermDto>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
+            return Result.Failure<PupilWeeklyTermDto>(allowed.Error);
         }
+
+        var pupil = allowed.Value;
 
         if (await terms.FindReadOnlyByIdAsync(Guid.Parse(request.TermId), cancellationToken).ConfigureAwait(false) is not { } term)
         {

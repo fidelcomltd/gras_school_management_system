@@ -67,7 +67,8 @@ internal sealed class ApproveAdmissionCommandHandler(
     ISystemAuditSink auditSink,
     IUnitOfWork unitOfWork,
     IPersistenceErrorTranslator persistenceErrorTranslator,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Pupils.Records.AdmissionCompleteness completeness)
     : IRequestHandler<ApproveAdmissionCommand, Result<PupilDto>>
 {
     private const string PupilEntityType = "pupil";
@@ -225,6 +226,17 @@ internal sealed class ApproveAdmissionCommandHandler(
             return Result.Failure<PupilDto>(Error.Validation(
                 "admission.declaration_not_signed",
                 "Declaration (Section I) has not been signed. Sign the declaration before approving."));
+        }
+
+        // Blocking conditions from steps 3 to 5 (spec 6.5.12): contacts, the barred-persons answer, the health answers.
+        // The declaration and assessment were checked just above against this command's own unsaved changes.
+        var report = await completeness.EvaluateAsync(pupil, cancellationToken).ConfigureAwait(false);
+        var missing = report.Blocking.Where(item => item.Code is not ("declaration.unsigned" or "assessment.outcome")).ToList();
+        if (missing.Count > 0)
+        {
+            return Result.Failure<PupilDto>(Error.Validation(
+                "admission.incomplete",
+                "This admission is not complete. " + string.Join(" ", missing.Select(item => $"Step {item.Step}: {item.Message}"))));
         }
 
         var actorId = currentUser.UserId is { } actorIdText && Guid.TryParse(actorIdText, out var parsedActorId)

@@ -130,6 +130,7 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<IRemarkTemplateRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Weekly.IWeeklyReportRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Weekly.IWeeklyNameLookup>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pupils.IPupilRecordRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Weekly.IWeeklySheetPdfRenderer>());
 
         // TASK-0038: the Classes/* handlers depend on these two ports, implemented by

@@ -60,13 +60,14 @@ public sealed class WeeklyReportEndpoints : IEndpointModule
                 return result.Match(TypedResults.Ok);
             })
             .WithTags(Tag)
-            .RequirePrivilege(Privileges.Weekly.View, ScopeParameterKind.Pupil, "pupilId")
+            .RequireAuthenticatedCaller()
             .WithName("GetPupilWeekly")
             .WithSummary("Read one pupil's weekly reports for a term")
             .WithDescription(
                 "Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` " +
                 "where nothing was written. A week that falls outside the term's current dates but holds notes is kept and " +
-                "flagged `outsideTerm` (6.10.10). Backs the per-pupil tab.")
+                "flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the " +
+                "handler so a pupil who has left (no open enrolment) is still readable school-wide.")
             .Produces<PupilWeeklyTermDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

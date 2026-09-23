@@ -241,6 +241,9 @@ public static class InfrastructureDependencyInjection
         // TASK-0086 stage B: remark templates.
         services.AddScoped<IRemarkTemplateRepository, RemarkTemplateRepository>();
 
+        // Spec 6.5.5-6.5.8: contacts, pickup and barred persons, health, the document checklist.
+        services.AddScoped<Application.Abstractions.Pupils.IPupilRecordRepository, PupilRecordRepository>();
+
         // Spec 6.10: weekly report sheets, the weekly-sheet PDF and the Friday auto-publish job.
         services.AddScoped<WeeklyReportRepository>();
         services.AddScoped<Application.Abstractions.Weekly.IWeeklyReportRepository>(provider => provider.GetRequiredService<WeeklyReportRepository>());

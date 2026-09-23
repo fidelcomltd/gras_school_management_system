@@ -10,6 +10,7 @@ using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Pupils;
+using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
 using SchoolManagement.Application.Results;
@@ -82,6 +83,21 @@ internal static class OpenApiExamples
 
     /// <summary>Example identifiers for the TASK-0088 stage B readiness examples, each a distinct entity.</summary>
     private const string ExampleThirdPupilId = "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605";
+
+    /// <summary>Spec 6.5.5: a father contact, reused by the contact examples.</summary>
+    private const string PupilFatherExample = """
+        {
+          "id": "0192f0c4-8c3e-7b6b-9f8d-3beaafd60706",
+          "role": "Father",
+          "fullName": "Emeka Okafor",
+          "relationship": null,
+          "phone": "+2348031234567",
+          "whatsappNumber": "+2348031234567",
+          "occupation": "Engineer",
+          "email": null,
+          "isPrimaryContact": true
+        }
+        """;
 
     /// <summary>Spec 6.10: one weekly day panel, reused inside every weekly example that carries days.</summary>
     private const string WeeklyMondayExample = $$"""
@@ -2965,6 +2981,159 @@ internal static class OpenApiExamples
         [typeof(UpdateWeeklySettingsCommand)] = $$"""
             { "armId": "{{ExampleArmId}}", "autoPublish": true }
             """,
+
+        // Spec 6.5.5-6.5.8 and 6.5.12: the admission form's per-pupil sections.
+        [typeof(PupilContactDto)] = PupilFatherExample,
+
+        [typeof(PupilContactListDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "items": [
+                {{PupilFatherExample}},
+                {
+                  "id": "0192f0c4-9d4f-7c7c-a09e-4cfcbfe71817",
+                  "role": "EmergencyPrimary",
+                  "fullName": "Ngozi Okafor",
+                  "relationship": "Aunt",
+                  "phone": "+2348059876543",
+                  "whatsappNumber": null,
+                  "occupation": null,
+                  "email": null,
+                  "isPrimaryContact": false
+                }
+              ]
+            }
+            """,
+
+        [typeof(PupilContactInput)] = """
+            {
+              "role": "Father",
+              "fullName": "Emeka Okafor",
+              "relationship": null,
+              "phone": "08031234567",
+              "whatsappNumber": "08031234567",
+              "occupation": "Engineer",
+              "email": null,
+              "isPrimaryContact": true
+            }
+            """,
+
+        [typeof(SavePupilContactsCommand)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "contacts": [
+                { "role": "Father", "fullName": "Emeka Okafor", "relationship": null, "phone": "08031234567", "whatsappNumber": "08031234567", "occupation": "Engineer", "email": null, "isPrimaryContact": true },
+                { "role": "EmergencyPrimary", "fullName": "Ngozi Okafor", "relationship": "Aunt", "phone": "08059876543", "whatsappNumber": null, "occupation": null, "email": null, "isPrimaryContact": false }
+              ]
+            }
+            """,
+
+        [typeof(PickupPersonDto)] = """
+            { "id": "0192f0c4-ae50-7d8d-b1af-5d0dc0f82928", "fullName": "Chinedu Obi", "relationship": "Driver", "phone": "+2348021112222" }
+            """,
+
+        [typeof(PickupPersonListDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "items": [ { "id": "0192f0c4-ae50-7d8d-b1af-5d0dc0f82928", "fullName": "Chinedu Obi", "relationship": "Driver", "phone": "+2348021112222" } ]
+            }
+            """,
+
+        [typeof(PickupPersonInput)] = """
+            { "fullName": "Chinedu Obi", "relationship": "Driver", "phone": "08021112222" }
+            """,
+
+        [typeof(SavePickupPersonsCommand)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "persons": [ { "fullName": "Chinedu Obi", "relationship": "Driver", "phone": "08021112222" } ] }
+            """,
+
+        [typeof(BarredPersonDto)] = """
+            { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            """,
+
+        [typeof(BarredPersonsDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "hasBarredPersons": true,
+              "items": [ { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." } ]
+            }
+            """,
+
+        [typeof(BarredPersonInput)] = """
+            { "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            """,
+
+        [typeof(SaveBarredPersonsCommand)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "hasBarredPersons": false, "persons": [] }
+            """,
+
+        [typeof(PupilHealthDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "hasAllergy": true,
+              "allergyDetails": "Peanuts: severe. EpiPen in the office.",
+              "hasMedicalCondition": false,
+              "medicalConditionDetails": null,
+              "takesRegularMedication": false,
+              "medicationDetails": null,
+              "specialInstructions": "Vegetarian.",
+              "preferredHospital": "St. Charles Borromeo Hospital, Onitsha",
+              "hospitalPhone": "+2348037776666",
+              "bloodGroup": "OPositive",
+              "genotype": "AA"
+            }
+            """,
+
+        [typeof(SavePupilHealthCommand)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "hasAllergy": true,
+              "allergyDetails": "Peanuts: severe. EpiPen in the office.",
+              "hasMedicalCondition": false,
+              "medicalConditionDetails": null,
+              "takesRegularMedication": false,
+              "medicationDetails": null,
+              "specialInstructions": "Vegetarian.",
+              "preferredHospital": "St. Charles Borromeo Hospital, Onitsha",
+              "hospitalPhone": "08037776666",
+              "bloodGroup": "OPositive",
+              "genotype": "AA"
+            }
+            """,
+
+        [typeof(PupilDocumentDto)] = """
+            { "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen." }
+            """,
+
+        [typeof(PupilDocumentListDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "items": [
+                { "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen." },
+                { "documentType": "PassportPhotograph", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
+                { "documentType": "PreviousSchoolResult", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
+                { "documentType": "TransferLetter", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
+                { "documentType": "Other", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null }
+              ]
+            }
+            """,
+
+        [typeof(PupilDocumentInput)] = """
+            { "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.", "otherLabel": null }
+            """,
+
+        [typeof(CompletenessItemDto)] = """
+            { "step": 5, "code": "health.unanswered", "message": "Answer all three health questions: allergy, medical condition, medication." }
+            """,
+
+        [typeof(AdmissionCompletenessDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "blocking": [ { "step": 5, "code": "health.unanswered", "message": "Answer all three health questions: allergy, medical condition, medication." } ],
+              "chased": [ { "step": 7, "code": "documents.BirthCertificate", "message": "Birth certificate." } ],
+              "chasedPercent": 90
+            }
+            """,
     };
 
     /// <summary>
@@ -2979,6 +3148,11 @@ internal static class OpenApiExamples
     /// </remarks>
     public static IReadOnlyDictionary<Type, string> DescriptionsByType { get; } = new Dictionary<Type, string>
     {
+        // Spec 6.5.7: enums used only as NULLABLE properties reach the transformer as Nullable<T>, whose component schema
+        // the XML doc comment on T does not reach.
+        [typeof(SchoolManagement.Domain.Pupils.BloodGroup?)] = "A blood group (spec 6.5.7): A+, A-, B+, B-, AB+, AB-, O+ or O-, spelled out. Free text is not accepted.",
+        [typeof(SchoolManagement.Domain.Pupils.Genotype?)] = "A genotype (spec 6.5.7): AA, AS, SS, AC or SC.",
+
         [typeof(Microsoft.AspNetCore.Mvc.ProblemDetails)] =
             "An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` " +
             "extension member — it is stable — and never on `detail`, which is human-readable prose that " +
