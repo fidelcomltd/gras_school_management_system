@@ -241,6 +241,14 @@ public static class InfrastructureDependencyInjection
         // TASK-0086 stage B: remark templates.
         services.AddScoped<IRemarkTemplateRepository, RemarkTemplateRepository>();
 
+        // Spec 6.10: weekly report sheets, the weekly-sheet PDF and the Friday auto-publish job.
+        services.AddScoped<WeeklyReportRepository>();
+        services.AddScoped<Application.Abstractions.Weekly.IWeeklyReportRepository>(provider => provider.GetRequiredService<WeeklyReportRepository>());
+        services.AddScoped<Application.Weekly.IWeeklyNameLookup>(provider => provider.GetRequiredService<WeeklyReportRepository>());
+        services.AddSingleton<Application.Abstractions.Weekly.IWeeklySheetPdfRenderer, Weekly.QuestPdfWeeklySheetRenderer>();
+        services.AddSingleton<Weekly.WeeklyAutoPublishService>();
+        services.AddHostedService(provider => provider.GetRequiredService<Weekly.WeeklyAutoPublishService>());
+
         // TASK-0072 stage 3a: one seam every settings handler asks for the whole config_version
         // snapshot input through, replacing the one-repository-per-OTHER-group constructor ripple —
         // see ISettingsSnapshotSource's own remarks.

@@ -41,6 +41,11 @@ internal static class PortalEndpoints
             AnnualAsync(sessionId, asPdf: false, http, sender, cancellationToken));
         portal.MapGet("/annual/{sessionId:guid}/pdf", (Guid sessionId, HttpContext http, ISender sender, CancellationToken cancellationToken) =>
             AnnualAsync(sessionId, asPdf: true, http, sender, cancellationToken));
+        portal.MapGet("/weekly/{termId:guid}", WeeklyListAsync);
+        portal.MapGet("/weekly/{termId:guid}/{weekNumber:int}", (Guid termId, int weekNumber, HttpContext http, ISender sender, CancellationToken cancellationToken) =>
+            WeeklyWeekAsync(termId, weekNumber, asPdf: false, http, sender, cancellationToken));
+        portal.MapGet("/weekly/{termId:guid}/{weekNumber:int}/pdf", (Guid termId, int weekNumber, HttpContext http, ISender sender, CancellationToken cancellationToken) =>
+            WeeklyWeekAsync(termId, weekNumber, asPdf: true, http, sender, cancellationToken));
         portal.MapPost("/end", EndAsync)
             .ExemptFromCsrfRequirement("The viewing cookie is SameSite=Strict, so a cross-site post arrives without it and ends nothing.");
         portal.MapGet("/logo", LogoAsync);
@@ -173,6 +178,51 @@ internal static class PortalEndpoints
             { Status: PortalResultStatus.Shown, Sheet: { } sheet, UseId: { } use } => Html(PortalHtml.Annual(branding, sheet, sessionId, use)),
             { Status: PortalResultStatus.SessionEnded } => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
             _ => Html(PortalHtml.Message(branding, PortalCopy.AnnualNotReady)),
+        };
+    }
+
+    // Spec 6.10.9: inside an existing viewing session, for no additional use (6.8.8).
+    private static async Task<IResult> WeeklyListAsync(Guid termId, HttpContext http, ISender sender, CancellationToken cancellationToken)
+    {
+        Guid? useId = Guid.TryParse(http.Request.Query["u"], out var parsed) ? parsed : null;
+        var result = await sender.SendAsync(new GetPortalWeeklyQuery(ReadTokens(http), useId, termId), cancellationToken).ConfigureAwait(false);
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return Html(PortalHtml.Message(branding, PortalCopy.ServerFault));
+        }
+
+        return result.Value.Status switch
+        {
+            PortalResultStatus.Shown => Html(PortalHtml.WeeklyList(branding, result.Value, termId)),
+            PortalResultStatus.SessionEnded => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
+            _ => Html(PortalHtml.Message(branding, PortalCopy.WeeklyNotAvailable)),
+        };
+    }
+
+    // Spec 6.10.9: opening a week, or downloading its PDF, consumes no use.
+    private static async Task<IResult> WeeklyWeekAsync(Guid termId, int weekNumber, bool asPdf, HttpContext http, ISender sender, CancellationToken cancellationToken)
+    {
+        Guid? useId = Guid.TryParse(http.Request.Query["u"], out var parsed) ? parsed : null;
+        var result = asPdf
+            ? await sender.SendAsync(new GetPortalWeeklyPdfQuery(ReadTokens(http), useId, termId, weekNumber), cancellationToken).ConfigureAwait(false)
+            : await sender.SendAsync(new GetPortalWeeklyWeekQuery(ReadTokens(http), useId, termId, weekNumber), cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess && result.Value.File is { } file)
+        {
+            return Results.File(file.Content.ToArray(), "application/pdf", file.FileName);
+        }
+
+        var branding = await BrandingAsync(sender, cancellationToken).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return Html(PortalHtml.Message(branding, PortalCopy.ServerFault));
+        }
+
+        return result.Value switch
+        {
+            { Status: PortalResultStatus.Shown, Sheet: { } sheet, UseId: { } use } => Html(PortalHtml.WeeklyWeek(branding, sheet, termId, use)),
+            { Status: PortalResultStatus.SessionEnded } => Html(PortalHtml.Message(branding, PortalCopy.SessionEnded)),
+            _ => Html(PortalHtml.Message(branding, PortalCopy.WeeklyNotAvailable)),
         };
     }
 

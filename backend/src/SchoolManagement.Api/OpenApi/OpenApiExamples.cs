@@ -20,6 +20,7 @@ using SchoolManagement.Application.Security.Roles;
 using SchoolManagement.Application.Sessions;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Application.Subjects;
+using SchoolManagement.Application.Weekly;
 using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Api.OpenApi;
@@ -81,6 +82,71 @@ internal static class OpenApiExamples
 
     /// <summary>Example identifiers for the TASK-0088 stage B readiness examples, each a distinct entity.</summary>
     private const string ExampleThirdPupilId = "0192f0c4-8c3e-7a6b-9f8d-3bebafd60605";
+
+    /// <summary>Spec 6.10: one weekly day panel, reused inside every weekly example that carries days.</summary>
+    private const string WeeklyMondayExample = $$"""
+        {
+          "dayOfWeek": "Monday",
+          "date": "2027-01-11",
+          "behaviour": "Calm and helpful",
+          "performance": "Finished her reading book",
+          "dressing": null,
+          "homeWork": "Returned, neat",
+          "eating": "Ate everything",
+          "symptomsOfIllness": null,
+          "teacherComment": "A lovely start to the week.",
+          "parentComment": null,
+          "lastEditedAt": "{{CanonicalTimestamp}}",
+          "lastEditedById": "{{ExampleAdminAccountId}}",
+          "lastEditedBy": "Mrs Adaeze Okonkwo"
+        }
+        """;
+
+    /// <summary>Spec 6.10.7 phrase memory.</summary>
+    private const string WeeklyPhrasesExample = """
+        {
+          "behaviour": ["Calm and helpful", "Settled well"],
+          "performance": ["Finished her reading book"],
+          "dressing": [],
+          "homeWork": ["Returned, neat"],
+          "eating": ["Ate everything", "Ate half"],
+          "symptomsOfIllness": [],
+          "teacherComment": ["A lovely start to the week."],
+          "parentComment": []
+        }
+        """;
+
+    /// <summary>Spec 6.10.12 completion row.</summary>
+    private const string WeeklyCompletionRowExample = $$"""
+        {
+          "armId": "{{ExampleArmId}}",
+          "armName": "Primary 2 Gold",
+          "weekNumber": 4,
+          "startDate": "2027-01-11",
+          "endDate": "2027-01-15",
+          "pupilsOnRoll": 28,
+          "pupilsWithNotes": 27,
+          "cellsFilled": 612,
+          "cellsAvailable": 1120,
+          "published": true,
+          "lastEditedAt": "{{CanonicalTimestamp}}",
+          "lastEditedBy": "Mrs Adaeze Okonkwo"
+        }
+        """;
+
+    /// <summary>Spec 6.10.12 illness summary row.</summary>
+    private const string WeeklyIllnessRowExample = $$"""
+        {
+          "pupilId": "{{ExamplePupilId}}",
+          "registrationNumber": "GRAS/2026/0041",
+          "displayName": "Okafor Chidera Ngozi",
+          "armName": "Primary 2 Gold",
+          "observations": [
+            { "date": "2027-01-12", "text": "Runny nose, sent home at noon" },
+            { "date": "2027-01-13", "text": "Still coughing" }
+          ]
+        }
+        """;
 
     /// <summary>
     /// Whole-object example JSON, keyed by contract type. Property names are camelCase, matching the
@@ -2751,6 +2817,152 @@ internal static class OpenApiExamples
                 "returnReason": "Mathematics examination marks for the whole class look 10 marks too low. Check against the mark book."
               }
             }
+            """,
+
+        // Spec 6.10: weekly report sheets.
+        [typeof(WeeklyDayDto)] = WeeklyMondayExample,
+
+        [typeof(WeeklyGridRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "onRoll": true,
+              "illnessDays": 0,
+              "days": [ {{WeeklyMondayExample}} ]
+            }
+            """,
+
+        [typeof(WeeklyWeekSummaryDto)] = """
+            {
+              "weekNumber": 4,
+              "startDate": "2027-01-11",
+              "endDate": "2027-01-15",
+              "outsideTerm": false,
+              "published": true,
+              "pupilsWithNotes": 27
+            }
+            """,
+
+        [typeof(WeeklyPhrasesDto)] = WeeklyPhrasesExample,
+
+        [typeof(WeeklyGridDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "weekNumber": 4,
+              "weekStartDate": "2027-01-11",
+              "weekEndDate": "2027-01-15",
+              "outsideTerm": false,
+              "published": true,
+              "publishedAt": "{{CanonicalTimestamp}}",
+              "autoPublish": false,
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}",
+                  "registrationNumber": "GRAS/2026/0041",
+                  "displayName": "Okafor Chidera Ngozi",
+                  "onRoll": true,
+                  "illnessDays": 0,
+                  "days": [ {{WeeklyMondayExample}} ]
+                }
+              ],
+              "weeks": [
+                { "weekNumber": 4, "startDate": "2027-01-11", "endDate": "2027-01-15", "outsideTerm": false, "published": true, "pupilsWithNotes": 27 }
+              ],
+              "phrases": {{WeeklyPhrasesExample}}
+            }
+            """,
+
+        [typeof(TermWeekDto)] = """
+            { "weekNumber": 4, "startDate": "2027-01-11", "endDate": "2027-01-15" }
+            """,
+
+        [typeof(TermWeekListResponse)] = $$"""
+            {
+              "termId": "{{ExampleTermId}}",
+              "items": [
+                { "weekNumber": 1, "startDate": "2026-12-21", "endDate": "2026-12-25" },
+                { "weekNumber": 2, "startDate": "2026-12-28", "endDate": "2027-01-01" }
+              ]
+            }
+            """,
+
+        [typeof(PupilWeeklyWeekDto)] = $$"""
+            {
+              "weekNumber": 4,
+              "startDate": "2027-01-11",
+              "endDate": "2027-01-15",
+              "outsideTerm": false,
+              "armId": "{{ExampleArmId}}",
+              "published": true,
+              "days": [ {{WeeklyMondayExample}} ]
+            }
+            """,
+
+        [typeof(PupilWeeklyTermDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "displayName": "Okafor Chidera Ngozi",
+              "termId": "{{ExampleTermId}}",
+              "weeks": [
+                { "weekNumber": 3, "startDate": "2027-01-04", "endDate": "2027-01-08", "outsideTerm": false, "armId": null, "published": false, "days": null },
+                {
+                  "weekNumber": 4,
+                  "startDate": "2027-01-11",
+                  "endDate": "2027-01-15",
+                  "outsideTerm": false,
+                  "armId": "{{ExampleArmId}}",
+                  "published": true,
+                  "days": [ {{WeeklyMondayExample}} ]
+                }
+              ]
+            }
+            """,
+
+        [typeof(WeeklySettingsDto)] = $$"""
+            { "armId": "{{ExampleArmId}}", "autoPublish": true }
+            """,
+
+        [typeof(WeeklyCompletionRowDto)] = WeeklyCompletionRowExample,
+
+        [typeof(WeeklyCompletionReportDto)] = $$"""
+            { "termId": "{{ExampleTermId}}", "items": [ {{WeeklyCompletionRowExample}} ] }
+            """,
+
+        [typeof(WeeklyIllnessObservationDto)] = """
+            { "date": "2027-01-12", "text": "Runny nose, sent home at noon" }
+            """,
+
+        [typeof(WeeklyIllnessRowDto)] = WeeklyIllnessRowExample,
+
+        [typeof(WeeklyIllnessReportDto)] = $$"""
+            { "termId": "{{ExampleTermId}}", "items": [ {{WeeklyIllnessRowExample}} ] }
+            """,
+
+        [typeof(WeeklyCellInput)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "dayOfWeek": "Monday", "field": "Eating", "value": "Ate everything" }
+            """,
+
+        [typeof(SaveWeeklyNotesCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "weekNumber": 4,
+              "cells": [
+                { "pupilId": "{{ExamplePupilId}}", "dayOfWeek": "Monday", "field": "Eating", "value": "Ate everything" },
+                { "pupilId": "{{ExampleSecondPupilId}}", "dayOfWeek": "Monday", "field": "Eating", "value": null }
+              ]
+            }
+            """,
+
+        [typeof(WeeklyPublicationRequest)] = $$"""
+            { "termId": "{{ExampleTermId}}" }
+            """,
+
+        [typeof(UpdateWeeklySettingsCommand)] = $$"""
+            { "armId": "{{ExampleArmId}}", "autoPublish": true }
             """,
     };
 

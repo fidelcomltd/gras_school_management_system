@@ -122,6 +122,8 @@ internal sealed class PortalRepository(ApplicationDbContext context) : IPortalRe
                     ArmId = arm.Id,
                     enrolment.EffectiveFrom,
                     ResultSetState = context.ResultSets.Where(set => set.ArmId == arm.Id && set.TermId == term.Id).Select(set => (Domain.Results.ResultSetState?)set.State).FirstOrDefault(),
+                    WeeklyPublished = context.WeeklyReports.Any(report =>
+                        report.PupilId == pupilId && report.TermId == term.Id && report.State == Domain.Weekly.WeeklyReportState.Published),
                 })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -132,7 +134,7 @@ internal sealed class PortalRepository(ApplicationDbContext context) : IPortalRe
             .Select(group => group.OrderByDescending(row => row.EffectiveFrom).First())
             .OrderByDescending(row => row.SessionStart)
             .ThenBy(row => row.Ordinal)
-            .Select(row => new PortalTermRow(row.SessionId, row.SessionName, row.TermId, row.TermName, row.Ordinal, row.ResultSetState))
+            .Select(row => new PortalTermRow(row.SessionId, row.SessionName, row.TermId, row.TermName, row.Ordinal, row.ResultSetState, row.WeeklyPublished))
             .ToList();
     }
 
