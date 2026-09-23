@@ -7,7 +7,7 @@ import { useReadiness } from './api-workflow';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
-import { useClassChoice } from './hooks/use-class-choice';
+import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { STATE_LABEL } from './types';
 
 /** `/results` — a class's results for a term: how complete they are, and the next step (spec 6.7.5, 6.7.8–6.7.11). */

@@ -9,7 +9,7 @@ import { useArmSubjects, useScoreSheet } from './api';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ScoreSheetEditor } from './components/score-sheet-editor';
 import { VoidSheetDialog } from './components/void-sheet-dialog';
-import { useClassChoice } from './hooks/use-class-choice';
+import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { isEditable } from './types';
 
 /** `/results/marks` — mark entry per class, subject and term (spec 6.7.4). */
