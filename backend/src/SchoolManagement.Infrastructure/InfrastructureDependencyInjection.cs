@@ -333,22 +333,24 @@ public static class InfrastructureDependencyInjection
 
         services.AddSingleton<IValidateOptions<CloudinaryOptions>, CloudinaryOptionsValidator>();
 
-        var cloudinary = configuration
-            .GetSection(CloudinaryOptions.SectionName)
-            .Get<CloudinaryOptions>() ?? new CloudinaryOptions();
-
-        if (cloudinary.AllowInMemoryStore || !cloudinary.IsConfigured)
+        // DECIDED AT RESOLUTION, FROM THE BOUND OPTIONS — never from `configuration` read here. Under
+        // minimal hosting this method runs BEFORE a WebApplicationFactory's ConfigureAppConfiguration
+        // overrides are applied, so a registration-time read saw a developer's user-secrets but not
+        // the integration fixture's AllowInMemoryStore, registered the Cloudinary store, and every
+        // portal PDF test then failed constructing a gateway from the fixture's blanked credentials
+        // (drift 2026-09-23). Both stores are registered; only the chosen one is ever constructed.
+        // Singleton so an in-memory upload persists for the lifetime of the process.
+        services.AddSingleton<InMemorySchoolImageStore>();
+        services.AddHttpClient(CloudinaryGateway.HttpClientName);
+        services.AddSingleton<ICloudinaryGateway, CloudinaryGateway>();
+        services.AddSingleton<CloudinaryImageStore>();
+        services.AddSingleton<ISchoolImageStore>(provider =>
         {
-            // Singleton so uploads persist for the lifetime of the process, matching a real store's
-            // behaviour closely enough for a fake.
-            services.AddSingleton<ISchoolImageStore, InMemorySchoolImageStore>();
-        }
-        else
-        {
-            services.AddHttpClient(CloudinaryGateway.HttpClientName);
-            services.AddSingleton<ICloudinaryGateway, CloudinaryGateway>();
-            services.AddSingleton<ISchoolImageStore, CloudinaryImageStore>();
-        }
+            var cloudinary = provider.GetRequiredService<IOptions<CloudinaryOptions>>().Value;
+            return cloudinary.AllowInMemoryStore || !cloudinary.IsConfigured
+                ? provider.GetRequiredService<InMemorySchoolImageStore>()
+                : provider.GetRequiredService<CloudinaryImageStore>();
+        });
 
         // TASK-0005b stage B2: SchoolImage row persistence for the upload routes.
         services.AddScoped<ISchoolImageRepository, SchoolImageRepository>();
