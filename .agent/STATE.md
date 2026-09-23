@@ -193,7 +193,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** (2026-09-23, `admissions-incomplete-report`); `No drift`; `npm run verify` 70 files / 441 tests / build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** (2026-09-23, `admissions-incomplete-report`); `No drift`; `npm run verify` 70 files / 442 tests / build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called

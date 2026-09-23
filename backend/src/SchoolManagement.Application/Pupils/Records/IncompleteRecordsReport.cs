@@ -106,12 +106,12 @@ internal sealed class GetIncompleteRecordsHandler(
             .Where(row => (armFilter is null || row.ArmId == armFilter) && (allowedArms is null || allowedArms.Contains(row.ArmId)))
             .ToList();
         var set = await records.LoadForPupilsAsync([.. enrolled.Select(row => row.Pupil.Id)], cancellationToken).ConfigureAwait(false);
-        var names = await ArmNamesAsync(cancellationToken).ConfigureAwait(false);
+        var names = await ArmNamesAsync(session.Id, cancellationToken).ConfigureAwait(false);
 
         var incomplete = enrolled
             .Select(row => (row.Pupil, row.ArmId, Completeness: AdmissionCompleteness.Evaluate(row.Pupil, set)))
             .Where(row => row.Completeness.Blocking.Count + row.Completeness.Chased.Count > 0)
-            .OrderBy(row => names.GetValueOrDefault(row.ArmId).Order)
+            .OrderBy(row => names.TryGetValue(row.ArmId, out var arm) ? arm.Order : int.MaxValue)
             .ThenBy(row => row.Pupil.Surname, StringComparer.OrdinalIgnoreCase)
             .ThenBy(row => row.Pupil.FirstName, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -133,7 +133,7 @@ internal sealed class GetIncompleteRecordsHandler(
             row.Pupil.FirstName,
             row.Pupil.MiddleName,
             row.ArmId.ToString("D", CultureInfo.InvariantCulture),
-            names.TryGetValue(row.ArmId, out var arm) ? arm.Name : string.Empty,
+            names.TryGetValue(row.ArmId, out var arm) ? arm.Name : "Unknown arm",
             row.Completeness.ChasedPercent,
             row.Completeness.Blocking,
             row.Completeness.Chased));
@@ -161,16 +161,19 @@ internal sealed class GetIncompleteRecordsHandler(
         _ => item.Message.TrimEnd('.'),
     };
 
-    private async Task<Dictionary<Guid, (string Name, int Order)>> ArmNamesAsync(CancellationToken cancellationToken)
+    // The active session's arms only, in level then label order; an arm whose level cannot be found keeps its label.
+    private async Task<Dictionary<Guid, (string Name, int Order)>> ArmNamesAsync(Guid sessionId, CancellationToken cancellationToken)
     {
         var levels = (await classLevels.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false)).ToDictionary(level => level.Id);
-        var ordered = (await arms.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false))
-            .Where(arm => levels.ContainsKey(arm.ClassLevelId))
-            .OrderBy(arm => levels[arm.ClassLevelId].ProgressionOrder)
+        var ordered = (await arms.ListBySessionTrackedAsync(sessionId, cancellationToken).ConfigureAwait(false))
+            .OrderBy(arm => levels.TryGetValue(arm.ClassLevelId, out var level) ? level.ProgressionOrder : int.MaxValue)
             .ThenBy(arm => arm.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return ordered
             .Select((arm, index) => (arm, index))
-            .ToDictionary(entry => entry.arm.Id, entry => (ArmDisplayName.Compose(levels[entry.arm.ClassLevelId].Name, entry.arm.Label), entry.index));
+            .ToDictionary(
+                entry => entry.arm.Id,
+                entry => (levels.TryGetValue(entry.arm.ClassLevelId, out var level) ? ArmDisplayName.Compose(level.Name, entry.arm.Label) : entry.arm.Label,
+                    entry.index));
     }
 }

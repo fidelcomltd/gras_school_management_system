@@ -53,18 +53,18 @@ function renderScreen(body: Report | Response = REPORT) {
 
 describe('IncompleteRecordsScreen', () => {
   it('lists each pupil with what is missing, and counts each gap', async () => {
-    mockMe('report.view');
+    mockMe('report.view', 'pupil.view');
     renderScreen();
 
     expect(await screen.findByText('2026/2027: 2 of 10 active pupils have something missing.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'BELLO Ada' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'BELLO Ada' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'No primary emergency contact: 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Birth certificate not received: 2' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Download CSV' })).not.toBeInTheDocument();
   });
 
   it('filters by a gap when its count is pressed, and again to clear it', async () => {
-    mockMe('report.view', 'report.export');
+    mockMe('report.view', 'report.export', 'pupil.view');
     const { user } = renderScreen();
 
     await user.click(await screen.findByRole('button', { name: 'No primary emergency contact: 1' }));
@@ -75,6 +75,14 @@ describe('IncompleteRecordsScreen', () => {
     await user.click(screen.getByRole('button', { name: 'No primary emergency contact: 1' }));
     expect(within(screen.getByRole('table')).getByRole('link', { name: 'OKAFOR Ada' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeEnabled();
+  });
+
+  it('shows names without links to a caller who cannot open pupil records', async () => {
+    mockMe('report.view');
+    renderScreen();
+
+    expect(await screen.findByText('BELLO Ada')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'BELLO Ada' })).not.toBeInTheDocument();
   });
 
   it('says so when no session is active', async () => {

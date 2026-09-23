@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
-import { hasPrivilege } from '@/lib/auth/auth-session';
+import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { saveFile } from '@/lib/http';
 import { csvDocument, csvLine } from '@/shared/format/csv';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
@@ -58,28 +58,41 @@ export function IncompleteRecordsScreen() {
 
 function Report({ report }: { report: IncompleteRecordsReport }) {
   const me = useMe();
-  const canExport = !!me.data && hasPrivilege(me.data, 'report.export');
-  const [armId, setArmId] = useState(ALL_ARMS);
-  const [code, setCode] = useState<string | null>(null);
+  const [chosenArm, setChosenArm] = useState(ALL_ARMS);
+  const [chosenCode, setChosenCode] = useState<string | null>(null);
+
+  const arms = useMemo(() => [...new Map(report.pupils.map((pupil) => [pupil.armId, pupil.armName])).entries()], [report]);
+  const labels = useMemo(() => new Map(report.counts.map((count) => [count.code, count.label])), [report]);
+  // A choice the data no longer offers (after a refetch, or a gap absent from the chosen arm) falls back rather than
+  // leaving an empty screen with nothing to press.
+  const armId = arms.some(([id]) => id === chosenArm) ? chosenArm : ALL_ARMS;
+  const inArm = useMemo(() => (armId === ALL_ARMS ? report.pupils : report.pupils.filter((pupil) => pupil.armId === armId)), [report, armId]);
+  // Counts follow the arm filter, in one pass; the server's counts supply the labels and their order.
+  const counts = useMemo(() => {
+    const tally = new Map<string, number>();
+    for (const pupil of inArm) for (const item of gaps(pupil)) tally.set(item.code, (tally.get(item.code) ?? 0) + 1);
+    return report.counts.map((count) => ({ ...count, count: tally.get(count.code) ?? 0 })).filter((count) => count.count > 0);
+  }, [report, inArm]);
+  const code = counts.some((count) => count.code === chosenCode) ? chosenCode : null;
+  const shown = useMemo(
+    () => (code === null ? inArm : inArm.filter((pupil) => gaps(pupil).some((item) => item.code === code))),
+    [inArm, code],
+  );
+  // report.export and pupil.view are arm-scopable: export and link only where the caller's grant reaches.
+  const exportable = me.data ? shown.filter((pupil) => hasPrivilegeInArm(me.data, 'report.export', pupil.armId)) : [];
+  const canExport = !!me.data && report.pupils.some((pupil) => hasPrivilegeInArm(me.data, 'report.export', pupil.armId));
 
   if (report.sessionName === null) {
     return <p className="text-sm text-muted-foreground">No session is active, so there is no roll to check.</p>;
   }
 
-  const arms = [...new Map(report.pupils.map((pupil) => [pupil.armId, pupil.armName])).entries()];
-  const inArm = armId === ALL_ARMS ? report.pupils : report.pupils.filter((pupil) => pupil.armId === armId);
-  const shown = code === null ? inArm : inArm.filter((pupil) => gaps(pupil).some((item) => item.code === code));
-  const labels = new Map(report.counts.map((count) => [count.code, count.label]));
-  // Counts follow the arm filter; the server's counts cover the whole report and supply the labels and their order.
-  const counts = report.counts
-    .map((count) => ({ ...count, count: inArm.filter((pupil) => gaps(pupil).some((item) => item.code === count.code)).length }))
-    .filter((count) => count.count > 0);
-
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-foreground">
-          {report.sessionName}: {report.pupils.length} of {report.pupilsChecked} active pupils have something missing.
+          {armId === ALL_ARMS
+            ? `${report.sessionName}: ${report.pupils.length} of ${report.pupilsChecked} active pupils have something missing.`
+            : `${report.sessionName}: ${inArm.length} ${inArm.length === 1 ? 'pupil' : 'pupils'} in this arm have something missing.`}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <LabelledSelect
@@ -87,14 +100,17 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
             placeholder="All arms"
             value={armId}
             options={[{ value: ALL_ARMS, label: 'All arms' }, ...arms.map(([id, name]) => ({ value: id, label: name }))]}
-            onChange={(next) => setArmId(next)}
+            onChange={(next) => {
+              setChosenArm(next);
+              setChosenCode(null);
+            }}
           />
           {canExport ? (
             <Button
               variant="outline"
               size="sm"
-              disabled={shown.length === 0}
-              onClick={() => saveFile({ blob: new Blob([toCsv(shown, labels)], { type: 'text/csv' }), fileName: 'incomplete-records.csv' })}
+              disabled={exportable.length === 0}
+              onClick={() => saveFile({ blob: new Blob([toCsv(exportable, labels)], { type: 'text/csv' }), fileName: 'incomplete-records.csv' })}
             >
               Download CSV
             </Button>
@@ -111,7 +127,7 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
               size="sm"
               variant={code === count.code ? 'primary' : 'outline'}
               aria-pressed={code === count.code}
-              onClick={() => setCode(code === count.code ? null : count.code)}
+              onClick={() => setChosenCode(code === count.code ? null : count.code)}
             >
               {count.label}: {count.count}
             </Button>
@@ -137,9 +153,13 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
               {shown.map((pupil) => (
                 <tr key={pupil.pupilId} className="border-t border-border align-top">
                   <td className="py-2 pr-4">
-                    <Link to={paths.pupilDetail(pupil.pupilId)} className="font-medium text-foreground underline">
-                      {fullName(pupil)}
-                    </Link>
+                    {me.data && hasPrivilegeInArm(me.data, 'pupil.view', pupil.armId) ? (
+                      <Link to={paths.pupilDetail(pupil.pupilId)} className="font-medium text-foreground underline">
+                        {fullName(pupil)}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground">{fullName(pupil)}</span>
+                    )}
                     <div className="text-muted-foreground">{pupil.registrationNumber}</div>
                   </td>
                   <td className="py-2 pr-4 text-foreground">{pupil.armName}</td>
