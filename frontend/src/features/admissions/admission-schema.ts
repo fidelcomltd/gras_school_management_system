@@ -26,9 +26,16 @@ export const approveAdmissionSchema = z
     assessmentResultRemarks: z.string(),
     headOfSchoolConfirmed: z.boolean(),
     headOfSchoolName: z.string(),
+    // Spec 6.5.16: only rendered, and only then required, when the health questions are the one gap left.
+    healthOverride: z.boolean(),
+    healthOverrideReason: z.string(),
   })
   .refine((values) => values.headOfSchoolConfirmed, {
     message: 'Confirm the head of school signature before approving.',
     path: ['headOfSchoolConfirmed'],
+  })
+  .refine((values) => !values.healthOverride || values.healthOverrideReason.trim().length >= 10, {
+    message: 'Say why this admission is approved without the health answers (at least 10 characters).',
+    path: ['healthOverrideReason'],
   });
 export type ApproveAdmissionFormValues = z.infer<typeof approveAdmissionSchema>;

@@ -25,10 +25,13 @@ export function ApproveAdmissionForm({
   pupil,
   record,
   onClose,
+  healthOverride = false,
 }: {
   pupil: AdmissionQueueRow;
   record: AdmissionRecordDto;
   onClose: () => void;
+  /** Spec 6.5.16: the health answers are the only gap and the caller holds `pupil.admission.override`. */
+  healthOverride?: boolean;
 }) {
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const approveAdmission = useApproveAdmission();
@@ -49,6 +52,8 @@ export function ApproveAdmissionForm({
       assessmentResultRemarks: '',
       headOfSchoolConfirmed: false,
       headOfSchoolName: '',
+      healthOverride,
+      healthOverrideReason: '',
     },
   });
   const headOfSchoolConfirmed = useWatch({ control, name: 'headOfSchoolConfirmed' });
@@ -62,16 +67,22 @@ export function ApproveAdmissionForm({
         values.assessmentResultRemarks.trim() === '' ? null : values.assessmentResultRemarks,
       headOfSchoolConfirmed: values.headOfSchoolConfirmed,
       headOfSchoolName: values.headOfSchoolName.trim() === '' ? null : values.headOfSchoolName,
+      healthOverrideReason: healthOverride ? values.healthOverrideReason.trim() : null,
     });
   });
 
   if (approveAdmission.isSuccess) {
+    const number = approveAdmission.data.registrationNumber ?? '—';
     return (
       <div className="flex flex-col gap-4">
-        <output className="text-sm text-foreground">
-          Approved. Registration number:{' '}
-          <span className="font-semibold">{approveAdmission.data.registrationNumber ?? '—'}</span>
+        {/* Spec 6.5.11: large type and a copy button, because the office is asked for the number immediately. */}
+        <output className="flex flex-col gap-1 text-sm text-foreground">
+          Approved. Registration number:
+          <span className="font-display text-3xl font-semibold tracking-wide">{number}</span>
         </output>
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void navigator.clipboard?.writeText(number)}>
+          Copy number
+        </Button>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             Done
@@ -118,6 +129,19 @@ export function ApproveAdmissionForm({
           Leave blank to use the head of school name already on file in settings.
         </FieldDescription>
       </Field>
+
+      {healthOverride ? (
+        <Field invalid={!!errors.healthOverrideReason}>
+          <FieldLabel>Reason for approving without the health answers</FieldLabel>
+          <BaseField.Control
+            render={<textarea rows={2} />}
+            className="w-full rounded-md border border-input bg-surface px-3 py-2 text-sm text-foreground"
+            {...register('healthOverrideReason')}
+          />
+          <FieldDescription>The parent declined the health questions. The reason is kept in the audit log.</FieldDescription>
+          <FieldError match={true}>{errors.healthOverrideReason?.message}</FieldError>
+        </Field>
+      ) : null}
 
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input type="checkbox" {...register('headOfSchoolConfirmed')} />

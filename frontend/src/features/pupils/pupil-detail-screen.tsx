@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,8 @@ import { pupilName, type PupilDto } from './types';
 
 type Tab = 'details' | 'contacts' | 'collection' | 'health' | 'documents';
 
-/** Spec 6.5.11's steps, to the tab that holds each. */
-const TAB_FOR_STEP: Record<number, Tab> = { 2: 'details', 3: 'contacts', 4: 'collection', 5: 'health', 6: 'details', 7: 'documents', 8: 'details', 9: 'details' };
+/** Spec 6.5.11's steps held on a tab here; the rest (declaration, approval) open in the admission flow. */
+const TAB_FOR_STEP: Partial<Record<number, Tab>> = { 3: 'contacts', 4: 'collection', 5: 'health', 7: 'documents' };
 
 function formatDate(iso: string): string {
   const [year, month, day] = iso.slice(0, 10).split('-');
@@ -46,6 +46,7 @@ export function PupilDetailScreen() {
   const me = useMe();
   const [dialog, setDialog] = useState<'edit' | 'number' | null>(null);
   const [tab, setTab] = useState<Tab>('details');
+  const navigate = useNavigate();
 
   if (pupil.isPending) {
     return <LoadingState label="Loading pupil…" />;
@@ -90,7 +91,21 @@ export function PupilDetailScreen() {
         </div>
       </header>
 
-      {record.status === 'Pending' ? <CompletenessCard pupilId={record.id} onGo={(step) => setTab(TAB_FOR_STEP[step] ?? 'details')} /> : null}
+      {record.status === 'Pending' ? (
+        <>
+          <Link to={paths.admissionFlow(record.id)} className="self-start text-sm font-medium text-primary hover:underline">
+            Continue the admission step by step →
+          </Link>
+          <CompletenessCard
+            pupilId={record.id}
+            onGo={(step) => {
+              const target = TAB_FOR_STEP[step];
+              if (target) setTab(target);
+              else void navigate(paths.admissionFlow(record.id, step));
+            }}
+          />
+        </>
+      ) : null}
 
       <div role="tablist" aria-label="Pupil record" className="flex flex-wrap gap-1 border-b border-border">
         {visible.map((candidate) => (
