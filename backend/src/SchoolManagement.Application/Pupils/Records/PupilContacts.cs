@@ -52,14 +52,19 @@ internal sealed class SavePupilContactsCommandValidator : AbstractValidator<Save
     public SavePupilContactsCommandValidator()
     {
         RuleFor(command => command.Contacts).NotNull();
-        RuleForEach(command => command.Contacts).ChildRules(contact => contact.RuleFor(entry => entry.Role).IsInEnum());
-        RuleFor(command => command.Contacts)
-            .Must(contacts => contacts.Select(contact => contact.Role).Distinct().Count() == contacts.Count)
-            .WithMessage("Each contact role can be recorded only once.")
-            .Must(contacts => contacts.Count(contact => contact.IsPrimaryContact) <= 1)
-            .WithMessage("Only one contact can be the primary contact.")
-            .Must(contacts => !contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)) || contacts.Count(contact => contact.IsPrimaryContact) == 1)
-            .WithMessage("Mark one of the father, mother or guardian as the primary contact.");
+
+        // Guarded, so a null list or a null entry is a 422 rather than a NullReferenceException in the set rules.
+        When(command => command.Contacts is not null && command.Contacts.All(contact => contact is not null), () =>
+        {
+            RuleForEach(command => command.Contacts).ChildRules(contact => contact.RuleFor(entry => entry.Role).IsInEnum());
+            RuleFor(command => command.Contacts)
+                .Must(contacts => contacts.Select(contact => contact.Role).Distinct().Count() == contacts.Count)
+                .WithMessage("Each contact role can be recorded only once.")
+                .Must(contacts => contacts.Count(contact => contact.IsPrimaryContact) <= 1)
+                .WithMessage("Only one contact can be the primary contact.")
+                .Must(contacts => !contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)) || contacts.Count(contact => contact.IsPrimaryContact) == 1)
+                .WithMessage("Mark one of the father, mother or guardian as the primary contact.");
+        }).Otherwise(() => RuleForEach(command => command.Contacts).NotNull().WithMessage("A contact entry is missing.").When(command => command.Contacts is not null));
     }
 }
 
@@ -78,14 +83,19 @@ internal sealed class SavePupilContactsHandler(
             return Result.Failure<PupilContactListDto>(allowed.Error);
         }
 
-        if (allowed.Value.Status != PupilStatus.Pending && !request.Contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)))
+        var existing = (await records.ListContactsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false))
+            .ToDictionary(contact => contact.Role);
+
+        // Spec 9.4: the last responsible adult of an active pupil is edited, never removed. A pupil who never had one (an
+        // older record) may still have other contacts added.
+        if (allowed.Value.Status != PupilStatus.Pending
+            && existing.Keys.Any(PupilContact.IsResponsibleAdult)
+            && !request.Contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)))
         {
             return Result.Failure<PupilContactListDto>(Error.Conflict(
                 "contact.last_responsible_adult", "A pupil must keep at least one father, mother or guardian. Edit the contact instead of removing it."));
         }
 
-        var existing = (await records.ListContactsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false))
-            .ToDictionary(contact => contact.Role);
         var before = existing.Values.Select(Snapshot).ToList();
 
         var failures = new Dictionary<string, string[]>(StringComparer.Ordinal);

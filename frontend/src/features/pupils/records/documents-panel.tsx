@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/http';
 import { useCompleteness, useDocuments, useSaveDocument, type PupilDocumentDto, type PupilDocumentType } from './api';
+import { errorText } from './format';
 
 const LABELS: Record<PupilDocumentType, string> = {
   BirthCertificate: 'Birth certificate',
@@ -74,7 +74,7 @@ function DocumentRow({ pupilId, item, canEdit }: { pupilId: string; item: PupilD
       ) : item.remarks ? (
         <span className="text-sm text-muted-foreground">{item.remarks}</span>
       ) : null}
-      <FormError message={save.error instanceof ApiError ? save.error.message : null} />
+      <FormError message={errorText(save.error)} />
     </li>
   );
 }

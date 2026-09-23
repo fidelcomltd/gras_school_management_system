@@ -67,7 +67,7 @@ internal sealed class SavePupilDocumentHandler(
         var document = documents.FirstOrDefault(candidate => candidate.DocumentType == request.DocumentType);
         var isNew = document is null;
         document ??= PupilDocument.Create(Guid.CreateVersion7(), request.PupilId, request.DocumentType);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().ToOffset(TimeSpan.FromHours(1)).DateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
         var applied = document.Apply(request.Received, request.ReceivedDate, request.Remarks, request.OtherLabel, today, currentUser.UserId);
         if (applied.IsFailure)
         {
@@ -119,6 +119,16 @@ internal sealed class GetAdmissionCompletenessHandler(PupilRecordAccess access, 
 /// </summary>
 internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdmissionRecordRepository admissions)
 {
+    /// <summary>
+    /// Only the blocking items of steps 3 to 5 (contacts, the barred answer, health) — what approval checks on top of its
+    /// own declaration and assessment rules, without reading the chased set it would discard.
+    /// </summary>
+    public async Task<IReadOnlyList<CompletenessItemDto>> BlockingSectionsAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        SectionsBlocking(
+            await records.ListContactsAsync(pupilId, track: false, cancellationToken).ConfigureAwait(false),
+            await records.FindBarredAnswerAsync(pupilId, track: false, cancellationToken).ConfigureAwait(false),
+            await records.FindHealthAsync(pupilId, track: false, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Both lists for <paramref name="pupil"/>.</summary>
     public async Task<AdmissionCompletenessDto> EvaluateAsync(Pupil pupil, CancellationToken cancellationToken)
     {
@@ -130,7 +140,7 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
         var documents = await records.ListDocumentsAsync(pupil.Id, track: false, cancellationToken).ConfigureAwait(false);
         var record = await admissions.FindReadOnlyByPupilIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
 
-        var blocking = new List<CompletenessItemDto>();
+        var blocking = SectionsBlocking(contacts, barred, health);
         void Block(bool missing, int step, string code, string message)
         {
             if (missing)
@@ -139,12 +149,6 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
             }
         }
 
-        Block(!contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)), 3, "contacts.responsible_adult", "Add the father, mother or guardian.");
-        Block(!contacts.Any(contact => contact.Role == ContactRole.EmergencyPrimary), 3, "contacts.emergency_primary", "Add the primary emergency contact.");
-        Block(contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role)) && !contacts.Any(contact => contact.IsPrimaryContact),
-            3, "contacts.primary", "Mark one parent or guardian as the primary contact.");
-        Block(barred is null, 4, "collection.barred_unanswered", "Answer whether anyone must not collect the child.");
-        Block(health is not { IsAnswered: true }, 5, "health.unanswered", "Answer all three health questions: allergy, medical condition, medication.");
         Block(record is not { DeclarationSigned: true }, 8, "declaration.unsigned", "Record the parent's declaration.");
         Block(record is { AssessmentRequired: true } && string.IsNullOrWhiteSpace(record.AssessmentResultRemarks),
             9, "assessment.outcome", "Record the assessment outcome.");
@@ -173,6 +177,26 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
 
         var percent = chasedTotal == 0 ? 100 : (int)Math.Round(100.0 * (chasedTotal - chased.Count) / chasedTotal);
         return new AdmissionCompletenessDto(PupilContactsMapper.Id(pupil.Id), blocking, chased, percent);
+    }
+
+    private static List<CompletenessItemDto> SectionsBlocking(IReadOnlyList<PupilContact> contacts, BarredPersonAnswer? barred, PupilHealth? health)
+    {
+        var blocking = new List<CompletenessItemDto>();
+        void Block(bool missing, int step, string code, string message)
+        {
+            if (missing)
+            {
+                blocking.Add(new CompletenessItemDto(step, code, message));
+            }
+        }
+
+        var hasAdult = contacts.Any(contact => PupilContact.IsResponsibleAdult(contact.Role));
+        Block(!hasAdult, 3, "contacts.responsible_adult", "Add the father, mother or guardian.");
+        Block(!contacts.Any(contact => contact.Role == ContactRole.EmergencyPrimary), 3, "contacts.emergency_primary", "Add the primary emergency contact.");
+        Block(hasAdult && !contacts.Any(contact => contact.IsPrimaryContact), 3, "contacts.primary", "Mark one parent or guardian as the primary contact.");
+        Block(barred is null, 4, "collection.barred_unanswered", "Answer whether anyone must not collect the child.");
+        Block(health is not { IsAnswered: true }, 5, "health.unanswered", "Answer all three health questions: allergy, medical condition, medication.");
+        return blocking;
     }
 }
 

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/http';
 import { useBarredPersons, usePickupPersons, useSaveBarredPersons, useSavePickupPersons, type BarredPersonsDto } from './api';
 import { TextField, YesNo } from './fields';
+import { errorText, localPhone } from './format';
 
 type PickupRow = { key: string; fullName: string; relationship: string; phone: string };
 const blankPickup = (): PickupRow => ({ key: crypto.randomUUID(), fullName: '', relationship: '', phone: '' });
@@ -40,7 +40,7 @@ export function CollectionPanel({
           <PickupForm
             key={JSON.stringify(pickup.data.items)}
             pupilId={pupilId}
-            initial={pickup.data.items.map((item) => ({ key: item.id, fullName: item.fullName, relationship: item.relationship, phone: item.phone.replace(/^\+234/, '0') }))}
+            initial={pickup.data.items.map((item) => ({ key: item.id, fullName: item.fullName, relationship: item.relationship, phone: localPhone(item.phone) }))}
             canEdit={canEdit}
           />
         )}
@@ -84,7 +84,7 @@ function PickupForm({ pupilId, initial, canEdit }: { pupilId: string; initial: P
           </div>
         ))}
       </fieldset>
-      <FormError message={save.error instanceof ApiError ? save.error.message : null} />
+      <FormError message={errorText(save.error)} />
       {canEdit ? (
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setRows((current) => [...current, blankPickup()])}>
@@ -129,7 +129,7 @@ function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredP
           ))}
         </fieldset>
       ) : null}
-      <FormError message={save.error instanceof ApiError ? save.error.message : null} />
+      <FormError message={errorText(save.error)} />
       {canEdit ? (
         <div className="flex gap-2">
           {answer ? (

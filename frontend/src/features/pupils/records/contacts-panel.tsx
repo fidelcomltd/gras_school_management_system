@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/http';
 import { useContacts, useSaveContacts, type ContactRole, type PupilContactDto, type PupilContactInput } from './api';
 import { TextField } from './fields';
+import { errorText, localPhone } from './format';
 
 const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean }[] = [
   { role: 'Father', title: 'Father', adult: true, parent: true },
@@ -17,17 +17,14 @@ type Draft = Record<ContactRole, { fullName: string; relationship: string; phone
 
 const blank = { fullName: '', relationship: '', phone: '', whatsappNumber: '', occupation: '', email: '' };
 
-/** "+2348031234567" back to the form people type, "08031234567". */
-const local = (phone: string | null | undefined) => (phone ? phone.replace(/^\+234/, '0') : '');
-
 function toDraft(items: PupilContactDto[]): Draft {
   const draft = Object.fromEntries(SLOTS.map((slot) => [slot.role, { ...blank }])) as Draft;
   for (const item of items) {
     draft[item.role] = {
       fullName: item.fullName,
       relationship: item.relationship ?? '',
-      phone: local(item.phone),
-      whatsappNumber: local(item.whatsappNumber),
+      phone: localPhone(item.phone),
+      whatsappNumber: localPhone(item.whatsappNumber),
       occupation: item.occupation ?? '',
       email: item.email ?? '',
     };
@@ -122,7 +119,7 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
           );
         })}
       </div>
-      <FormError message={save.error instanceof ApiError ? save.error.message : null} />
+      <FormError message={errorText(save.error)} />
       {canEdit ? (
         <div className="flex items-center gap-3">
           <Button onClick={submit} disabled={save.isPending}>

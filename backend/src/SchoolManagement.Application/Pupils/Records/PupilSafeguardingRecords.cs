@@ -39,7 +39,13 @@ public sealed record SavePickupPersonsCommand(Guid PupilId, IReadOnlyList<Pickup
 /// <summary>A sane upper bound; the form's table has three rows.</summary>
 internal sealed class SavePickupPersonsCommandValidator : AbstractValidator<SavePickupPersonsCommand>
 {
-    public SavePickupPersonsCommandValidator() => RuleFor(command => command.Persons).NotNull().Must(persons => persons.Count <= 20);
+    public SavePickupPersonsCommandValidator()
+    {
+        RuleFor(command => command.Persons).NotNull();
+        RuleFor(command => command.Persons).Must(persons => persons.Count <= 20 && persons.All(person => person is not null))
+            .WithMessage("Send at most 20 people, with no empty entries.")
+            .When(command => command.Persons is not null);
+    }
 }
 
 /// <summary>Handles <see cref="SavePickupPersonsCommand"/>. The list is replaced whole.</summary>
@@ -149,11 +155,16 @@ internal sealed class SaveBarredPersonsCommandValidator : AbstractValidator<Save
 {
     public SaveBarredPersonsCommandValidator()
     {
-        RuleFor(command => command.Persons).NotNull().Must(persons => persons.Count <= 10);
-        RuleFor(command => command.Persons).Must(persons => persons.Count > 0).When(command => command.HasBarredPersons)
-            .WithMessage("Name at least one person who must not collect the child.");
-        RuleFor(command => command.Persons).Must(persons => persons.Count == 0).When(command => !command.HasBarredPersons)
-            .WithMessage("Remove the names, or answer Yes.");
+        RuleFor(command => command.Persons).NotNull();
+        When(command => command.Persons is not null, () =>
+        {
+            RuleFor(command => command.Persons).Must(persons => persons.Count <= 10 && persons.All(person => person is not null))
+                .WithMessage("Send at most 10 names, with no empty entries.");
+            RuleFor(command => command.Persons).Must(persons => persons.Count > 0).When(command => command.HasBarredPersons)
+                .WithMessage("Name at least one person who must not collect the child.");
+            RuleFor(command => command.Persons).Must(persons => persons.Count == 0).When(command => !command.HasBarredPersons)
+                .WithMessage("Remove the names, or answer Yes.");
+        });
     }
 }
 
@@ -165,7 +176,13 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
     public async Task<Result<BarredPersonsDto>> HandleAsync(SaveBarredPersonsCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        // The response is the stored record, so a save needs view as well as update (spec 6.5.6: no unaudited reads).
         var allowed = await access.CheckAsync(request.PupilId, Privileges.Pupil.SafeguardingUpdate, cancellationToken).ConfigureAwait(false);
+        if (allowed.IsSuccess)
+        {
+            allowed = await access.CheckAsync(request.PupilId, Privileges.Pupil.SafeguardingView, cancellationToken).ConfigureAwait(false);
+        }
+
         if (allowed.IsFailure)
         {
             return Result.Failure<BarredPersonsDto>(allowed.Error);
@@ -282,7 +299,13 @@ internal sealed class SavePupilHealthHandler(PupilRecordAccess access, IPupilRec
     public async Task<Result<PupilHealthDto>> HandleAsync(SavePupilHealthCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        // The response is the stored record, so a save needs view as well as update (spec 6.5.7: no unaudited reads).
         var allowed = await access.CheckAsync(request.PupilId, Privileges.Pupil.SafeguardingUpdate, cancellationToken).ConfigureAwait(false);
+        if (allowed.IsSuccess)
+        {
+            allowed = await access.CheckAsync(request.PupilId, Privileges.Pupil.SafeguardingView, cancellationToken).ConfigureAwait(false);
+        }
+
         if (allowed.IsFailure)
         {
             return Result.Failure<PupilHealthDto>(allowed.Error);

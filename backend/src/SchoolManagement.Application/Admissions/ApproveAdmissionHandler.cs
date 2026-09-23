@@ -230,8 +230,7 @@ internal sealed class ApproveAdmissionCommandHandler(
 
         // Blocking conditions from steps 3 to 5 (spec 6.5.12): contacts, the barred-persons answer, the health answers.
         // The declaration and assessment were checked just above against this command's own unsaved changes.
-        var report = await completeness.EvaluateAsync(pupil, cancellationToken).ConfigureAwait(false);
-        var missing = report.Blocking.Where(item => item.Code is not ("declaration.unsigned" or "assessment.outcome")).ToList();
+        var missing = await completeness.BlockingSectionsAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
         if (missing.Count > 0)
         {
             return Result.Failure<PupilDto>(Error.Validation(

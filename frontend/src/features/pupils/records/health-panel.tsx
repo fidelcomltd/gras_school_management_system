@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/http';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { useHealth, useSaveHealth, type BloodGroup, type Genotype, type PupilHealthDto } from './api';
 import { TextField, YesNo } from './fields';
+import { errorText, localPhone } from './format';
 
 const BLOOD_GROUPS: { value: BloodGroup; label: string }[] = [
   { value: 'APositive', label: 'A+' },
@@ -37,7 +37,7 @@ function HealthForm({ pupilId, data, canEdit }: { pupilId: string; data: PupilHe
     medicationDetails: data.medicationDetails ?? '',
     specialInstructions: data.specialInstructions ?? '',
     preferredHospital: data.preferredHospital ?? '',
-    hospitalPhone: (data.hospitalPhone ?? '').replace(/^\+234/, '0'),
+    hospitalPhone: localPhone(data.hospitalPhone),
     bloodGroup: (data.bloodGroup ?? '') as BloodGroup | '',
     genotype: (data.genotype ?? '') as Genotype | '',
   });
@@ -73,7 +73,7 @@ function HealthForm({ pupilId, data, canEdit }: { pupilId: string; data: PupilHe
           className="w-40"
         />
       </div>
-      <FormError message={save.error instanceof ApiError ? save.error.message : null} />
+      <FormError message={errorText(save.error)} />
       {canEdit ? (
         <Button
           className="self-start"

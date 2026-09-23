@@ -76,6 +76,26 @@ public sealed class PupilRecordEndpointsTests(ApiTestFixture fixture) : Integrat
     }
 
     [Fact]
+    public async Task Contacts_ANullList_Is422_AndAnActivePupilWithNoAdultYetCanStillGainAnEmergencyContact()
+    {
+        RequireDatabase();
+        var pupilId = await SeedPendingAdmissionAsync();
+        var jar = await SignInAsync();
+
+        (await PutAsync($"/api/v1/pupils/{pupilId}/contacts", jar, new { contacts = (object[]?)null })).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await PutAsync($"/api/v1/pupils/{pupilId}/pickup-persons", jar, new { persons = (object[]?)null })).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE pupils SET status = {nameof(PupilStatus.Active)} WHERE id = {pupilId}", TestContext.Current.CancellationToken);
+        }
+
+        (await PutAsync($"/api/v1/pupils/{pupilId}/contacts", jar, new { contacts = new object[] { Contact("EmergencyPrimary", "Ngozi Okafor", "Aunt", "08059876543", false) } }))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Health_AYesNeedsItsDetails_AndEveryReadIsAudited()
     {
         RequireDatabase();

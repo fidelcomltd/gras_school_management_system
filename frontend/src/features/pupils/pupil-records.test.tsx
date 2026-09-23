@@ -78,6 +78,30 @@ describe('PupilDetailScreen admission sections', () => {
     expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyPrimary', fullName: 'Emeka Okafor', relationship: 'Father', isPrimaryContact: false });
   });
 
+  it("shows a rejected contact's own reason, not the generic validation message", async () => {
+    mockMe('pupil.view', 'contact.view', 'contact.update');
+    mockPendingPupil();
+    server.use(
+      http.put(apiUrl('/api/v1/pupils/:pupilId/contacts'), () =>
+        HttpResponse.json(
+          {
+            type: 'about:blank', title: 'One or more validation errors occurred.', status: 422, errorCode: 'validation', traceId: 't',
+            errors: { 'Contacts[0]': ['Enter a Nigerian phone number, for example 08031234567.'] },
+          },
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
+    await user.type(await screen.findByLabelText('Father: full name'), 'Emeka Okafor');
+    await user.type(screen.getByLabelText('Father: phone'), '0803');
+    await user.click(screen.getByRole('button', { name: 'Save contacts' }));
+
+    expect(await screen.findByText('Enter a Nigerian phone number, for example 08031234567.')).toBeInTheDocument();
+  });
+
   it('hides the Health tab from staff without the safeguarding privilege', async () => {
     mockMe('pupil.view', 'contact.view');
     mockPendingPupil();
