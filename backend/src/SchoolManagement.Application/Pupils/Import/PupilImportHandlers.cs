@@ -225,7 +225,7 @@ internal sealed class CommitPupilImportHandler(
         }
 
         // Spec 6.1.12: a bulk action is ONE event with a null entity id and a batch id in its metadata. No names and no
-        // health detail: counts, the number range and the file's hash only.
+        // health detail: counts, the numbers issued per admission year and the file's hash only.
         var skipped = run.Report.AcceptedCount - toCreate.Count;
         await auditSink.RecordAsync(
             Privileges.Pupil.Import,
@@ -236,8 +236,7 @@ internal sealed class CommitPupilImportHandler(
                 ["batchId"] = batchId,
                 ["imported"] = imported.Count,
                 ["skipped"] = skipped,
-                ["firstRegistrationNumber"] = imported[0].RegistrationNumber,
-                ["lastRegistrationNumber"] = imported[^1].RegistrationNumber,
+                ["registrationNumbers"] = NumberRanges(batch, imported),
                 ["fileSha256"] = run.Report.FileSha256,
             },
             actorAdminId: currentUser.UserId,
@@ -245,6 +244,17 @@ internal sealed class CommitPupilImportHandler(
 
         return Result.Success(new PupilImportResultDto(imported.Count, skipped, imported));
     }
+
+    // Rows from different admission years draw from different counters, so one first-to-last pair would misstate the batch.
+    private static List<string> NumberRanges(List<(Pupil Pupil, int AdmissionYear)> batch, List<PupilImportedDto> imported) =>
+        imported
+            .Select((pupil, index) => (Year: batch[index].AdmissionYear, pupil.RegistrationNumber))
+            .GroupBy(entry => entry.Year)
+            .OrderBy(group => group.Key)
+            .Select(group => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{group.First().RegistrationNumber} to {group.Last().RegistrationNumber} ({group.Count()})"))
+            .ToList();
 
     // Every register match needs exactly one decision, and a decision on any other row means the client is out of step.
     private static Result<List<PupilImportDraft>> Decide(PupilImportRun run, CommitPupilImportCommand request)

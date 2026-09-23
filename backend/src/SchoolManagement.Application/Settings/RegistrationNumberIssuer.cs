@@ -1,4 +1,5 @@
 using SchoolManagement.Application.Abstractions.Persistence;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Settings;
@@ -20,12 +21,15 @@ namespace SchoolManagement.Application.Settings;
 /// sanctioned escape hatch <c>IUnitOfWork</c>'s remarks name. EF Core wraps a save made under an already-open,
 /// caller-managed transaction in an automatic SAVEPOINT, so a failed attempt rolls back only that savepoint and the
 /// ambient transaction stays usable for the next attempt. Everything the caller has staged is saved with the number, so
-/// the caller stages the pupil's other rows first. A failed attempt's counter increments have already run as their own
-/// statements, so a genuine collision burns those serials rather than reusing them.
+/// the caller stages the pupil's other rows first. Before saving, the drawn numbers are checked against the register in
+/// one query per draw and a held number is replaced by one more serial (see <see cref="DrawAsync"/>), so a clash
+/// (possible only after a manual correction) burns that one serial; the index and the whole-batch retry remain the
+/// backstop for a concurrent insert.
 /// </para>
 /// </remarks>
 internal sealed class RegistrationNumberIssuer(
     IRegistrationCounterRepository registrationCounters,
+    IPupilRepository pupils,
     IUnitOfWork unitOfWork,
     IPersistenceErrorTranslator persistenceErrorTranslator)
 {
@@ -33,6 +37,9 @@ internal sealed class RegistrationNumberIssuer(
     private const int MaxIssueAttempts = 3;
 
     private const string DuplicateValueErrorCode = "persistence.duplicate_value";
+
+    private static readonly Error IssueFailed = Error.Conflict(
+        "pupil.registration_number_issue_failed", "Could not issue a registration number. Try again.");
 
     /// <summary>
     /// Takes the next serial for <paramref name="admissionYear"/>'s counter, composes the number from SAVED settings,
@@ -51,7 +58,8 @@ internal sealed class RegistrationNumberIssuer(
 
     /// <summary>
     /// The same, for several pupils in order: one counter increment per pupil, so a batch takes consecutive serials in
-    /// the order given (rule 5), then ONE save. A duplicate retries the whole batch with fresh serials.
+    /// the order given (rule 5), then ONE save. A duplicate at save (a concurrent insert the pre-check could not see)
+    /// retries the whole batch with fresh serials.
     /// </summary>
     /// <param name="batch">Tracked pupils with their admission years, in issue order.</param>
     /// <param name="profile">The saved settings.</param>
@@ -64,18 +72,16 @@ internal sealed class RegistrationNumberIssuer(
 
         for (var attempt = 1; ; attempt++)
         {
-            var issued = new List<string>(batch.Count);
-            foreach (var (pupil, admissionYear) in batch)
+            var drawn = await DrawAsync(batch, profile, cancellationToken).ConfigureAwait(false);
+            if (drawn.IsFailure)
             {
-                var counterKey = RegistrationCounterPartition.Resolve(profile.SerialReset, admissionYear);
-                var serial = await registrationCounters
-                    .IncrementAndGetNextSerialAsync(counterKey, cancellationToken)
-                    .ConfigureAwait(false);
+                return Result.Failure<IReadOnlyList<string>>(drawn.Error);
+            }
 
-                // Byte-identical to the preview: both call RegNumberFormat.Compose.
-                var number = RegNumberFormat.Compose(profile.Abbreviation, profile.Separator, admissionYear, profile.SerialWidth, serial);
-                pupil.IssueRegistrationNumber(number);
-                issued.Add(number);
+            var issued = drawn.Value;
+            for (var index = 0; index < batch.Count; index++)
+            {
+                batch[index].Pupil.IssueRegistrationNumber(issued[index]);
             }
 
             try
@@ -88,11 +94,61 @@ internal sealed class RegistrationNumberIssuer(
             {
                 if (attempt == MaxIssueAttempts)
                 {
-                    return Result.Failure<IReadOnlyList<string>>(Error.Conflict(
-                        "pupil.registration_number_issue_failed",
-                        "Could not issue a registration number. Try again."));
+                    return Result.Failure<IReadOnlyList<string>>(IssueFailed);
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Draws one serial per pupil, admission year by admission year. A drawn number some pupil already holds is burned
+    /// and one more serial drawn in its place, and the free numbers go to the pupils in serial order, so file order holds
+    /// and a clash costs exactly one serial. More than <see cref="MaxIssueAttempts"/> draws per pupil fails, as rule 4's
+    /// retry limit does.
+    /// </summary>
+    private async Task<Result<string[]>> DrawAsync(
+        IReadOnlyList<(Pupil Pupil, int AdmissionYear)> batch, SchoolProfile profile, CancellationToken cancellationToken)
+    {
+        var issued = new string[batch.Count];
+        var byYear = Enumerable.Range(0, batch.Count).GroupBy(index => batch[index].AdmissionYear);
+        foreach (var year in byYear)
+        {
+            var rows = year.ToList();
+            var free = new List<string>(rows.Count);
+            var burned = 0;
+            while (free.Count < rows.Count)
+            {
+                var candidates = new List<string>(rows.Count - free.Count);
+                for (var draw = free.Count; draw < rows.Count; draw++)
+                {
+                    candidates.Add(await NextNumberAsync(year.Key, profile, cancellationToken).ConfigureAwait(false));
+                }
+
+                var taken = (await pupils.ListTakenRegistrationNumbersAsync(candidates, cancellationToken).ConfigureAwait(false))
+                    .ToHashSet(StringComparer.Ordinal);
+                free.AddRange(candidates.Where(number => !taken.Contains(number)));
+                burned += taken.Count;
+                if (burned > (MaxIssueAttempts - 1) * rows.Count)
+                {
+                    return Result.Failure<string[]>(IssueFailed);
+                }
+            }
+
+            for (var position = 0; position < rows.Count; position++)
+            {
+                issued[rows[position]] = free[position];
+            }
+        }
+
+        return Result.Success(issued);
+    }
+
+    // One increment of the partition's counter, composed from SAVED settings: byte-identical to the preview, since both
+    // call RegNumberFormat.Compose.
+    private async Task<string> NextNumberAsync(int admissionYear, SchoolProfile profile, CancellationToken cancellationToken)
+    {
+        var counterKey = RegistrationCounterPartition.Resolve(profile.SerialReset, admissionYear);
+        var serial = await registrationCounters.IncrementAndGetNextSerialAsync(counterKey, cancellationToken).ConfigureAwait(false);
+        return RegNumberFormat.Compose(profile.Abbreviation, profile.Separator, admissionYear, profile.SerialWidth, serial);
     }
 }

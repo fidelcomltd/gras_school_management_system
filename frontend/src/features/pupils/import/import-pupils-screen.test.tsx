@@ -100,7 +100,7 @@ describe('ImportPupilsScreen', () => {
     await user.click(screen.getByLabelText('Skip this row'));
     await user.click(screen.getByRole('button', { name: 'Import 1 pupil' }));
 
-    expect(await screen.findByText(/Imported 1 pupil, numbered GRAS\/2026\/0041 to GRAS\/2026\/0041/)).toBeInTheDocument();
+    expect(await screen.findByText(/Imported 1 pupil, numbered GRAS\/2026\/0041\. Skipped 1\./)).toBeInTheDocument();
     const form = sent as unknown as FormData;
     expect(form.get('fileSha256')).toBe(HASH);
     expect(form.getAll('skipRows')).toEqual(['2']);
@@ -118,6 +118,25 @@ describe('ImportPupilsScreen', () => {
 
     expect(await screen.findByText(/needs the capacity override privilege/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import 1 pupil' })).toBeDisabled();
+  });
+
+  it('drops a capacity warning once skipping rows brings the arm back within capacity', async () => {
+    mockMe('pupil.import');
+    const { user } = renderScreen();
+    const match = { pupilId: 'p-old', registrationNumber: 'GRAS/2024/0007', status: 'Active' as const, surname: 'Okafor', firstName: 'Child2', dateOfBirth: '2020-05-03' };
+
+    await chooseAndCheck(
+      user,
+      report([row(2, { registerMatches: [match] }), row(3)], {
+        capacityWarnings: [{ armId: 'arm-1', armName: 'Primary 1A', capacity: 30, currentCount: 29, importCount: 2 }],
+      }),
+    );
+
+    expect(await screen.findByText(/needs the capacity override privilege/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Skip this row'));
+
+    expect(screen.queryByText(/needs the capacity override privilege/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import 1 pupil' })).toBeEnabled();
   });
 
   it('lets a caller holding the override confirm it', async () => {

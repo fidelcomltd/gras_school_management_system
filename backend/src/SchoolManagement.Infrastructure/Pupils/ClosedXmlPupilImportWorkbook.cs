@@ -12,8 +12,14 @@ namespace SchoolManagement.Infrastructure.Pupils;
 /// </summary>
 internal sealed class ClosedXmlPupilImportWorkbook : IPupilImportWorkbook
 {
-    /// <summary>A 1000-row register inflates to a few MB; anything near this is a zip bomb, not a register.</summary>
-    private const long MaxUncompressedBytes = 100L * 1024 * 1024;
+    /// <summary>
+    /// A full 1000-row, 43-column register inflates to about 5 MB. ClosedXML holds the whole workbook in memory before
+    /// any row cap applies, so this bound is what keeps one upload from costing the VPS gigabytes.
+    /// </summary>
+    private const long MaxUncompressedBytes = 25L * 1024 * 1024;
+
+    /// <summary>The template has 43 columns; anything to the right of this is ignored rather than allocated per row.</summary>
+    private const int MaxColumns = 128;
 
     private const string DataSheetName = "Pupils";
 
@@ -94,14 +100,26 @@ internal sealed class ClosedXmlPupilImportWorkbook : IPupilImportWorkbook
         return output.ToArray();
     }
 
+    // The declared sizes, summed without overflow: a crafted Zip64 entry can declare close to long.MaxValue.
     private static bool WithinUncompressedLimit(Stream stream)
     {
         try
         {
             using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
-            return zip.Entries.Sum(entry => entry.Length) <= MaxUncompressedBytes;
+            long total = 0;
+            foreach (var entry in zip.Entries)
+            {
+                if (entry.Length < 0 || entry.Length > MaxUncompressedBytes - total)
+                {
+                    return false;
+                }
+
+                total += entry.Length;
+            }
+
+            return true;
         }
-        catch (InvalidDataException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or NotSupportedException or ArgumentException)
         {
             return false;
         }
@@ -113,7 +131,7 @@ internal sealed class ClosedXmlPupilImportWorkbook : IPupilImportWorkbook
 
     private static ImportSheet ReadSheet(IXLWorksheet sheet, int maxRows)
     {
-        var lastColumn = sheet.LastColumnUsed(XLCellsUsedOptions.Contents)?.ColumnNumber() ?? 0;
+        var lastColumn = Math.Min(sheet.LastColumnUsed(XLCellsUsedOptions.Contents)?.ColumnNumber() ?? 0, MaxColumns);
         var headers = Enumerable.Range(1, lastColumn).Select(column => sheet.Cell(1, column).GetString().Trim()).ToList();
         var rows = new List<ImportSheetRow>();
         var dataRowCount = 0;
@@ -123,6 +141,13 @@ internal sealed class ClosedXmlPupilImportWorkbook : IPupilImportWorkbook
             var rowNumber = row.RowNumber();
             if (rowNumber == 1)
             {
+                continue;
+            }
+
+            // Past the cap a row is only counted, for the "too many rows" message; its cells are never read.
+            if (rows.Count >= maxRows)
+            {
+                dataRowCount++;
                 continue;
             }
 
@@ -139,10 +164,7 @@ internal sealed class ClosedXmlPupilImportWorkbook : IPupilImportWorkbook
             }
 
             dataRowCount++;
-            if (rows.Count < maxRows)
-            {
-                rows.Add(new ImportSheetRow(rowNumber, cells));
-            }
+            rows.Add(new ImportSheetRow(rowNumber, cells));
         }
 
         return new ImportSheet(headers, rows, dataRowCount);

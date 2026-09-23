@@ -153,6 +153,45 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         audit.AfterJson.ShouldNotContain("Asthma");
     }
 
+    // Spec 6.5.10: a number already held (after a manual correction) burns ONE serial, never the whole batch's.
+    [Fact]
+    public async Task Commit_ANumberAlreadyHeld_BurnsOneSerialOnly()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        await SeedCounterAsync("2026", 40);
+        await SeedPupilHoldingNumberAsync("GRAS/2026/0042");
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        var file = Workbook(Row("Okafor", "Chidera", levelName, "A"), Row("Bello", "Amina", levelName, "A"), Row("Eze", "Ifeanyi", levelName, "A"));
+        var report = await ValidateAsync(jar, file);
+
+        using var response = await CommitAsync(jar, file, report.FileSha256);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<PupilImportResultDto>(response)).Pupils.Select(pupil => pupil.RegistrationNumber)
+            .ShouldBe(["GRAS/2026/0041", "GRAS/2026/0043", "GRAS/2026/0044"]);
+    }
+
+    // The decisions are part of the request: the same key with different ones is a conflict, not a replay.
+    [Fact]
+    public async Task Commit_TheSameKeyWithDifferentDecisions_IsAConflict()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync(capacity: 1);
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        var file = Workbook(Row("Okafor", "Chidera", levelName, "A"), Row("Bello", "Amina", levelName, "A"));
+        var report = await ValidateAsync(jar, file);
+        var key = Guid.NewGuid().ToString("D");
+
+        using var first = await CommitAsync(jar, file, report.FileSha256, idempotencyKey: key);
+        first.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var changed = await CommitAsync(jar, file, report.FileSha256, overrideCapacity: true, idempotencyKey: key);
+
+        changed.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(changed);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("idempotency.key_conflict");
+    }
+
     [Fact]
     public async Task Commit_WithOneRejectedRow_ImportsNothing()
     {
@@ -324,6 +363,23 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
+    private async Task SeedPupilHoldingNumberAsync(string registrationNumber)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var pupil = Pupil.Create(
+            Guid.CreateVersion7(), "Holder", "Ofanumber", middleName: null, PupilSex.Male, new DateOnly(2019, 1, 1),
+            asOfDate: new DateOnly(2026, 9, 1), nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka",
+            previousSchool: null, previousClass: null, otherInformation: null).Value;
+        context.Add(pupil);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE pupils SET registration_number = {registrationNumber}, status = 'Active' WHERE id = {pupil.Id}",
+            TestContext.Current.CancellationToken);
+    }
+
     private async Task SeedCounterAsync(string counterKey, int lastSerial)
     {
         await using var scope = Fixture.CreateScope();
@@ -383,7 +439,7 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
     }
 
     private Task<HttpResponseMessage> CommitAsync(
-        CookieJar jar, byte[] file, string fileSha256, int[]? skipRows = null, bool overrideCapacity = false)
+        CookieJar jar, byte[] file, string fileSha256, int[]? skipRows = null, bool overrideCapacity = false, string? idempotencyKey = null)
     {
         var fields = new List<(string Name, string Value)> { ("fileSha256", fileSha256) };
         fields.AddRange((skipRows ?? []).Select(row => ("skipRows", row.ToString(CultureInfo.InvariantCulture))));
@@ -392,7 +448,7 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
             fields.Add(("overrideCapacity", "true"));
         }
 
-        return PostFileAsync(CommitUrl, jar, file, fields, idempotencyKey: Guid.NewGuid().ToString("D"));
+        return PostFileAsync(CommitUrl, jar, file, fields, idempotencyKey: idempotencyKey ?? Guid.NewGuid().ToString("D"));
     }
 
     private async Task<HttpResponseMessage> PostFileAsync(

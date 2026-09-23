@@ -185,7 +185,22 @@ internal static class RequireIdempotencyKeyExtensions
             filePart = Convert.ToHexString(hash);
         }
 
-        return string.Join('|', httpContext.Request.Method, httpContext.Request.Path.Value, caller, bodyPart, filePart);
+        // A multipart body's other fields (bulk import's decisions, its capacity override) are part of what was asked, so a
+        // retry that changes them under the same key is a conflict, not a replay of the first answer.
+        var fieldsPart = string.Empty;
+
+        if (httpContext.Request.HasFormContentType)
+        {
+            var form = await httpContext.Request.ReadFormAsync(cancellationToken).ConfigureAwait(false);
+            fieldsPart = string.Join(
+                '&',
+                form.OrderBy(field => field.Key, StringComparer.Ordinal)
+                    .Select(field => $"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(field.Value.ToString())}"));
+        }
+
+        // Appended only when present, so every fingerprint without form fields stays byte-identical to before.
+        var fingerprint = string.Join('|', httpContext.Request.Method, httpContext.Request.Path.Value, caller, bodyPart, filePart);
+        return fieldsPart.Length == 0 ? fingerprint : $"{fingerprint}|{fieldsPart}";
     }
 
     /// <summary>

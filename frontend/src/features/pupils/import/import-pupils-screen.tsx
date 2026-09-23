@@ -53,7 +53,14 @@ export function ImportPupilsScreen() {
   const skipRows = matchRows.filter((row) => decisions[row.sheetRow] === 'skip').map((row) => row.sheetRow);
   const createRows = matchRows.filter((row) => decisions[row.sheetRow] === 'create').map((row) => row.sheetRow);
   const toImport = report ? report.acceptedCount - skipRows.length : 0;
-  const capacityBlocked = !!report && report.capacityWarnings.length > 0 && !overrideCapacity;
+  // The check counted every accepted row; commit counts only the rows it will create, so a Skip can clear a warning.
+  const overCapacity = (report?.capacityWarnings ?? [])
+    .map((warning) => ({
+      ...warning,
+      importCount: warning.importCount - (report?.rows.filter((row) => row.armId === warning.armId && skipRows.includes(row.sheetRow)).length ?? 0),
+    }))
+    .filter((warning) => warning.currentCount + warning.importCount > warning.capacity);
+  const capacityBlocked = overCapacity.length > 0 && !overrideCapacity;
   const canCommit = !!report && !!file && report.rejectedCount === 0 && undecided === 0 && !capacityBlocked && toImport > 0;
 
   return (
@@ -140,11 +147,11 @@ export function ImportPupilsScreen() {
             </section>
           ) : null}
 
-          {report.capacityWarnings.length > 0 ? (
+          {overCapacity.length > 0 ? (
             <section className="flex flex-col gap-2 rounded-md border border-border bg-surface p-4 text-sm">
               <h2 className="text-lg font-semibold text-foreground">Over capacity</h2>
               <ul className="list-disc pl-5 text-foreground">
-                {report.capacityWarnings.map((warning) => (
+                {overCapacity.map((warning) => (
                   <li key={warning.armId}>
                     {warning.armName}: {warning.currentCount} enrolled plus {warning.importCount} in this file, against a capacity of{' '}
                     {warning.capacity}.
@@ -168,7 +175,8 @@ export function ImportPupilsScreen() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={() =>
-                file && commit.mutate({ file, fileSha256: report.fileSha256, skipRows, createRows, overrideCapacity })
+                file &&
+                commit.mutate({ file, fileSha256: report.fileSha256, skipRows, createRows, overrideCapacity: overrideCapacity && overCapacity.length > 0 })
               }
               disabled={!canCommit || commit.isPending}
             >
@@ -243,15 +251,29 @@ function Rejections({ report }: { report: PupilImportReport }) {
   );
 }
 
+/**
+ * One "first to last" per counter: the serial is the number's trailing digits, and rows from different admission years
+ * draw from different counters, so a single first-to-last pair would misstate what was issued.
+ */
+function numberRanges(result: PupilImportResult): string[] {
+  const groups = new Map<string, string[]>();
+  for (const pupil of result.pupils) {
+    const prefix = pupil.registrationNumber.replace(/\d+$/, '');
+    groups.set(prefix, [...(groups.get(prefix) ?? []), pupil.registrationNumber]);
+  }
+  return [...groups.values()].map((numbers) =>
+    numbers.length === 1 ? `${numbers[0]}` : `${numbers[0]} to ${numbers[numbers.length - 1]} (${numbers.length})`,
+  );
+}
+
 function ImportDone({ result, onAnother }: { result: PupilImportResult; onAnother: () => void }) {
-  const first = result.pupils[0]?.registrationNumber;
-  const last = result.pupils[result.pupils.length - 1]?.registrationNumber;
+  const ranges = numberRanges(result);
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">Import complete</h1>
       <output className="block text-sm text-foreground">
         Imported {result.importedCount} {result.importedCount === 1 ? 'pupil' : 'pupils'}
-        {first && last ? `, numbered ${first} to ${last}` : ''}
+        {ranges.length > 0 ? `, numbered ${ranges.join('; ')}` : ''}
         {result.skippedCount > 0 ? `. Skipped ${result.skippedCount}.` : '.'}
       </output>
       <p className="text-sm text-muted-foreground">

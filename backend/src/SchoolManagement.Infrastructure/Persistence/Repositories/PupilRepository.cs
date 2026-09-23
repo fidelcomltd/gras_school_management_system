@@ -398,6 +398,29 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListTakenRegistrationNumbersAsync(
+        IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(registrationNumbers);
+
+        if (registrationNumbers.Count == 0)
+        {
+            return [];
+        }
+
+        var numbers = registrationNumbers.ToArray();
+
+        // IgnoreQueryFilters: the unique index spans every status, so the pre-check must too.
+        return await context.Pupils
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(pupil => pupil.RegistrationNumber != null && numbers.Contains(pupil.RegistrationNumber))
+            .Select(pupil => pupil.RegistrationNumber!)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<PupilRegisterEntry>> ListByDatesOfBirthAsync(
         IReadOnlyCollection<DateOnly> datesOfBirth, CancellationToken cancellationToken)
     {

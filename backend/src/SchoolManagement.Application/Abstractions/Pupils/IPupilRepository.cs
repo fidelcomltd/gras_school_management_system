@@ -117,6 +117,13 @@ public interface IPupilRepository
         string registrationNumber, Guid excludingPupilId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Which of <paramref name="registrationNumbers"/> a pupil in ANY status already holds: the issuer's pre-check, so a
+    /// clash re-draws one serial instead of retrying a whole batch.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListTakenRegistrationNumbersAsync(
+        IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every pupil, in ANY status, born on one of <paramref name="datesOfBirth"/>: bulk import's register-duplicate check
     /// (spec 6.5.13) in one query, matched on name in memory by the caller.
     /// </summary>

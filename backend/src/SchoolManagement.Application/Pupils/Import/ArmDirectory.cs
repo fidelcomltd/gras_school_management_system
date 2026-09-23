@@ -5,8 +5,9 @@ using SchoolManagement.Domain.Sessions;
 namespace SchoolManagement.Application.Pupils.Import;
 
 /// <summary>
-/// The active session's open arms, looked up the two ways spec 6.5.13 allows: Class Level plus Arm Label, matched
-/// case-insensitively, or a single composed display name such as <c>Primary 2C</c> in the Class Level column.
+/// The active session's arms open to new enrolment, looked up the two ways spec 6.5.13 allows: Class Level plus Arm
+/// Label, matched case-insensitively, or a single composed display name such as <c>Primary 2C</c> in the Class Level
+/// column.
 /// </summary>
 internal sealed class ArmDirectory
 {
@@ -24,9 +25,10 @@ internal sealed class ArmDirectory
         _levelsByKey = levels.Where(level => level.Status == LevelStatus.Active)
             .GroupBy(level => PupilImportColumns.Key(level.Name))
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        var levelsById = levels.ToDictionary(level => level.Id);
+        // New enrolment only: an Inactive arm and every arm of an Inactive level are hidden from it (spec 6.4.2, 6.4.7).
+        var levelsById = levels.Where(level => level.Status == LevelStatus.Active).ToDictionary(level => level.Id);
         var open = arms
-            .Where(arm => arm.SessionId == session.Id && arm.Status != ArmStatus.Closed && levelsById.ContainsKey(arm.ClassLevelId))
+            .Where(arm => arm.SessionId == session.Id && arm.Status == ArmStatus.Active && levelsById.ContainsKey(arm.ClassLevelId))
             .OrderBy(arm => levelsById[arm.ClassLevelId].ProgressionOrder)
             .ThenBy(arm => arm.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -41,7 +43,7 @@ internal sealed class ArmDirectory
         }
     }
 
-    /// <summary>Every open arm of the active session, in level then label order.</summary>
+    /// <summary>Every arm open to new enrolment in the active session, in level then label order.</summary>
     public IReadOnlyList<Arm> Arms { get; }
 
     /// <summary>Each of <see cref="Arms"/>' level name, aligned.</summary>

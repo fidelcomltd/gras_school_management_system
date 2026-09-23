@@ -73,7 +73,7 @@ public sealed class PupilEndpoints : IEndpointModule
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var bytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
                 var result = await sender.SendAsync(new ValidatePupilImportQuery(bytes), cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
@@ -111,7 +111,7 @@ public sealed class PupilEndpoints : IEndpointModule
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var bytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
                 var command = new CommitPupilImportCommand(bytes, fileSha256, skipRows ?? [], createRows ?? [], overrideCapacity ?? false);
                 var result = await sender.SendAsync(command, cancellationToken);
                 return result.Match(TypedResults.Ok);
@@ -140,14 +140,6 @@ public sealed class PupilEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
-
-    private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
-    {
-        await using var stream = file.OpenReadStream();
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
-        return buffer.ToArray();
-    }
 
     private static void MapCreate(RouteGroupBuilder group) =>
         group.MapPost(string.Empty, async (

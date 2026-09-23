@@ -120,7 +120,7 @@ public sealed class SettingsEndpoints : IEndpointModule
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var fileBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var fileBytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
                 var result = await sender.SendAsync(new UploadSchoolLogoCommand(fileBytes), cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
@@ -153,7 +153,7 @@ public sealed class SettingsEndpoints : IEndpointModule
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var fileBytes = await ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+                var fileBytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
                 var result = await sender.SendAsync(new UploadSchoolSignatureCommand(fileBytes), cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
@@ -234,14 +234,6 @@ public sealed class SettingsEndpoints : IEndpointModule
         httpContext.Response.Headers.CacheControl = "private";
         httpContext.Response.Headers.ContentDisposition = $"inline; filename={content.FileName}";
         return TypedResults.Stream(content.Content, content.ContentType);
-    }
-
-    private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken cancellationToken)
-    {
-        await using var stream = file.OpenReadStream();
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
-        return buffer.ToArray();
     }
 
     private static void MapUpdateRegNumber(RouteGroupBuilder group) =>
