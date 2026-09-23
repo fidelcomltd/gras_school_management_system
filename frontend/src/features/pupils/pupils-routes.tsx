@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { RequirePrivilege } from '@/app/router/require-privilege';
 import { ImportPupilsScreen } from './import/import-pupils-screen';
+import { IncompleteRecordsScreen } from './incomplete/incomplete-records-screen';
 import { PupilDetailScreen } from './pupil-detail-screen';
 import { PupilsListScreen } from './pupils-list-screen';
 
@@ -19,6 +20,14 @@ export const pupilsRoutes: RouteObject[] = [
     element: (
       <RequirePrivilege privilege="pupil.import">
         <ImportPupilsScreen />
+      </RequirePrivilege>
+    ),
+  },
+  {
+    path: 'reports/incomplete-records',
+    element: (
+      <RequirePrivilege privilege="report.view">
+        <IncompleteRecordsScreen />
       </RequirePrivilege>
     ),
   },

@@ -34,6 +34,31 @@ internal sealed class PupilRecordRepository(ApplicationDbContext context) : IPup
         await Query<PupilDocument>(track).Where(document => document.PupilId == pupilId).ToListAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<PupilRecordSet> LoadForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+
+        var contacts = await Query<PupilContact>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var barred = await Query<BarredPersonAnswer>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var health = await Query<PupilHealth>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var pickup = await Query<AuthorisedPickupPerson>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var documents = await Query<PupilDocument>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var admissions = await context.AdmissionRecords.AsNoTracking().Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new PupilRecordSet(
+            contacts.ToLookup(row => row.PupilId),
+            barred.ToDictionary(row => row.PupilId),
+            health.ToDictionary(row => row.PupilId),
+            pickup.ToLookup(row => row.PupilId),
+            documents.ToLookup(row => row.PupilId),
+            admissions.ToDictionary(row => row.PupilId));
+    }
+
+    /// <inheritdoc />
     public Task AddAsync(object entity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entity);

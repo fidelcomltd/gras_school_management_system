@@ -142,7 +142,31 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
         var pickup = await records.ListPickupPersonsAsync(pupil.Id, track: false, cancellationToken).ConfigureAwait(false);
         var documents = await records.ListDocumentsAsync(pupil.Id, track: false, cancellationToken).ConfigureAwait(false);
         var record = await admissions.FindReadOnlyByPupilIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
+        return Evaluate(pupil, contacts, barred, health, pickup, documents, record);
+    }
 
+    /// <summary>
+    /// The same evaluation over sub-records already loaded, for many pupils at once (the incomplete-records report). One
+    /// rule set, so a pupil reads the same on the report as on their own record.
+    /// </summary>
+    public static AdmissionCompletenessDto Evaluate(Pupil pupil, PupilRecordSet set)
+    {
+        ArgumentNullException.ThrowIfNull(pupil);
+        ArgumentNullException.ThrowIfNull(set);
+        return Evaluate(
+            pupil, [.. set.Contacts[pupil.Id]], set.Barred.GetValueOrDefault(pupil.Id), set.Health.GetValueOrDefault(pupil.Id),
+            [.. set.Pickup[pupil.Id]], [.. set.Documents[pupil.Id]], set.Admissions.GetValueOrDefault(pupil.Id));
+    }
+
+    private static AdmissionCompletenessDto Evaluate(
+        Pupil pupil,
+        IReadOnlyList<PupilContact> contacts,
+        BarredPersonAnswer? barred,
+        PupilHealth? health,
+        IReadOnlyList<AuthorisedPickupPerson> pickup,
+        IReadOnlyList<PupilDocument> documents,
+        Domain.Admissions.AdmissionRecord? record)
+    {
         var blocking = SectionsBlocking(contacts, barred, health);
         void Block(bool missing, int step, string code, string message)
         {

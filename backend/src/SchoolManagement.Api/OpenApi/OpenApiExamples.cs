@@ -3137,6 +3137,44 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(IncompleteRecordsCountDto)] = """
+            { "code": "contacts.emergency_primary", "label": "No primary emergency contact", "required": true, "count": 6 }
+            """,
+
+        [typeof(IncompleteRecordDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2026/0041",
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "middleName": null,
+              "armId": "{{ExampleArmId}}",
+              "armName": "Primary 2C",
+              "chasedPercent": 78,
+              "required": [ { "step": 3, "code": "contacts.emergency_primary", "message": "Add the primary emergency contact." } ],
+              "chased": [ { "step": 7, "code": "documents.BirthCertificate", "message": "Birth certificate." } ]
+            }
+            """,
+
+        [typeof(IncompleteRecordsReportDto)] = $$"""
+            {
+              "sessionName": "2026/2027",
+              "pupilsChecked": 142,
+              "counts": [
+                { "code": "contacts.emergency_primary", "label": "No primary emergency contact", "required": true, "count": 1 },
+                { "code": "documents.BirthCertificate", "label": "Birth certificate not received", "required": false, "count": 1 }
+              ],
+              "pupils": [
+                {
+                  "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRAS/2026/0041", "surname": "Okafor", "firstName": "Chidera",
+                  "middleName": null, "armId": "{{ExampleArmId}}", "armName": "Primary 2C", "chasedPercent": 78,
+                  "required": [ { "step": 3, "code": "contacts.emergency_primary", "message": "Add the primary emergency contact." } ],
+                  "chased": [ { "step": 7, "code": "documents.BirthCertificate", "message": "Birth certificate." } ]
+                }
+              ]
+            }
+            """,
+
         [typeof(PupilImportIssueDto)] = """
             { "column": "Date of Birth", "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018." }
             """,
