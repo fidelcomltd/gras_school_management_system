@@ -1,4 +1,5 @@
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Pupils;
 
 namespace SchoolManagement.Application.Authorization;
 
@@ -7,7 +8,8 @@ namespace SchoolManagement.Application.Authorization;
 /// </summary>
 internal sealed class ScopeResolver(
     IPupilArmOfRecordLookup pupilArmLookup,
-    IResultSetArmLookup resultSetArmLookup)
+    IResultSetArmLookup resultSetArmLookup,
+    IPupilRepository pupils)
     : IScopeResolver
 {
     /// <inheritdoc />
@@ -40,8 +42,16 @@ internal sealed class ScopeResolver(
                     .GetArmIdAsync(pupilId, cancellationToken)
                     .ConfigureAwait(false);
 
-                return pupilArm is { } resolvedPupilArm
-                    ? new ScopeResolution.ResolvedArm(resolvedPupilArm)
+                if (pupilArm is { } resolvedPupilArm)
+                {
+                    return new ScopeResolution.ResolvedArm(resolvedPupilArm);
+                }
+
+                // A pupil with no open enrolment (a pending admission, a leaver) has no arm for an
+                // arm-scoped grant to match, but is still a real target: only a school-wide grant
+                // covers them (human ruling 2026-09-23). An id naming no pupil stays unresolvable.
+                return await pupils.FindReadOnlyByIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not null
+                    ? new ScopeResolution.RequiresSchoolWide()
                     : new ScopeResolution.Unresolvable();
 
             case ScopeParameterKind.ResultSet:

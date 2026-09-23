@@ -170,7 +170,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a pending admission
-         * @description Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved).
+         * @description Spec 6.5.10, 6.5.11 step 9, 6.5.14: the ONLY route into PupilStatus.Active for a new record. In ONE transaction: issues the registration number (the year comes from THIS record's own DateAdmitted, never today's date; the abbreviation, separator and serial width are read from SAVED settings at the moment of issue and frozen into the stored string), writes section J, and opens the first enrolment in `armId` effective from the later of the admission date and the session start date. `Idempotency-Key` is REQUIRED — a retry never issues a second number. Blocked when: no arm exists for the pupil's class level in the active session (422); no term is currently active (409, verbatim spec message); a required assessment has no recorded outcome (422); the declaration (Section I) is unsigned (422); `headOfSchoolConfirmed` is false (422, validated before the handler runs). Capacity (spec 6.4.6) is a soft limit: over capacity is a WARNING that proceeds — audited — for a caller holding `arm.capacity.override`, and a 409 otherwise. `headOfSchoolName` omitted defaults to `settings.head_teacher_name`; a supplied value always wins. 409 when the admission is no longer pending (already approved, declined, or otherwise resolved). Also 422 `admission.incomplete` naming each missing step (contacts, the barred-persons answer, the health answers). Spec 6.5.16: when the ONLY gap is the unanswered health questions, `healthOverrideReason` (10-500 characters) approves anyway for a caller holding `pupil.admission.override` (403 `admission.override_forbidden` otherwise); audited with the reason.
          */
         post: operations["ApproveAdmission"];
         delete?: never;
@@ -2669,7 +2669,8 @@ export interface components {
          *       "armId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f70",
          *       "assessmentResultRemarks": "Passed the entrance assessment.",
          *       "headOfSchoolConfirmed": true,
-         *       "headOfSchoolName": null
+         *       "headOfSchoolName": null,
+         *       "healthOverrideReason": null
          *     }
          */
         ApproveAdmissionCommand: {
@@ -2706,6 +2707,12 @@ export interface components {
              *     always wins over the default.
              */
             headOfSchoolName: null | string;
+            /**
+             * @description Spec 6.5.16: the parent declined to answer the health questions, and a holder of
+             *     `pupil.admission.override` approves anyway, saying why (10 to 500 characters). Waives ONLY the
+             *     unanswered health questions; every other blocking item still blocks. Audited with the reason. Omit otherwise.
+             */
+            healthOverrideReason?: null | string;
         };
         /**
          * @description The 200 response (contract delta item 1).

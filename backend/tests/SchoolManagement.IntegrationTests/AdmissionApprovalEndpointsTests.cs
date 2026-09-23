@@ -361,6 +361,51 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
     }
 
     [Fact]
+    public async Task Approve_HealthDeclined_OverrideWithReason_ApprovesOnlyForTheOverridePrivilege()
+    {
+        // Spec 6.5.16: the parent declined the health questions; the head teacher approves with a reason.
+        RequireDatabase();
+
+        var (sessionId, _, levelId, armId) = await SeedActiveSessionTermAndArmAsync(new DateOnly(2026, 9, 1));
+        var (pupilId, _) = await SeedApprovableAdmissionAsync(
+            "Health", "Declined", sessionId, levelId, new DateOnly(2026, 9, 10), healthAnswered: false);
+        const string reason = "Parent declined to answer at the counter; head teacher spoke to them.";
+
+        var clerk = await SignInWithGrantAsync([Privileges.Pupil.AdmissionApprove], sessionId);
+        var refused = await ApproveAsync(pupilId, clerk, armId, key: $"key-{Guid.NewGuid():N}", healthOverrideReason: reason);
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        using (var document = await ReadJsonAsync(refused))
+        {
+            document.RootElement.GetProperty("errorCode").GetString().ShouldBe("admission.override_forbidden");
+        }
+
+        var headTeacher = await SignInWithGrantAsync([Privileges.Pupil.AdmissionApprove, Privileges.Pupil.AdmissionOverride], sessionId);
+        var withoutReason = await ApproveAsync(pupilId, headTeacher, armId, key: $"key-{Guid.NewGuid():N}");
+        withoutReason.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        var approved = await ApproveAsync(pupilId, headTeacher, armId, key: $"key-{Guid.NewGuid():N}", healthOverrideReason: reason);
+        approved.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Approve_OverrideReason_DoesNotWaiveMissingContacts()
+    {
+        RequireDatabase();
+
+        var (sessionId, _, levelId, armId) = await SeedActiveSessionTermAndArmAsync(new DateOnly(2026, 9, 1));
+        var (pupilId, _) = await SeedApprovableAdmissionAsync(
+            "Contacts", "Missing", sessionId, levelId, new DateOnly(2026, 9, 10), sectionsComplete: false);
+        var headTeacher = await SignInWithGrantAsync([Privileges.Pupil.AdmissionApprove, Privileges.Pupil.AdmissionOverride], sessionId);
+
+        var response = await ApproveAsync(
+            pupilId, headTeacher, armId, key: $"key-{Guid.NewGuid():N}", healthOverrideReason: "Parent declined the health questions.");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("admission.incomplete");
+    }
+
+    [Fact]
     public async Task Approve_HeadOfSchoolConfirmedFalse_Returns422()
     {
         RequireDatabase();
@@ -631,7 +676,8 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
         DateOnly dateAdmitted,
         bool assessmentRequired = false,
         bool declarationSigned = true,
-        bool sectionsComplete = true)
+        bool sectionsComplete = true,
+        bool healthAnswered = true)
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -661,7 +707,11 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
             var emergency = PupilContact.Create(Guid.CreateVersion7(), pupil.Id, ContactRole.EmergencyPrimary);
             emergency.Apply("Test Relative", "Aunt", "08059876543", null, null, null, isPrimary: false).IsSuccess.ShouldBeTrue();
             var health = PupilHealth.Create(pupil.Id);
-            health.Apply(false, null, false, null, false, null, null, null, null, null, null).IsSuccess.ShouldBeTrue();
+            if (healthAnswered)
+            {
+                health.Apply(false, null, false, null, false, null, null, null, null, null, null).IsSuccess.ShouldBeTrue();
+            }
+
             context.AddRange(father, emergency, health, BarredPersonAnswer.Create(pupil.Id, hasBarredPersons: false));
         }
 
@@ -812,8 +862,9 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
         string key,
         string? assessmentResultRemarks = null,
         bool headOfSchoolConfirmed = true,
-        string? headOfSchoolName = null) =>
-        ApproveAsync(Client, pupilId, jar, armId, key, assessmentResultRemarks, headOfSchoolConfirmed, headOfSchoolName);
+        string? headOfSchoolName = null,
+        string? healthOverrideReason = null) =>
+        ApproveAsync(Client, pupilId, jar, armId, key, assessmentResultRemarks, headOfSchoolConfirmed, headOfSchoolName, healthOverrideReason);
 
     private static Task<HttpResponseMessage> ApproveAsync(
         HttpClient client,
@@ -823,14 +874,16 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
         string key,
         string? assessmentResultRemarks = null,
         bool headOfSchoolConfirmed = true,
-        string? headOfSchoolName = null)
+        string? headOfSchoolName = null,
+        string? healthOverrideReason = null)
     {
         var command = new ApproveAdmissionCommand(
             Guid.Empty,
             armId.ToString("D", CultureInfo.InvariantCulture),
             assessmentResultRemarks,
             headOfSchoolConfirmed,
-            headOfSchoolName);
+            headOfSchoolName,
+            healthOverrideReason);
 
         return PostAsync(client, $"{AdmissionsUrl}/{pupilId}/approve", jar, command, key);
     }
