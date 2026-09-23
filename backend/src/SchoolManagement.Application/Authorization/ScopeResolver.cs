@@ -50,7 +50,7 @@ internal sealed class ScopeResolver(
                 // A pupil with no open enrolment (a pending admission, a leaver) has no arm for an
                 // arm-scoped grant to match, but is still a real target: only a school-wide grant
                 // covers them (human ruling 2026-09-23). An id naming no pupil stays unresolvable.
-                return await pupils.FindReadOnlyByIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not null
+                return await pupils.ExistsAsync(pupilId, cancellationToken).ConfigureAwait(false)
                     ? new ScopeResolution.RequiresSchoolWide()
                     : new ScopeResolution.Unresolvable();
 

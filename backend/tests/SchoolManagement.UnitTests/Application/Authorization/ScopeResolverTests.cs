@@ -64,7 +64,7 @@ public sealed class ScopeResolverTests
             Guid.CreateVersion7(), "Okafor", "Chidi", null, PupilSex.Male, new DateOnly(2019, 3, 1), new DateOnly(2026, 9, 1),
             "Nigerian", "Anambra", "Awka South", "12 Zik Avenue", previousSchool: null, previousClass: null, otherInformation: null).Value;
         _pupilArmLookup.GetArmIdAsync(pupil.Id, Arg.Any<CancellationToken>()).Returns((Guid?)null);
-        _pupils.FindReadOnlyByIdAsync(pupil.Id, Arg.Any<CancellationToken>()).Returns(pupil);
+        _pupils.ExistsAsync(pupil.Id, Arg.Any<CancellationToken>()).Returns(true);
 
         var resolution = await CreateResolver().ResolveAsync(
             ScopeParameterKind.Pupil, pupil.Id, TestContext.Current.CancellationToken);

@@ -163,7 +163,8 @@ public sealed class AdmissionEndpoints : IEndpointModule
                 "`admission.incomplete` naming each missing step (contacts, the barred-persons answer, the " +
                 "health answers). Spec 6.5.16: when the ONLY gap is the unanswered health questions, " +
                 "`healthOverrideReason` (10-500 characters) approves anyway for a caller holding " +
-                "`pupil.admission.override` (403 `admission.override_forbidden` otherwise); audited with the reason.")
+                "`pupil.admission.override` (403 `admission.override_forbidden` otherwise); audited, with the reason kept " +
+                "on the admission record rather than in the audit log.")
             .Produces<PupilDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

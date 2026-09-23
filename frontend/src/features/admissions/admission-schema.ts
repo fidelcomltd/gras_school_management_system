@@ -34,8 +34,8 @@ export const approveAdmissionSchema = z
     message: 'Confirm the head of school signature before approving.',
     path: ['headOfSchoolConfirmed'],
   })
-  .refine((values) => !values.healthOverride || values.healthOverrideReason.trim().length >= 10, {
-    message: 'Say why this admission is approved without the health answers (at least 10 characters).',
-    path: ['healthOverrideReason'],
-  });
+  .refine(
+    (values) => !values.healthOverride || (values.healthOverrideReason.trim().length >= 10 && values.healthOverrideReason.trim().length <= 500),
+    { message: 'Say why this admission is approved without the health answers, in 10 to 500 characters.', path: ['healthOverrideReason'] },
+  );
 export type ApproveAdmissionFormValues = z.infer<typeof approveAdmissionSchema>;

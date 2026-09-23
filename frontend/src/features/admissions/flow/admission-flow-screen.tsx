@@ -49,7 +49,7 @@ export function AdmissionFlowScreen() {
   if (!pending) return <AdmittedNotice pupil={record} />;
 
   const requested = Number(params.get('step'));
-  const valid = requested >= 2 && requested <= 9;
+  const valid = Number.isInteger(requested) && requested >= 2 && requested <= 9;
   if (!valid && completeness.isPending) return <LoadingState label="Finding where this admission stopped…" />;
   const blockingSteps = new Set((completeness.data?.blocking ?? []).map((item) => Number(item.step)));
   const firstBlocking = [...blockingSteps].sort((a, b) => a - b)[0];
@@ -98,7 +98,10 @@ export function AdmissionFlowScreen() {
           <h2 id="step-heading" className="text-lg font-semibold text-foreground">
             Step {step}: {STEPS[step - 1]}
           </h2>
-          {step === 2 ? <PupilInfoForm pupil={record} onSaved={() => go(3)} submitLabel="Save and continue" /> : null}
+          {step === 2 && can('pupil.update') ? <PupilInfoForm pupil={record} onSaved={() => go(3)} submitLabel="Save and continue" /> : null}
+          {step === 2 && !can('pupil.update') ? (
+            <p className="text-sm text-muted-foreground">Editing the pupil information needs the pupil update privilege.</p>
+          ) : null}
           {step === 3 ? <ContactsPanel pupilId={id} canEdit={can('contact.update')} /> : null}
           {step === 4 ? (
             <CollectionPanel
@@ -112,9 +115,9 @@ export function AdmissionFlowScreen() {
           {step === 5 && !can('pupil.safeguarding.view') ? (
             <p className="text-sm text-muted-foreground">Health and safety needs the safeguarding privilege. Ask the head teacher to complete this step.</p>
           ) : null}
-          {step === 6 ? <OtherInformationStep pupil={record} onSaved={() => go(7)} /> : null}
+          {step === 6 ? <OtherInformationStep pupil={record} onSaved={() => go(7)} canEdit={can('pupil.update')} /> : null}
           {step === 7 ? <DocumentsPanel pupilId={id} canEdit={can('pupil.document.manage')} /> : null}
-          {step === 8 ? <DeclarationStep pupilId={id} onSaved={() => go(9)} /> : null}
+          {step === 8 ? <DeclarationStep pupilId={id} onSaved={() => go(9)} canEdit={can('pupil.update')} /> : null}
           {step === 9 ? <ReviewStep pupil={record} onGo={go} /> : null}
 
           <div className="flex justify-between border-t border-border pt-4">

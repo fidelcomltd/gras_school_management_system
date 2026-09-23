@@ -7,11 +7,13 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useArms } from '@/features/arms/api';
+import { errorText } from '@/features/pupils/records/format';
 import { ApiError } from '@/lib/http';
 import { useApproveAdmission } from '../api';
 import { approveAdmissionSchema, type ApproveAdmissionFormValues } from '../admission-schema';
 import type { AdmissionQueueRow, AdmissionRecordDto } from '../types';
 import { ArmSelect } from './arm-select';
+import { RegistrationNumber } from './registration-number';
 
 /**
  * `Idempotency-Key` is generated ONCE per mount, held in `useState`'s
@@ -33,7 +35,7 @@ export function ApproveAdmissionForm({
   /** Spec 6.5.16: the health answers are the only gap and the caller holds `pupil.admission.override`. */
   healthOverride?: boolean;
 }) {
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const approveAdmission = useApproveAdmission();
   // Never sessionId/levelId omitted or guessed — sourced from THIS record's
   // own ids, exactly as the card's AC requires.
@@ -68,21 +70,21 @@ export function ApproveAdmissionForm({
       headOfSchoolConfirmed: values.headOfSchoolConfirmed,
       headOfSchoolName: values.headOfSchoolName.trim() === '' ? null : values.headOfSchoolName,
       healthOverrideReason: healthOverride ? values.healthOverrideReason.trim() : null,
+    }, {
+      // The server stores its answer per key, refusals included. After a 4xx nothing was issued, so a corrected retry
+      // gets a fresh key; after a dropped response or a 5xx the same key is reused, so a retry never issues twice.
+      onError: (error) => {
+        if (error instanceof ApiError && error.status !== undefined && error.status >= 400 && error.status < 500) {
+          setIdempotencyKey(crypto.randomUUID());
+        }
+      },
     });
   });
 
   if (approveAdmission.isSuccess) {
-    const number = approveAdmission.data.registrationNumber ?? '—';
     return (
       <div className="flex flex-col gap-4">
-        {/* Spec 6.5.11: large type and a copy button, because the office is asked for the number immediately. */}
-        <output className="flex flex-col gap-1 text-sm text-foreground">
-          Approved. Registration number:
-          <span className="font-display text-3xl font-semibold tracking-wide">{number}</span>
-        </output>
-        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void navigator.clipboard?.writeText(number)}>
-          Copy number
-        </Button>
+        <RegistrationNumber number={approveAdmission.data.registrationNumber ?? '—'} label="Approved. Registration number:" />
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             Done
@@ -93,7 +95,7 @@ export function ApproveAdmissionForm({
   }
 
   const error = approveAdmission.error;
-  const formError = error instanceof ApiError ? error.message : null;
+  const formError = errorText(error);
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -134,11 +136,11 @@ export function ApproveAdmissionForm({
         <Field invalid={!!errors.healthOverrideReason}>
           <FieldLabel>Reason for approving without the health answers</FieldLabel>
           <BaseField.Control
-            render={<textarea rows={2} />}
+            render={<textarea rows={2} maxLength={500} />}
             className="w-full rounded-md border border-input bg-surface px-3 py-2 text-sm text-foreground"
             {...register('healthOverrideReason')}
           />
-          <FieldDescription>The parent declined the health questions. The reason is kept in the audit log.</FieldDescription>
+          <FieldDescription>The parent declined the health questions. The reason is kept on the admission record.</FieldDescription>
           <FieldError match={true}>{errors.healthOverrideReason?.message}</FieldError>
         </Field>
       ) : null}

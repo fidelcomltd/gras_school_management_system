@@ -43,6 +43,7 @@ internal sealed class AdmissionRecordConfiguration : IEntityTypeConfiguration<Ad
 
         builder.Property(record => record.HeadOfSchoolConfirmed).IsRequired();
         builder.Property(record => record.HeadOfSchoolName).HasMaxLength(AdmissionRecord.HeadOfSchoolNameMaxLength);
+        builder.Property(record => record.HealthOverrideReason).HasMaxLength(AdmissionRecord.HealthOverrideReasonMaxLength);
 
         builder.Property(record => record.CreatedBy).HasMaxLength(AuditActorMaxLength);
         builder.Property(record => record.ModifiedBy).HasMaxLength(AuditActorMaxLength);

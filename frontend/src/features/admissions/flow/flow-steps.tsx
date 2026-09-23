@@ -8,6 +8,7 @@ import { TextField } from '@/features/pupils/records/fields';
 import { errorText } from '@/features/pupils/records/format';
 import { pupilName, type PupilDto } from '@/features/pupils/types';
 import { useAdmissionRecord, useUpdateAdmissionRecord } from '../api';
+import { RegistrationNumber } from '../components/registration-number';
 import type { AdmissionRecordDto } from '../types';
 
 /** Today in Lagos (fixed UTC+1), as the date input wants it. */
@@ -16,7 +17,7 @@ function lagosToday(): string {
 }
 
 /** Step 6 (section G): one free-text box, skippable with Next. */
-export function OtherInformationStep({ pupil, onSaved }: { pupil: PupilDto; onSaved: () => void }) {
+export function OtherInformationStep({ pupil, onSaved, canEdit }: { pupil: PupilDto; onSaved: () => void; canEdit: boolean }) {
   const update = useUpdatePupil(pupil.id);
   const [text, setText] = useState(pupil.otherInformation ?? '');
   const unchanged = text === (pupil.otherInformation ?? '');
@@ -43,24 +44,38 @@ export function OtherInformationStep({ pupil, onSaved }: { pupil: PupilDto; onSa
 
   return (
     <div className="flex flex-col gap-3">
-      <TextField label="Any other important information about the child" multiline value={text} onChange={setText} />
+      <fieldset disabled={!canEdit} className="flex flex-col gap-3">
+        <TextField label="Any other important information about the child" multiline value={text} onChange={setText} />
+      </fieldset>
       <FormError message={errorText(update.error)} />
-      <Button className="self-start" disabled={update.isPending || unchanged} onClick={save}>
-        {update.isPending ? 'Saving…' : 'Save and continue'}
-      </Button>
+      {canEdit ? (
+        <Button className="self-start" disabled={update.isPending || unchanged} onClick={save}>
+          {update.isPending ? 'Saving…' : 'Save and continue'}
+        </Button>
+      ) : null}
     </div>
   );
 }
 
 /** Step 8 (section I): the declaring parent, the date, and a tick that the signed paper form exists. */
-export function DeclarationStep({ pupilId, onSaved }: { pupilId: string; onSaved: () => void }) {
+export function DeclarationStep({ pupilId, onSaved, canEdit }: { pupilId: string; onSaved: () => void; canEdit: boolean }) {
   const record = useAdmissionRecord(pupilId);
   if (record.isPending) return <LoadingState label="Loading the declaration…" />;
   if (record.isError) return <QueryErrorState error={record.error} onRetry={() => void record.refetch()} />;
-  return <DeclarationForm pupilId={pupilId} record={record.data} onSaved={onSaved} />;
+  return <DeclarationForm pupilId={pupilId} record={record.data} onSaved={onSaved} canEdit={canEdit} />;
 }
 
-function DeclarationForm({ pupilId, record, onSaved }: { pupilId: string; record: AdmissionRecordDto; onSaved: () => void }) {
+function DeclarationForm({
+  pupilId,
+  record,
+  onSaved,
+  canEdit,
+}: {
+  pupilId: string;
+  record: AdmissionRecordDto;
+  onSaved: () => void;
+  canEdit: boolean;
+}) {
   const update = useUpdateAdmissionRecord(pupilId);
   const [name, setName] = useState(record.declarationName ?? '');
   const [signed, setSigned] = useState(record.declarationSigned);
@@ -91,7 +106,7 @@ function DeclarationForm({ pupilId, record, onSaved }: { pupilId: string; record
     );
 
   return (
-    <div className="flex max-w-xl flex-col gap-3">
+    <fieldset disabled={!canEdit} className="flex max-w-xl flex-col gap-3">
       <p className="text-sm text-muted-foreground">The signed paper form is the record. This step notes who signed it and when.</p>
       <TextField label="Name of the parent or guardian making the declaration" value={name} onChange={setName} />
       <label className="flex items-center gap-2 text-sm text-foreground">
@@ -118,10 +133,12 @@ function DeclarationForm({ pupilId, record, onSaved }: { pupilId: string; record
         </label>
       ) : null}
       <FormError message={errorText(update.error)} />
-      <Button className="self-start" disabled={update.isPending || incomplete} onClick={save}>
-        {update.isPending ? 'Saving…' : 'Save and continue'}
-      </Button>
-    </div>
+      {canEdit ? (
+        <Button className="self-start" disabled={update.isPending || incomplete} onClick={save}>
+          {update.isPending ? 'Saving…' : 'Save and continue'}
+        </Button>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -132,15 +149,7 @@ export function AdmittedNotice({ pupil }: { pupil: PupilDto }) {
     <div className="flex flex-col items-start gap-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(pupil)}</h1>
       {pupil.status === 'Active' && number ? (
-        <>
-          <output className="flex flex-col gap-1 text-sm text-foreground">
-            Admitted. Registration number:
-            <span className="font-display text-4xl font-semibold tracking-wide">{number}</span>
-          </output>
-          <Button variant="outline" size="sm" onClick={() => void navigator.clipboard?.writeText(number)}>
-            Copy number
-          </Button>
-        </>
+        <RegistrationNumber number={number} label="Admitted. Registration number:" />
       ) : (
         <p className="text-sm text-muted-foreground">This admission is no longer pending (status: {pupil.status}).</p>
       )}

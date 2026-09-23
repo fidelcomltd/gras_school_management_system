@@ -63,6 +63,16 @@ describe('AdmissionFlowScreen', () => {
     expect(await screen.findByRole('heading', { name: 'Step 9: Review and approve' })).toBeInTheDocument();
   });
 
+  it('shows the declaration read-only to staff who cannot update the record', async () => {
+    mockMe('pupil.view');
+    mockAdmission([]);
+
+    renderFlow('/admissions/pupil-1?step=8');
+
+    expect(await screen.findByLabelText('Name of the parent or guardian making the declaration')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save and continue' })).not.toBeInTheDocument();
+  });
+
   it('lets a holder of the override approve with a reason when only the health answers are missing', async () => {
     mockMe('pupil.view', 'pupil.admission.approve', 'pupil.admission.override');
     mockAdmission([HEALTH]);

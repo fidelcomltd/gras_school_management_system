@@ -263,6 +263,10 @@ internal sealed class ApproveAdmissionCommandHandler(
         var now = timeProvider.GetUtcNow();
 
         record.RecordApproval(actorId, now);
+        if (healthOverridden)
+        {
+            record.RecordHealthOverride(request.HealthOverrideReason!);
+        }
 
         var approveResult = pupil.Approve();
 
@@ -341,7 +345,8 @@ internal sealed class ApproveAdmissionCommandHandler(
 
         if (healthOverridden)
         {
-            // A distinct event, as the capacity override is: who waived the health answers, and why.
+            // A distinct event, as the capacity override is: who waived the health answers. The reason itself stays on the
+            // admission record, because it may describe the child's health (audit readers need not hold safeguarding view).
             await auditSink.RecordAsync(
                 Privileges.Pupil.AdmissionOverride,
                 PupilEntityType,
@@ -349,7 +354,6 @@ internal sealed class ApproveAdmissionCommandHandler(
                 metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
                     ["waived"] = Pupils.Records.AdmissionCompleteness.HealthUnansweredCode,
-                    ["reason"] = request.HealthOverrideReason!.Trim(),
                 },
                 actorAdminId: currentUser.UserId,
                 cancellationToken).ConfigureAwait(false);

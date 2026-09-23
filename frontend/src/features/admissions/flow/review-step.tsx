@@ -4,17 +4,12 @@ import { useCompleteness } from '@/features/pupils/records/api';
 import { CompletenessCard } from '@/features/pupils/records/documents-panel';
 import { pupilName, type PupilDto } from '@/features/pupils/types';
 import { hasPrivilege } from '@/lib/auth/auth-session';
+import { formatDate } from '@/shared/format/date';
 import { useAdmissionRecord } from '../api';
 import { ApproveAdmissionForm } from '../components/approve-admission-form';
 import type { AdmissionRecordDto } from '../types';
 
 const HEALTH_UNANSWERED = 'health.unanswered';
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const [year, month, day] = iso.slice(0, 10).split('-');
-  return `${day}/${month}/${year}`;
-}
 
 /**
  * Step 9 (spec 6.5.11): what is still missing, each item linking to its step; a read-only summary of sections A, B and
@@ -51,7 +46,13 @@ export function ReviewStep({ pupil, onGo }: { pupil: PupilDto; onGo: (step: numb
           <h3 id="approve-heading" className="text-base font-semibold text-foreground">
             Approve the admission
           </h3>
-          <ApproveAdmissionForm pupil={pupil} record={record.data} onClose={() => onGo(9)} healthOverride={canOverride && healthUnanswered} />
+          <ApproveAdmissionForm
+            key={String(canOverride && healthUnanswered)}
+            pupil={pupil}
+            record={record.data}
+            onClose={() => onGo(9)}
+            healthOverride={canOverride && healthUnanswered}
+          />
         </section>
       )}
     </div>

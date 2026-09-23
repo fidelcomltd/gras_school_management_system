@@ -385,6 +385,18 @@ public sealed class AdmissionApprovalEndpointsTests(ApiTestFixture fixture) : In
 
         var approved = await ApproveAsync(pupilId, headTeacher, armId, key: $"key-{Guid.NewGuid():N}", healthOverrideReason: reason);
         approved.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // The reason may describe the child's health: kept on the admission record, never in the audit trail.
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var stored = await context.AdmissionRecords.AsNoTracking().SingleAsync(record => record.PupilId == pupilId, TestContext.Current.CancellationToken);
+        stored.HealthOverrideReason.ShouldBe(reason);
+        var events = await context.AuditEvents.AsNoTracking()
+            .Where(audit => audit.EntityId == pupilId.ToString("D", CultureInfo.InvariantCulture))
+            .ToListAsync(TestContext.Current.CancellationToken);
+        events.ShouldContain(audit => audit.Action == Privileges.Pupil.AdmissionOverride);
+        events.ShouldAllBe(audit => (audit.AfterJson ?? string.Empty).Contains("declined", StringComparison.Ordinal) == false
+            && (audit.Reason ?? string.Empty).Contains("declined", StringComparison.Ordinal) == false);
     }
 
     [Fact]

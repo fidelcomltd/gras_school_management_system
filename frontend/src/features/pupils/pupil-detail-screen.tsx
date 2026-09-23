@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
+import { formatDate } from '@/shared/format/date';
 import { usePupil } from './api';
 import { CorrectNumberDialog } from './components/correct-number-dialog';
 import { EditPupilDialog } from './components/edit-pupil-dialog';
@@ -19,11 +20,6 @@ type Tab = 'details' | 'contacts' | 'collection' | 'health' | 'documents';
 
 /** Spec 6.5.11's steps held on a tab here; the rest (declaration, approval) open in the admission flow. */
 const TAB_FOR_STEP: Partial<Record<number, Tab>> = { 3: 'contacts', 4: 'collection', 5: 'health', 7: 'documents' };
-
-function formatDate(iso: string): string {
-  const [year, month, day] = iso.slice(0, 10).split('-');
-  return `${day}/${month}/${year}`;
-}
 
 const ROWS: { label: string; value: (pupil: PupilDto) => string | null }[] = [
   { label: 'Registration number', value: (pupil) => pupil.registrationNumber ?? 'Issued on admission approval' },

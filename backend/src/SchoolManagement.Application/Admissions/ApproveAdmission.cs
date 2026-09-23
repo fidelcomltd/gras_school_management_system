@@ -39,7 +39,8 @@ namespace SchoolManagement.Application.Admissions;
 /// <param name="HealthOverrideReason">
 /// Spec 6.5.16: the parent declined to answer the health questions, and a holder of
 /// <c>pupil.admission.override</c> approves anyway, saying why (10 to 500 characters). Waives ONLY the
-/// unanswered health questions; every other blocking item still blocks. Audited with the reason. Omit otherwise.
+/// unanswered health questions; every other blocking item still blocks. The approval is audited; the reason is kept on
+/// the admission record, not in the audit log. Omit otherwise.
 /// </param>
 public sealed record ApproveAdmissionCommand(
     Guid Id,
@@ -76,7 +77,7 @@ internal sealed class ApproveAdmissionCommandValidator : AbstractValidator<Appro
             .When(command => command.HeadOfSchoolName is not null);
 
         RuleFor(command => command.HealthOverrideReason)
-            .Must(reason => reason!.Trim().Length is >= 10 and <= 500)
+            .Must(reason => reason!.Trim().Length is >= 10 and <= AdmissionRecord.HealthOverrideReasonMaxLength)
             .WithMessage("Give a reason of 10 to 500 characters for approving without the health answers.")
             .When(command => command.HealthOverrideReason is not null);
     }
