@@ -7,7 +7,11 @@ name: frontend-ci
 
 on:
   push:
-    branches: [main]
+    # `staging` added 2026-09-22. The 2026-09-16 directive moved CI onto `staging` because all work
+    # happens there, but only backend-ci.yml was changed — so a direct push to `staging` ran no
+    # frontend gate at all, and the drift check below (the one that catches a stale generated client)
+    # fired on pull_request alone. Same root cause that directive named, left half-fixed.
+    branches: [main, staging]
     paths:
       - 'frontend/**'
       - 'contracts/**'          # a contract change must re-run the client drift check
