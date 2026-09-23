@@ -10,6 +10,7 @@ using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Pupils;
+using SchoolManagement.Application.Pupils.Import;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -3135,6 +3136,74 @@ internal static class OpenApiExamples
               "chasedPercent": 90
             }
             """,
+
+        [typeof(PupilImportIssueDto)] = """
+            { "column": "Date of Birth", "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018." }
+            """,
+
+        [typeof(PupilImportRegisterMatchDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "registrationNumber": "GRAS/2024/0007",
+              "status": "Active",
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "dateOfBirth": "2020-05-03"
+            }
+            """,
+
+        [typeof(PupilImportRowDto)] = $$"""
+            {
+              "sheetRow": 2,
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "dateOfBirth": "2020-05-03",
+              "armId": "{{ExampleArmId}}",
+              "armName": "Primary 2C",
+              "outcome": "Accepted",
+              "errors": [],
+              "registerMatches": []
+            }
+            """,
+
+        [typeof(PupilImportCapacityWarningDto)] = $$"""
+            { "armId": "{{ExampleArmId}}", "armName": "Primary 2C", "capacity": 30, "currentCount": 28, "importCount": 4 }
+            """,
+
+        [typeof(PupilImportReportDto)] = $$"""
+            {
+              "fileSha256": "9f2c0d6b1e4a7c3f8d5e2b0a6c9f1e4d7b3a8c5f2e9d6b0a3c7f1e4d8b2a5c9f",
+              "totalRows": 2,
+              "acceptedCount": 1,
+              "rejectedCount": 1,
+              "registerMatchCount": 0,
+              "rows": [
+                {
+                  "sheetRow": 2, "surname": "Okafor", "firstName": "Chidera", "dateOfBirth": "2020-05-03",
+                  "armId": "{{ExampleArmId}}", "armName": "Primary 2C", "outcome": "Accepted", "errors": [], "registerMatches": []
+                },
+                {
+                  "sheetRow": 3, "surname": "Bello", "firstName": "Amina", "dateOfBirth": null, "armId": null, "armName": null,
+                  "outcome": "Rejected",
+                  "errors": [ { "column": "Date of Birth", "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018." } ],
+                  "registerMatches": []
+                }
+              ],
+              "capacityWarnings": []
+            }
+            """,
+
+        [typeof(PupilImportedDto)] = $$"""
+            { "sheetRow": 2, "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRAS/2026/0041" }
+            """,
+
+        [typeof(PupilImportResultDto)] = $$"""
+            {
+              "importedCount": 1,
+              "skippedCount": 0,
+              "pupils": [ { "sheetRow": 2, "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRAS/2026/0041" } ]
+            }
+            """,
     };
 
     /// <summary>
@@ -3184,8 +3253,8 @@ internal static class OpenApiExamples
 
         // TASK-0005b stage C: the image-serving responses' body.
         [typeof(Stream)] =
-            "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this " +
-            "privilege-checked endpoint, never from a public URL (spec 9.6).",
+            "The raw file bytes: an image, a PDF or an XLSX workbook, as the response's Content-Type says. " +
+            "Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).",
     };
 
     /// <summary>

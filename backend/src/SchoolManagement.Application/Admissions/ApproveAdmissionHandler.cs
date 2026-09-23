@@ -6,7 +6,6 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
-using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Pupils;
@@ -16,7 +15,6 @@ using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
-using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Application.Admissions;
 
@@ -29,27 +27,8 @@ namespace SchoolManagement.Application.Admissions;
 /// established for this record shape.
 /// </para>
 /// <para>
-/// THE COUNTER IS A ROW LOCK, NEVER A MAXIMUM QUERY (spec 6.5.10). <see
-/// cref="IRegistrationCounterRepository.IncrementAndGetNextSerialAsync"/> is the ONLY thing that
-/// touches <c>registration_counter</c>, and it runs the raw <c>INSERT ... ON CONFLICT ... DO UPDATE
-/// ... RETURNING</c> statement spec 6.5.10 mandates, immediately, inside this handler's own ambient
-/// transaction (<c>UnitOfWorkBehavior</c>).
-/// </para>
-/// <para>
-/// RETRY ON A UNIQUE-INDEX VIOLATION (spec 6.5.10 rule 4, acceptance criterion 7): the loop below
-/// calls <see cref="IUnitOfWork.SaveChangesAsync"/> DIRECTLY, deliberately departing from "handlers
-/// never call SaveChangesAsync" — <c>IUnitOfWork</c>'s own remarks name this as the sanctioned escape
-/// hatch ("Prefer letting the unit-of-work behaviour call this"), and there is no other way to
-/// observe the real database constraint firing from inside a retry loop the outer
-/// <c>UnitOfWork.ExecuteAtomicallyAsync</c> does not know exists. This works safely because EF Core
-/// wraps a <c>SaveChangesAsync</c> call made under an ALREADY-OPEN, caller-managed transaction (which
-/// <c>ExecuteAtomicallyAsync</c> is) in an automatic SAVEPOINT: a failed attempt rolls back only that
-/// savepoint, never the whole transaction, so the ambient transaction stays usable for the next
-/// attempt. The one accepted side effect: the counter increment for a FAILED attempt already
-/// committed as its own statement before the savepoint existed, so a genuine collision (expected to
-/// be vanishingly rare, since two different serials cannot format to the same string except through
-/// TASK-0063's out-of-scope manual correction path) burns that one serial rather than reusing it —
-/// preferred here over hand-rolled savepoint management for a backstop this unlikely to fire.
+/// THE NUMBER ITSELF is issued by <see cref="RegistrationNumberIssuer"/> — the counter row lock, the
+/// composition and the retry-on-duplicate loop (spec 6.5.10), shared with bulk import.
 /// </para>
 /// </remarks>
 internal sealed class ApproveAdmissionCommandHandler(
@@ -60,24 +39,17 @@ internal sealed class ApproveAdmissionCommandHandler(
     IAcademicSessionRepository sessions,
     ITermRepository terms,
     IEnrolmentRepository enrolments,
-    IRegistrationCounterRepository registrationCounters,
+    RegistrationNumberIssuer issuer,
     ISchoolProfileRepository schoolProfiles,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
-    IUnitOfWork unitOfWork,
-    IPersistenceErrorTranslator persistenceErrorTranslator,
     TimeProvider timeProvider,
     Pupils.Records.AdmissionCompleteness completeness)
     : IRequestHandler<ApproveAdmissionCommand, Result<PupilDto>>
 {
     private const string PupilEntityType = "pupil";
     private const string ArmEntityType = "arm";
-
-    /// <summary>Spec 6.5.10 rule 4: "the application retries the whole transaction up to three times".</summary>
-    private const int MaxIssueAttempts = 3;
-
-    private const string DuplicateValueErrorCode = "persistence.duplicate_value";
 
     /// <inheritdoc />
     public async Task<Result<PupilDto>> HandleAsync(ApproveAdmissionCommand request, CancellationToken cancellationToken)
@@ -296,39 +268,14 @@ internal sealed class ApproveAdmissionCommandHandler(
         // criterion 3). Abbreviation/separator/serialWidth/serialReset are read from SAVED settings
         // and frozen into the composed string — never the preview endpoint's unsaved query
         // parameters (acceptance criterion 4).
-        var admissionYear = record.DateAdmitted.Year;
-        var counterKey = RegistrationCounterPartition.Resolve(profile.SerialReset, admissionYear);
+        var issued = await issuer.IssueAndSaveAsync(pupil, record.DateAdmitted.Year, profile, cancellationToken).ConfigureAwait(false);
 
-        string? issuedRegistrationNumber = null;
-
-        for (var attempt = 1; attempt <= MaxIssueAttempts; attempt++)
+        if (issued.IsFailure)
         {
-            var serial = await registrationCounters
-                .IncrementAndGetNextSerialAsync(counterKey, cancellationToken)
-                .ConfigureAwait(false);
-
-            issuedRegistrationNumber = RegNumberFormat.Compose(
-                profile.Abbreviation, profile.Separator, admissionYear, profile.SerialWidth, serial);
-
-            // Byte-identical to the preview (acceptance criterion 2): both call RegNumberFormat.Compose.
-            pupil.IssueRegistrationNumber(issuedRegistrationNumber);
-
-            try
-            {
-                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            }
-            catch (Exception exception) when (
-                persistenceErrorTranslator.TryTranslate(exception) is { Code: DuplicateValueErrorCode })
-            {
-                if (attempt == MaxIssueAttempts)
-                {
-                    return Result.Failure<PupilDto>(Error.Conflict(
-                        "pupil.registration_number_issue_failed",
-                        "Could not issue a registration number. Try again."));
-                }
-            }
+            return Result.Failure<PupilDto>(issued.Error);
         }
+
+        var issuedRegistrationNumber = issued.Value;
 
         await auditSink.RecordAsync(
             Privileges.Pupil.AdmissionApprove,

@@ -284,6 +284,10 @@ public static class NigerianGeography
                 ["Abaji", "Abuja Municipal", "Bwari", "Gwagwalada", "Kuje", "Kwali"],
         };
 
+    /// <summary>The LGAs of <paramref name="canonicalState"/>, in list order; empty for an unknown state.</summary>
+    public static IReadOnlyList<string> LgasOf(string canonicalState) =>
+        LgasByState.TryGetValue(canonicalState, out var lgas) ? lgas : [];
+
     /// <summary>
     /// Attempts to resolve <paramref name="rawState"/> (any casing/whitespace) against
     /// <see cref="States"/>. Returns the canonical spelling on success.

@@ -7397,6 +7397,399 @@
         }
       }
     },
+    "/api/v1/pupils/import/template": {
+      "get": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Download the bulk-import template",
+        "description": "Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet `Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet `LGAs` lists every state's LGAs. With no active session the arm columns are empty.",
+        "operationId": "GetPupilImportTemplate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils/import/validate": {
+      "post": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Validate a bulk-import file",
+        "description": "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils). WRITES NOTHING. Returns every row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the file duplicating an earlier row are rejected. Whole-file problems are 422: `import.file_invalid`, `import.file_empty`, `import.too_many_rows`, `import.missing_columns`; 409 `import.no_active_session`.",
+        "operationId": "ValidatePupilImport",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilImportReportDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils/import/commit": {
+      "post": {
+        "tags": [
+          "Pupils"
+        ],
+        "summary": "Import a validated file",
+        "description": "Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` (repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import past an arm's capacity (needs `arm.capacity.override`). The file is re-validated and imported ALL OR NOTHING: each pupil is created active, with a registration number issued in file order by the same counter as admission approval, an open enrolment, and an admission record with the declaration unsigned; health columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 `import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, `import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CommitPupilImport",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file",
+                  "fileSha256"
+                ],
+                "type": "object",
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "fileSha256": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "skipRows": {
+                        "type": "array",
+                        "items": {
+                          "pattern": "^-?(?:0|[1-9]\\d*)$",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "format": "int32"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "createRows": {
+                        "type": "array",
+                        "items": {
+                          "pattern": "^-?(?:0|[1-9]\\d*)$",
+                          "type": [
+                            "integer",
+                            "string"
+                          ],
+                          "format": "int32"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "overrideCapacity": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PupilImportResultDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pupils/{pupilId}/contacts": {
       "get": {
         "tags": [
@@ -24023,6 +24416,492 @@
           "genotype": "AA"
         }
       },
+      "PupilImportCapacityWarningDto": {
+        "required": [
+          "armId",
+          "armName",
+          "capacity",
+          "currentCount",
+          "importCount"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "armName": {
+            "type": "string",
+            "description": "Its display name.",
+            "example": "Primary 2C"
+          },
+          "capacity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Its capacity.",
+            "format": "int32",
+            "example": 30
+          },
+          "currentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pupils enrolled now.",
+            "format": "int32",
+            "example": 28
+          },
+          "importCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows in this file for it.",
+            "format": "int32",
+            "example": 4
+          }
+        },
+        "additionalProperties": false,
+        "description": "An arm the file would take over its capacity (spec 6.4.6: a warning, overridable with `arm.capacity.override`).",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "armName": "Primary 2C",
+          "capacity": 30,
+          "currentCount": 28,
+          "importCount": 4
+        }
+      },
+      "PupilImportIssueDto": {
+        "required": [
+          "column",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "column": {
+            "type": "string",
+            "description": "The template column it concerns.",
+            "example": "Date of Birth"
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong and how to fix it.",
+            "example": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One problem with a row.",
+        "example": {
+          "column": "Date of Birth",
+          "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+        }
+      },
+      "PupilImportRegisterMatchDto": {
+        "required": [
+          "pupilId",
+          "registrationNumber",
+          "status",
+          "surname",
+          "firstName",
+          "dateOfBirth"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "The existing pupil.",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Null while that pupil is pending.",
+            "example": "GRAS/2024/0007"
+          },
+          "status": {
+            "description": "Its status.",
+            "$ref": "#/components/schemas/PupilStatus"
+          },
+          "surname": {
+            "type": "string",
+            "description": "Its surname.",
+            "example": "Okafor"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Its first name.",
+            "example": "Chidera"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "Its date of birth.",
+            "format": "date",
+            "example": "2020-05-03"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pupil already on the register that a row appears to duplicate.",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "registrationNumber": "GRAS/2024/0007",
+          "status": "Active",
+          "surname": "Okafor",
+          "firstName": "Chidera",
+          "dateOfBirth": "2020-05-03"
+        }
+      },
+      "PupilImportReportDto": {
+        "required": [
+          "fileSha256",
+          "totalRows",
+          "acceptedCount",
+          "rejectedCount",
+          "registerMatchCount",
+          "rows",
+          "capacityWarnings"
+        ],
+        "type": "object",
+        "properties": {
+          "fileSha256": {
+            "type": "string",
+            "description": "The uploaded file's SHA-256, hex. Commit must send it back, so decisions cannot land on another file.",
+            "example": "9f2c0d6b1e4a7c3f8d5e2b0a6c9f1e4d7b3a8c5f2e9d6b0a3c7f1e4d8b2a5c9f"
+          },
+          "totalRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Data rows in the file.",
+            "format": "int32",
+            "example": 2
+          },
+          "acceptedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows with no error.",
+            "format": "int32",
+            "example": 1
+          },
+          "rejectedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows with at least one error.",
+            "format": "int32",
+            "example": 1
+          },
+          "registerMatchCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Accepted rows matching a pupil already on the register; each needs skip or create.",
+            "format": "int32",
+            "example": 0
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilImportRowDto"
+            },
+            "description": "Every data row, in file order.",
+            "example": [
+              {
+                "sheetRow": 2,
+                "surname": "Okafor",
+                "firstName": "Chidera",
+                "dateOfBirth": "2020-05-03",
+                "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+                "armName": "Primary 2C",
+                "outcome": "Accepted",
+                "errors": [ ],
+                "registerMatches": [ ]
+              },
+              {
+                "sheetRow": 3,
+                "surname": "Bello",
+                "firstName": "Amina",
+                "dateOfBirth": null,
+                "armId": null,
+                "armName": null,
+                "outcome": "Rejected",
+                "errors": [
+                  {
+                    "column": "Date of Birth",
+                    "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+                  }
+                ],
+                "registerMatches": [ ]
+              }
+            ]
+          },
+          "capacityWarnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilImportCapacityWarningDto"
+            },
+            "description": "Arms this file would take over capacity, counting every accepted row.",
+            "example": [ ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "The validation report (spec 6.5.13): every data row with its outcome, plus per-arm capacity warnings. Health answers\nare never echoed back.",
+        "example": {
+          "fileSha256": "9f2c0d6b1e4a7c3f8d5e2b0a6c9f1e4d7b3a8c5f2e9d6b0a3c7f1e4d8b2a5c9f",
+          "totalRows": 2,
+          "acceptedCount": 1,
+          "rejectedCount": 1,
+          "registerMatchCount": 0,
+          "rows": [
+            {
+              "sheetRow": 2,
+              "surname": "Okafor",
+              "firstName": "Chidera",
+              "dateOfBirth": "2020-05-03",
+              "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+              "armName": "Primary 2C",
+              "outcome": "Accepted",
+              "errors": [ ],
+              "registerMatches": [ ]
+            },
+            {
+              "sheetRow": 3,
+              "surname": "Bello",
+              "firstName": "Amina",
+              "dateOfBirth": null,
+              "armId": null,
+              "armName": null,
+              "outcome": "Rejected",
+              "errors": [
+                {
+                  "column": "Date of Birth",
+                  "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
+                }
+              ],
+              "registerMatches": [ ]
+            }
+          ],
+          "capacityWarnings": [ ]
+        }
+      },
+      "PupilImportResultDto": {
+        "required": [
+          "importedCount",
+          "skippedCount",
+          "pupils"
+        ],
+        "type": "object",
+        "properties": {
+          "importedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Pupils created.",
+            "format": "int32",
+            "example": 1
+          },
+          "skippedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Rows skipped by decision.",
+            "format": "int32",
+            "example": 0
+          },
+          "pupils": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilImportedDto"
+            },
+            "description": "Each created pupil, in file order, which is registration-number order.",
+            "example": [
+              {
+                "sheetRow": 2,
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "registrationNumber": "GRAS/2026/0041"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "What a commit created.",
+        "example": {
+          "importedCount": 1,
+          "skippedCount": 0,
+          "pupils": [
+            {
+              "sheetRow": 2,
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "registrationNumber": "GRAS/2026/0041"
+            }
+          ]
+        }
+      },
+      "PupilImportRowDto": {
+        "required": [
+          "sheetRow",
+          "surname",
+          "firstName",
+          "dateOfBirth",
+          "armId",
+          "armName",
+          "outcome",
+          "errors",
+          "registerMatches"
+        ],
+        "type": "object",
+        "properties": {
+          "sheetRow": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The spreadsheet row number (the header is row 1).",
+            "format": "int32",
+            "example": 2
+          },
+          "surname": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "As typed, when present.",
+            "example": "Okafor"
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "As typed, when present.",
+            "example": "Chidera"
+          },
+          "dateOfBirth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it could be read.",
+            "format": "date",
+            "example": "2020-05-03"
+          },
+          "armId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The resolved arm, when it could be.",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "armName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The resolved arm's display name.",
+            "example": "Primary 2C"
+          },
+          "outcome": {
+            "description": "Accepted or rejected.",
+            "$ref": "#/components/schemas/PupilImportRowOutcome"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilImportIssueDto"
+            },
+            "description": "Why the row is rejected: one entry per problem, each naming its column.",
+            "example": [ ]
+          },
+          "registerMatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PupilImportRegisterMatchDto"
+            },
+            "description": "Existing pupils with the same surname, first name and date of birth. A warning, not an error.",
+            "example": [ ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One data row of the report.",
+        "example": {
+          "sheetRow": 2,
+          "surname": "Okafor",
+          "firstName": "Chidera",
+          "dateOfBirth": "2020-05-03",
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "armName": "Primary 2C",
+          "outcome": "Accepted",
+          "errors": [ ],
+          "registerMatches": [ ]
+        }
+      },
+      "PupilImportRowOutcome": {
+        "enum": [
+          "Accepted",
+          "Rejected"
+        ],
+        "description": "Whether a row can be imported.",
+        "example": "Accepted"
+      },
+      "PupilImportedDto": {
+        "required": [
+          "sheetRow",
+          "pupilId",
+          "registrationNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "sheetRow": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Its row in the file.",
+            "format": "int32",
+            "example": 2
+          },
+          "pupilId": {
+            "type": "string",
+            "description": "The new pupil.",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "The number issued.",
+            "example": "GRAS/2026/0041"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One created pupil.",
+        "example": {
+          "sheetRow": 2,
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "registrationNumber": "GRAS/2026/0041"
+        }
+      },
       "PupilSex": {
         "enum": [
           "Male",
@@ -28790,7 +29669,7 @@
       },
       "Stream": {
         "type": "string",
-        "description": "The raw image bytes, PNG or JPEG as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).",
+        "description": "The raw file bytes: an image, a PDF or an XLSX workbook, as the response's Content-Type says. Streamed through this privilege-checked endpoint, never from a public URL (spec 9.6).",
         "format": "binary",
         "example": "binary PNG or JPEG bytes"
       },

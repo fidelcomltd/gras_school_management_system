@@ -137,6 +137,13 @@
     <PackageVersion Include="QuestPDF" Version="2026.9.0" />
     <!-- MIT. The result sheet's verification QR code (spec 6.9.6); PngByteQRCode has no System.Drawing dependency. -->
     <PackageVersion Include="QRCoder" Version="1.8.0" />
+    <!--
+      MIT. Bulk pupil import (spec 6.5.13): reads the uploaded XLSX and writes the template. Its tree is MIT
+      (DocumentFormat.OpenXml, ExcelNumberFormat, RBush.Signed, ClosedXML.Parser) plus SixLabors.Fonts 1.0.0,
+      Apache-2.0 (the 1.x line predates that project's Split licence). Fonts are read only for auto-fit column
+      widths, which the adapter never calls. Only ClosedXmlPupilImportWorkbook references it.
+    -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
   </ItemGroup>
 
   <ItemGroup Label="File storage">
