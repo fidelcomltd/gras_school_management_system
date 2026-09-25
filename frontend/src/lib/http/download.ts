@@ -40,7 +40,7 @@ export async function getFile(url: string, fallbackName: string): Promise<Downlo
       }
     }
     const apiError = normalizeError(error);
-    if (apiError.isUnauthorized) terminateSession();
+    if (apiError.endsSession) terminateSession();
     throw apiError;
   }
 }

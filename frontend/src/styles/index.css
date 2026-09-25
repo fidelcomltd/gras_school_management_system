@@ -34,7 +34,7 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
   /* A visible focus ring is a hard requirement, not a preference.

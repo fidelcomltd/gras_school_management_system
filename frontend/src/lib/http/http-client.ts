@@ -13,6 +13,7 @@ import {
   terminateSession,
 } from '@/lib/auth/auth-session';
 import { errorCodeOf, isAuthSessionResponse, newCorrelationId } from './http-client-guards';
+import { CURRENT_PASSWORD_INCORRECT } from './http-error';
 
 /**
  * The one Axios instance. Created once, exported once.
@@ -119,10 +120,13 @@ export function attachAuthInterceptors(client: AxiosInstance): void {
       // including `/refresh` itself — ends the session and never calls
       // `/refresh`. `terminateSession` is idempotent/single-flight, so several
       // requests failing at once still produce exactly one sign-out transition.
-      if (status === 401) {
+      // One 401 is not about the session: a wrong CURRENT password on `POST /auth/password` is a failed
+      // re-authentication inside a live session, and the form shows it on the field instead of signing out.
+      if (status === 401 && errorCodeOf(error.response.data) !== CURRENT_PASSWORD_INCORRECT) {
         terminateSession();
         throw error;
       }
+      if (status === 401) throw error;
 
       // The ONLY retry in this layer (ruling 3): a 403 naming a CSRF failure
       // gets exactly one re-fetch-and-retry. Never a second, never an auth retry.

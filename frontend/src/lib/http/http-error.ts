@@ -69,6 +69,9 @@ function isProblemDetails(body: unknown): body is AnyProblemDetails {
   return typeof body === 'object' && body !== null && !Array.isArray(body);
 }
 
+/** The one 401 that leaves the session alive; see `ApiError.endsSession`. */
+export const CURRENT_PASSWORD_INCORRECT = 'auth.current_password_incorrect';
+
 /**
  * A single error type for every failure crossing the HTTP boundary.
  *
@@ -115,6 +118,14 @@ export class ApiError extends Error {
 
   get isUnauthorized(): boolean {
     return this.kind === 'unauthorized';
+  }
+
+  /**
+   * Whether this failure means the session is over (delta §3a: every 401 is terminal) — except a wrong CURRENT
+   * password on `POST /auth/password`, a failed re-authentication inside a live session that the form shows on the field.
+   */
+  get endsSession(): boolean {
+    return this.isUnauthorized && this.errorCode !== CURRENT_PASSWORD_INCORRECT;
   }
 
   /** Transient failures — safe for a retry policy to act on. */

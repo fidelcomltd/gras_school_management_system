@@ -1,48 +1,18 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router';
-import { paths } from '@/app/router/paths';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
+import { Menu, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { Button } from '@/components/ui/button';
-import { useSignOut } from '@/features/auth/api';
-import { hasPrivilege, type AuthSession } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
-import { cn } from '@/lib/utils/cn';
-import { AppShell } from './app-shell';
+import { APP_NAME } from '@/config/env-values';
+import type { AuthSession } from '@/lib/auth/auth-session';
+import { SkipLink } from './app-shell';
+import { Sidebar } from './sidebar';
 
 /**
- * Wraps `AppShell` for every authenticated route (TASK-0041) — it does not
- * fork a second shell, it adds the persistent nav row `AppShell`'s own
- * comment says is deliberately absent until a feature needs one.
- *
- * Nav items are filtered by the caller's privileges from `GET /auth/me`: an
- * item the caller cannot use is ABSENT, never rendered disabled (AC-2). Add a
- * feature's nav entry here as its route lands.
+ * The back office's frame for every signed-in route with navigation (TASK-0041): a fixed sidebar on wide screens, the
+ * same sidebar in a drawer below `lg`, and a top bar with the theme toggle. The drawer is a Base UI dialog, so focus is
+ * trapped inside it, `Escape` closes it and focus returns to the menu button.
  */
-interface NavItem {
-  label: string;
-  to: string;
-  /** Privilege code required to see this item. Omit for "any signed-in caller". */
-  requires?: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', to: paths.root },
-  { label: 'Sessions', to: paths.sessions, requires: 'session.view' },
-  { label: 'Classes', to: paths.classes, requires: 'level.view' },
-  { label: 'Arms', to: paths.arms, requires: 'arm.view' },
-  { label: 'Pupils', to: paths.pupils, requires: 'pupil.view' },
-  { label: 'Incomplete records', to: paths.incompleteRecords, requires: 'report.view' },
-  { label: 'Subjects', to: paths.subjects, requires: 'subject.view' },
-  { label: 'Results', to: paths.results, requires: 'result.view' },
-  { label: 'Marks', to: paths.marks, requires: 'result.view' },
-  { label: 'Class records', to: paths.classRecords, requires: 'result.view' },
-  { label: 'Weekly reports', to: paths.weekly, requires: 'weekly.view' },
-  { label: 'Pins', to: paths.pins, requires: 'pin.view' },
-  { label: 'Admins', to: paths.admins, requires: 'admin.view' },
-  { label: 'Roles', to: paths.roles, requires: 'role.view' },
-  { label: 'Settings', to: paths.settings, requires: 'settings.view' },
-  { label: 'Audit log', to: paths.audit, requires: 'audit.view' },
-];
-
 export function AuthenticatedShell({
   session,
   children,
@@ -50,55 +20,48 @@ export function AuthenticatedShell({
   session: AuthSession;
   children: ReactNode;
 }) {
-  const signOut = useSignOut();
-  const items = NAV_ITEMS.filter((item) => !item.requires || hasPrivilege(session, item.requires));
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <AppShell>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
-          <nav aria-label="Main">
-            <ul className="flex flex-wrap gap-4">
-              {items.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={item.to === paths.root || item.to === paths.results}
-                    className={({ isActive }) =>
-                      cn(
-                        'text-sm font-medium transition-colors',
-                        isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-                      )
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
+    <div className="min-h-dvh bg-background">
+      <SkipLink />
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-foreground">{session.staffName}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => signOut.mutate()}
-              disabled={signOut.isPending}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface lg:block">
+        <Sidebar session={session} />
+      </aside>
+
+      <BaseDialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <BaseDialog.Portal>
+          <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] lg:hidden" />
+          <BaseDialog.Popup className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-border bg-surface shadow-xl lg:hidden">
+            <BaseDialog.Title className="sr-only">Menu</BaseDialog.Title>
+            <BaseDialog.Close
+              aria-label="Close menu"
+              className="absolute top-4 right-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
-              {signOut.isPending ? 'Signing out…' : 'Sign out'}
-            </Button>
+              <X className="size-4" aria-hidden="true" />
+            </BaseDialog.Close>
+            {/* A drawer left open over the page it just navigated to would hide that page. */}
+            <Sidebar session={session} onNavigate={() => setDrawerOpen(false)} />
+          </BaseDialog.Popup>
+        </BaseDialog.Portal>
+      </BaseDialog.Root>
+
+      <div className="flex min-h-dvh flex-col lg:pl-64">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-surface/85 px-4 backdrop-blur sm:px-6">
+          <Button variant="ghost" size="sm" aria-label="Open menu" className="lg:hidden" onClick={() => setDrawerOpen(true)}>
+            <Menu className="size-5" aria-hidden="true" />
+          </Button>
+          <p className="truncate text-sm font-semibold text-foreground lg:hidden">{APP_NAME}</p>
+          <div className="ml-auto">
+            <ThemeToggle />
           </div>
-        </div>
+        </header>
 
-        {signOut.error instanceof ApiError ? (
-          <p role="alert" className="text-xs text-destructive">
-            {signOut.error.message}
-          </p>
-        ) : null}
-
-        {children}
+        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+          {children}
+        </main>
       </div>
-    </AppShell>
+    </div>
   );
 }

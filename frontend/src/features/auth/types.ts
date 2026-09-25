@@ -10,6 +10,7 @@ export const AuthKeys = {
   Me: 'auth.me',
   SignIn: 'auth.signIn',
   SignOut: 'auth.signOut',
+  ChangePassword: 'auth.changePassword',
 } as const;
 
 /**
@@ -18,3 +19,4 @@ export const AuthKeys = {
  */
 export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
 export type SignInCommand = components['schemas']['SignInCommand'];
+export type ChangePasswordCommand = components['schemas']['ChangePasswordCommand'];

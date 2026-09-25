@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@/test/render';
+import { render, screen, userEvent } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { paths } from './paths';
@@ -67,5 +67,29 @@ describe('ProtectedLayout', () => {
     // The shell chrome — nav + identity + sign-out — is there too, not just the child route.
     expect(screen.getByText('Chisom Maxwell')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  });
+  it('holds a flagged account on the password change, then opens the app once it succeeds', async () => {
+    let sent: unknown;
+    server.use(
+      http.get(apiUrl('/api/v1/auth/me'), () => HttpResponse.json({ ...SESSION, mustChangePassword: true })),
+      http.post(apiUrl('/api/v1/auth/password'), async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(SESSION);
+      }),
+    );
+    const user = userEvent.setup();
+
+    renderGuardedApp(paths.root);
+
+    expect(await screen.findByRole('heading', { name: 'Set a new password' })).toBeInTheDocument();
+    expect(screen.queryByText('protected content')).toBeNull();
+
+    await user.type(screen.getByLabelText('Current password'), 'temporary-pass-1');
+    await user.type(screen.getByLabelText('New password'), 'a much better pass 9');
+    await user.type(screen.getByLabelText('Confirm new password'), 'a much better pass 9');
+    await user.click(screen.getByRole('button', { name: 'Change password' }));
+
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+    expect(sent).toEqual({ currentPassword: 'temporary-pass-1', newPassword: 'a much better pass 9' });
   });
 });

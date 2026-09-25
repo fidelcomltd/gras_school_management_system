@@ -54,7 +54,7 @@ async function send<TResponse>(
     // Defense in depth: the interceptor's response handler already calls this
     // for a 401 (delta §3a — every 401 is terminal). `terminateSession` is
     // idempotent, so calling it again here is a no-op, not a double sign-out.
-    if (apiError.isUnauthorized) terminateSession();
+    if (apiError.endsSession) terminateSession();
 
     throw apiError;
   }

@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { ErrorBoundary } from '@/components/feedback/error-boundary';
 import { AppShell } from '@/components/layout/app-shell';
+import { ChangePasswordScreen } from './change-password-screen';
 import { LandingScreen } from './landing-screen';
 import { SignInScreen } from './sign-in-screen';
 
@@ -26,4 +27,7 @@ export const publicAuthRoutes: RouteObject[] = [
 ];
 
 /** Protected — mounted inside `ProtectedLayout`'s `<Outlet/>`. */
-export const authRoutes: RouteObject[] = [{ index: true, element: <LandingScreen /> }];
+export const authRoutes: RouteObject[] = [
+  { index: true, element: <LandingScreen /> },
+  { path: paths.changePassword, element: <ChangePasswordScreen /> },
+];

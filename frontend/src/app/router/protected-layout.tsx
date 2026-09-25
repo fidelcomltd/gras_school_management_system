@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { AuthenticatedShell } from '@/components/layout/authenticated-shell';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
+import { ForcedPasswordChange } from '@/features/auth/change-password-screen';
 import { onSessionEnded } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { paths } from './paths';
@@ -47,6 +48,15 @@ export function ProtectedLayout() {
             Try again
           </Button>
         </div>
+      </AppShell>
+    );
+  }
+
+  // The server refuses everything else until the password changes (403 auth.password_change_required), so no nav.
+  if (me.data.mustChangePassword) {
+    return (
+      <AppShell>
+        <ForcedPasswordChange staffName={me.data.staffName} />
       </AppShell>
     );
   }
