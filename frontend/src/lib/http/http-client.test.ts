@@ -112,6 +112,20 @@ describe('a single 401 — terminal, never retried', () => {
     expect(calls).toBe(1);
   });
 
+  it('keeps the session on a wrong current password, which is a failed re-authentication, not a dead session', async () => {
+    const onEnded = vi.fn();
+    onSessionEnded(onEnded);
+    server.use(
+      http.post(apiUrl('/api/v1/auth/password'), () => problemResponse(401, { errorCode: 'auth.current_password_incorrect' })),
+    );
+
+    setSession(liveSession());
+    setCsrfToken('csrf-token');
+    await expect(postRequest('/api/v1/auth/password', { currentPassword: 'x', newPassword: 'y' })).rejects.toThrow();
+
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+
   it('never calls POST /auth/refresh (delta §3a: reactive 401s are terminal)', async () => {
     let refreshCalls = 0;
     server.use(

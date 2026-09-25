@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/http';
 import { useSignOut } from './api';
 import { ChangePasswordForm } from './components/change-password-form';
 
@@ -30,10 +31,15 @@ export function ForcedPasswordChange({ staffName }: { staffName: string }) {
           Welcome, {staffName}. Your account needs a new password before you can continue.
         </p>
       </header>
-      <ChangePasswordForm onDone={() => undefined} />
+      <ChangePasswordForm showSuccess={false} />
       <Button variant="ghost" size="sm" className="self-start" onClick={() => signOut.mutate()} disabled={signOut.isPending}>
         Sign out instead
       </Button>
+      {signOut.error instanceof ApiError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {signOut.error.message}
+        </p>
+      ) : null}
     </div>
   );
 }
