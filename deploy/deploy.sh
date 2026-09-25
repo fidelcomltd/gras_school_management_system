@@ -94,19 +94,27 @@ log "Applying migrations"
 #
 # Run as the service account, not as root: the bundle is the one deployer-supplied binary this
 # script executes, and it has no business holding root on the database host.
+# The bundle is a self-contained single file: it unpacks its runtime on first run, by default under the
+# user's home. The service account has none (/nonexistent), so it gets a scratch directory instead,
+# removed once the migration has run.
+EXTRACT_DIR=/var/lib/gras/bundle-extract
+rm -rf "$EXTRACT_DIR"
+install -d -o "$APP_USER" -g "$APP_USER" -m 0700 "$EXTRACT_DIR"
 chmod a+x "$TARGET/efbundle"
 if ! sudo -u "$APP_USER" \
       SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION="$CONNECTION_STRING" \
       Database__ConnectionString="$CONNECTION_STRING" \
+      DOTNET_BUNDLE_EXTRACT_BASE_DIR="$EXTRACT_DIR" \
       "$TARGET/efbundle"; then
   echo "FAILED: migrations did not apply. Nothing was swapped — the previous release is still" >&2
   echo "        running and serving traffic. The pre-deploy dump is in /var/backups/gras." >&2
-  rm -rf "$TARGET"
+  rm -rf "$TARGET" "$EXTRACT_DIR"
   exit 1
 fi
 
 # Not part of the running application, and it embeds a whole EF toolchain.
 rm -f "$TARGET/efbundle"
+rm -rf "$EXTRACT_DIR"
 
 # ── Swap and restart ─────────────────────────────────────────────────────────────────────────
 log "Restarting gras-api"

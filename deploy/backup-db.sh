@@ -42,6 +42,14 @@ printf 'wrote %s (%s)\n' "$ARCHIVE" "$(du -h "$ARCHIVE" | cut -f1)"
 # A dump that is silently empty is worse than no dump, because it looks like a backup. pg_restore
 # --list on the archive is the cheapest real check that the file is a readable dump with content.
 # Read back as root, not as postgres: the archive is mode 0600 and owned by root.
+# A brand-new database (the first deploy, before any migration) has no tables, so its dump has no
+# table data by design; that is not a failed backup. Every later run still gets the full check.
+TABLE_COUNT=$(sudo -u postgres psql -tA -d "$DB" -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")
+if [[ "$TABLE_COUNT" == "0" ]]; then
+  echo "NOTE: $DB has no tables yet (first deploy), so the empty dump is expected."
+  exit 0
+fi
+
 if ! pg_restore --list "$ARCHIVE" | grep -q 'TABLE DATA'; then
   echo "FAILED: $ARCHIVE contains no table data. Not pruning old backups." >&2
   exit 1

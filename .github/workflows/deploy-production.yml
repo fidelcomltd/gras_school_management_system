@@ -57,11 +57,17 @@ jobs:
         # Built from the SAME commit as the app, so the schema and the code can never be a version
         # apart. Self-contained, because the VPS has the ASP.NET Core runtime but no SDK and no EF
         # tool. The connection string is supplied on the box at apply time, not here.
+        # The startup project is Infrastructure, not the Api: Microsoft.EntityFrameworkCore.Design is
+        # referenced there with PrivateAssets=all, so it never flows to the Api, and the tool refuses an
+        # Api startup project. DesignTimeDbContextFactory then needs SOME connection string to build the
+        # model; nothing connects at build time, so a placeholder is enough.
+        env:
+          SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION: Host=localhost;Database=unused;Username=unused;Password=unused
         run: |
           dotnet tool restore
           dotnet tool run dotnet-ef migrations bundle \
             --project src/SchoolManagement.Infrastructure \
-            --startup-project src/SchoolManagement.Api \
+            --startup-project src/SchoolManagement.Infrastructure \
             --configuration Release \
             --self-contained \
             --target-runtime linux-x64 \
