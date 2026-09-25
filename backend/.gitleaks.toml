@@ -132,6 +132,13 @@ regexes = [
   # the `$NAME` shape (uppercase shell convention) rather than to the file, so the same suppression
   # cannot quietly cover a literal password added to that script later.
   '''(?i)password\s*=\s*\$[A-Z_][A-Z0-9_]*\b''',
+
+  # First VPS deploy, 2026-09-25: the migration bundle's design-time connection string
+  # (.github/workflows/deploy-production.yml and DEPLOYMENT.md "Deploying by hand") is a placeholder
+  # nothing ever connects with; EF only needs a non-empty value to build the model. Anchored to the
+  # literal word `unused`, like the tokens above, so no real password can match. It must cover
+  # history as well as the working tree, because commit d56d269 is already on main.
+  '''(?i)password\s*=\s*unused\b''',
 ]
 
 # TASK-0011 (2026-08-27), Family B — the default `generic-api-key` rule (from `useDefault`, not a
