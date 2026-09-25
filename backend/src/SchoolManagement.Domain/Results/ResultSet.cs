@@ -178,6 +178,30 @@ public sealed class ResultSet : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
+    /// A pupil moved into or out of this set's arm (spec 06 §6.4.4 step 5, 09 §6.7.12): the cohort changed, so class
+    /// averages and positions are stale. Flags the set; Awaiting Approval drops to Draft with a system note, so the head
+    /// teacher sees why the item left the approval queue, and Returned for Correction drops to Draft as it does for a
+    /// settings change (keeping the head teacher's reason). Approved keeps its state and only gains the flag, which
+    /// publication already refuses. The caller never passes a Published set: it renders from its snapshot.
+    /// </summary>
+    /// <param name="note">The system-written note, for example "Cohort changed by pupil transfer on 14/10/2026".</param>
+    /// <returns><see langword="true"/> when <see cref="State"/> changed.</returns>
+    public bool FlagCohortChanged(string note)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(note);
+
+        if (State == ResultSetState.AwaitingApproval)
+        {
+            NeedsRecompute = true;
+            State = ResultSetState.Draft;
+            ReturnReason = note.Length <= ReturnReasonMaxLength ? note : note[..ReturnReasonMaxLength];
+            return true;
+        }
+
+        return FlagNeedsRecomputeBySystem();
+    }
+
+    /// <summary>
     /// Applies computation's outcome (spec 8.2 step 11): stamps <see cref="ComputedAtUtc"/>/
     /// <see cref="ComputedBy"/>, writes <see cref="PupilCount"/> (the ranked denominator printed on
     /// the sheet), and clears <see cref="NeedsRecompute"/>. Does NOT change <see cref="State"/> —

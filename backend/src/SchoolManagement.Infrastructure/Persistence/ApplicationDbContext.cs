@@ -158,6 +158,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     /// </summary>
     internal DbSet<PupilRegNumberHistory> PupilRegNumberHistory => Set<PupilRegNumberHistory>();
 
+    /// <summary>Spec 6.5.14. Every status-screen transition, appended and never updated — see <c>Configurations.PupilStatusChangeConfiguration</c>.</summary>
+    internal DbSet<PupilStatusChange> PupilStatusChanges => Set<PupilStatusChange>();
+
     /// <summary>TASK-0070. Internal, not public: only this assembly's repositories may query it.</summary>
     internal DbSet<Subject> Subjects => Set<Subject>();
 

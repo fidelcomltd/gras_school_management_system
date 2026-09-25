@@ -149,7 +149,10 @@ public sealed class Enrolment : Entity<Guid>, IAuditableEntity
     /// <param name="currentOpenEnrolment">The pupil's open enrolment, tracked, about to be closed.</param>
     /// <param name="newEnrolmentId">A fresh <see cref="Guid.CreateVersion7()"/> value for the new row.</param>
     /// <param name="destinationArmId">The arm the pupil is moving to. Must differ from the current arm.</param>
-    /// <param name="transferDate">Closes the old row and opens the new one on this date.</param>
+    /// <param name="transferDate">
+    /// Opens the new row on this date and closes the old one the day before (spec 06 §6.4.4 step 3: "effective_to set to
+    /// the day before"), so no date belongs to two arms. Must therefore fall after the old row's effective-from date.
+    /// </param>
     public static Result<Enrolment> Transfer(
         Enrolment currentOpenEnrolment,
         Guid newEnrolmentId,
@@ -165,7 +168,14 @@ public sealed class Enrolment : Entity<Guid>, IAuditableEntity
                 "The pupil is already enrolled in this arm."));
         }
 
-        var closeResult = currentOpenEnrolment.Close(transferDate);
+        if (currentOpenEnrolment.IsOpen && transferDate <= currentOpenEnrolment.EffectiveFrom)
+        {
+            return Result.Failure<Enrolment>(Error.Validation(
+                "enrolment.transfer_date_not_after_start",
+                $"A move must take effect after {currentOpenEnrolment.EffectiveFrom:dd/MM/yyyy}, the date the pupil joined this arm."));
+        }
+
+        var closeResult = currentOpenEnrolment.Close(transferDate.AddDays(-1));
 
         if (closeResult.IsFailure)
         {

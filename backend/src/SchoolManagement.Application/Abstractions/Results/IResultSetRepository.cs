@@ -100,4 +100,12 @@ public interface IResultSetRepository
     /// </summary>
     Task<IReadOnlyList<ResultSet>> LockNonPublishedByTermAndClassLevelsAsync(
         Guid termId, IReadOnlyCollection<Guid> classLevelIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Row-locks, in ASCENDING ID ORDER (see <see cref="LockNonPublishedInSessionAsync"/>'s remarks), every result set of
+    /// the arms in <paramref name="armIds"/>, in EVERY state, and returns them TRACKED in that order. A pupil status
+    /// change or transfer reads the Published ones to decide whether it is blocked and flags the rest (spec 06 §6.4.4
+    /// steps 5 and 6).
+    /// </summary>
+    Task<IReadOnlyList<ResultSet>> LockByArmsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken);
 }

@@ -955,6 +955,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pupils/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change a pupil's status: leave, graduate or reactivate
+         * @description Spec 6.5.14. `pupil.status.update`, checked in the handler (a leaver has no open enrolment for a route scope to resolve). Active to `transferred` or `withdrawn` closes the open enrolment on `effectiveDate` (not after today) and needs a `reason`; active to `graduated` closes it at the session end date and needs a `reason`; `transferred`, `withdrawn` or `graduated` to `active` (reactivation) opens a new enrolment in `armId` (an active arm of the active session) from `effectiveDate`, keeps the registration number and all history, and needs a `reason` only from graduated. The pupil leaves (or rejoins) score entry, the completeness gate and ranking from that date; marks are kept. Every non-Published result set of the arm is flagged for recompute (Awaiting Approval and Returned for Correction drop to Draft); Published results stay published. Capacity is a soft limit (`arm.capacity.override`). With `dryRun` nothing is written and the response lists the consequences. 409 `pupil.status_pending` for a pending admission (use the admissions queue), `pupil.status_unchanged`, `pupil.status_transition_not_allowed`, `pupil.reactivation_needs_admission` (a declined application), `arm.at_capacity`. 422 for a future or out-of-range date. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["ChangePupilStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a pupil to another arm in the same session
+         * @description Spec 6.5.17, 06 §6.4.4. `pupil.transfer`, checked in the handler. The open enrolment closes the day before `effectiveDate` (not after today, and after the current enrolment began) and a new one opens in `armId` on it. Marks travel with the pupil. Every non-Published result set of both arms is flagged for recompute; Awaiting Approval and Returned for Correction drop to Draft with the note "Cohort changed by pupil transfer on dd/MM/yyyy". A Published result set of either arm for the term the date falls in, or a later term, refuses the move (409 `pupil.transfer_blocked_by_published_results`). With `dryRun` nothing is written and `resultSets` lists the publication and recompute consequences, `Blocks` entries included. 409 `pupil.not_in_a_class`, `arm.at_capacity`; 422 `pupil.arm_not_available` (inactive, or another session: that is promotion). `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["TransferPupil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}/enrolments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A pupil's class history and status changes
+         * @description Spec 6.5.15, 02 §5.2. `pupil.view`, checked in the handler (arm-scoped callers see only pupils whose open enrolment is in their arms). The current arm, every enrolment oldest first, and every status change with its reason.
+         */
+        get: operations["GetPupilEnrolments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils/import/template": {
         parameters: {
             query?: never;
@@ -3533,6 +3593,49 @@ export interface components {
              * @example another horse battery staple 4
              */
             newPassword: string;
+        };
+        /**
+         * @description `POST /api/v1/pupils/{id}/status` (spec 6.5.14, 6.5.17): the status screen. Active to transferred or withdrawn
+         *             closes the open enrolment on the effective date; active to graduated closes it at the session end date; transferred,
+         *             withdrawn or graduated back to active (reactivation) opens a new enrolment in ArmId, keeping the
+         *             registration number and all history. A pending admission is approved or declined from the admissions queue instead.
+         * @example {
+         *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50",
+         *       "targetStatus": "Withdrawn",
+         *       "effectiveDate": "2026-11-20",
+         *       "reason": "Family relocated to Abuja.",
+         *       "armId": null,
+         *       "dryRun": true
+         *     }
+         */
+        ChangePupilStatusCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil. From the route.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50
+             */
+            id: string;
+            /** @description Active, transferred, withdrawn or graduated. */
+            targetStatus: components["schemas"]["PupilStatus"];
+            /**
+             * Format: date
+             * @description Required, not after today, except for graduated, which always takes the session end date.
+             * @example 2026-11-20
+             */
+            effectiveDate: null | string;
+            /**
+             * @description Required when the pupil leaves, and when a graduated pupil is reactivated. At most 500 characters.
+             * @example Family relocated to Abuja.
+             */
+            reason: null | string;
+            /** @description The destination arm for a reactivation: an active arm in the active session. Omitted otherwise. */
+            armId: null | string;
+            /**
+             * @description When true, nothing is written and the response says what would happen.
+             * @default false
+             * @example true
+             */
+            dryRun: boolean;
         };
         /**
          * @description One missing item on an admission (spec 6.5.12), keyed to the step that fixes it.
@@ -7185,6 +7288,124 @@ export interface components {
             missing?: null | string[];
         };
         /**
+         * @description One enrolment in the pupil's history (spec 02 §5.2).
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2C",
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "sessionName": "2026/2027",
+         *       "effectiveFrom": "2026-10-14",
+         *       "effectiveTo": null
+         *     }
+         */
+        PupilEnrolmentDto: {
+            /**
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Its composed display name.
+             * @example Primary 2C
+             */
+            armName: string;
+            /**
+             * @description The arm's session.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /**
+             * @description For example 2026/2027.
+             * @example 2026/2027
+             */
+            sessionName: string;
+            /**
+             * Format: date
+             * @description The first day in the arm.
+             * @example 2026-10-14
+             */
+            effectiveFrom: string;
+            /**
+             * Format: date
+             * @description The last day; `null` while open.
+             */
+            effectiveTo: null | string;
+        };
+        /**
+         * @description `GET /pupils/{id}/enrolments`: where the pupil sits now, where they sat before, and every status change.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "status": "Active",
+         *       "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "currentArmName": "Primary 2C",
+         *       "enrolments": [
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+         *           "armName": "Primary 2A",
+         *           "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *           "sessionName": "2026/2027",
+         *           "effectiveFrom": "2026-09-08",
+         *           "effectiveTo": "2026-10-13"
+         *         },
+         *         {
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armName": "Primary 2C",
+         *           "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *           "sessionName": "2026/2027",
+         *           "effectiveFrom": "2026-10-14",
+         *           "effectiveTo": null
+         *         }
+         *       ],
+         *       "statusChanges": []
+         *     }
+         */
+        PupilEnrolmentHistoryDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /** @description The pupil's current status. */
+            status: components["schemas"]["PupilStatus"];
+            /**
+             * @description The open enrolment's arm; `null` when the pupil has none.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            currentArmId: null | string;
+            /**
+             * @description Its display name.
+             * @example Primary 2C
+             */
+            currentArmName: null | string;
+            /**
+             * @description Oldest first.
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+             *         "armName": "Primary 2A",
+             *         "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+             *         "sessionName": "2026/2027",
+             *         "effectiveFrom": "2026-09-08",
+             *         "effectiveTo": "2026-10-13"
+             *       },
+             *       {
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armName": "Primary 2C",
+             *         "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+             *         "sessionName": "2026/2027",
+             *         "effectiveFrom": "2026-10-14",
+             *         "effectiveTo": null
+             *       }
+             *     ]
+             */
+            enrolments: components["schemas"]["PupilEnrolmentDto"][];
+            /**
+             * @description Oldest first.
+             * @example []
+             */
+            statusChanges: components["schemas"]["PupilStatusChangeDto"][];
+        };
+        /**
          * @description Section F (spec 6.5.7). Null answers mean "not asked yet". Safeguarding data: every read is audited.
          * @example {
          *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
@@ -7591,6 +7812,206 @@ export interface components {
             registrationNumber: string;
         };
         /**
+         * @description The destination arm's capacity once this pupil is added (spec 6.4.6). A soft limit.
+         * @example {
+         *       "capacity": 22,
+         *       "enrolledAfter": 20,
+         *       "overCapacity": false,
+         *       "canOverride": false
+         *     }
+         */
+        PupilMovementCapacityDto: {
+            /**
+             * Format: int32
+             * @description The arm's capacity.
+             * @example 22
+             */
+            capacity: number | string;
+            /**
+             * Format: int32
+             * @description Open enrolments once this pupil is added.
+             * @example 23
+             */
+            enrolledAfter: number | string;
+            /**
+             * @description Whether this pupil takes the arm past its capacity.
+             * @example true
+             */
+            overCapacity: boolean;
+            /**
+             * @description Whether the caller holds `arm.capacity.override` for the arm; without it an over-capacity move is refused.
+             * @example true
+             */
+            canOverride: boolean;
+        };
+        /**
+         * @description What a status change or transfer does to one result set (spec 06 §6.4.4 steps 5 and 6).
+         * @example RevertsToDraft
+         * @enum {unknown}
+         */
+        PupilMovementEffect: "Blocks" | "NeedsRecompute" | "RevertsToDraft";
+        /**
+         * @description The outcome of `POST /pupils/{id}/status` or `POST /pupils/{id}/transfer`. With `dryRun` nothing is
+         *     written and PupilDto PupilMovementOutcomeDto.Pupil is the pupil as it stands; otherwise the change has been made.
+         * @example {
+         *       "dryRun": true,
+         *       "pupil": {
+         *         "id": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *         "registrationNumber": "GRAS/2026/0041",
+         *         "surname": "Okafor",
+         *         "firstName": "Chidera",
+         *         "middleName": null,
+         *         "sex": "Female",
+         *         "dateOfBirth": "2020-05-03",
+         *         "ageYears": 6,
+         *         "nationality": "Nigerian",
+         *         "stateOfOrigin": "Anambra",
+         *         "lga": "Awka South",
+         *         "homeAddress": "14 Zik Avenue, Awka",
+         *         "previousSchool": null,
+         *         "previousClass": null,
+         *         "status": "Active",
+         *         "otherInformation": null,
+         *         "matchedField": null,
+         *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *         "createdBy": null,
+         *         "admission": null,
+         *         "levelAppliedFor": null,
+         *         "dateApplicationReceived": null,
+         *         "missing": []
+         *       },
+         *       "fromStatus": "Active",
+         *       "toStatus": "Active",
+         *       "fromArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+         *       "fromArmName": "Primary 2A",
+         *       "toArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "toArmName": "Primary 2C",
+         *       "effectiveDate": "2026-10-14",
+         *       "enrolmentClosesOn": "2026-10-13",
+         *       "resultSets": [
+         *         {
+         *           "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+         *           "armName": "Primary 2A",
+         *           "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *           "termName": "First Term",
+         *           "state": "AwaitingApproval",
+         *           "effect": "RevertsToDraft"
+         *         }
+         *       ],
+         *       "capacity": {
+         *         "capacity": 22,
+         *         "enrolledAfter": 20,
+         *         "overCapacity": false,
+         *         "canOverride": false
+         *       }
+         *     }
+         */
+        PupilMovementOutcomeDto: {
+            /**
+             * @description Echoes the request.
+             * @example true
+             */
+            dryRun: boolean;
+            /** @description The pupil, after the change unless DryRun. */
+            pupil: components["schemas"]["PupilDto"];
+            /** @description The status before. */
+            fromStatus: components["schemas"]["PupilStatus"];
+            /** @description The status after (the same for a transfer). */
+            toStatus: components["schemas"]["PupilStatus"];
+            /**
+             * @description The arm the pupil leaves; `null` when they had no open enrolment.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5185
+             */
+            fromArmId: null | string;
+            /**
+             * @description Its display name.
+             * @example Primary 2A
+             */
+            fromArmName: null | string;
+            /**
+             * @description The arm the pupil joins; `null` when they leave the school.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            toArmId: null | string;
+            /**
+             * @description Its display name.
+             * @example Primary 2C
+             */
+            toArmName: null | string;
+            /**
+             * Format: date
+             * @description When the change takes effect. For a graduation, the session end date.
+             * @example 2026-10-14
+             */
+            effectiveDate: string;
+            /**
+             * Format: date
+             * @description The date the old enrolment closes: the effective date, or the day before it for a transfer.
+             * @example 2026-10-13
+             */
+            enrolmentClosesOn: null | string;
+            /**
+             * @description Every result set the move touches, and how. A PupilMovementEffect.Blocks entry means a real call is refused.
+             * @example [
+             *       {
+             *         "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+             *         "armName": "Primary 2A",
+             *         "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+             *         "termName": "First Term",
+             *         "state": "AwaitingApproval",
+             *         "effect": "RevertsToDraft"
+             *       }
+             *     ]
+             */
+            resultSets: components["schemas"]["PupilMovementResultSetDto"][];
+            capacity: null | components["schemas"]["PupilMovementCapacityDto"];
+        };
+        /**
+         * @description One result set a move touches.
+         * @example {
+         *       "resultSetId": "0192f0c4-37e9-7566-4a38-e6960588b1b0",
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2A",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "termName": "First Term",
+         *       "state": "AwaitingApproval",
+         *       "effect": "RevertsToDraft"
+         *     }
+         */
+        PupilMovementResultSetDto: {
+            /**
+             * @description The set.
+             * @example 0192f0c4-37e9-7566-4a38-e6960588b1b0
+             */
+            resultSetId: string;
+            /**
+             * @description Its arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Composed display name, for example Primary 2A.
+             * @example Primary 2A
+             */
+            armName: string;
+            /**
+             * @description Its term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description For example First Term.
+             * @example First Term
+             */
+            termName: string;
+            /** @description Its state before the move. */
+            state: components["schemas"]["ResultSetState"];
+            /** @description What the move does to it. */
+            effect: components["schemas"]["PupilMovementEffect"];
+        };
+        /**
          * @description A Pupil's sex (spec 6.5.4). Required, no default.
          * @example Female
          * @enum {unknown}
@@ -7602,6 +8023,42 @@ export interface components {
          * @enum {unknown}
          */
         PupilStatus: "Pending" | "Active" | "Transferred" | "Withdrawn" | "Graduated";
+        /**
+         * @description One status-screen transition (spec 6.5.14).
+         * @example {
+         *       "fromStatus": "Active",
+         *       "toStatus": "Withdrawn",
+         *       "effectiveDate": "2026-11-20",
+         *       "reason": "Family relocated to Abuja.",
+         *       "armName": null,
+         *       "changedAtUtc": "2026-11-20T10:15:00+00:00"
+         *     }
+         */
+        PupilStatusChangeDto: {
+            /** @description Before. */
+            fromStatus: components["schemas"]["PupilStatus"];
+            /** @description After. */
+            toStatus: components["schemas"]["PupilStatus"];
+            /**
+             * Format: date
+             * @description When it took effect.
+             * @example 2026-11-20
+             */
+            effectiveDate: string;
+            /**
+             * @description Why; `null` for a reactivation given none.
+             * @example Family relocated to Abuja.
+             */
+            reason: null | string;
+            /** @description The arm a reactivation enrolled the pupil into. */
+            armName: null | string;
+            /**
+             * Format: date-time
+             * @description When it was recorded.
+             * @example 2026-11-20T10:15:00+00:00
+             */
+            changedAtUtc: string;
+        };
         /**
          * @description One pupil's whole term, week by week (spec 6.10.11). Backs the per-pupil tab.
          * @example {
@@ -12226,6 +12683,44 @@ export interface components {
          * @enum {unknown}
          */
         TraitStatus: "Active" | "Archived";
+        /**
+         * @description `POST /api/v1/pupils/{id}/transfer` (spec 6.5.17, 06 §6.4.4): moves an active pupil to another arm in the same
+         *             session. The open enrolment closes the day before EffectiveDate and a new one opens on it. Marks
+         *             stay with the pupil. Every non-Published result set of both arms is flagged for recompute (Awaiting Approval and
+         *             Returned for Correction drop to Draft); a Published set of either arm for the term the date falls in, or a later
+         *             one, refuses the move.
+         * @example {
+         *       "id": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "effectiveDate": "2026-10-14",
+         *       "dryRun": true
+         *     }
+         */
+        TransferPupilCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil. From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            id: string;
+            /**
+             * @description The destination: an active arm in the same session as the pupil's current arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * Format: date
+             * @description The pupil's first day in the destination. After their current enrolment began, and not after today.
+             * @example 2026-10-14
+             */
+            effectiveDate: string;
+            /**
+             * @description When true, nothing is written and the response lists the publication and recompute consequences.
+             * @default false
+             * @example true
+             */
+            dryRun: boolean;
+        };
         /**
          * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
          *             string UpdateAbbreviationCommandValidator.RequiredConfirmationToken and a reason (spec: "the
@@ -18755,6 +19250,262 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangePupilStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePupilStatusCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilMovementOutcomeDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferPupil: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferPupilCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilMovementOutcomeDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilEnrolments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilEnrolmentHistoryDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

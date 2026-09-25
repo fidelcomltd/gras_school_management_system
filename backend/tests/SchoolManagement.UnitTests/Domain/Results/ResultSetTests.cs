@@ -239,4 +239,31 @@ public sealed class ResultSetTests
         resultSet.State.ShouldBe(ResultSetState.AwaitingApproval);
         resultSet.ReturnReason.ShouldBeNull();
     }
+
+    [Fact]
+    public void FlagCohortChanged_OnAnAwaitingApprovalSet_DropsToDraftWithTheNote()
+    {
+        var resultSet = WithState(ResultSetState.AwaitingApproval);
+
+        var stateChanged = resultSet.FlagCohortChanged("Cohort changed by pupil transfer on 14/10/2026.");
+
+        stateChanged.ShouldBeTrue();
+        resultSet.State.ShouldBe(ResultSetState.Draft);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+        resultSet.ReturnReason.ShouldBe("Cohort changed by pupil transfer on 14/10/2026.");
+    }
+
+    [Theory]
+    [InlineData(ResultSetState.Draft, ResultSetState.Draft)]
+    [InlineData(ResultSetState.Approved, ResultSetState.Approved)]
+    [InlineData(ResultSetState.ReturnedForCorrection, ResultSetState.Draft)]
+    public void FlagCohortChanged_OnOtherStates_BehavesAsTheSystemFlag(ResultSetState state, ResultSetState expected)
+    {
+        var resultSet = WithState(state);
+
+        resultSet.FlagCohortChanged("Cohort changed by pupil transfer on 14/10/2026.");
+
+        resultSet.State.ShouldBe(expected);
+        resultSet.NeedsRecompute.ShouldBeTrue();
+    }
 }

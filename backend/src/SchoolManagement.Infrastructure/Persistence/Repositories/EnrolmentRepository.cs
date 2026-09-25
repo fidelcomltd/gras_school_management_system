@@ -30,6 +30,15 @@ internal sealed class EnrolmentRepository(ApplicationDbContext context) : IEnrol
             enrolment => enrolment.PupilId == pupilId && enrolment.EffectiveTo == null, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Enrolment>> ListByPupilReadOnlyAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        await context.Enrolments.AsNoTracking()
+            .Where(enrolment => enrolment.PupilId == pupilId)
+            .OrderBy(enrolment => enrolment.EffectiveFrom)
+            .ThenBy(enrolment => enrolment.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public Task<int> CountOpenExcludingPendingByArmAsync(Guid armId, CancellationToken cancellationToken) =>
         (from enrolment in context.Enrolments.AsNoTracking()
          where enrolment.ArmId == armId && enrolment.EffectiveTo == null
@@ -60,14 +69,25 @@ internal sealed class EnrolmentRepository(ApplicationDbContext context) : IEnrol
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<ArmLeaverPupil>> ListLeftDuringTermByArmAsync(
-        Guid armId, DateOnly termStart, DateOnly termEnd, CancellationToken cancellationToken) =>
-        await (from enrolment in context.Enrolments.AsNoTracking()
-               where enrolment.ArmId == armId && enrolment.EffectiveTo != null
-                     && enrolment.EffectiveTo >= termStart && enrolment.EffectiveTo <= termEnd
-               join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
-               orderby pupil.Surname.ToLower(), pupil.Id
-               select new ArmLeaverPupil(
-                   pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName, enrolment.EffectiveTo!.Value))
+        Guid armId, DateOnly termStart, DateOnly termEnd, CancellationToken cancellationToken)
+    {
+        var leavers = await (from enrolment in context.Enrolments.AsNoTracking()
+                             where enrolment.ArmId == armId && enrolment.EffectiveTo != null
+                                   && enrolment.EffectiveTo >= termStart && enrolment.EffectiveTo <= termEnd
+                                   // A pupil reinstated into this same arm is back on the roster, not a leaver.
+                                   && !context.Enrolments.Any(open =>
+                                       open.PupilId == enrolment.PupilId && open.ArmId == armId && open.EffectiveTo == null)
+                             join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                             orderby pupil.Surname.ToLower(), pupil.Id
+                             select new ArmLeaverPupil(
+                                 pupil.Id, pupil.RegistrationNumber, pupil.Surname, pupil.FirstName, pupil.MiddleName, enrolment.EffectiveTo!.Value))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        // A pupil who left, came back and left again in one term has two closed rows; list them once, on the latest.
+        return leavers
+            .GroupBy(leaver => leaver.PupilId)
+            .Select(group => group.MaxBy(leaver => leaver.LeftOn)!)
+            .ToList();
+    }
 }

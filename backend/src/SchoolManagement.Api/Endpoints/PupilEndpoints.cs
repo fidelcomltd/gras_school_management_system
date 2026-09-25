@@ -7,16 +7,16 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Pupils.Import;
+using SchoolManagement.Application.Pupils.Movement;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Api.Endpoints;
 
 /// <summary>
-/// The pupil register's entity and read surface (TASK-0050; spec 6.5.4, 6.5.10, 6.5.14, 6.5.15).
-/// Contacts, health, pickup/barred persons, documents, the admission flow, photograph upload, bulk
-/// import, transfer and every status transition are later cards — see the task card's own
-/// out-of-scope list. <c>GET /admissions</c> is <see cref="AdmissionEndpoints"/>, a separate module.
+/// The pupil register's entity and read surface (TASK-0050; spec 6.5.4, 6.5.10, 6.5.14, 6.5.15), bulk import (6.5.13),
+/// and status changes and transfers (6.5.14, 6.5.17). Contacts, health, pickup/barred persons and documents are
+/// <see cref="PupilRecordEndpoints"/>; <c>GET /admissions</c> is <see cref="AdmissionEndpoints"/>.
 /// </summary>
 public sealed class PupilEndpoints : IEndpointModule
 {
@@ -37,6 +37,9 @@ public sealed class PupilEndpoints : IEndpointModule
         MapGet(group);
         MapUpdate(group);
         MapCorrectRegistrationNumber(group);
+        MapChangeStatus(group);
+        MapTransfer(group);
+        MapEnrolments(group);
         MapImportTemplate(group);
         MapImportValidate(group);
         MapImportCommit(group);
@@ -318,5 +321,97 @@ public sealed class PupilEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapChangeStatus(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/status", async (
+                Guid id,
+                ChangePupilStatusCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequireAuthenticatedCaller()
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .WithName("ChangePupilStatus")
+            .WithSummary("Change a pupil's status: leave, graduate or reactivate")
+            .WithDescription(
+                "Spec 6.5.14. `pupil.status.update`, checked in the handler (a leaver has no open enrolment for a route " +
+                "scope to resolve). Active to `transferred` or `withdrawn` closes the open enrolment on `effectiveDate` " +
+                "(not after today) and needs a `reason`; active to `graduated` closes it at the session end date and " +
+                "needs a `reason`; `transferred`, `withdrawn` or `graduated` to `active` (reactivation) opens a new " +
+                "enrolment in `armId` (an active arm of the active session) from `effectiveDate`, keeps the registration " +
+                "number and all history, and needs a `reason` only from graduated. The pupil leaves (or rejoins) score " +
+                "entry, the completeness gate and ranking from that date; marks are kept. Every non-Published result set " +
+                "of the arm is flagged for recompute (Awaiting Approval and Returned for Correction drop to Draft); " +
+                "Published results stay published. Capacity is a soft limit (`arm.capacity.override`). With `dryRun` " +
+                "nothing is written and the response lists the consequences. 409 `pupil.status_pending` for a pending " +
+                "admission (use the admissions queue), `pupil.status_unchanged`, `pupil.status_transition_not_allowed`, " +
+                "`pupil.reactivation_needs_admission` (a declined application), `arm.at_capacity`. 422 for a future or " +
+                "out-of-range date. `Idempotency-Key` is REQUIRED.")
+            .Produces<PupilMovementOutcomeDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapTransfer(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/transfer", async (
+                Guid id,
+                TransferPupilCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequireAuthenticatedCaller()
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .WithName("TransferPupil")
+            .WithSummary("Move a pupil to another arm in the same session")
+            .WithDescription(
+                "Spec 6.5.17, 06 §6.4.4. `pupil.transfer`, checked in the handler. The open enrolment closes the day " +
+                "before `effectiveDate` (not after today, and after the current enrolment began) and a new one opens in " +
+                "`armId` on it. Marks travel with the pupil. Every non-Published result set of both arms is flagged for " +
+                "recompute; Awaiting Approval and Returned for Correction drop to Draft with the note \"Cohort changed " +
+                "by pupil transfer on dd/MM/yyyy\". A Published result set of either arm for the term the date falls in, " +
+                "or a later term, refuses the move (409 `pupil.transfer_blocked_by_published_results`). With `dryRun` " +
+                "nothing is written and `resultSets` lists the publication and recompute consequences, `Blocks` entries " +
+                "included. 409 `pupil.not_in_a_class`, `arm.at_capacity`; 422 `pupil.arm_not_available` (inactive, or " +
+                "another session: that is promotion). `Idempotency-Key` is REQUIRED.")
+            .Produces<PupilMovementOutcomeDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapEnrolments(RouteGroupBuilder group) =>
+        group.MapGet("/{id:guid}/enrolments", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(new GetPupilEnrolmentsQuery(id), cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequireAuthenticatedCaller()
+            .WithName("GetPupilEnrolments")
+            .WithSummary("A pupil's class history and status changes")
+            .WithDescription(
+                "Spec 6.5.15, 02 §5.2. `pupil.view`, checked in the handler (arm-scoped callers see only pupils whose " +
+                "open enrolment is in their arms). The current arm, every enrolment oldest first, and every status " +
+                "change with its reason.")
+            .Produces<PupilEnrolmentHistoryDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 }
