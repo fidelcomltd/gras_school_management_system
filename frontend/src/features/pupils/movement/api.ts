@@ -26,11 +26,13 @@ export const MovementKeys = {
   History: 'pupils.movement.history',
   ChangeStatus: 'pupils.movement.status',
   Transfer: 'pupils.movement.transfer',
+  Undo: 'pupils.movement.undo',
 } as const;
 
 const HISTORY_PATH = '/api/v1/pupils/{id}/enrolments';
 const STATUS_PATH = '/api/v1/pupils/{id}/status';
 const TRANSFER_PATH = '/api/v1/pupils/{id}/transfer';
+const UNDO_PATH = '/api/v1/pupils/{id}/status/undo';
 
 function normalise(outcome: S['PupilMovementOutcomeDto']): PupilMovementOutcome {
   const { capacity } = outcome;
@@ -79,6 +81,17 @@ export function useChangePupilStatus(id: string) {
     mutationKey: [MovementKeys.ChangeStatus, id],
     mutationFn: async ({ idempotencyKey, ...body }: ChangePupilStatusCommand & { idempotencyKey: string }) =>
       normalise(await apiPost(STATUS_PATH, body, { pathParams: { id }, idempotencyKey })),
+    onSuccess: onMoved,
+  });
+}
+
+/** Gated `pupil.status.update`: undo today's leaving change (human ruling 2026-09-25). A fresh key per click. */
+export function useUndoStatusChange(id: string) {
+  const onMoved = useOnMoved(id);
+  return useMutation({
+    mutationKey: [MovementKeys.Undo, id],
+    mutationFn: async (reason: string | null) =>
+      normalise(await apiPost(UNDO_PATH, { id, reason }, { pathParams: { id }, idempotencyKey: crypto.randomUUID() })),
     onSuccess: onMoved,
   });
 }

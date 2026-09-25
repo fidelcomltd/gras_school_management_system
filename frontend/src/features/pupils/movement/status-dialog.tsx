@@ -43,7 +43,6 @@ export function StatusDialog({ pupilId, status, onClose }: { pupilId: string; st
   const changeStatus = useChangePupilStatus(pupilId);
 
   const reactivating = target === 'Active';
-  const graduating = target === 'Graduated';
   const reasonRequired = !reactivating || status === 'Graduated';
   const sessions = useSessions('Active');
   const activeSessionId = sessions.data?.pages[0]?.items[0]?.id ?? '';
@@ -58,14 +57,14 @@ export function StatusDialog({ pupilId, status, onClose }: { pupilId: string; st
   const body = (dryRun: boolean, idempotencyKey: string) => ({
     id: pupilId,
     targetStatus: target,
-    effectiveDate: graduating ? null : effectiveDate,
+    effectiveDate,
     reason: reason.trim() === '' ? null : reason.trim(),
     armId: reactivating ? armId : null,
     dryRun,
     idempotencyKey,
   });
 
-  const ready = (!reasonRequired || reason.trim() !== '') && (graduating || effectiveDate !== '') && (!reactivating || armId !== '');
+  const ready = (!reasonRequired || reason.trim() !== '') && effectiveDate !== '' && (!reactivating || armId !== '');
 
   const check = () => changeStatus.mutate(body(true, crypto.randomUUID()), { onSuccess: setPreview });
 
@@ -122,21 +121,17 @@ export function StatusDialog({ pupilId, status, onClose }: { pupilId: string; st
             </Field>
           ) : null}
 
-          {graduating ? (
-            <p className="text-sm text-muted-foreground">The pupil’s class closes at the end of the session.</p>
-          ) : (
-            <Field>
-              <FieldLabel>Effective date</FieldLabel>
-              <input
-                type="date"
-                aria-label="Effective date"
-                className={dateInput}
-                value={effectiveDate}
-                max={today}
-                onChange={(event) => change(() => setEffectiveDate(event.target.value))}
-              />
-            </Field>
-          )}
+          <Field>
+            <FieldLabel>Effective date</FieldLabel>
+            <input
+              type="date"
+              aria-label="Effective date"
+              className={dateInput}
+              value={effectiveDate}
+              max={today}
+              onChange={(event) => change(() => setEffectiveDate(event.target.value))}
+            />
+          </Field>
 
           <Field>
             <FieldLabel>{reasonRequired ? 'Reason' : 'Reason (optional)'}</FieldLabel>

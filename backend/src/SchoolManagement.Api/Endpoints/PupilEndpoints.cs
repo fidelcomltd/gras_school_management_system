@@ -38,6 +38,7 @@ public sealed class PupilEndpoints : IEndpointModule
         MapUpdate(group);
         MapCorrectRegistrationNumber(group);
         MapChangeStatus(group);
+        MapUndoStatus(group);
         MapTransfer(group);
         MapEnrolments(group);
         MapImportTemplate(group);
@@ -340,9 +341,9 @@ public sealed class PupilEndpoints : IEndpointModule
             .WithSummary("Change a pupil's status: leave, graduate or reactivate")
             .WithDescription(
                 "Spec 6.5.14. `pupil.status.update`, checked in the handler (a leaver has no open enrolment for a route " +
-                "scope to resolve). Active to `transferred` or `withdrawn` closes the open enrolment on `effectiveDate` " +
-                "(not after today) and needs a `reason`; active to `graduated` closes it at the session end date and " +
-                "needs a `reason`; `transferred`, `withdrawn` or `graduated` to `active` (reactivation) opens a new " +
+                "scope to resolve). Active to `transferred`, `withdrawn` or `graduated` closes the open enrolment on " +
+                "`effectiveDate` (not after today) and needs a `reason`; `transferred`, `withdrawn` or `graduated` to " +
+                "`active` (reactivation) opens a new " +
                 "enrolment in `armId` (an active arm of the active session) from `effectiveDate`, keeps the registration " +
                 "number and all history, and needs a `reason` only from graduated. The pupil leaves (or rejoins) score " +
                 "entry, the completeness gate and ranking from that date; marks are kept. Every non-Published result set " +
@@ -352,6 +353,36 @@ public sealed class PupilEndpoints : IEndpointModule
                 "admission (use the admissions queue), `pupil.status_unchanged`, `pupil.status_transition_not_allowed`, " +
                 "`pupil.reactivation_needs_admission` (a declined application), `arm.at_capacity`. 422 for a future or " +
                 "out-of-range date. `Idempotency-Key` is REQUIRED.")
+            .Produces<PupilMovementOutcomeDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+    private static void MapUndoStatus(RouteGroupBuilder group) =>
+        group.MapPost("/{id:guid}/status/undo", async (
+                Guid id,
+                UndoPupilStatusChangeCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command with { Id = id }, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequireAuthenticatedCaller()
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .WithName("UndoPupilStatusChange")
+            .WithSummary("Undo today's leaving status change")
+            .WithDescription(
+                "Human ruling 2026-09-25. `pupil.status.update`, checked in the handler. Undoes the pupil's most recent " +
+                "status change when it was a leave (`transferred`, `withdrawn` or `graduated`) recorded TODAY (Lagos " +
+                "date): the enrolment it closed is reopened, the pupil is active again, and every non-Published result " +
+                "set of that arm is flagged for recompute. The history keeps both rows: the undo is appended as its own " +
+                "status change. 409 `pupil.status_undo_unavailable` otherwise (reactivate from the status screen " +
+                "instead). `Idempotency-Key` is REQUIRED.")
             .Produces<PupilMovementOutcomeDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

@@ -3180,6 +3180,10 @@ internal static class OpenApiExamples
             { "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50", "targetStatus": "Withdrawn", "effectiveDate": "2026-11-20", "reason": "Family relocated to Abuja.", "armId": null, "dryRun": true }
             """,
 
+        [typeof(UndoPupilStatusChangeCommand)] = $$"""
+            { "id": "{{ExamplePupilId}}", "reason": "Withdrawn on the wrong record." }
+            """,
+
         [typeof(TransferPupilCommand)] = $$"""
             { "id": "{{ExamplePupilId}}", "armId": "{{ExampleArmId}}", "effectiveDate": "2026-10-14", "dryRun": true }
             """,

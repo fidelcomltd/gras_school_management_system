@@ -39,6 +39,10 @@ internal sealed class EnrolmentRepository(ApplicationDbContext context) : IEnrol
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public Task<Enrolment?> FindTrackedByIdAsync(Guid enrolmentId, CancellationToken cancellationToken) =>
+        context.Enrolments.FirstOrDefaultAsync(enrolment => enrolment.Id == enrolmentId, cancellationToken);
+
+    /// <inheritdoc />
     public Task<int> CountOpenExcludingPendingByArmAsync(Guid armId, CancellationToken cancellationToken) =>
         (from enrolment in context.Enrolments.AsNoTracking()
          where enrolment.ArmId == armId && enrolment.EffectiveTo == null

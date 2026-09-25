@@ -52,7 +52,7 @@ public sealed record PupilMovementCapacityDto(int Capacity, int EnrolledAfter, b
 /// <param name="FromArmName">Its display name.</param>
 /// <param name="ToArmId">The arm the pupil joins; <see langword="null"/> when they leave the school.</param>
 /// <param name="ToArmName">Its display name.</param>
-/// <param name="EffectiveDate">When the change takes effect. For a graduation, the session end date.</param>
+/// <param name="EffectiveDate">When the change takes effect.</param>
 /// <param name="EnrolmentClosesOn">The date the old enrolment closes: the effective date, or the day before it for a transfer.</param>
 /// <param name="ResultSets">Every result set the move touches, and how. A <see cref="PupilMovementEffect.Blocks"/> entry means a real call is refused.</param>
 /// <param name="Capacity">The destination's capacity; <see langword="null"/> when the pupil joins no arm.</param>

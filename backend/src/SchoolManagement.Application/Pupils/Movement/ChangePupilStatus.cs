@@ -18,14 +18,15 @@ using SchoolManagement.Domain.Security;
 namespace SchoolManagement.Application.Pupils.Movement;
 
 /// <summary>
-/// <c>POST /api/v1/pupils/{id}/status</c> (spec 6.5.14, 6.5.17): the status screen. Active to transferred or withdrawn
-/// closes the open enrolment on the effective date; active to graduated closes it at the session end date; transferred,
+/// <c>POST /api/v1/pupils/{id}/status</c> (spec 6.5.14, 6.5.17): the status screen. Active to transferred, withdrawn or
+/// graduated closes the open enrolment on the effective date (a manual graduation included, human ruling 2026-09-25, so
+/// a mistaken one can be reversed; promotion at the terminal level will close at the session end itself); transferred,
 /// withdrawn or graduated back to active (reactivation) opens a new enrolment in <paramref name="ArmId"/>, keeping the
 /// registration number and all history. A pending admission is approved or declined from the admissions queue instead.
 /// </summary>
 /// <param name="Id">The pupil. From the route.</param>
 /// <param name="TargetStatus">Active, transferred, withdrawn or graduated.</param>
-/// <param name="EffectiveDate">Required, not after today, except for graduated, which always takes the session end date.</param>
+/// <param name="EffectiveDate">Required, not after today.</param>
 /// <param name="Reason">Required when the pupil leaves, and when a graduated pupil is reactivated. At most 500 characters.</param>
 /// <param name="ArmId">The destination arm for a reactivation: an active arm in the active session. Omitted otherwise.</param>
 /// <param name="DryRun">When true, nothing is written and the response says what would happen.</param>
@@ -50,8 +51,7 @@ internal sealed class ChangePupilStatusCommandValidator : AbstractValidator<Chan
 
         RuleFor(command => command.EffectiveDate)
             .NotNull()
-            .WithMessage("Enter the date the change takes effect.")
-            .When(command => command.TargetStatus != PupilStatus.Graduated);
+            .WithMessage("Enter the date the change takes effect.");
 
         RuleFor(command => command.Reason)
             .NotEmpty()
@@ -144,25 +144,11 @@ internal sealed class ChangePupilStatusHandler(
         var arm = open is null ? null : await arms.FindReadOnlyByIdAsync(open.ArmId, cancellationToken).ConfigureAwait(false);
         var armNames = await engine.DisplayNamesAsync(arm is null ? [] : [arm], cancellationToken).ConfigureAwait(false);
 
-        DateOnly effectiveDate;
-
-        if (request.TargetStatus == PupilStatus.Graduated)
+        var effectiveDate = request.EffectiveDate!.Value;
+        var future = PupilMovementEngine.RefuseIfFuture(effectiveDate, today);
+        if (future.IsFailure)
         {
-            // Spec 6.5.14: graduation "closes the enrolment at the session end date".
-            var session = arm is null
-                ? await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false)
-                : await sessions.FindReadOnlyByIdAsync(arm.SessionId, cancellationToken).ConfigureAwait(false);
-            effectiveDate = session?.EndDate ?? today;
-        }
-        else
-        {
-            effectiveDate = request.EffectiveDate!.Value;
-
-            var future = PupilMovementEngine.RefuseIfFuture(effectiveDate, today);
-            if (future.IsFailure)
-            {
-                return Result.Failure<PupilMovementOutcomeDto>(future.Error);
-            }
+            return Result.Failure<PupilMovementOutcomeDto>(future.Error);
         }
 
         if (open is not null && effectiveDate < open.EffectiveFrom)
@@ -265,7 +251,7 @@ internal sealed class ChangePupilStatusHandler(
                 "pupil.enrolment_still_open", "This pupil still has an open enrolment. Close it before reactivating."));
         }
 
-        // No date may belong to two enrolments. A graduated pupil's enrolment runs to the end of their session.
+        // No date may belong to two enrolments.
         var lastDay = history.Max(enrolment => enrolment.EffectiveTo);
         if (lastDay is { } last && effectiveDate <= last)
         {
