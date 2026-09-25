@@ -499,13 +499,43 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
         meAfter.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    // TASK-0084: the test below this comment used to be a single
+    // `ChangeStatus_TwoSuperAdminsSuspendEachOtherConcurrently_OnlyOneSucceeds`, firing both requests
+    // via `Task.WhenAll` with no barrier. It proved 409+200 the overwhelming majority of runs but
+    // twice observed 200+401 instead (drift 2026-Q3, grep "SuspendEachOther": 2026-09-16 and
+    // 2026-09-18). Investigation (TASK-0084) found H1 true, not a product bug:
+    //
+    //   - Authentication runs exactly ONCE per request, in
+    //     CookieSessionAuthenticationHandler.HandleAuthenticateAsync (backend/src/SchoolManagement.Api
+    //     /Security/CookieSessionAuthenticationHandler.cs:38-46), strictly BEFORE the request reaches
+    //     routing or the command handler. It is never re-run mid-request:
+    //     HttpCurrentUser.UserId (backend/src/SchoolManagement.Api/Security/AuthenticationSetup.cs
+    //     :152-167) only reads the ClaimsPrincipal that step already produced.
+    //   - The row lock and commit happen entirely inside ChangeAdminAccountStatusCommandHandler
+    //     (backend/src/SchoolManagement.Application/Auth/AdminAccounts/ChangeAdminAccountStatusHandler.cs
+    //     :117-155) and UnitOfWork.ExecuteAtomicallyAsync
+    //     (backend/src/SchoolManagement.Infrastructure/Persistence/UnitOfWork.cs:34-53), which commits
+    //     only AFTER the handler returns — i.e. strictly after that request's own authentication.
+    //
+    //   So the only race is BETWEEN two independent request pipelines: whether the loser's own
+    //   authentication (of the loser's OWN session, which the winner's commit revokes) happens before
+    //   or after the winner's commit. Both 409 (loser authenticated first, then lost the row-lock
+    //   race) and 401 (winner already committed and revoked the loser's session before the loser's
+    //   request even authenticated) are legitimate outcomes — matching spec 6.1.13's "An account with
+    //   an active session is deactivated: ... the next request ... returns 401." Split into the two
+    //   interleavings below, each forced deterministically rather than left to Task.WhenAll timing.
+
     [Fact]
-    public async Task ChangeStatus_TwoSuperAdminsSuspendEachOtherConcurrently_OnlyOneSucceeds()
+    public async Task ChangeStatus_TwoSuperAdminsSuspendEachOtherConcurrently_BothAuthenticatedFirst_OnlyOneSucceedsWith409()
     {
-        // Spec 6.1.13: "Two Super Admins suspend each other in the same minute: the second operation
-        // fails the last-active-Super-Admin check... The check runs inside the transaction with a row
-        // lock on the account table, not as a pre-flight read." Proven under REAL concurrency, not
-        // sequenced calls — both requests are started before either is awaited.
+        // Interleaving (a): both requests have already passed authentication before either commits.
+        // Forced by an EXTERNAL transaction taking the SAME `FOR UPDATE` row lock
+        // AdminAccountRepository.LockActiveSuperAdminIdsAsync takes (backend/src/SchoolManagement
+        // .Infrastructure/Persistence/Repositories/AdminAccountRepository.cs:185-198): while it is
+        // held, NEITHER request's transaction can reach commit, so neither session can be revoked —
+        // which means both requests are still free to authenticate. Releasing only once BOTH requests
+        // are observed queued on that exact lock (pg_locks, not a guessed delay) proves both already
+        // got past authentication to reach it.
         RequireDatabase();
 
         var (idA, emailA) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
@@ -514,10 +544,24 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
         var jarA = await SignInAsync(emailA);
         var jarB = await SignInAsync(emailB);
 
+        await using var barrierScope = Fixture.CreateScope();
+        var barrierContext = barrierScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var barrierTransaction = await barrierContext.Database
+            .BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await barrierContext.Database
+            .SqlQuery<Guid>(
+                $"SELECT id FROM admin_accounts WHERE is_super_admin = TRUE AND status = 'Active' FOR UPDATE")
+            .ToListAsync(TestContext.Current.CancellationToken);
+
         var taskA = PostAsync(
             $"{AdminsUrl}/{idB}/status", jarA, new { status = "Suspended", reason = (string?)null });
         var taskB = PostAsync(
             $"{AdminsUrl}/{idA}/status", jarB, new { status = "Suspended", reason = (string?)null });
+
+        await WaitUntilBothQueuedOnAdminAccountsLockAsync();
+
+        await barrierTransaction.RollbackAsync(TestContext.Current.CancellationToken);
 
         var results = await Task.WhenAll(taskA, taskB);
 
@@ -527,6 +571,38 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
         var conflictResponse = results.Single(response => response.StatusCode == HttpStatusCode.Conflict);
         using var document = await ReadJsonAsync(conflictResponse);
         document.RootElement.GetProperty("errorCode").GetString().ShouldBe("admin.last_active_super_admin");
+
+        await AssertExactlyOneActiveSuperAdminAsync();
+    }
+
+    [Fact]
+    public async Task ChangeStatus_TwoSuperAdminsSuspendEachOther_WinnerCommitsBeforeLoserAuthenticates_Returns401()
+    {
+        // Interleaving (b): the loser's request is not even sent until AFTER the winner's request has
+        // fully committed — so the loser's own session is already revoked before its request reaches
+        // CookieSessionAuthenticationHandler, and it never reaches the handler or the row lock at all.
+        RequireDatabase();
+
+        var (idA, emailA) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        var (idB, emailB) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+
+        var jarA = await SignInAsync(emailA);
+        var jarB = await SignInAsync(emailB);
+
+        var suspendB = await PostAsync(
+            $"{AdminsUrl}/{idB}/status", jarA, new { status = "Suspended", reason = (string?)null });
+        suspendB.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // B's session was revoked by A's already-committed request above. B's own pending
+        // suspend-A request now fails authentication before it can ever reach the handler.
+        var suspendA = await PostAsync(
+            $"{AdminsUrl}/{idA}/status", jarB, new { status = "Suspended", reason = (string?)null });
+        suspendA.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        using var document = await ReadJsonAsync(suspendA);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("authentication.session_revoked");
+
+        await AssertExactlyOneActiveSuperAdminAsync();
     }
 
     [Fact]
@@ -601,6 +677,71 @@ public sealed class AdminAccountEndpointsTests(ApiTestFixture fixture) : Integra
         var signIn = await PostAsync(SignInUrl, jar, new SignInCommand(email, AdminAccountSeeder.Password));
         signIn.StatusCode.ShouldBe(HttpStatusCode.OK);
         return jar;
+    }
+
+    /// <summary>
+    /// TASK-0084's deterministic barrier: polls until two sessions are queued (not granted) on the
+    /// `admin_accounts` row lock, proving both concurrent status-change requests have already reached
+    /// <c>AdminAccountRepository.LockActiveSuperAdminIdsAsync</c>'s <c>FOR UPDATE</c> — which is only
+    /// reachable after each request's own authentication has already completed. Fails loudly with a
+    /// timeout rather than hanging if that never happens, so a real regression cannot masquerade as a
+    /// stalled test run.
+    /// </summary>
+    private async Task WaitUntilBothQueuedOnAdminAccountsLockAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var scope = Fixture.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            // A blocked `FOR UPDATE` waiter shows up in pg_locks as EITHER a `tuple` lock on
+            // `admin_accounts` (relation populated) OR a `transactionid` lock on the holder's XID
+            // (relation null, via Postgres's XactLockTableWait) — confirmed empirically: with two
+            // real concurrent requests blocked on the SAME barrier, one manifested each way. The
+            // fixture runs one test collection sequentially with nothing else concurrent, so any
+            // ungranted lock of either shape here can only be our own two requests.
+            var queued = await context.Database
+                .SqlQuery<int>(
+                    $"""
+                    SELECT COUNT(*) AS "Value" FROM pg_locks
+                    WHERE NOT granted AND (locktype = 'transactionid' OR relation = 'admin_accounts'::regclass)
+                    """)
+                .SingleAsync(TestContext.Current.CancellationToken);
+
+            if (queued >= 2)
+            {
+                return;
+            }
+
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException(
+            "Both concurrent status-change requests did not queue on the admin_accounts row lock " +
+            "within 10s — the barrier this test relies on did not engage.");
+    }
+
+    /// <summary>
+    /// TASK-0084 acceptance criterion: whichever interleaving produced the HTTP result, the
+    /// last-active-Super-Admin invariant itself must never be violated — never zero, and (with only
+    /// two Super Admins seeded in this test) never more than one still active either.
+    /// </summary>
+    private async Task AssertExactlyOneActiveSuperAdminAsync()
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var activeSuperAdmins = await context.Database
+            .SqlQuery<int>(
+                $"""
+                SELECT COUNT(*) AS "Value" FROM admin_accounts
+                WHERE is_super_admin = TRUE AND status = 'Active'
+                """)
+            .SingleAsync(TestContext.Current.CancellationToken);
+
+        activeSuperAdmins.ShouldBe(1);
     }
 
     private Task<HttpResponseMessage> GetAsync(string url, CookieJar jar) => GetAsync(Client, url, jar);
