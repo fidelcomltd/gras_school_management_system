@@ -4,13 +4,11 @@ using SchoolManagement.Domain.Common;
 namespace SchoolManagement.Domain.Pupils;
 
 /// <summary>
-/// The pupil register's core record (spec 6.5.4). TASK-0050 builds this entity and its read
-/// surface only — <c>registration_number</c> stays <see langword="null"/> forever within this
-/// card (issued at admission approval, TASK-0051), <see cref="Status"/> stays
-/// <see cref="PupilStatus.Pending"/> forever within this card (no status-change endpoint exists
-/// yet), and no arm/enrolment reference exists on this type at all: spec 6.5.4's "class as the
-/// composed arm display name" comes from the pupil's OPEN ENROLMENT, an entity this card
-/// deliberately does not build (see the card's own "Do not model an enrolment").
+/// The pupil register's core record (spec 6.5.4). <c>registration_number</c> is issued at admission
+/// approval (TASK-0051); <see cref="Status"/> moves only through <see cref="Approve"/>,
+/// <see cref="DeclineAdmission"/>, <see cref="Leave"/> and <see cref="Reactivate"/> (spec 6.5.14). No
+/// arm/enrolment reference exists on this type at all: spec 6.5.4's "class as the composed arm display
+/// name" comes from the pupil's OPEN ENROLMENT (spec 02 §5.2).
 /// </summary>
 /// <remarks>
 /// <c>blood_group</c>, <c>genotype</c> and <c>medical_note</c> are NOT on this entity — spec 6.5.4:
@@ -136,7 +134,7 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     /// <summary>Optional. Same conditional rule as <see cref="PreviousSchool"/>.</summary>
     public string? PreviousClass { get; private set; }
 
-    /// <summary>Defaults <see cref="PupilStatus.Pending"/> and stays there for every record this card creates.</summary>
+    /// <summary>Defaults <see cref="PupilStatus.Pending"/>; see the type summary for the transitions.</summary>
     public PupilStatus Status { get; private set; }
 
     /// <summary>Section G free text. Optional.</summary>
@@ -514,6 +512,80 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
         }
 
         Status = PupilStatus.Withdrawn;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Active to transferred, withdrawn or graduated (spec 6.5.14). The caller closes the open enrolment on the effective
+    /// date and records the reason; this only guards the transition itself.
+    /// </summary>
+    /// <param name="target">Transferred, withdrawn or graduated.</param>
+    public Result Leave(PupilStatus target)
+    {
+        var check = CheckLeave(target);
+
+        if (check.IsFailure)
+        {
+            return check;
+        }
+
+        Status = target;
+        return Result.Success();
+    }
+
+    /// <summary>Whether <see cref="Leave"/> would succeed, without changing anything (a dry run reads it).</summary>
+    public Result CheckLeave(PupilStatus target)
+    {
+        if (target is not (PupilStatus.Transferred or PupilStatus.Withdrawn or PupilStatus.Graduated))
+        {
+            return Result.Failure(Error.Validation(
+                "pupil.status_not_a_leaving_status", "A pupil can leave only as transferred, withdrawn or graduated."));
+        }
+
+        if (Status != PupilStatus.Active)
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.status_transition_not_allowed", $"Only an active pupil can be marked {target.ToString().ToLowerInvariant()}."));
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Transferred, withdrawn or graduated back to active (spec 6.5.14: reactivation). Keeps the registration number and
+    /// every history row; the caller opens the new enrolment. Never re-admission, so a pending pupil cannot come this way.
+    /// </summary>
+    public Result Reactivate()
+    {
+        var check = CheckReactivation();
+
+        if (check.IsFailure)
+        {
+            return check;
+        }
+
+        Status = PupilStatus.Active;
+        return Result.Success();
+    }
+
+    /// <summary>Whether <see cref="Reactivate"/> would succeed, without changing anything (a dry run reads it).</summary>
+    public Result CheckReactivation()
+    {
+        if (Status is not (PupilStatus.Transferred or PupilStatus.Withdrawn or PupilStatus.Graduated))
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.status_transition_not_allowed", "Only a transferred, withdrawn or graduated pupil can be reactivated."));
+        }
+
+        // A declined admission is withdrawn too, but was never issued a number or an enrolment (spec 6.5.14): it comes
+        // back through a fresh admission, not reactivation.
+        if (RegistrationNumber is null)
+        {
+            return Result.Failure(Error.Conflict(
+                "pupil.reactivation_needs_admission",
+                "This application was declined before admission, so there is nothing to reactivate. Start a new admission instead."));
+        }
+
         return Result.Success();
     }
 

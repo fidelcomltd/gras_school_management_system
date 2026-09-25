@@ -104,9 +104,9 @@ public sealed class EnrolmentTests
 
         result.IsSuccess.ShouldBeTrue();
 
-        // The OLD row: closed, on the transfer date, its arm untouched.
+        // The OLD row: closed the day before the transfer date (spec 6.4.4 step 3), its arm untouched.
         current.IsOpen.ShouldBeFalse();
-        current.EffectiveTo.ShouldBe(transferDate);
+        current.EffectiveTo.ShouldBe(transferDate.AddDays(-1));
         current.ArmId.ShouldBe(ArmId);
 
         // The NEW row: a different id, the destination arm, open from the transfer date.
@@ -140,5 +140,17 @@ public sealed class EnrolmentTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("enrolment.already_closed");
+    }
+
+    [Fact]
+    public void Transfer_OnTheDayTheEnrolmentOpened_Fails()
+    {
+        var current = Enrolment.Open(Guid.CreateVersion7(), PupilId, ArmId, OpenedOn).Value;
+
+        var result = Enrolment.Transfer(current, Guid.CreateVersion7(), OtherArmId, OpenedOn);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("enrolment.transfer_date_not_after_start");
+        current.IsOpen.ShouldBeTrue();
     }
 }

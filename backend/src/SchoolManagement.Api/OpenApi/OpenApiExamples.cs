@@ -11,6 +11,7 @@ using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Pupils.Import;
+using SchoolManagement.Application.Pupils.Movement;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
@@ -3172,6 +3173,88 @@ internal static class OpenApiExamples
                   "chased": [ { "step": 7, "code": "documents.BirthCertificate", "message": "Birth certificate." } ]
                 }
               ]
+            }
+            """,
+
+        [typeof(ChangePupilStatusCommand)] = """
+            { "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d50", "targetStatus": "Withdrawn", "effectiveDate": "2026-11-20", "reason": "Family relocated to Abuja.", "armId": null, "dryRun": true }
+            """,
+
+        [typeof(TransferPupilCommand)] = $$"""
+            { "id": "{{ExamplePupilId}}", "armId": "{{ExampleArmId}}", "effectiveDate": "2026-10-14", "dryRun": true }
+            """,
+
+        [typeof(PupilMovementResultSetDto)] = $$"""
+            {
+              "resultSetId": "{{ExampleResultSetId}}", "armId": "{{ExampleArmId}}", "armName": "Primary 2A",
+              "termId": "{{ExampleTermId}}", "termName": "First Term", "state": "AwaitingApproval", "effect": "RevertsToDraft"
+            }
+            """,
+
+        [typeof(PupilMovementCapacityDto)] = """
+            { "capacity": 22, "enrolledAfter": 23, "overCapacity": true, "canOverride": true }
+            """,
+
+        [typeof(PupilMovementOutcomeDto)] = $$"""
+            {
+              "dryRun": true,
+              "pupil": {
+                "id": "{{ExamplePupilId}}", "registrationNumber": "GRAS/2026/0041", "surname": "Okafor", "firstName": "Chidera",
+                "middleName": null, "sex": "Female", "dateOfBirth": "2020-05-03", "ageYears": 6, "nationality": "Nigerian",
+                "stateOfOrigin": "Anambra", "lga": "Awka South", "homeAddress": "14 Zik Avenue, Awka", "previousSchool": null,
+                "previousClass": null, "status": "Active", "otherInformation": null, "matchedField": null,
+                "createdAtUtc": "2026-08-03T09:30:00+00:00", "createdBy": null, "admission": null, "levelAppliedFor": null,
+                "dateApplicationReceived": null, "missing": []
+              },
+              "fromStatus": "Active",
+              "toStatus": "Active",
+              "fromArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185",
+              "fromArmName": "Primary 2A",
+              "toArmId": "{{ExampleArmId}}",
+              "toArmName": "Primary 2C",
+              "effectiveDate": "2026-10-14",
+              "enrolmentClosesOn": "2026-10-13",
+              "resultSets": [
+                {
+                  "resultSetId": "{{ExampleResultSetId}}", "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185", "armName": "Primary 2A",
+                  "termId": "{{ExampleTermId}}", "termName": "First Term", "state": "AwaitingApproval", "effect": "RevertsToDraft"
+                }
+              ],
+              "capacity": { "capacity": 22, "enrolledAfter": 20, "overCapacity": false, "canOverride": false }
+            }
+            """,
+
+        [typeof(PupilEnrolmentDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}", "armName": "Primary 2C", "sessionId": "{{ExampleSessionId}}", "sessionName": "2026/2027",
+              "effectiveFrom": "2026-10-14", "effectiveTo": null
+            }
+            """,
+
+        [typeof(PupilStatusChangeDto)] = """
+            {
+              "fromStatus": "Active", "toStatus": "Withdrawn", "effectiveDate": "2026-11-20", "reason": "Family relocated to Abuja.",
+              "armName": null, "changedAtUtc": "2026-11-20T10:15:00+00:00"
+            }
+            """,
+
+        [typeof(PupilEnrolmentHistoryDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "status": "Active",
+              "currentArmId": "{{ExampleArmId}}",
+              "currentArmName": "Primary 2C",
+              "enrolments": [
+                {
+                  "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5185", "armName": "Primary 2A", "sessionId": "{{ExampleSessionId}}",
+                  "sessionName": "2026/2027", "effectiveFrom": "2026-09-08", "effectiveTo": "2026-10-13"
+                },
+                {
+                  "armId": "{{ExampleArmId}}", "armName": "Primary 2C", "sessionId": "{{ExampleSessionId}}", "sessionName": "2026/2027",
+                  "effectiveFrom": "2026-10-14", "effectiveTo": null
+                }
+              ],
+              "statusChanges": []
             }
             """,
 

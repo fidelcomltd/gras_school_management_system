@@ -298,6 +298,7 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0063: the permanent registration-number history alias (spec 6.5.10).
         services.AddScoped<IPupilRegNumberHistoryRepository, PupilRegNumberHistoryRepository>();
+        services.AddScoped<IPupilStatusChangeRepository, PupilStatusChangeRepository>();
 
         // TASK-0070: subjects, level mappings and per-arm exceptions (spec 6.6).
         services.AddScoped<ISubjectRepository, SubjectRepository>();

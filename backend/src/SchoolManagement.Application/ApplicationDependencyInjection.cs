@@ -44,6 +44,8 @@ public static class ApplicationDependencyInjection
 
         // Spec 6.5.5-6.5.8: the in-handler privilege check for a pupil's sub-records (see its remarks).
         services.AddScoped<Pupils.Records.PupilRecordAccess>();
+        services.AddScoped<Classes.ArmCapacityGuard>();
+        services.AddScoped<Pupils.Movement.PupilMovementEngine>();
         services.AddScoped<Pupils.Records.AdmissionCompleteness>();
 
         // Spec 6.5.10: the one registration-number issuance path, shared by admission approval and bulk import.

@@ -10,13 +10,14 @@ import { formatDate } from '@/shared/format/date';
 import { usePupil } from './api';
 import { CorrectNumberDialog } from './components/correct-number-dialog';
 import { EditPupilDialog } from './components/edit-pupil-dialog';
+import { ClassStatusPanel } from './movement/class-status-panel';
 import { CollectionPanel } from './records/collection-panel';
 import { ContactsPanel } from './records/contacts-panel';
 import { CompletenessCard, DocumentsPanel } from './records/documents-panel';
 import { HealthPanel } from './records/health-panel';
 import { pupilName, type PupilDto } from './types';
 
-type Tab = 'details' | 'contacts' | 'collection' | 'health' | 'documents';
+type Tab = 'details' | 'class' | 'contacts' | 'collection' | 'health' | 'documents';
 
 /** Spec 6.5.11's steps held on a tab here; the rest (declaration, approval) open in the admission flow. */
 const TAB_FOR_STEP: Partial<Record<number, Tab>> = { 3: 'contacts', 4: 'collection', 5: 'health', 7: 'documents' };
@@ -58,6 +59,7 @@ export function PupilDetailScreen() {
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
   const tabs: { id: Tab; label: string; shown: boolean }[] = [
     { id: 'details', label: 'Details', shown: true },
+    { id: 'class', label: 'Class and status', shown: record.status !== 'Pending' },
     { id: 'contacts', label: 'Contacts', shown: can('contact.view') },
     { id: 'collection', label: 'Collection', shown: can('contact.view') },
     { id: 'health', label: 'Health', shown: can('pupil.safeguarding.view') },
@@ -133,6 +135,15 @@ export function PupilDetailScreen() {
               </div>
             ))}
           </dl>
+        ) : null}
+        {current === 'class' ? (
+          <ClassStatusPanel
+            pupilId={record.id}
+            status={record.status}
+            declined={record.registrationNumber === null}
+            canTransfer={can('pupil.transfer')}
+            canChangeStatus={can('pupil.status.update')}
+          />
         ) : null}
         {current === 'contacts' ? <ContactsPanel pupilId={record.id} canEdit={can('contact.update')} /> : null}
         {current === 'collection' ? (

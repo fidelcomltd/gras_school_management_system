@@ -180,6 +180,7 @@ public sealed class PipelineTests
         // TASK-0063: CorrectRegistrationNumberHandler depends on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.
         services.AddSingleton(Substitute.For<IPupilRegNumberHistoryRepository>());
+        services.AddSingleton(Substitute.For<IPupilStatusChangeRepository>());
 
         // TASK-0049: the Audit/* read-surface handlers depend on this port, implemented by
         // Infrastructure — same treatment as every other repository stubbed above.

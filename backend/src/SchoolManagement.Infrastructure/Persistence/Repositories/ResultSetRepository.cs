@@ -163,6 +163,32 @@ internal sealed class ResultSetRepository(ApplicationDbContext context) : IResul
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ResultSet>> LockByArmsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(armIds);
+
+        if (armIds.Count == 0)
+        {
+            return [];
+        }
+
+        var armIdArray = armIds.ToArray();
+
+        var lockedIds = await context.Database
+            .SqlQuery<Guid>(
+                $"""
+                SELECT rs.id FROM result_set rs
+                WHERE rs.arm_id = ANY({armIdArray})
+                ORDER BY rs.id
+                FOR UPDATE OF rs
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return await LoadTrackedInLockOrderAsync(lockedIds, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ResultSet>> LockNonPublishedByTermAndClassLevelsAsync(
         Guid termId, IReadOnlyCollection<Guid> classLevelIds, CancellationToken cancellationToken)
     {

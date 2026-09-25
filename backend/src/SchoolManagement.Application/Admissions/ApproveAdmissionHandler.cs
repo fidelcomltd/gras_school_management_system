@@ -41,6 +41,7 @@ internal sealed class ApproveAdmissionCommandHandler(
     IEnrolmentRepository enrolments,
     RegistrationNumberIssuer issuer,
     ISchoolProfileRepository schoolProfiles,
+    Classes.ArmCapacityGuard capacityGuard,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -49,7 +50,6 @@ internal sealed class ApproveAdmissionCommandHandler(
     : IRequestHandler<ApproveAdmissionCommand, Result<PupilDto>>
 {
     private const string PupilEntityType = "pupil";
-    private const string ArmEntityType = "arm";
 
     /// <inheritdoc />
     public async Task<Result<PupilDto>> HandleAsync(ApproveAdmissionCommand request, CancellationToken cancellationToken)
@@ -116,43 +116,12 @@ internal sealed class ApproveAdmissionCommandHandler(
 
         // Capacity (spec 6.4.6): a SOFT limit. A WARNING with an audited override, never an outright
         // rejection — over capacity blocks only a caller who does NOT hold arm.capacity.override.
-        var openCount = await enrolments.CountOpenExcludingPendingByArmAsync(arm.Id, cancellationToken).ConfigureAwait(false);
+        var capacity = await capacityGuard.CheckAsync(arm, cancellationToken).ConfigureAwait(false);
+        var capacityOutcome = await capacityGuard.EnforceAsync(arm, armDisplayName, pupil.Id, capacity, cancellationToken).ConfigureAwait(false);
 
-        if (openCount >= arm.Capacity)
+        if (capacityOutcome.IsFailure)
         {
-            var grants = await effectivePrivilegeProvider
-                .GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
-                .ConfigureAwait(false);
-
-            var overrideScope = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride);
-            var hasOverride = overrideScope switch
-            {
-                PupilAccessScope.SchoolWide => true,
-                PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride).Contains(arm.Id),
-                _ => false,
-            };
-
-            if (!hasOverride)
-            {
-                return Result.Failure<PupilDto>(Error.Conflict(
-                    "arm.at_capacity",
-                    $"{armDisplayName} is at its capacity of {arm.Capacity}. Raise the capacity or choose another arm."));
-            }
-
-            // Spec 6.4.6: "the override is written to the audit log with the arm, the pupil and the
-            // resulting count" — a distinct audit event from the approval itself.
-            await auditSink.RecordAsync(
-                Privileges.Arm.CapacityOverride,
-                ArmEntityType,
-                arm.Id.ToString("D", CultureInfo.InvariantCulture),
-                metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["pupilId"] = pupil.Id.ToString("D", CultureInfo.InvariantCulture),
-                    ["capacity"] = arm.Capacity,
-                    ["resultingCount"] = openCount + 1,
-                },
-                actorAdminId: currentUser.UserId,
-                cancellationToken).ConfigureAwait(false);
+            return Result.Failure<PupilDto>(capacityOutcome.Error);
         }
 
         var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);

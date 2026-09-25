@@ -23,6 +23,13 @@ public interface IPupilRepository
     /// </summary>
     Task<Pupil?> FindTrackedByIdAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// As <see cref="FindTrackedByIdAsync"/>, after row-locking the pupil (<c>FOR UPDATE</c>) for the rest of the
+    /// transaction, so two status changes or transfers of the same pupil run one after the other and the second reads
+    /// the first's outcome (spec 6.5.14).
+    /// </summary>
+    Task<Pupil?> FindTrackedByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Loads a read-only pupil by id, for a query. Same pending-inclusion rule as <see cref="FindTrackedByIdAsync"/>.</summary>
     Task<Pupil?> FindReadOnlyByIdAsync(Guid id, CancellationToken cancellationToken);
 

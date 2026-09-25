@@ -54,6 +54,12 @@ public interface IEnrolmentRepository
     Task<Enrolment?> FindOpenReadOnlyByPupilIdAsync(Guid pupilId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Every enrolment the pupil has ever had, open and closed, oldest first (spec 02 §5.2: "who sat where, and from
+    /// when"). The status screen's history and reactivation's no-overlap check read it. <c>AsNoTracking</c>.
+    /// </summary>
+    Task<IReadOnlyList<Enrolment>> ListByPupilReadOnlyAsync(Guid pupilId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// The number of OPEN enrolments in <paramref name="armId"/>, excluding any pupil whose status
     /// is <see cref="Domain.Pupils.PupilStatus.Pending"/> — spec 07 §6.5.14's pending-exclusion
     /// invariant applies to "every ... enrolment count, every capacity calculation" as much as to a

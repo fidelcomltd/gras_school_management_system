@@ -25,10 +25,19 @@ internal static class ResultSetRecomputeFlagger
     /// 14 §9.3). A set that only gains the flag is not separately audited: it is not a state change,
     /// and the settings/mapping save that triggered it already carries its own audit event.
     /// </summary>
+    /// <param name="lockedResultSets">Already row-locked by the caller, never Published.</param>
+    /// <param name="auditSink">Records each state change.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <param name="cohortNote">
+    /// Set when a pupil moved into or out of the arm (spec 06 §6.4.4 step 5): Awaiting Approval then drops to Draft too,
+    /// carrying this note — see <see cref="ResultSet.FlagCohortChanged"/>. <see langword="null"/> for a settings or
+    /// mapping change.
+    /// </param>
     public static async Task FlagAsync(
         IEnumerable<ResultSet> lockedResultSets,
         ISystemAuditSink auditSink,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? cohortNote = null)
     {
         foreach (var resultSet in lockedResultSets)
         {
@@ -38,7 +47,9 @@ internal static class ResultSetRecomputeFlagger
             var stateBefore = resultSet.State;
             var needsRecomputeBefore = resultSet.NeedsRecompute;
 
-            var droppedToDraft = resultSet.FlagNeedsRecomputeBySystem();
+            var droppedToDraft = cohortNote is null
+                ? resultSet.FlagNeedsRecomputeBySystem()
+                : resultSet.FlagCohortChanged(cohortNote);
 
             if (!droppedToDraft)
             {
@@ -46,7 +57,9 @@ internal static class ResultSetRecomputeFlagger
             }
 
             await auditSink.RecordAsync(
-                "result_set.returned_for_correction_reverted_to_draft",
+                stateBefore == ResultSetState.AwaitingApproval
+                    ? "result_set.awaiting_approval_reverted_to_draft"
+                    : "result_set.returned_for_correction_reverted_to_draft",
                 EntityType,
                 resultSet.Id.ToString("D", CultureInfo.InvariantCulture),
                 metadata: new Dictionary<string, object?>(StringComparer.Ordinal)

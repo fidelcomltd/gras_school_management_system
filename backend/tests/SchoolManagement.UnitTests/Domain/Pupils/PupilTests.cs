@@ -314,4 +314,53 @@ public sealed class PupilTests
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("pupil.not_pending");
     }
+
+    [Theory]
+    [InlineData(PupilStatus.Transferred)]
+    [InlineData(PupilStatus.Withdrawn)]
+    [InlineData(PupilStatus.Graduated)]
+    public void Leave_FromActive_SetsTheLeavingStatus(PupilStatus target)
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+
+        pupil.Leave(target).IsSuccess.ShouldBeTrue();
+        pupil.Status.ShouldBe(target);
+    }
+
+    [Fact]
+    public void Leave_FromPending_Fails()
+    {
+        var pupil = CreateValid().Value;
+
+        var result = pupil.Leave(PupilStatus.Withdrawn);
+
+        result.Error.Code.ShouldBe("pupil.status_transition_not_allowed");
+        pupil.Status.ShouldBe(PupilStatus.Pending);
+    }
+
+    [Fact]
+    public void Reactivate_AfterLeaving_ReturnsToActiveKeepingTheNumber()
+    {
+        var pupil = CreateValid().Value;
+        pupil.Approve();
+        pupil.IssueRegistrationNumber("GRAS/2026/0041");
+        pupil.Leave(PupilStatus.Withdrawn);
+
+        pupil.Reactivate().IsSuccess.ShouldBeTrue();
+        pupil.Status.ShouldBe(PupilStatus.Active);
+        pupil.RegistrationNumber.ShouldBe("GRAS/2026/0041");
+    }
+
+    [Fact]
+    public void Reactivate_ADeclinedApplication_Fails()
+    {
+        var pupil = CreateValid().Value;
+        pupil.DeclineAdmission();
+
+        var result = pupil.Reactivate();
+
+        result.Error.Code.ShouldBe("pupil.reactivation_needs_admission");
+        pupil.Status.ShouldBe(PupilStatus.Withdrawn);
+    }
 }

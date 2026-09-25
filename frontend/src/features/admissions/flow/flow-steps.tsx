@@ -7,14 +7,10 @@ import { useUpdatePupil } from '@/features/pupils/api';
 import { TextField } from '@/features/pupils/records/fields';
 import { errorText } from '@/features/pupils/records/format';
 import { pupilName, type PupilDto } from '@/features/pupils/types';
+import { lagosToday } from '@/shared/format/date';
 import { useAdmissionRecord, useUpdateAdmissionRecord } from '../api';
 import { RegistrationNumber } from '../components/registration-number';
 import type { AdmissionRecordDto } from '../types';
-
-/** Today in Lagos (fixed UTC+1), as the date input wants it. */
-function lagosToday(): string {
-  return new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
-}
 
 /** Step 6 (section G): one free-text box, skippable with Next. */
 export function OtherInformationStep({ pupil, onSaved, canEdit }: { pupil: PupilDto; onSaved: () => void; canEdit: boolean }) {
