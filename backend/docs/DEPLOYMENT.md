@@ -120,6 +120,12 @@ sudo certbot --nginx -d api.goldenroyalark.com -d results.goldenroyalark.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+If `nginx -t` refuses the 443 blocks before any certificate exists, issue it with Nginx stopped
+(`sudo systemctl stop nginx && sudo certbot certonly --standalone -d ... -d ...`), add the
+`ssl_certificate` / `ssl_certificate_key` lines for `/etc/letsencrypt/live/api.goldenroyalark.com/`
+to both 443 blocks, start Nginx, and switch renewals to the webroot the port-80 blocks already serve:
+`sudo certbot reconfigure --cert-name api.goldenroyalark.com --webroot -w /var/www/html`.
+
 certbot edits the two site files in place and installs its own renewal timer. The sites are not
 reloaded by the provisioning script, because they reference certificates that do not exist yet.
 
@@ -192,6 +198,27 @@ because the symlink has not moved.
 `/opt/gras/api` is a symlink, not a directory. Provisioning deliberately does not create it; the
 first deploy does.
 
+### Deploying by hand
+
+The same path CI takes, for the first deploy or when CI is unavailable. On a machine with the .NET
+SDK, from `backend/`:
+
+```bash
+dotnet publish src/SchoolManagement.Api/SchoolManagement.Api.csproj -c Release -o ../release /p:UseAppHost=false
+SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION='Host=localhost;Database=unused;Username=unused;Password=unused' \
+  dotnet tool run dotnet-ef migrations bundle --project src/SchoolManagement.Infrastructure \
+  --startup-project src/SchoolManagement.Infrastructure --configuration Release --self-contained \
+  --target-runtime linux-x64 --output ../release/efbundle --force
+```
+
+(In PowerShell, set `$env:SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION` first and use backticks for line
+breaks.) Copy `release/` to `/tmp/gras-release` on the box, then:
+
+```bash
+sudo chmod +x /tmp/gras-release/efbundle      # an archive made on Windows loses the executable bit
+sudo /usr/local/bin/gras-deploy /tmp/gras-release
+```
+
 ### Rollback
 
 Releases are kept as timestamped directories, three deep:
@@ -211,9 +238,16 @@ deploy takes a `pre-deploy` dump first — see `/var/backups/gras`.
 ## 6. The first admin account
 
 ```bash
-sudo -u gras dotnet /opt/gras/api/SchoolManagement.Api.dll bootstrap-admin \
+sudo systemd-run --pty --wait --collect \
+  -p User=gras -p WorkingDirectory=/opt/gras/api \
+  -p EnvironmentFile=/etc/gras/api.env -E ASPNETCORE_ENVIRONMENT=Production \
+  /usr/bin/dotnet /opt/gras/api/SchoolManagement.Api.dll bootstrap-admin \
   --email=head@goldenroyalark.com --staff-name="Firstname Lastname"
 ```
+
+`systemd-run` gives the command exactly the service's environment: the connection string from
+`api.env` (which is root-only, so a plain `sudo -u gras dotnet ...` would run with no database
+settings at all), the Production settings file, and the release directory as its content root.
 
 It prints a temporary password to the terminal, once, and the account must change it at first
 sign-in. Run it in a session whose scrollback you can clear.
