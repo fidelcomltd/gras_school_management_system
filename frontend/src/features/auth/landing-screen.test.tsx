@@ -65,17 +65,4 @@ describe('LandingScreen — four required states', () => {
 
     expect(await screen.findByRole('heading', { name: 'Welcome, Chisom Maxwell' })).toBeInTheDocument();
   });
-
-  it('mustChangePassword: shows the forced-change message instead of the dashboard', async () => {
-    server.use(
-      http.get(apiUrl('/api/v1/auth/me'), () =>
-        HttpResponse.json({ ...SESSION, mustChangePassword: true }),
-      ),
-    );
-    renderLanding();
-
-    expect(
-      await screen.findByText('You must change your password before continuing.'),
-    ).toBeInTheDocument();
-  });
 });

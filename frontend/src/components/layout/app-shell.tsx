@@ -48,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
  * Placeholder mark. Swap for the real crest once the asset is committed to
  * `public/` — see CONVENTIONS.md §8.
  */
-function Crest() {
+export function Crest() {
   return (
     <span
       aria-hidden="true"

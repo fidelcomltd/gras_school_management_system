@@ -8,6 +8,7 @@
 export const paths = {
   root: '/',
   signIn: '/sign-in',
+  changePassword: '/account/password',
   settings: '/settings',
   sessions: '/sessions',
   sessionDetail: (id: string) => `/sessions/${id}`,

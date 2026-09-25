@@ -43,16 +43,6 @@ export function LandingScreen() {
 
   const session = me.data;
 
-  if (session.mustChangePassword) {
-    return (
-      <div className="flex flex-col items-start gap-4">
-        <p className="text-sm text-foreground">
-          You must change your password before continuing.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-start gap-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">

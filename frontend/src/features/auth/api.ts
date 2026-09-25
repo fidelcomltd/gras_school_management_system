@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/api/client';
 import { terminateSession } from '@/lib/auth/auth-session';
-import { AuthKeys, type SignInCommand } from './types';
+import { AuthKeys, type ChangePasswordCommand, type SignInCommand } from './types';
 
 /**
  * One hook per endpoint, per CONVENTIONS.md §4/`src/features/README.md`. None of
@@ -14,6 +14,7 @@ import { AuthKeys, type SignInCommand } from './types';
 const ME_PATH = '/api/v1/auth/me';
 const SIGN_IN_PATH = '/api/v1/auth/sign-in';
 const SIGN_OUT_PATH = '/api/v1/auth/sign-out';
+const PASSWORD_PATH = '/api/v1/auth/password';
 
 /** The caller's own account + session state. 401s when nobody is signed in. */
 export function useMe() {
@@ -39,6 +40,21 @@ export function useSignOut() {
     onSuccess: () => {
       terminateSession();
       queryClient.removeQueries({ queryKey: [AuthKeys.Me] });
+    },
+  });
+}
+
+/**
+ * The caller's own password (spec 6.1.11). The response is the refreshed session, so `me` is replaced with it: a
+ * forced change clears `mustChangePassword` and the full shell renders without a refetch.
+ */
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [AuthKeys.ChangePassword],
+    mutationFn: (payload: ChangePasswordCommand) => apiPost(PASSWORD_PATH, payload),
+    onSuccess: (session) => {
+      queryClient.setQueryData([AuthKeys.Me], session);
     },
   });
 }
