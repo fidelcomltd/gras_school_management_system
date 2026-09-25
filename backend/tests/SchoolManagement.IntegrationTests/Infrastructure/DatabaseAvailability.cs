@@ -60,6 +60,14 @@ internal static class DatabaseAvailability
     /// </summary>
     private const string LocalhostFallbackEndpoint = "tcp://localhost:2375";
 
+    /// <summary>
+    /// The IPv4 literal, tried after <see cref="LocalhostFallbackEndpoint"/>. The second dev machine
+    /// (2026-09-25) is the reverse of the reference one: <c>localhost</c> resolves to <c>::1</c> first,
+    /// which hangs past <see cref="ProbeTimeout"/>, while <c>127.0.0.1</c> answers. Trying both lets
+    /// either machine run with no per-machine <c>$env:DOCKER_HOST</c> tuning.
+    /// </summary>
+    private const string Ipv4FallbackEndpoint = "tcp://127.0.0.1:2375";
+
     /// <summary>How long a single endpoint probe may take before it counts as "does not answer".</summary>
     /// <remarks>
     /// Deliberately short, and never retried: this must stay far below the tens of seconds a failed
@@ -111,7 +119,7 @@ internal static class DatabaseAvailability
                "execute. Both fallbacks were tried and neither produced a database: " +
                $"(1) {ConnectionEnvironmentVariable} is not set; " +
                $"(2) no Docker endpoint answered a /_ping — tried $DOCKER_HOST ({dockerHostTried}), " +
-               $"{LocalhostFallbackEndpoint}, and the local named pipe/socket. " +
+               $"{LocalhostFallbackEndpoint}, {Ipv4FallbackEndpoint}, and the local named pipe/socket. " +
                $"Fix either way: set {ConnectionEnvironmentVariable} to a PostgreSQL connection string, " +
                $"or make a container runtime's Docker API reachable and Testcontainers will start " +
                $"{PostgresImage} automatically. See backend/README.md, 'Running the tests'.";
@@ -126,6 +134,7 @@ internal static class DatabaseAvailability
     /// presence is never trusted on its own.</item>
     /// <item><see cref="LocalhostFallbackEndpoint"/> — the WSL2 NAT-mode path that answers when the
     /// literal IPv4 form in (1) does not.</item>
+    /// <item><see cref="Ipv4FallbackEndpoint"/> — for a machine where the opposite holds.</item>
     /// <item>The platform's local named pipe (Windows) or Unix socket (Linux/podman), if present.</item>
     /// </list>
     /// <para>
@@ -146,6 +155,11 @@ internal static class DatabaseAvailability
         if (await TcpEndpointAnswersAsync(LocalhostFallbackEndpoint).ConfigureAwait(false))
         {
             return LocalhostFallbackEndpoint;
+        }
+
+        if (await TcpEndpointAnswersAsync(Ipv4FallbackEndpoint).ConfigureAwait(false))
+        {
+            return Ipv4FallbackEndpoint;
         }
 
         return LocalNamedEndpoint();
