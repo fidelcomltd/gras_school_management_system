@@ -85,13 +85,16 @@ export function useChangePupilStatus(id: string) {
   });
 }
 
-/** Gated `pupil.status.update`: undo today's leaving change (human ruling 2026-09-25). A fresh key per click. */
+/**
+ * Gated `pupil.status.update`: undo today's leaving change (human ruling 2026-09-25). The caller owns the key, one per
+ * confirmation, so a retry after a dropped response replays the undo instead of being refused as already undone.
+ */
 export function useUndoStatusChange(id: string) {
   const onMoved = useOnMoved(id);
   return useMutation({
     mutationKey: [MovementKeys.Undo, id],
-    mutationFn: async (reason: string | null) =>
-      normalise(await apiPost(UNDO_PATH, { id, reason }, { pathParams: { id }, idempotencyKey: crypto.randomUUID() })),
+    mutationFn: async ({ reason, idempotencyKey }: { reason: string | null; idempotencyKey: string }) =>
+      normalise(await apiPost(UNDO_PATH, { id, reason }, { pathParams: { id }, idempotencyKey })),
     onSuccess: onMoved,
   });
 }

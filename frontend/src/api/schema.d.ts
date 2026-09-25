@@ -8071,7 +8071,7 @@ export interface components {
              * @example Family relocated to Abuja.
              */
             reason: null | string;
-            /** @description The arm a reactivation enrolled the pupil into. */
+            /** @description The arm a reactivation enrolled the pupil into, or the arm a leave took them out of. */
             armName: null | string;
             /**
              * Format: date-time
@@ -12759,7 +12759,7 @@ export interface components {
              */
             id: string;
             /**
-             * @description Optional note on why the change was wrong. At most 500 characters.
+             * @description Optional note on why the change was wrong. At most 492 characters: it is stored after "Undone: ".
              * @example Withdrawn on the wrong record.
              */
             reason: null | string;

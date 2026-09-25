@@ -55,7 +55,10 @@ public sealed class PupilStatusChange : Entity<Guid>
     /// <summary>Why. Required for every transition except a reactivation from transferred or withdrawn.</summary>
     public string? Reason { get; private set; }
 
-    /// <summary>The arm a reactivation enrolled the pupil into; <see langword="null"/> when the pupil left.</summary>
+    /// <summary>
+    /// The arm a reactivation enrolled the pupil into, or the arm a leave took them out of (which the same-day undo
+    /// reopens). <see langword="null"/> when a leave closed no enrolment.
+    /// </summary>
     public Guid? ArmId { get; private set; }
 
     /// <summary>The acting admin, or <see langword="null"/> for a system action.</summary>

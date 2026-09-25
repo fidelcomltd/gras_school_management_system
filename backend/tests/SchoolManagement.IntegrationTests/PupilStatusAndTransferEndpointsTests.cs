@@ -289,6 +289,24 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task Undo_ByAnArmScopedHolder_OfTheirOwnWithdrawal_Succeeds()
+    {
+        RequireDatabase();
+        var world = await SeedWorldAsync();
+        var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
+        var jar = await SignInWithArmGrantAsync(Privileges.Pupil.StatusUpdate, world.SessionId, world.ArmA);
+
+        var withdraw = await PostAsync(
+            $"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Withdrawn", effectiveDate = Today, reason = "Wrong pupil." });
+        withdraw.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // A leaver has no open enrolment, so scope is judged on the arm being reopened.
+        var undo = await PostAsync($"/api/v1/pupils/{pupilId}/status/undo", jar, new { reason = (string?)null });
+
+        undo.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Undo_OfAChangeRecordedOnAnEarlierDay_IsRefused()
     {
         RequireDatabase();

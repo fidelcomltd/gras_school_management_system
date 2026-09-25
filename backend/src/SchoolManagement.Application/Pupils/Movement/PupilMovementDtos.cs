@@ -85,7 +85,7 @@ public sealed record PupilEnrolmentDto(
 /// <param name="ToStatus">After.</param>
 /// <param name="EffectiveDate">When it took effect.</param>
 /// <param name="Reason">Why; <see langword="null"/> for a reactivation given none.</param>
-/// <param name="ArmName">The arm a reactivation enrolled the pupil into.</param>
+/// <param name="ArmName">The arm a reactivation enrolled the pupil into, or the arm a leave took them out of.</param>
 /// <param name="ChangedAtUtc">When it was recorded.</param>
 public sealed record PupilStatusChangeDto(
     PupilStatus FromStatus, PupilStatus ToStatus, DateOnly EffectiveDate, string? Reason, string? ArmName, DateTimeOffset ChangedAtUtc);

@@ -1,9 +1,6 @@
-using System.Globalization;
 using FluentValidation;
-using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
-using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -87,11 +84,8 @@ internal sealed class ChangePupilStatusHandler(
     IEnrolmentRepository enrolments,
     IArmRepository arms,
     IAcademicSessionRepository sessions,
-    IPupilStatusChangeRepository statusChanges,
     PupilMovementEngine engine,
     ArmCapacityGuard capacityGuard,
-    ICurrentUser currentUser,
-    ISystemAuditSink auditSink,
     TimeProvider timeProvider)
     : IRequestHandler<ChangePupilStatusCommand, Result<PupilMovementOutcomeDto>>
 {
@@ -184,7 +178,8 @@ internal sealed class ChangePupilStatusHandler(
             return Result.Failure<PupilMovementOutcomeDto>(leave.Error);
         }
 
-        var recorded = await RecordAsync(pupil, fromStatus, request.TargetStatus, effectiveDate, request.Reason, null, cancellationToken)
+        var recorded = await engine
+            .RecordStatusChangeAsync(pupil, fromStatus, effectiveDate, request.Reason, arm?.Id, null, undo: false, cancellationToken)
             .ConfigureAwait(false);
         if (recorded.IsFailure)
         {
@@ -193,8 +188,6 @@ internal sealed class ChangePupilStatusHandler(
 
         await engine.ApplyAsync(affected, PupilMovementEngine.CohortNote("a pupil leaving", effectiveDate), cancellationToken)
             .ConfigureAwait(false);
-
-        await AuditAsync(pupil, fromStatus, effectiveDate, arm?.Id, null, cancellationToken).ConfigureAwait(false);
 
         return PupilMovementEngine.Outcome(false, pupil, fromStatus, request.TargetStatus, arm, null, armNames, effectiveDate, open is null ? null : effectiveDate, affected, null, today);
     }
@@ -290,7 +283,8 @@ internal sealed class ChangePupilStatusHandler(
             return Result.Failure<PupilMovementOutcomeDto>(reactivate.Error);
         }
 
-        var recorded = await RecordAsync(pupil, fromStatus, PupilStatus.Active, effectiveDate, request.Reason, arm.Id, cancellationToken)
+        var recorded = await engine
+            .RecordStatusChangeAsync(pupil, fromStatus, effectiveDate, request.Reason, null, arm.Id, undo: false, cancellationToken)
             .ConfigureAwait(false);
         if (recorded.IsFailure)
         {
@@ -300,44 +294,6 @@ internal sealed class ChangePupilStatusHandler(
         await engine.ApplyAsync(affected, PupilMovementEngine.CohortNote("a pupil returning", effectiveDate), cancellationToken)
             .ConfigureAwait(false);
 
-        await AuditAsync(pupil, fromStatus, effectiveDate, null, arm.Id, cancellationToken).ConfigureAwait(false);
-
         return PupilMovementEngine.Outcome(false, pupil, fromStatus, PupilStatus.Active, null, arm, armNames, effectiveDate, null, affected, capacity, today);
     }
-
-    private async Task<Result> RecordAsync(
-        Pupil pupil, PupilStatus fromStatus, PupilStatus toStatus, DateOnly effectiveDate, string? reason, Guid? armId, CancellationToken cancellationToken)
-    {
-        var actorId = currentUser.UserId is { } actorIdText && Guid.TryParse(actorIdText, out var parsedActorId) ? parsedActorId : (Guid?)null;
-
-        var row = PupilStatusChange.Create(
-            Guid.CreateVersion7(), pupil.Id, fromStatus, toStatus, effectiveDate, reason, armId, actorId, timeProvider.GetUtcNow());
-        if (row.IsFailure)
-        {
-            return Result.Failure(row.Error);
-        }
-
-        await statusChanges.AddAsync(row.Value, cancellationToken).ConfigureAwait(false);
-        return Result.Success();
-    }
-
-    // Codes and ids only: the reason is free text and may describe the child, so it stays on the status-change row.
-    private Task AuditAsync(Pupil pupil, PupilStatus fromStatus, DateOnly effectiveDate, Guid? fromArmId, Guid? toArmId, CancellationToken cancellationToken) =>
-        auditSink.RecordAsync(
-            Privileges.Pupil.StatusUpdate,
-            "pupil",
-            pupil.Id.ToString("D", CultureInfo.InvariantCulture),
-            metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["status"] = pupil.Status.ToString(),
-                ["effectiveDate"] = effectiveDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                ["armId"] = toArmId?.ToString("D", CultureInfo.InvariantCulture),
-            },
-            actorAdminId: currentUser.UserId,
-            cancellationToken,
-            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["status"] = fromStatus.ToString(),
-                ["armId"] = fromArmId?.ToString("D", CultureInfo.InvariantCulture),
-            });
 }

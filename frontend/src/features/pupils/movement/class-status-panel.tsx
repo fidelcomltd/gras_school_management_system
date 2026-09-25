@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/http';
 import { formatDate, lagosDateOf, lagosToday } from '@/shared/format/date';
 import { errorText } from '../records/format';
 import type { PupilStatus } from '../types';
@@ -27,6 +28,7 @@ export function ClassStatusPanel({
   const undo = useUndoStatusChange(pupilId);
   const [dialog, setDialog] = useState<'transfer' | 'status' | null>(null);
   const [confirmUndo, setConfirmUndo] = useState(false);
+  const [undoKey, setUndoKey] = useState(() => crypto.randomUUID());
 
   if (history.isPending) return <LoadingState label="Loading class history…" />;
   if (history.isError) return <QueryErrorState error={history.error} onRetry={() => void history.refetch()} />;
@@ -104,7 +106,20 @@ export function ClassStatusPanel({
                 <span className="text-muted-foreground">Recorded by mistake? It can be undone today.</span>
                 {confirmUndo ? (
                   <>
-                    <Button size="sm" disabled={undo.isPending} onClick={() => undo.mutate(null, { onSuccess: () => setConfirmUndo(false) })}>
+                    <Button size="sm" disabled={undo.isPending} onClick={() =>
+                        undo.mutate(
+                          { reason: null, idempotencyKey: undoKey },
+                          {
+                            onSuccess: () => setConfirmUndo(false),
+                            // A refusal wrote nothing, so a later attempt gets a fresh key; a dropped response keeps it.
+                            onError: (error) => {
+                              if (error instanceof ApiError && error.status !== undefined && error.status >= 400 && error.status < 500) {
+                                setUndoKey(crypto.randomUUID());
+                              }
+                            },
+                          },
+                        )
+                      }>
                       {undo.isPending ? 'Undoing…' : 'Confirm undo'}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setConfirmUndo(false)}>

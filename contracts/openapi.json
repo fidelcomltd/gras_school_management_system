@@ -26428,7 +26428,7 @@
               "null",
               "string"
             ],
-            "description": "The arm a reactivation enrolled the pupil into."
+            "description": "The arm a reactivation enrolled the pupil into, or the arm a leave took them out of."
           },
           "changedAtUtc": {
             "type": "string",
@@ -32417,7 +32417,7 @@
               "null",
               "string"
             ],
-            "description": "Optional note on why the change was wrong. At most 500 characters.",
+            "description": "Optional note on why the change was wrong. At most 492 characters: it is stored after \"Undone: \".",
             "example": "Withdrawn on the wrong record."
           }
         },
