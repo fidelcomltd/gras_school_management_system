@@ -1,3 +1,6 @@
 # A hand-built deploy (backend/docs/DEPLOYMENT.md, "Deploying by hand"): never committed.
 /release/
 /gras-release.tgz
+
+# Per-developer Claude Code settings (holds each clone's autoMemoryDirectory).
+/.claude/settings.local.json

@@ -38,6 +38,7 @@ CLAUDE.md              ← this file: hard rules, read by everyone, nothing else
 .agent/tasks/          ← task cards
 .agent/decisions/      ← full text behind STATE.md's decision index
 .agent/drift/          ← full text behind STATE.md's drift index
+.agent/memory/         ← shared Claude auto-memory (setup: its README.md)
 backend/ frontend/ contracts/
 ```
 
