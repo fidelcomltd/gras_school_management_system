@@ -1,0 +1,6 @@
+- [Postgres integration-test failures are network, not code](vpn-blocks-postgres-tests.md) — three signatures with different tells: all-red = VPN filtering 5432, a subset with "No such host" = DNS, a single unrelated test dying in fixture setup = transient TLS drop, just re-run.
+- [Token budget is the binding constraint on school-management-proj](token-budget-is-the-binding-constraint.md) — usage limits bind; prefer slices over whole files, index+archive over shrinking docs, and never let a subagent run the full gate.
+- [Integration DB: local container first, hosted only on confirmation](integration-db-local-container-first.md) — never let a gate run on hosted Neon unless the user confirms for that run; if the local container fails, stop and ask.
+- [Lean mode](lean-mode.md) — since 2026-09-22 I write code directly; no subagents, minimal ledger, proportionate tests
+- [Production hosting and NDPA](production-hosting-and-ndpa.md) — app + Postgres on one Namecheap Pulsar VPS, Cloudinary for files; NDPA relaxed, don't gate on it
+- [Probe WSL before declaring a tool absent](probe-wsl-before-declaring-a-tool-absent.md) — Bash is Git Bash, not WSL; check across the Windows/WSL boundary with a functional probe (e.g. `localhost:2375/_ping`) before reporting Docker or a port missing

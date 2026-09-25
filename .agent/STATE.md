@@ -54,6 +54,7 @@ to open it. **If the test does not apply to your card, do not open the file.**
 | `.agent/contract-history.md` | 17 | reconciling hash history, or a promote looks out of sequence. The CURRENT hash is in `## Contract` below — that is all a normal dispatch needs |
 | `.agent/ROADMAP.md` | 14 | sequencing the next card |
 | `.agent/AUDIT.md` | 16 | auditing process compliance |
+| `.agent/memory/MEMORY.md` | 2 | shared Claude auto-memory index, auto-loaded once `README.md` setup is done; otherwise read it before a gate, a deploy, or a "tool is missing" conclusion |
 
 ### Contract
 
