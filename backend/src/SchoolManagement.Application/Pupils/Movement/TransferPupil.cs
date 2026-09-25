@@ -33,11 +33,15 @@ public sealed record TransferPupilCommand(Guid Id, string ArmId, DateOnly Effect
 /// <summary>Structural checks only.</summary>
 internal sealed class TransferPupilCommandValidator : AbstractValidator<TransferPupilCommand>
 {
-    public TransferPupilCommandValidator() =>
+    public TransferPupilCommandValidator()
+    {
         RuleFor(command => command.ArmId)
             .NotEmpty()
             .Must(value => Guid.TryParse(value, out _))
             .WithMessage("ArmId must be a valid identifier.");
+
+        RuleFor(command => command.EffectiveDate).NotEmpty().WithMessage("Enter the pupil's first day in the new class.");
+    }
 }
 
 /// <summary>Handles <see cref="TransferPupilCommand"/>. <c>pupil.transfer</c> is checked in the handler, as for the status screen.</summary>
@@ -64,7 +68,7 @@ internal sealed class TransferPupilHandler(
             return Result.Failure<PupilMovementOutcomeDto>(allowed.Error);
         }
 
-        var pupil = await pupils.FindTrackedByIdAsync(request.Id, cancellationToken).ConfigureAwait(false);
+        var pupil = await pupils.FindTrackedByIdForUpdateAsync(request.Id, cancellationToken).ConfigureAwait(false);
         if (pupil is null)
         {
             return Result.Failure<PupilMovementOutcomeDto>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
@@ -80,7 +84,7 @@ internal sealed class TransferPupilHandler(
                 "Only an active pupil enrolled in a class can be moved. To bring back a pupil who left, reactivate them from the status screen."));
         }
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
         var future = PupilMovementEngine.RefuseIfFuture(request.EffectiveDate, today);
         if (future.IsFailure)
         {
@@ -101,6 +105,12 @@ internal sealed class TransferPupilHandler(
             return Result.Failure<PupilMovementOutcomeDto>(Error.Validation(
                 "pupil.arm_not_available",
                 "Choose an active class in the pupil's current session. Moving a pupil into another session is promotion, not a transfer."));
+        }
+
+        var destinationAllowed = await access.CheckArmAsync(destination.Id, Privileges.Pupil.Transfer, cancellationToken).ConfigureAwait(false);
+        if (destinationAllowed.IsFailure)
+        {
+            return Result.Failure<PupilMovementOutcomeDto>(destinationAllowed.Error);
         }
 
         if (destination.Id == source.Id)

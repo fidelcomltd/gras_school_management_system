@@ -8,6 +8,7 @@ using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
+using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
@@ -132,6 +133,22 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
         var response = await PostAsync($"/api/v1/pupils/{pupilId}/transfer", jar, new { armId = world.ArmB.ToString(), effectiveDate = Today });
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Transfer_ByAnArmScopedHolder_IntoAnArmOutsideTheirScope_IsForbidden()
+    {
+        RequireDatabase();
+        var world = await SeedWorldAsync();
+        var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
+        var jar = await SignInWithArmGrantAsync(Privileges.Pupil.Transfer, world.SessionId, world.ArmA);
+
+        var response = await PostAsync($"/api/v1/pupils/{pupilId}/transfer", jar, new { armId = world.ArmB.ToString(), effectiveDate = Today });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        // The source arm is in scope; it is the destination that is refused.
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("destination class");
+        (await CountEnrolmentsAsync(pupilId)).ShouldBe(1);
     }
 
     // ---- Status: leaving and coming back ---------------------------------------------------------
@@ -338,6 +355,21 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
     private async Task<CookieJar> SignInWithNoGrantsAsync()
     {
         var (_, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
+        return await SignInAsync(email);
+    }
+
+    private async Task<CookieJar> SignInWithArmGrantAsync(string privilege, Guid sessionId, Guid armId)
+    {
+        var (accountId, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var role = Role.Create(Guid.CreateVersion7(), $"Role-{Guid.NewGuid():N}", null, [privilege]).Value;
+            context.Add(role);
+            context.Add(RoleAssignment.Create(Guid.CreateVersion7(), accountId, role.Id, sessionId, ScopeType.ArmList, [armId], accountId).Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
         return await SignInAsync(email);
     }
 

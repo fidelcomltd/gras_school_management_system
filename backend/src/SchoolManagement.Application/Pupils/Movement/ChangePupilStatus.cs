@@ -106,7 +106,7 @@ internal sealed class ChangePupilStatusHandler(
             return Result.Failure<PupilMovementOutcomeDto>(allowed.Error);
         }
 
-        var pupil = await pupils.FindTrackedByIdAsync(request.Id, cancellationToken).ConfigureAwait(false);
+        var pupil = await pupils.FindTrackedByIdForUpdateAsync(request.Id, cancellationToken).ConfigureAwait(false);
         if (pupil is null)
         {
             return Result.Failure<PupilMovementOutcomeDto>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
@@ -124,7 +124,7 @@ internal sealed class ChangePupilStatusHandler(
                 "pupil.status_unchanged", $"This pupil is already {request.TargetStatus.ToString().ToLowerInvariant()}."));
         }
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         return request.TargetStatus == PupilStatus.Active
             ? await ReactivateAsync(request, pupil, today, cancellationToken).ConfigureAwait(false)
@@ -242,6 +242,12 @@ internal sealed class ChangePupilStatusHandler(
         {
             return Result.Failure<PupilMovementOutcomeDto>(Error.Validation(
                 "pupil.arm_not_available", "Choose an active class in the current session."));
+        }
+
+        var armAllowed = await access.CheckArmAsync(arm.Id, Privileges.Pupil.StatusUpdate, cancellationToken).ConfigureAwait(false);
+        if (armAllowed.IsFailure)
+        {
+            return Result.Failure<PupilMovementOutcomeDto>(armAllowed.Error);
         }
 
         if (effectiveDate < activeSession.StartDate)

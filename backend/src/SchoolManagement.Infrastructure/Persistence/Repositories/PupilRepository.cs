@@ -38,6 +38,17 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         context.Pupils.IgnoreQueryFilters().FirstOrDefaultAsync(pupil => pupil.Id == id, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<Pupil?> FindTrackedByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await context.Database
+            .SqlQuery<Guid>($"SELECT id FROM pupils WHERE id = {id} FOR UPDATE")
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return await FindTrackedByIdAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public Task<Pupil?> FindReadOnlyByIdAsync(Guid id, CancellationToken cancellationToken) =>
         context.Pupils.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(pupil => pupil.Id == id, cancellationToken);
 

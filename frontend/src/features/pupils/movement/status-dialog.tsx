@@ -6,13 +6,12 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { ArmSelect } from '@/features/admissions/components/arm-select';
-import { useArms } from '@/features/arms/api';
 import { useSessions } from '@/features/sessions/api';
 import { ApiError } from '@/lib/http';
 import { lagosToday } from '@/shared/format/date';
 import { errorText } from '../records/format';
 import type { PupilStatus } from '../types';
-import { canCommit, useChangePupilStatus, type PupilMovementOutcome } from './api';
+import { canCommit, useActiveArms, useChangePupilStatus, type PupilMovementOutcome } from './api';
 import { Consequences } from './consequences';
 
 const dateInput = 'h-9 w-44 rounded-md border border-input bg-background px-2 text-sm text-foreground';
@@ -48,8 +47,7 @@ export function StatusDialog({ pupilId, status, onClose }: { pupilId: string; st
   const reasonRequired = !reactivating || status === 'Graduated';
   const sessions = useSessions('Active');
   const activeSessionId = sessions.data?.pages[0]?.items[0]?.id ?? '';
-  const arms = useArms({ sessionId: activeSessionId, status: 'Active' });
-  const armChoices = activeSessionId ? (arms.data?.pages.flatMap((page) => page.items) ?? []) : [];
+  const armChoices = useActiveArms(activeSessionId);
 
   const change = (apply: () => void) => {
     apply();

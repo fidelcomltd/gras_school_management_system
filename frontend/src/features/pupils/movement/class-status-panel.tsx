@@ -11,11 +11,14 @@ import { TransferDialog } from './transfer-dialog';
 export function ClassStatusPanel({
   pupilId,
   status,
+  declined,
   canTransfer,
   canChangeStatus,
 }: {
   pupilId: string;
   status: PupilStatus;
+  /** A declined application (withdrawn, never issued a number): it comes back through a new admission, not here. */
+  declined: boolean;
   canTransfer: boolean;
   canChangeStatus: boolean;
 }) {
@@ -28,7 +31,7 @@ export function ClassStatusPanel({
   const data = history.data;
   const current = data.enrolments.find((enrolment) => enrolment.effectiveTo === null);
   const showTransfer = canTransfer && status === 'Active' && !!current;
-  const showStatus = canChangeStatus && status !== 'Pending';
+  const showStatus = canChangeStatus && status !== 'Pending' && !declined;
 
   return (
     <div className="flex flex-col gap-4">

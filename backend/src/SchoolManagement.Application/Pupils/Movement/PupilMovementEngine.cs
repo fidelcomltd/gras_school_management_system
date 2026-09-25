@@ -148,7 +148,7 @@ internal sealed class PupilMovementEngine(
             cancellationToken,
             cohortNote: note);
 
-    /// <summary>A date is refused when it is after today: rosters read the enrolment open now (human ruling 2026-09-25).</summary>
+    /// <summary>A date is refused when it is after today in Lagos, the date the screens offer: rosters read the enrolment open now (human ruling 2026-09-25).</summary>
     public static Result RefuseIfFuture(DateOnly effectiveDate, DateOnly today) =>
         effectiveDate > today
             ? Result.Failure(Error.Validation(

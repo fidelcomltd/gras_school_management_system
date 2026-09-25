@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { ArmSelect } from '@/features/admissions/components/arm-select';
-import { useArms } from '@/features/arms/api';
 import { ApiError } from '@/lib/http';
 import { lagosToday } from '@/shared/format/date';
 import { errorText } from '../records/format';
-import { canCommit, useTransferPupil, type PupilMovementOutcome } from './api';
+import { canCommit, useActiveArms, useTransferPupil, type PupilMovementOutcome } from './api';
 import { Consequences } from './consequences';
 
 const dateInput = 'h-9 w-44 rounded-md border border-input bg-background px-2 text-sm text-foreground';
@@ -36,8 +35,7 @@ export function TransferDialog({
   // attempt draws a fresh one. A dry run always gets its own key, or the commit would replay the preview.
   const [commitKey, setCommitKey] = useState(() => crypto.randomUUID());
   const transfer = useTransferPupil(pupilId);
-  const arms = useArms({ sessionId, status: 'Active' });
-  const choices = (arms.data?.pages.flatMap((page) => page.items) ?? []).filter((arm) => arm.id !== currentArmId);
+  const choices = useActiveArms(sessionId).filter((arm) => arm.id !== currentArmId);
 
   const change = (apply: () => void) => {
     apply();

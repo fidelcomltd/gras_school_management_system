@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { apiGet, apiPost } from '@/api/client';
 import type { components } from '@/api/schema';
+import { useArms } from '@/features/arms/api';
 import { PupilsKeys } from '../types';
 
 type S = components['schemas'];
@@ -47,6 +49,16 @@ export function usePupilEnrolments(id: string) {
     queryFn: ({ signal }) => apiGet(HISTORY_PATH, undefined, { pathParams: { id }, signal }),
     staleTime: 30_000,
   });
+}
+
+/** Every active arm of the session, all pages (a picker must offer every class, not the first page). */
+export function useActiveArms(sessionId: string) {
+  const arms = useArms({ sessionId, status: 'Active' });
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = arms;
+  useEffect(() => {
+    if (sessionId && hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [sessionId, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  return sessionId ? (arms.data?.pages.flatMap((page) => page.items) ?? []) : [];
 }
 
 /** After a real change: the pupil, the register, and this history are all stale. */

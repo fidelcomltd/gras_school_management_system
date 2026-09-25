@@ -140,6 +140,7 @@ export function PupilDetailScreen() {
           <ClassStatusPanel
             pupilId={record.id}
             status={record.status}
+            declined={record.registrationNumber === null}
             canTransfer={can('pupil.transfer')}
             canChangeStatus={can('pupil.status.update')}
           />

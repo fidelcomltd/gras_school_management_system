@@ -45,6 +45,26 @@ internal sealed class PupilRecordAccess(
         return Result.Success(pupil);
     }
 
+    /// <summary>
+    /// Whether the caller's <paramref name="privilege"/> covers <paramref name="armId"/>: always for a school-wide grant,
+    /// only for its own arms for an arm-scoped one. A move checks its DESTINATION with this; <see cref="CheckAsync"/>
+    /// has already covered the pupil's current arm.
+    /// </summary>
+    public async Task<Result> CheckArmAsync(Guid armId, string privilege, CancellationToken cancellationToken)
+    {
+        var grants = await grantsProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var covered = PupilAccessGuard.Resolve(grants, privilege) switch
+        {
+            PupilAccessScope.SchoolWide => true,
+            PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, privilege).Contains(armId),
+            _ => false,
+        };
+
+        return covered
+            ? Result.Success()
+            : Result.Failure(Error.Forbidden("pupil.record_forbidden", $"You do not hold {privilege} for the destination class."));
+    }
+
     private static Result<Pupil> Forbidden(string privilege) =>
         Result.Failure<Pupil>(Error.Forbidden("pupil.record_forbidden", $"You do not hold {privilege} for this pupil."));
 }
