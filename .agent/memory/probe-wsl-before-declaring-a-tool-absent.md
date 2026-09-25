@@ -26,8 +26,12 @@ me. A wrong negative on a capability probe doesn't just lose time — it silentl
 **How to apply:** before telling the user a tool/daemon/port is absent on this machine, check the
 *other* side of the Windows/WSL boundary and prefer a positive functional probe over an inventory
 one — an HTTP call, a connect, an actual invocation. Here, `Invoke-WebRequest http://localhost:2375/_ping`
-settled in one call what two greps got wrong. Note also that WSL2 NAT-mode localhost forwarding
-answers on the *hostname* `localhost` only: `127.0.0.1` and raw `[::1]` both fail for the same port.
+settled in one call what two greps got wrong. Which loopback form answers is **per machine**: on the
+original machine only the hostname `localhost` works; on the second machine (2026-09-25) only
+`127.0.0.1` does, because `localhost` goes to `::1`, which hangs. Probe all three forms
+(`localhost`, `127.0.0.1`, `[::1]`) with `curl -m 4`. Also, PowerShell 5.1's `Invoke-WebRequest`
+answered `localhost` there while .NET 10's `HttpClient` timed out, so probe with the client that
+will actually be used. See [[two-dev-machines]].
 
 Project-side facts about this Docker setup live in the repo at `.agent/STATE.md` `## Toolchain`,
 which every session is routed to read — that, not this memory, is the durable home for them.

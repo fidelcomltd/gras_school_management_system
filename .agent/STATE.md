@@ -91,22 +91,35 @@ client generator:   openapi-typescript@7.13.0 (types only, pinned exact, devDepe
 repo:      git, branch main, origin https://github.com/maxcotech/school-management-proj.git
 ```
 
-## Toolchain present on this machine
+## Toolchain present on each dev machine
 
-dotnet SDK 10.0.100 · node v22.21.0 · npm 10.9.4 · yarn 1.22.22 · pnpm ABSENT · pwsh ABSENT ·
-docker **ABSENT ON THE WINDOWS HOST, LIVE IN WSL2** (corrected 2026-09-16 — the old flat "docker
-ABSENT" was read as "no container runtime anywhere" and is why the container path went unexercised
-for three weeks). Engine 29.8.1 in WSL2 Ubuntu as `dockerd -H fd:// -H tcp://0.0.0.0:2375`;
-**reachable from Windows at `http://localhost:2375` — NOT at `127.0.0.1:2375`**, WSL2 NAT-mode
-localhost forwarding answers on the hostname path only. `$env:DOCKER_HOST` is set at user scope to
-the broken IPv4 literal. No Docker Desktop, no `\.\pipe\docker_engine`, no `dotnet` inside WSL.
+**Two Windows dev machines, both in use (human, 2026-09-25): keep the repo working on both.** Anything
+machine-local (below, plus `~/.gras/`, user-secrets, `appsettings.Development.json`, `frontend/.env`,
+`.claude/settings.local.json`) is set up per machine and never committed. Identify the machine with `hostname`.
+
+| | Original machine | Second machine (`PC`, user `HomePC`, from 2026-09-25) |
+|---|---|---|
+| dotnet SDK | 10.0.100 | 10.0.112 (+10.0.401; `backend/global.json` selects 10.0.112) |
+| node | 22.21.0 only | nvm-windows with 18/20/22/24/26: **`frontend/.nvmrc` pins 22.21.0** — without it the nvm proxy floats `frontend/` to 26, where `localStorage` is undefined and all 442 vitest tests fail |
+| yarn / pnpm | 1.22.22 / ABSENT | ABSENT / present (neither used; npm only) |
+| git | 2.51.1 | 2.55.0 |
+| dockerd bind (WSL) | `tcp://0.0.0.0:2375` | `tcp://127.0.0.1:2375` (systemd `override.conf`) |
+| answers from Windows | `localhost` only, NOT `127.0.0.1` | `127.0.0.1` only; `localhost` → `::1` hangs past the 750 ms probe |
+| `$env:DOCKER_HOST` (user) | `tcp://127.0.0.1:2375` (broken there) | `tcp://127.0.0.1:2375` |
+| `~/.gras/pg-test.txt` | present | ABSENT (hosted runs need it copied over first) |
+
+Both answers are handled by `DatabaseAvailability`'s fallbacks (`$DOCKER_HOST` → `localhost` → `127.0.0.1`), so
+neither machine needs `DOCKER_HOST` right. Common to both: pwsh ABSENT · psql ABSENT · gitleaks 8.30.1 · docker
+**ABSENT ON THE WINDOWS HOST, LIVE IN WSL2** (Engine 29.8.1, Ubuntu). No Docker Desktop, no
+`\.\pipe\docker_engine`, no `dotnet` inside WSL. (Corrected 2026-09-16: the old flat "docker ABSENT" was read as
+"no container runtime anywhere", which is why the container path went unexercised for three weeks.)
 **CORRECTED 2026-09-17: local `ci.ps1` runs were NOT container-backed. `~/.gras/pg-test.txt` (hosted Neon)
 exists and the script prefers it over the container, so gates silently ran on Neon.** Human directive:
 local container first, hosted ONLY on human confirmation per run (`rules/gates.md` §7; enforced by TASK-0078).
 Testcontainers against the WSL daemon has been available since TASK-0065
 (2026-09-16): 322 tests in ~4 min, and **proven green with the network physically disconnected** —
 the WSL bridge survives the adapter going down. `POSTGRES_TEST_CONNECTION` still wins when set, and
-CI still uses a service-container Postgres · psql ABSENT · git 2.51.1.windows.1 · gitleaks 8.30.1
+CI still uses a service-container Postgres.
 
 **PINNED — changing one side alone re-breaks CI (0024, 0026):** `global.json`
 `rollForward: latestPatch` · gitleaks **8.30.1** in `backend-ci.yml` must equal local · Node
@@ -239,6 +252,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-25 **Second dev machine (`PC`) brought up; repo kept working on both** (branch `chore/second-dev-machine`): `frontend/.nvmrc` 22.21.0 (nvm floated it to 26, failing all 442 tests), a `127.0.0.1:2375` fallback in `DatabaseAvailability` (loopback behaviour is reversed between the machines), and the dev template's `$comment_ef` moved out of `Serilog:MinimumLevel:Override` (a verbatim copy failed startup). Full local gate 1990/1990, 0 skipped, local container; `verify` + e2e 9/9. Per-machine table: `## Toolchain`.
 - 2026-09-25 **First production deploy DONE, by hand, to the Namecheap VPS** (Ubuntu 24.04, `provision-vps.sh`, then `gras-deploy` with a release built on the maintainer's PC; all 43 migrations applied, `/health/ready` green). It found five defects, all fixed on `main` via PR #10 (`d56d269`) plus `ci/gitleaks-placeholder-allowlist`: nginx 1.24 rejects `http2 on;` (now `listen ... http2`); the EF bundle must use Infrastructure as startup project (Design is PrivateAssets there) with a placeholder `SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION`; `backup-db.sh` failed the first deploy on an empty database; the single-file bundle had nowhere to unpack (`gras` has no home, now `DOTNET_BUNDLE_EXTRACT_BASE_DIR`); the runbook's `bootstrap-admin` lacked the service environment (now `systemd-run`). The placeholder `Password=unused` then failed backend-ci's secret scan (history pass), fixed by a literal-anchored allowlist entry. **Lesson: run `gitleaks` on EVERY branch before handing it back, including deploy/docs-only ones; a scoped local gate never ran on that branch.** Still to do by the human: GitHub `production` environment + 4 secrets (in progress 2026-09-25), first `deploy-production` run, offsite backups, Netlify frontend on `app.`, staging on Render. `task-0084` (`3cfc232`, the TASK-0084 test split) was never merged: `main` still carries the flaky admin-suspension test; it merges cleanly.
 - 2026-09-23 **Incomplete-records report (spec 6.5.12) done**, branch `admissions-incomplete-report` (stacked on `admissions-import`): `GET /reports/incomplete-records[?armId=]` lists every ACTIVE pupil enrolled in the active session with a gap, by arm then surname, each with `required` items still missing (possible after an import or a health override: no emergency contact, declaration unrecorded, health unanswered, barred question unasked) and `chased` items, plus `counts` per gap with short labels. Same rules as the per-pupil completeness: `AdmissionCompleteness.Evaluate` is now one pure function over pre-loaded records, fed by `IPupilRecordRepository.LoadForPupilsAsync` (fixed number of queries). `report.view` checked in the HANDLER (a route check with no arm refuses arm-restricted grants); arm-restricted callers see only their arms, `armId` outside them is 403. Codes only, never health or barred content, so no safeguarding privilege. Frontend `/reports/incomplete-records` (nav "Incomplete records"): arm filter, gap chips that filter and count, table linking to each pupil, CSV for `report.export` (`shared/format/csv.ts` promoted, second user). Photograph is not chased yet (no photo field until the files slice). Contract `2eecd88b…` +1 path +3 schemas. Next: status changes and transfers (6.5.14).
 - 2026-09-23 **Human rulings on bulk import:** the emergency primary contact stays OPTIONAL on import (a responsible adult with a phone is required); a row with several parents and a blank Primary Contact stays REJECTED; import needs an active session, not an active term; the incomplete-records report comes before status changes and transfers.
