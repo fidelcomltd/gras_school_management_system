@@ -18,13 +18,15 @@ namespace SchoolManagement.IntegrationTests;
 
 /// <summary>
 /// Bulk import (spec 6.5.13): the template, the validation pass that writes nothing, and the all-or-nothing commit that
-/// issues numbers in file order through the same counter as admission approval.
+/// issues numbers in file order through the same counter as admission approval. Also the incomplete-records report
+/// (spec 6.5.12), which exists to chase what an import leaves missing, so its pupils are made by importing them.
 /// </summary>
 public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     private const string TemplateUrl = "/api/v1/pupils/import/template";
     private const string ValidateUrl = "/api/v1/pupils/import/validate";
     private const string CommitUrl = "/api/v1/pupils/import/commit";
+    private const string IncompleteUrl = "/api/v1/reports/incomplete-records";
 
     private static readonly string[] Headers =
     [
@@ -275,6 +277,70 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         (await CountPupilsAsync()).ShouldBe(0);
     }
 
+    // Imported pupils are active with the declaration unrecorded and the barred question unasked; one also has no
+    // emergency contact and no health answers. The report names each gap per pupil and counts it.
+    [Fact]
+    public async Task IncompleteRecords_ListsWhatImportedPupilsStillLack()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, armName) = await SeedSessionAndArmAsync();
+        var importer = await SignInWithAsync([Privileges.Pupil.Import, Privileges.Report.View], sessionId);
+        var okafor = Row("Okafor", "Chidera", levelName, "A");
+        okafor.Remove("Emergency Primary Name");
+        okafor.Remove("Emergency Primary Relationship");
+        okafor.Remove("Emergency Primary Phone");
+        var bello = Row("Bello", "Amina", levelName, "A");
+        bello["Has Allergy"] = "No";
+        bello["Has Medical Condition"] = "No";
+        bello["Takes Medication"] = "No";
+        await ImportAsync(importer, Workbook(okafor, bello));
+
+        using var response = await GetAsync(IncompleteUrl, importer);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var report = await ReadAsync<SchoolManagement.Application.Pupils.Records.IncompleteRecordsReportDto>(response);
+        report.SessionName.ShouldBe("2026/2027");
+        report.PupilsChecked.ShouldBe(2);
+        report.Pupils.Select(pupil => pupil.Surname).ShouldBe(["Bello", "Okafor"]);
+        report.Pupils.ShouldAllBe(pupil => pupil.ArmName == armName);
+        int Count(string code) => report.Counts.SingleOrDefault(count => count.Code == code)?.Count ?? 0;
+        Count("declaration.unsigned").ShouldBe(2);
+        Count("contacts.emergency_primary").ShouldBe(1);
+        Count("health.unanswered").ShouldBe(1);
+        report.Counts.Single(count => count.Code == "contacts.emergency_primary").Required.ShouldBeTrue();
+        report.Pupils.Single(pupil => pupil.Surname == "Okafor").Required.Select(item => item.Code)
+            .ShouldContain("contacts.emergency_primary");
+        report.Pupils.Single(pupil => pupil.Surname == "Bello").Required.Select(item => item.Code)
+            .ShouldNotContain("health.unanswered");
+    }
+
+    [Fact]
+    public async Task IncompleteRecords_AnArmRestrictedGrantSeesOnlyItsArms()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        var otherArmId = await SeedArmAsync(sessionId, "B");
+        var importer = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        await ImportAsync(importer, Workbook(Row("Okafor", "Chidera", levelName, "A"), Row("Bello", "Amina", levelName, "B")));
+        var teacher = await SignInWithAsync([Privileges.Report.View], sessionId, armIds: [otherArmId]);
+
+        using var response = await GetAsync(IncompleteUrl, teacher);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var report = await ReadAsync<SchoolManagement.Application.Pupils.Records.IncompleteRecordsReportDto>(response);
+        report.PupilsChecked.ShouldBe(1);
+        report.Pupils.ShouldHaveSingleItem().Surname.ShouldBe("Bello");
+        report.Pupils[0].ArmId.ShouldBe(otherArmId.ToString("D"));
+
+        var anyOtherArm = Guid.NewGuid().ToString("D");
+        using var outside = await GetAsync($"{IncompleteUrl}?armId={anyOtherArm}", teacher);
+        outside.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        // The route only authenticates; without report.view in any scope the handler refuses.
+        using var withoutReportView = await GetAsync(IncompleteUrl, importer);
+        withoutReportView.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
     // ---- Files -----------------------------------------------------------------------------------
 
     private static Dictionary<string, object> Row(
@@ -400,7 +466,26 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         return await context.Pupils.IgnoreQueryFilters().CountAsync(TestContext.Current.CancellationToken);
     }
 
-    private async Task<CookieJar> SignInWithAsync(IReadOnlyCollection<string> privileges, Guid sessionId)
+    private async Task<Guid> SeedArmAsync(Guid sessionId, string label)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var level = await context.ClassLevels.AsNoTracking().OrderBy(candidate => candidate.ProgressionOrder).FirstAsync(TestContext.Current.CancellationToken);
+        var arm = Arm.Create(Guid.CreateVersion7(), level.Id, sessionId, label, null, null).Value;
+        context.Add(arm);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return arm.Id;
+    }
+
+    private async Task ImportAsync(CookieJar jar, byte[] file)
+    {
+        var report = await ValidateAsync(jar, file);
+        report.RejectedCount.ShouldBe(0);
+        using var response = await CommitAsync(jar, file, report.FileSha256);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    private async Task<CookieJar> SignInWithAsync(IReadOnlyCollection<string> privileges, Guid sessionId, Guid[]? armIds = null)
     {
         var (accountId, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
 
@@ -408,7 +493,9 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var role = Role.Create(Guid.CreateVersion7(), $"Role-{Guid.NewGuid():N}", null, privileges).Value;
-            var assignment = RoleAssignment.Create(Guid.CreateVersion7(), accountId, role.Id, sessionId, ScopeType.SchoolWide, [], accountId).Value;
+            var assignment = RoleAssignment.Create(
+                Guid.CreateVersion7(), accountId, role.Id, sessionId, armIds is null ? ScopeType.SchoolWide : ScopeType.ArmList, armIds ?? [],
+                accountId).Value;
             context.AddRange(role, assignment);
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }

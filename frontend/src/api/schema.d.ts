@@ -1171,6 +1171,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/incomplete-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active pupils with records still to chase
+         * @description Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with the `required` items still missing (possible after a bulk import or a health override) and the `chased` items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty when no session is active. Bounded by the active roll, so not paginated.
+         */
+        get: operations["GetIncompleteRecordsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/terms/{termId}/weeks": {
         parameters: {
             query?: never;
@@ -5733,6 +5753,235 @@ export interface components {
          * @example binary image content, sent as the multipart request's `file` part
          */
         IFormFile: string;
+        /**
+         * @description One pupil with gaps.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRAS/2026/0041",
+         *       "surname": "Okafor",
+         *       "firstName": "Chidera",
+         *       "middleName": null,
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 2C",
+         *       "chasedPercent": 78,
+         *       "required": [
+         *         {
+         *           "step": 3,
+         *           "code": "contacts.emergency_primary",
+         *           "message": "Add the primary emergency contact."
+         *         }
+         *       ],
+         *       "chased": [
+         *         {
+         *           "step": 7,
+         *           "code": "documents.BirthCertificate",
+         *           "message": "Birth certificate."
+         *         }
+         *       ]
+         *     }
+         */
+        IncompleteRecordDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Their number.
+             * @example GRAS/2026/0041
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Surname.
+             * @example Okafor
+             */
+            surname: string;
+            /**
+             * @description First name.
+             * @example Chidera
+             */
+            firstName: string;
+            /** @description Middle name. */
+            middleName: null | string;
+            /**
+             * @description Their current arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description Its display name.
+             * @example Primary 2C
+             */
+            armName: string;
+            /**
+             * Format: int32
+             * @description Completeness across the chased set, as on the record.
+             * @example 78
+             */
+            chasedPercent: number | string;
+            /**
+             * @description Required items still missing.
+             * @example [
+             *       {
+             *         "step": 3,
+             *         "code": "contacts.emergency_primary",
+             *         "message": "Add the primary emergency contact."
+             *       }
+             *     ]
+             */
+            required: components["schemas"]["CompletenessItemDto"][];
+            /**
+             * @description Chased items missing.
+             * @example [
+             *       {
+             *         "step": 7,
+             *         "code": "documents.BirthCertificate",
+             *         "message": "Birth certificate."
+             *       }
+             *     ]
+             */
+            chased: components["schemas"]["CompletenessItemDto"][];
+        };
+        /**
+         * @description One gap across the report.
+         * @example {
+         *       "code": "contacts.emergency_primary",
+         *       "label": "No primary emergency contact",
+         *       "required": true,
+         *       "count": 6
+         *     }
+         */
+        IncompleteRecordsCountDto: {
+            /**
+             * @description The completeness code, as on each pupil's items.
+             * @example contacts.emergency_primary
+             */
+            code: string;
+            /**
+             * @description A short name for it, for a filter or a heading.
+             * @example No primary emergency contact
+             */
+            label: string;
+            /**
+             * @description True for what approval requires (spec 6.5.12), missing only after an import or an override.
+             * @example true
+             */
+            required: boolean;
+            /**
+             * Format: int32
+             * @description Pupils with this gap.
+             * @example 6
+             */
+            count: number | string;
+        };
+        /**
+         * @description The report.
+         * @example {
+         *       "sessionName": "2026/2027",
+         *       "pupilsChecked": 142,
+         *       "counts": [
+         *         {
+         *           "code": "contacts.emergency_primary",
+         *           "label": "No primary emergency contact",
+         *           "required": true,
+         *           "count": 1
+         *         },
+         *         {
+         *           "code": "documents.BirthCertificate",
+         *           "label": "Birth certificate not received",
+         *           "required": false,
+         *           "count": 1
+         *         }
+         *       ],
+         *       "pupils": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRAS/2026/0041",
+         *           "surname": "Okafor",
+         *           "firstName": "Chidera",
+         *           "middleName": null,
+         *           "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "armName": "Primary 2C",
+         *           "chasedPercent": 78,
+         *           "required": [
+         *             {
+         *               "step": 3,
+         *               "code": "contacts.emergency_primary",
+         *               "message": "Add the primary emergency contact."
+         *             }
+         *           ],
+         *           "chased": [
+         *             {
+         *               "step": 7,
+         *               "code": "documents.BirthCertificate",
+         *               "message": "Birth certificate."
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        IncompleteRecordsReportDto: {
+            /**
+             * @description The active session, or null when none is active (the report is then empty).
+             * @example 2026/2027
+             */
+            sessionName: null | string;
+            /**
+             * Format: int32
+             * @description Active pupils in scope.
+             * @example 142
+             */
+            pupilsChecked: number | string;
+            /**
+             * @description Each gap and how many of the pupils below have it, most common first.
+             * @example [
+             *       {
+             *         "code": "contacts.emergency_primary",
+             *         "label": "No primary emergency contact",
+             *         "required": true,
+             *         "count": 1
+             *       },
+             *       {
+             *         "code": "documents.BirthCertificate",
+             *         "label": "Birth certificate not received",
+             *         "required": false,
+             *         "count": 1
+             *       }
+             *     ]
+             */
+            counts: components["schemas"]["IncompleteRecordsCountDto"][];
+            /**
+             * @description Every pupil in scope with at least one gap, by arm then surname.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRAS/2026/0041",
+             *         "surname": "Okafor",
+             *         "firstName": "Chidera",
+             *         "middleName": null,
+             *         "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "armName": "Primary 2C",
+             *         "chasedPercent": 78,
+             *         "required": [
+             *           {
+             *             "step": 3,
+             *             "code": "contacts.emergency_primary",
+             *             "message": "Add the primary emergency contact."
+             *           }
+             *         ],
+             *         "chased": [
+             *           {
+             *             "step": 7,
+             *             "code": "documents.BirthCertificate",
+             *             "message": "Birth certificate."
+             *           }
+             *         ]
+             *       }
+             *     ]
+             */
+            pupils: components["schemas"]["IncompleteRecordDto"][];
+        };
         /**
          * @description The whole serialised configuration as of this version (spec 6.2.9) — free-form JSON, because every settings card adds its own section to the same snapshot shape. Read it as an opaque object; do not assume today's set of keys is complete.
          * @example {
@@ -19466,6 +19715,64 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIncompleteRecordsReport: {
+        parameters: {
+            query?: {
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncompleteRecordsReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Too Many Requests */

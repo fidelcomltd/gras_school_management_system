@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
@@ -105,6 +106,26 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             "admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.")
             .WithTags(Tag)
             .Produces<AdmissionCompletenessDto>(StatusCodes.Status200OK);
+
+        endpoints.MapGet("/reports/incomplete-records", async (
+                [FromQuery(Name = "armId")] string? armId, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetIncompleteRecordsQuery(armId), cancellationToken)).Match(TypedResults.Ok))
+            // The handler checks report.view: a route check with no arm to resolve would refuse an arm-restricted grant.
+            .RequireAuthenticatedCaller()
+            .WithTags(Tag)
+            .WithName("GetIncompleteRecordsReport")
+            .WithSummary("Active pupils with records still to chase")
+            .WithDescription(
+                "Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with " +
+                "the `required` items still missing (possible after a bulk import or a health override) and the `chased` " +
+                "items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its " +
+                "arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty " +
+                "when no session is active. Bounded by the active roll, so not paginated.")
+            .Produces<IncompleteRecordsReportDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }
 
     private static RouteHandlerBuilder Read(RouteHandlerBuilder route, string name, string summary, string description) =>
