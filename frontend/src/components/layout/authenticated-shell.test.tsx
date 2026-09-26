@@ -35,6 +35,7 @@ function sessionWith(...privileges: string[]): AuthSession {
     isSuperAdmin: false,
     mustChangePassword: false,
     effectivePrivileges: privileges.map((privilege) => ({ privilege, scope: 'SchoolWide', armIds: [] })),
+    roleNames: [],
     sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     sessionAbsoluteExpiresAt: new Date(Date.now() + 8 * 3_600_000).toISOString(),
   };
@@ -123,7 +124,9 @@ describe('AuthenticatedShell — sign-out order (AC-4)', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    // Sign out sits in the header's account menu.
+    await user.click(screen.getByRole('button', { name: /^Account:/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     // The request has fired but the response has not resolved yet — client
     // state must still show the session as active (§5: revoke THEN clear).

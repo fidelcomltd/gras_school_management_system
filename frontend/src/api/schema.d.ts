@@ -3389,6 +3389,9 @@ export interface components {
          *           "armIds": []
          *         }
          *       ],
+         *       "roleNames": [
+         *         "Super Admin"
+         *       ],
          *       "sessionExpiresAt": "2026-08-03T09:30:00+00:00",
          *       "sessionAbsoluteExpiresAt": "2026-08-03T09:30:00+00:00"
          *     }
@@ -3433,6 +3436,14 @@ export interface components {
              *     ]
              */
             effectivePrivileges: components["schemas"]["EffectivePrivilegeDto"][];
+            /**
+             * @description Display only: `["Super Admin"]` for a super admin, else the names of the roles behind the active assignments,
+             *     ordered by name. Never an authorization input; IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges is.
+             * @example [
+             *       "Super Admin"
+             *     ]
+             */
+            roleNames: string[];
             /**
              * Format: date-time
              * @description The sooner of the session's idle and absolute deadlines, recomputed on every response.

@@ -12,6 +12,7 @@ export function mockMe(...privileges: string[]) {
         isSuperAdmin: false,
         mustChangePassword: false,
         effectivePrivileges: privileges.map((privilege) => ({ privilege, scope: 'SchoolWide', armIds: [] })),
+        roleNames: ['Head Teacher'],
         sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
         sessionAbsoluteExpiresAt: new Date(Date.now() + 8 * 3_600_000).toISOString(),
       }),

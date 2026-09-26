@@ -13,6 +13,7 @@ internal sealed class ChangePasswordCommandHandler(
     IAdminSessionRepository sessions,
     IPasswordHasher passwordHasher,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
+    IAccountRoleNames accountRoleNames,
     ICurrentUser currentUser,
     ICurrentSession currentSession,
     TimeProvider timeProvider)
@@ -108,6 +109,10 @@ internal sealed class ChangePasswordCommandHandler(
             .GetGrantsAsync(account.Id.ToString(), cancellationToken)
             .ConfigureAwait(false);
 
+        var roleNames = await accountRoleNames
+            .GetActiveRoleNamesAsync(account.Id, account.IsSuperAdmin, cancellationToken)
+            .ConfigureAwait(false);
+
         var response = AuthSessionResponse.Create(
             account.Id,
             account.Email,
@@ -115,6 +120,7 @@ internal sealed class ChangePasswordCommandHandler(
             account.IsSuperAdmin,
             account.MustChangePassword,
             grants,
+            roleNames,
             currentSessionRow.IdleExpiresAtUtc,
             currentSessionRow.AbsoluteExpiresAtUtc);
 

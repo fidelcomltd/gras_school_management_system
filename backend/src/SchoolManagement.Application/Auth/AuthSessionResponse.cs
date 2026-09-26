@@ -20,6 +20,10 @@ namespace SchoolManagement.Application.Auth;
 /// provider graduation) the union of a non-super-admin's own active <c>role_assignment</c> grants.
 /// This endpoint's SHAPE is unchanged by TASK-0030; only the data behind it improved.
 /// </param>
+/// <param name="RoleNames">
+/// Display only: <c>["Super Admin"]</c> for a super admin, else the names of the roles behind the active assignments,
+/// ordered by name. Never an authorization input; <see cref="EffectivePrivileges"/> is.
+/// </param>
 /// <param name="SessionExpiresAt">
 /// The sooner of the session's idle and absolute deadlines, recomputed on every response.
 /// </param>
@@ -33,6 +37,7 @@ public sealed record AuthSessionResponse(
     bool IsSuperAdmin,
     bool MustChangePassword,
     IReadOnlyList<EffectivePrivilegeDto> EffectivePrivileges,
+    IReadOnlyList<string> RoleNames,
     DateTimeOffset SessionExpiresAt,
     DateTimeOffset SessionAbsoluteExpiresAt)
 {
@@ -44,6 +49,7 @@ public sealed record AuthSessionResponse(
         bool isSuperAdmin,
         bool mustChangePassword,
         IReadOnlyCollection<PrivilegeGrant> grants,
+        IReadOnlyList<string> roleNames,
         DateTimeOffset idleExpiresAtUtc,
         DateTimeOffset absoluteExpiresAtUtc)
     {
@@ -62,6 +68,7 @@ public sealed record AuthSessionResponse(
             IsSuperAdmin: isSuperAdmin,
             MustChangePassword: mustChangePassword,
             EffectivePrivileges: privileges,
+            RoleNames: roleNames,
             SessionExpiresAt: soonerExpiry,
             SessionAbsoluteExpiresAt: absoluteExpiresAtUtc);
     }

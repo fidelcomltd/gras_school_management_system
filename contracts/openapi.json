@@ -20730,6 +20730,7 @@
           "isSuperAdmin",
           "mustChangePassword",
           "effectivePrivileges",
+          "roleNames",
           "sessionExpiresAt",
           "sessionAbsoluteExpiresAt"
         ],
@@ -20774,6 +20775,16 @@
               }
             ]
           },
+          "roleNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Display only: `[\"Super Admin\"]` for a super admin, else the names of the roles behind the active assignments,\nordered by name. Never an authorization input; IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges is.",
+            "example": [
+              "Super Admin"
+            ]
+          },
           "sessionExpiresAt": {
             "type": "string",
             "description": "The sooner of the session's idle and absolute deadlines, recomputed on every response.",
@@ -20801,6 +20812,9 @@
               "scope": "SchoolWide",
               "armIds": [ ]
             }
+          ],
+          "roleNames": [
+            "Super Admin"
           ],
           "sessionExpiresAt": "2026-08-03T09:30:00+00:00",
           "sessionAbsoluteExpiresAt": "2026-08-03T09:30:00+00:00"

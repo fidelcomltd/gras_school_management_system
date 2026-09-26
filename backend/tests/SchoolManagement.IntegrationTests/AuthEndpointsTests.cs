@@ -80,6 +80,7 @@ public sealed class AuthEndpointsTests(ApiTestFixture fixture) : IntegrationTest
         session.Email.ShouldBe(email);
         session.MustChangePassword.ShouldBeFalse();
         session.IsSuperAdmin.ShouldBeTrue();
+        session.RoleNames.ShouldBe(["Super Admin"]);
         session.EffectivePrivileges.ShouldNotBeEmpty(
             "A super-admin's effective privileges are resolved via the flag-bypass path (TASK-0003 §1).");
     }

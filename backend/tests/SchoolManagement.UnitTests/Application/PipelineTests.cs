@@ -57,6 +57,7 @@ public sealed class PipelineTests
         // by Infrastructure (or the Api layer, for the two Identity ports) — same treatment as the
         // TASK-0002 stubs above, needed only so this Application-only container can construct them.
         services.AddSingleton(Substitute.For<IEffectivePrivilegeProvider>());
+        services.AddSingleton(Substitute.For<IAccountRoleNames>());
         services.AddSingleton(Substitute.For<IAdminAccountRepository>());
         services.AddSingleton(Substitute.For<IAdminSessionRepository>());
         services.AddSingleton(Substitute.For<IPasswordHasher>());
