@@ -6,7 +6,8 @@
 # Everything else is non-secret and identical on every deploy, so it lives here where it is reviewed.
 #
 # The image migrates the staging database on every boot (backend/Dockerfile), so there is no separate
-# migration step: a failed migration fails the deploy, and Render keeps the previous version serving.
+# migration step: a failed migration fails the deploy. It does NOT roll the schema back: migrations that
+# committed before the failure stay applied under the previous version. Acceptable for staging only.
 
 services:
   - type: web
@@ -24,9 +25,11 @@ services:
     # around a minute to wake (and to re-run its migration check) on the next request.
     plan: starter
     numInstances: 1
-    # /health/ready opens a real database connection, so a deploy that cannot reach Postgres never
-    # goes live.
-    healthCheckPath: /health/ready
+    # LIVENESS, not /health/ready. Render restarts an instance after 60 seconds of failed checks, and
+    # the entrypoint migrates before the app starts, so a readiness check would turn a short database
+    # outage into a restart loop (HealthEndpoints: readiness stops traffic, it must not restart). The
+    # database is still proven on every deploy: the boot-time migration cannot pass without it.
+    healthCheckPath: /health/live
     autoDeployTrigger: commit
     # Only backend changes (and this file) rebuild the API; a frontend or docs commit does not.
     buildFilter:

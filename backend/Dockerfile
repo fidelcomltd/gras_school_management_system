@@ -18,7 +18,9 @@ COPY src/SchoolManagement.Api/SchoolManagement.Api.csproj src/SchoolManagement.A
 COPY src/SchoolManagement.Application/SchoolManagement.Application.csproj src/SchoolManagement.Application/
 COPY src/SchoolManagement.Domain/SchoolManagement.Domain.csproj src/SchoolManagement.Domain/
 COPY src/SchoolManagement.Infrastructure/SchoolManagement.Infrastructure.csproj src/SchoolManagement.Infrastructure/
-RUN dotnet restore src/SchoolManagement.Api/SchoolManagement.Api.csproj
+# For linux-x64 only: without a runtime identifier the publish output carries native libraries for every
+# platform (about 350 MB of Windows and ARM builds of SkiaSharp and friends this container never loads).
+RUN dotnet restore src/SchoolManagement.Api/SchoolManagement.Api.csproj -r linux-x64
 
 # The analyzer severities (warnings are errors in Release). Without it the build applies the SDK's defaults
 # and fails on rules this codebase deliberately turns off, such as CA1034 for the privilege register.
@@ -27,20 +29,21 @@ COPY src/ src/
 RUN dotnet publish src/SchoolManagement.Api/SchoolManagement.Api.csproj \
     -c Release \
     -o /app/publish \
+    -r linux-x64 \
+    --self-contained false \
     --no-restore \
     /p:UseAppHost=false
 
 # The migration bundle, built from the same source as the app so schema and code can never be a version
-# apart (the production workflow builds its bundle the same way; see deploy-production.yml for why the
-# startup project is Infrastructure and why a placeholder connection string is enough at build time).
+# apart (see deploy-production.yml for why the startup project is Infrastructure and why a placeholder
+# connection string is enough at build time). Framework-dependent, unlike production's: the runtime stage
+# already carries .NET, so a self-contained bundle would only add a second copy of it to the image.
 RUN dotnet tool restore \
     && SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION='Host=localhost;Database=unused;Username=unused;Password=unused' \
        dotnet tool run dotnet-ef migrations bundle \
          --project src/SchoolManagement.Infrastructure \
          --startup-project src/SchoolManagement.Infrastructure \
          --configuration Release \
-         --self-contained \
-         --target-runtime linux-x64 \
          --output /app/efbundle \
          --force
 
@@ -63,9 +66,11 @@ ENV ASPNETCORE_ENVIRONMENT=Staging \
 EXPOSE 8080
 
 # Staging migrates on every boot, before the app starts: a staging database holds nothing that needs the
-# production deploy's backup-then-migrate ceremony, and there is no deploy script on Render to run it.
-# The connection string reaches the bundle through the environment (both names, as in deploy.sh), never
-# as an argument. A failed migration exits non-zero, so Render keeps the previous version serving.
+# production deploy's backup-then-migrate ceremony. Not Render's pre-deploy command: that does not exist
+# on the free plan, and Render does not document how it treats an image's ENTRYPOINT. On a boot with
+# nothing pending the bundle is a quick no-op. The connection string reaches the bundle through the
+# environment (both names, as in deploy.sh), never as an argument. If the database is unreachable the
+# bundle exits non-zero and the app never starts, so a deploy cannot go live without its database.
 #
 # Then binds $PORT when the platform sets one (Render does), 8080 otherwise. A shell form is needed
 # because the exec form does not expand variables; `exec` keeps the app as PID 1 so it receives

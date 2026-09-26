@@ -286,8 +286,14 @@ its edge and sets `$PORT`, both of which the image handles.
 
 **The image migrates on every boot.** The entrypoint runs the migration bundle (built into the image
 from the same commit) before starting the app. There is no backup-first step: staging holds nothing
-worth one. A migration that fails exits non-zero, the new version fails its health check, and Render
-keeps the previous one serving.
+worth one. A migration that fails, or a database that cannot be reached, stops the app from starting,
+so the deploy fails and Render keeps the previous version serving. That is not a rollback: any
+migration that committed before the failure stays applied under the previous version's code, which is
+acceptable on staging and is why production migrates in its own backed-up step instead.
+
+The health check is `/health/live`, not `/health/ready`: Render restarts an instance after 60 seconds
+of failed checks, and with migrations in the entrypoint a readiness check would turn a short database
+outage into a restart loop.
 
 The six secrets are asked for once, when the Blueprint is created, and are never in git:
 
@@ -311,9 +317,15 @@ the `deploy-production` workflow.
 
 ### Opening the staging database to Render
 
-Render reaches the VPS over the public internet, so this is a deliberate exposure of port 5432,
-restricted to Render's outbound addresses for the service's region, to the staging role and database
-only, and to TLS. The production database stays unreachable from outside the box.
+Render reaches the VPS over the public internet, so this is a deliberate exposure of port 5432 to
+Render's outbound addresses for the service's region, for the staging role and database only, over
+TLS. The production database stays unreachable from outside the box.
+
+**Those addresses are shared by every Render service in the region**, so they keep the rest of the
+internet off the port but do not identify this service. The real boundary is the staging password,
+sent over TLS with SCRAM channel binding (`Channel Binding=Require` in the printed connection string),
+which defeats a man in the middle even though the certificate is self-signed. Render's dedicated
+outbound IPs (a paid add-on), or a tunnel, would narrow it further if staging ever holds real data.
 
 [deploy/open-staging-db.sh](../../deploy/open-staging-db.sh) does all of it. Copy it to the VPS and
 run it with the addresses from the Render dashboard (the service's **Connect** menu, **Outbound**
@@ -325,11 +337,14 @@ sudo bash open-staging-db.sh <address> <address> ...
 
 It creates the `gras_staging` role and database only if they are missing (`provision-vps.sh`
 normally made them already; an existing role keeps its password), caps the role at 12 connections
-so staging cannot starve production of the instance's 60, turns TLS on if it is off, adds the box's
-public address to `listen_addresses`, writes a marked `hostssl` block to `pg_hba.conf`, opens 5432
-in ufw to those addresses only, and prints the connection string for Render. A restart of Postgres
-is needed only the first time (listen address or TLS changed); production's API reconnects on its
-next request.
+(two overlapping pools of 5 during a deploy, plus the migration and a psql session) so staging
+cannot starve production of the instance's 60, turns TLS on if it is off, adds the box's public
+address to `listen_addresses`, writes a marked `hostssl` block to `pg_hba.conf`, opens 5432 in ufw
+to those addresses only, and prints the connection string for Render. It refuses to run while ufw is
+inactive. A restart of Postgres is needed only the first time (listen address or TLS changed), and
+it checks the certificate is readable before restarting; production's API reconnects on its next
+request. Both config files are backed up with a timestamp, and a failed restart prints the command
+that restores them.
 
 Re-run it whenever Render's addresses change: the `pg_hba.conf` block and the ufw rules it owns are
 replaced by the new list. If they change without a re-run, staging loses its database and production

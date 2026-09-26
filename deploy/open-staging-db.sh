@@ -18,6 +18,12 @@
 #      TLS, in pg_hba.conf and in ufw
 #   5. prints the connection string to paste into Render
 #
+# THE ADDRESSES ARE NOT THE BOUNDARY. Render shares its outbound ranges across every service in a region,
+# so any Render customer in Frankfurt passes the address check. What actually keeps them out is the
+# long random staging password, sent inside TLS with SCRAM channel binding (the printed connection
+# string requires it, so a man in the middle presenting its own certificate cannot relay the login).
+# The address filter only keeps the rest of the internet off port 5432.
+#
 # The production database stays unreachable from outside: no pg_hba line names it.
 #
 # Override the detected public address with VPS_IP=<address> if the box has more than one.
@@ -27,8 +33,11 @@ set -euo pipefail
 STAGING_DB=gras_staging
 STAGING_ROLE=gras_staging
 PASSWORD_FILE=/etc/gras/staging-db-password
-# Staging's pool (Maximum Pool Size in the printed connection string) plus room for a psql session.
-# max_connections is 60 (provision-vps.sh) and production needs the rest.
+# Render's zero-downtime deploy keeps the old instance running for at least 60 seconds after the new one
+# is healthy, so two pools overlap: 2 x 5 (Maximum Pool Size in the printed connection string), plus the
+# new instance's migration connection, plus a psql session. max_connections is 60 (provision-vps.sh) and
+# production needs the rest.
+STAGING_POOL_SIZE=5
 CONNECTION_LIMIT=12
 MARK=gras-staging-render
 
@@ -50,6 +59,8 @@ for raw in "$@"; do
   fi
   for octet in "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"; do
     (( 10#$octet <= 255 )) || fail "'$raw' has an octet above 255."
+    # Postgres reads a leading zero as octal (053 is 43) while ufw refuses it: two tools, two answers.
+    [[ $octet == 0 || $octet != 0* ]] || fail "'$raw' has an octet with a leading zero."
   done
   prefix=${BASH_REMATCH[6]:-32}
   (( 10#$prefix <= 32 )) || fail "'$raw' has a prefix above /32."
@@ -59,6 +70,8 @@ for raw in "$@"; do
 done
 
 command -v ufw >/dev/null || fail "ufw is not installed; run provision-vps.sh first."
+# With ufw off, the listen address below would put 5432 on the whole internet with pg_hba as the only filter.
+ufw status | grep -q '^Status: active' || fail "ufw is not active, so port 5432 would be open to everyone. Enable it (provision-vps.sh does) and re-run."
 systemctl is-active --quiet postgresql || fail "PostgreSQL is not running."
 
 VPS_IP=${VPS_IP:-$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')}
@@ -110,22 +123,37 @@ sudo -u postgres psql -v ON_ERROR_STOP=1 -q -c "ALTER ROLE $STAGING_ROLE CONNECT
 # ── 3. Listen address and TLS ────────────────────────────────────────────────────────────────
 PG_CONF=$(psql_q 'SHOW config_file')
 HBA_FILE=$(psql_q 'SHOW hba_file')
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 restart_needed=false
+# Kept whatever happens, so a bad edit is one `cp` away from undone.
+cp -a "$PG_CONF" "$PG_CONF.bak.$STAMP"
 
 log "Checking TLS"
 if [[ $(psql_q 'SHOW ssl') == on ]]; then
   note "ssl is on"
 else
-  # Ubuntu's package ships a self-signed "snakeoil" pair for exactly this. Npgsql's SSL Mode=Require
-  # encrypts without validating the certificate, so a self-signed one is enough.
-  [[ -f /etc/ssl/certs/ssl-cert-snakeoil.pem && -f /etc/ssl/private/ssl-cert-snakeoil.key ]] ||
-    fail "ssl is off and the snakeoil certificate is missing; install ssl-cert (apt-get install ssl-cert) and re-run."
-  sed -i -E "s|^\s*#?\s*ssl\s*=.*|ssl = on|" "$PG_CONF"
-  grep -qE '^ssl = on' "$PG_CONF" || printf 'ssl = on\n' >> "$PG_CONF"
+  # Ubuntu's package ships a self-signed "snakeoil" pair for exactly this. SSL Mode=Require encrypts
+  # without validating the certificate, and channel binding (in the printed connection string) is what
+  # stops a substituted certificate, so a self-signed one is enough.
   if ! grep -qE "^\s*ssl_cert_file\s*=" "$PG_CONF"; then
     printf "ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'\nssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'\n" >> "$PG_CONF"
   fi
-  note "turned ssl on with the snakeoil certificate"
+  # A certificate the server cannot read is a cluster that does not come back after the restart, and
+  # production shares it. Check the files the config will actually use, as the postgres user, first.
+  cert=$(sed -n -E "s/^\s*ssl_cert_file\s*=\s*'([^']*)'.*/\1/p" "$PG_CONF" | tail -1)
+  key=$(sed -n -E "s/^\s*ssl_key_file\s*=\s*'([^']*)'.*/\1/p" "$PG_CONF" | tail -1)
+  data_dir=$(psql_q 'SHOW data_directory')
+  [[ $cert == /* ]] || cert="$data_dir/${cert:-server.crt}"
+  [[ $key == /* ]] || key="$data_dir/${key:-server.key}"
+  if ! sudo -u postgres test -r "$cert" || ! sudo -u postgres test -r "$key"; then
+    cp -a "$PG_CONF.bak.$STAMP" "$PG_CONF"
+    fail "ssl is off, and the postgres user cannot read the certificate ($cert) or key ($key) the config names.
+        Nothing was restarted and $PG_CONF is unchanged. Install ssl-cert (apt-get install ssl-cert) or fix
+        those paths, then re-run."
+  fi
+  sed -i -E "s|^\s*#?\s*ssl\s*=.*|ssl = on|" "$PG_CONF"
+  grep -qE '^ssl = on' "$PG_CONF" || printf 'ssl = on\n' >> "$PG_CONF"
+  note "turning ssl on with $cert"
   restart_needed=true
 fi
 
@@ -149,7 +177,7 @@ fi
 # first-match, and nothing above it matches a remote address, so an address outside this block
 # simply finds no line and is refused.
 log "Writing the Render block in $HBA_FILE"
-cp -a "$HBA_FILE" "$HBA_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+cp -a "$HBA_FILE" "$HBA_FILE.bak.$STAMP"
 sed -i "/^# BEGIN $MARK/,/^# END $MARK/d" "$HBA_FILE"
 {
   printf '# BEGIN %s (managed by deploy/open-staging-db.sh; edits here are overwritten)\n' "$MARK"
@@ -184,7 +212,11 @@ if [[ $restart_needed == true ]]; then
   # listen_addresses and ssl need a restart. Production's API drops its connections for a second or
   # two and its pool reconnects on the next request.
   log "Restarting PostgreSQL (listen address or TLS changed)"
-  systemctl restart postgresql
+  if ! systemctl restart postgresql; then
+    fail "PostgreSQL did not come back, and PRODUCTION shares it. Put the previous config back and start it:
+        sudo cp -a $PG_CONF.bak.$STAMP $PG_CONF && sudo cp -a $HBA_FILE.bak.$STAMP $HBA_FILE && sudo systemctl restart postgresql
+        The reason is in: sudo journalctl -u postgresql -n 50"
+  fi
 else
   log "Reloading PostgreSQL (pg_hba.conf changed)"
   systemctl reload postgresql
@@ -200,10 +232,11 @@ cat <<EOF
     Paste this into Render as Database__ConnectionString (it contains the staging password, so paste
     it there and nowhere else):
 
-    Host=$VPS_IP;Port=5432;Database=$STAGING_DB;Username=$STAGING_ROLE;Password=$STAGING_DB_PASSWORD;SSL Mode=Require;Maximum Pool Size=10;GSS Encryption Mode=Disable
+    Host=$VPS_IP;Port=5432;Database=$STAGING_DB;Username=$STAGING_ROLE;Password=$STAGING_DB_PASSWORD;SSL Mode=Require;Channel Binding=Require;Maximum Pool Size=$STAGING_POOL_SIZE;GSS Encryption Mode=Disable
 
-    (GSS Encryption Mode=Disable: the container has no Kerberos library, so Npgsql's default attempt at
-    GSS encryption only logs a load error on every new connection before falling back to TLS.)
+    Channel Binding=Require ties the login to this TLS session, so a relayed login fails even though the
+    certificate is self-signed. GSS Encryption Mode=Disable: the container has no Kerberos library, so
+    Npgsql's default GSS attempt only logs a load error on every new connection.
 
     If Render's outbound addresses change, re-run this script with the new list.
 EOF
