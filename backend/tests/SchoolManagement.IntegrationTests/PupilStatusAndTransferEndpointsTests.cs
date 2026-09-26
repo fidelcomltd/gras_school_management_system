@@ -24,7 +24,8 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
     private const string CsrfUrl = "/api/v1/auth/csrf";
     private const string SignInUrl = "/api/v1/auth/sign-in";
 
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    // The server's date, which is Lagos (UTC+1): the UTC date lags it by a day from 23:00 UTC.
+    private static readonly DateOnly Today = Application.Weekly.WeeklyProjection.LagosToday(DateTimeOffset.UtcNow);
     private static readonly DateOnly SessionStart = Today.AddDays(-60);
 
     // ---- Transfer ------------------------------------------------------------------------------
