@@ -68,11 +68,8 @@ EXPOSE 8080
 # Staging migrates on every boot, before the app starts: a staging database holds nothing that needs the
 # production deploy's backup-then-migrate ceremony. Not Render's pre-deploy command: that does not exist
 # on the free plan, and Render does not document how it treats an image's ENTRYPOINT. On a boot with
-# nothing pending the bundle is a quick no-op. The connection string reaches the bundle through the
-# environment (both names, as in deploy.sh), never as an argument. If the database is unreachable the
-# bundle exits non-zero and the app never starts, so a deploy cannot go live without its database.
-#
-# Then binds $PORT when the platform sets one (Render does), 8080 otherwise. A shell form is needed
-# because the exec form does not expand variables; `exec` keeps the app as PID 1 so it receives
-# SIGTERM and shuts down gracefully.
-ENTRYPOINT ["/bin/sh", "-c", "SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION=\"$Database__ConnectionString\" gras-efbundle && exec dotnet SchoolManagement.Api.dll --urls http://+:${PORT:-8080}"]
+# nothing pending the bundle is a quick no-op. The steps, and the optional first-administrator bootstrap
+# the free plan needs in place of a Shell, are in docker-entrypoint.sh. Run through `sh` so the script
+# needs no executable bit, which a Windows checkout cannot carry.
+COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/gras-entrypoint
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/gras-entrypoint"]

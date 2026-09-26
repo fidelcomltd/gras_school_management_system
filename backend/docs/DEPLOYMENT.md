@@ -295,6 +295,16 @@ The health check is `/health/live`, not `/health/ready`: Render restarts an inst
 of failed checks, and with migrations in the entrypoint a readiness check would turn a short database
 outage into a restart loop.
 
+**It runs on Render's free plan** (no payment card). Three consequences:
+
+- It sleeps after 15 idle minutes. Measured under the free limits (0.1 CPU, 512 MB), a boot takes
+  roughly 2 to 3 minutes, so the first visit after a quiet spell waits that long and the web app's
+  first request may time out before a retry succeeds. Memory stays under 150 MB.
+- There is no Shell, so the first administrator is created at boot instead (below).
+- 750 free instance hours a month per workspace; one sleeping service stays well inside that.
+
+`plan: starter` in `render.yaml` removes all three, if staging ever needs to stay awake.
+
 The six secrets are asked for once, when the Blueprint is created, and are never in git:
 
 | Variable | Where it comes from |
@@ -302,6 +312,12 @@ The six secrets are asked for once, when the Blueprint is created, and are never
 | `Database__ConnectionString` | printed by `deploy/open-staging-db.sh` on the VPS (below) |
 | `Pins__LookupKey`, `Pins__EncryptionKey` | `openssl rand -base64 32`, once each, for staging only |
 | `Cloudinary__CloudName`, `__ApiKey`, `__ApiSecret` | the same Cloudinary account as production |
+
+**First administrator.** Render also asks for `GRAS_BOOTSTRAP_ADMIN_EMAIL` and
+`GRAS_BOOTSTRAP_ADMIN_NAME` (two words). With both set, `backend/docker-entrypoint.sh` runs
+`bootstrap-admin` after migrating and before starting the app; the temporary password appears once in
+the service's **Logs**, and must be changed at first sign-in. The command refuses once any account
+exists, so later boots only log that refusal. Delete both variables after the first sign-in.
 
 Generate staging's pin keys separately. Sharing production's would mean a staging compromise hands
 over the ability to compute production lookup keys. `Cloudinary__FolderPrefix=gras/staging` (in the

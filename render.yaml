@@ -21,9 +21,11 @@ services:
     # The closest Render region to Nigeria. Its outbound addresses are what deploy/open-staging-db.sh
     # lets into Postgres, so changing the region means re-running that script with the new list.
     region: frankfurt
-    # Starter keeps the service awake. Free also works, but sleeps after 15 idle minutes and takes
-    # around a minute to wake (and to re-run its migration check) on the next request.
-    plan: starter
+    # FREE (human, 2026-09-26: no payment card for staging). It sleeps after 15 idle minutes and takes
+    # about a minute to wake on the next request (including the boot-time migration check), has no Shell
+    # (hence the bootstrap variables below), and 750 free hours a month per workspace. `starter` removes
+    # all three limits if staging ever needs to stay awake.
+    plan: free
     numInstances: 1
     # LIVENESS, not /health/ready. Render restarts an instance after 60 seconds of failed checks, and
     # the entrypoint migrates before the app starts, so a readiness check would turn a short database
@@ -60,6 +62,13 @@ services:
       - key: Cloudinary__ApiKey
         sync: false
       - key: Cloudinary__ApiSecret
+        sync: false
+      # The first staging administrator, created at boot by docker-entrypoint.sh because the free plan
+      # has no Shell to run bootstrap-admin in. The temporary password appears ONCE in the service log.
+      # Delete both variables after the first sign-in; while set, later boots only log a refusal.
+      - key: GRAS_BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: GRAS_BOOTSTRAP_ADMIN_NAME
         sync: false
 
       # ── Non-secret staging settings ──
