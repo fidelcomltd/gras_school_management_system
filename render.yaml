@@ -21,8 +21,8 @@ services:
     # The closest Render region to Nigeria. Its outbound addresses are what deploy/open-staging-db.sh
     # lets into Postgres, so changing the region means re-running that script with the new list.
     region: frankfurt
-    # FREE (human, 2026-09-26: no payment card for staging). It sleeps after 15 idle minutes and takes
-    # about a minute to wake on the next request (including the boot-time migration check), has no Shell
+    # FREE (human, 2026-09-26: no payment card for staging). It sleeps after 15 idle minutes and, measured
+    # at the free limits (0.1 CPU), takes 2 to 3 minutes to wake on the next request, has no Shell
     # (hence the bootstrap variables below), and 750 free hours a month per workspace. `starter` removes
     # all three limits if staging ever needs to stay awake.
     plan: free
@@ -86,8 +86,9 @@ services:
       - key: Proxy__TrustAllProxies
         value: "true"
       # Both directories exist in the image, owned by the service user. The container disk is
-      # ephemeral, so a redeploy loses the key ring (outstanding CSRF tokens re-fetch, nothing more)
-      # and the PDF cache (results re-render).
+      # ephemeral, so every restart loses them, and on the free plan that includes every wake from
+      # sleep: the key ring (the web app re-fetches its CSRF token once and retries, so users do not
+      # see it) and the PDF cache (results re-render on first view).
       - key: DataProtection__KeyRingPath
         value: /var/lib/gras/dataprotection-keys
       - key: Portal__PdfCacheDirectory

@@ -303,9 +303,14 @@ outage into a restart loop.
 - There is no Shell, so the first administrator is created at boot instead (below).
 - 750 free instance hours a month per workspace; one sleeping service stays well inside that.
 
+Every wake is a fresh container, so the CSRF key ring and the result-PDF cache start empty each time.
+The web app re-fetches its CSRF token once and retries, so users do not see the first; the second
+costs a re-render on the first view of each result.
+
 `plan: starter` in `render.yaml` removes all three, if staging ever needs to stay awake.
 
-The six secrets are asked for once, when the Blueprint is created, and are never in git:
+Eight values are asked for once, when the Blueprint is created, and are never in git: the six
+secrets below and the two bootstrap variables after them.
 
 | Variable | Where it comes from |
 |---|---|
@@ -315,9 +320,13 @@ The six secrets are asked for once, when the Blueprint is created, and are never
 
 **First administrator.** Render also asks for `GRAS_BOOTSTRAP_ADMIN_EMAIL` and
 `GRAS_BOOTSTRAP_ADMIN_NAME` (two words). With both set, `backend/docker-entrypoint.sh` runs
-`bootstrap-admin` after migrating and before starting the app; the temporary password appears once in
-the service's **Logs**, and must be changed at first sign-in. The command refuses once any account
-exists, so later boots only log that refusal. Delete both variables after the first sign-in.
+`bootstrap-admin` after migrating and before starting the app, and the temporary password appears in
+the service's **Logs**. That log is readable by anyone with access to the Render workspace for as long
+as Render keeps it, so **sign in and change the password straight away**, then delete both variables.
+While they are set, every boot pays for an extra start-up just to be refused (and logs a warning
+saying so), and an emptied database would get a new administrator. A bad name or email fails the
+boot with the reason in the log, rather than going live with no administrator; setting only one of
+the two logs a warning and creates nothing.
 
 Generate staging's pin keys separately. Sharing production's would mean a staging compromise hands
 over the ability to compute production lookup keys. `Cloudinary__FolderPrefix=gras/staging` (in the
