@@ -113,15 +113,20 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
         var decoded = DecodeAndDetectType(fileBytes);
         if (decoded.IsFailure)
         {
-            return Result.Failure<ProcessedPupilPhoto>(Error.Validation(
-                PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
+            return Result.Failure<ProcessedPupilPhoto>(decoded.Error.Code == SchoolImageErrorCodes.TooManyPixels
+                ? Error.Validation(PupilUploadErrorCodes.PhotoTooLarge, decoded.Error.Description)
+                : Error.Validation(PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
         }
 
         // Centre crop to the largest square, then both sizes come from that one crop. The original is dropped here.
         using var bitmap = decoded.Value.Bitmap;
         var side = Math.Min(bitmap.Width, bitmap.Height);
         using var square = new SKBitmap();
-        bitmap.ExtractSubset(square, SKRectI.Create((bitmap.Width - side) / 2, (bitmap.Height - side) / 2, side, side));
+        if (!bitmap.ExtractSubset(square, SKRectI.Create((bitmap.Width - side) / 2, (bitmap.Height - side) / 2, side, side)))
+        {
+            return Result.Failure<ProcessedPupilPhoto>(Error.Validation(
+                PupilUploadErrorCodes.PhotoUnsupportedType, "This photograph could not be read. Take it again or save it as a JPEG."));
+        }
 
         return Result.Success(new ProcessedPupilPhoto(
             EncodeSquareJpeg(square, 400, SchoolImageSizeVariant.Square400),
@@ -149,8 +154,9 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
         var decoded = DecodeAndDetectType(fileBytes);
         if (decoded.IsFailure)
         {
-            return Result.Failure<ProcessedDocumentScan>(Error.Validation(
-                PupilUploadErrorCodes.DocumentUnsupportedType, "Only PDF, JPEG and PNG files are accepted, verified by file content rather than name."));
+            return Result.Failure<ProcessedDocumentScan>(decoded.Error.Code == SchoolImageErrorCodes.TooManyPixels
+                ? Error.Validation(PupilUploadErrorCodes.DocumentTooLarge, decoded.Error.Description)
+                : Error.Validation(PupilUploadErrorCodes.DocumentUnsupportedType, "Only PDF, JPEG and PNG files are accepted, verified by file content rather than name."));
         }
 
         using var bitmap = decoded.Value.Bitmap;
@@ -194,6 +200,18 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
 
         using var data = SKData.CreateCopy(fileBytes);
         using var codec = SKCodec.Create(data);
+
+        // A few megabytes of compressed PNG or JPEG can declare tens of thousands of pixels a side; the header is read
+        // before any pixel is decoded, so a decompression bomb is refused before it can allocate gigabytes.
+        var info = codec.Info;
+        if ((long)info.Width * info.Height > SchoolImageLimits.MaxDecodedPixels)
+        {
+            return Result.Failure<(SKBitmap, string)>(Error.Validation(
+                SchoolImageErrorCodes.TooManyPixels,
+                $"This image is {info.Width} by {info.Height} pixels. The limit is {SchoolImageLimits.MaxDecodedPixels / 1_000_000} megapixels; " +
+                "reduce its size and try again."));
+        }
+
         var rawBitmap = SKBitmap.Decode(codec);
 
         if (rawBitmap is null)

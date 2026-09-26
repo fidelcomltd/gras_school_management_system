@@ -111,9 +111,6 @@ public sealed class SettingsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
-    /// <summary>Bytes over the processor's own cap that a multipart envelope's boundaries/headers may add.</summary>
-    private const long MultipartOverheadBytes = 64 * 1024;
-
     private static void MapUploadSchoolLogo(RouteGroupBuilder group) =>
         group.MapPost("/identity/logo", async (
                 IFormFile file,
@@ -131,7 +128,7 @@ public sealed class SettingsEndpoints : IEndpointModule
             // antiforgery requirement would otherwise throw (500) because no antiforgery middleware is registered.
             .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
-            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxLogoBytes + MultipartOverheadBytes))
+            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxLogoBytes + FileResponses.MultipartOverheadBytes))
             .WithName("UploadSchoolLogo")
             .WithSummary("Upload the school logo")
             .WithDescription(
@@ -164,7 +161,7 @@ public sealed class SettingsEndpoints : IEndpointModule
             // antiforgery requirement would otherwise throw (500) because no antiforgery middleware is registered.
             .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
-            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxSignatureBytes + MultipartOverheadBytes))
+            .WithMetadata(new RequestSizeLimitAttribute(SchoolImageLimits.MaxSignatureBytes + FileResponses.MultipartOverheadBytes))
             .WithName("UploadHeadTeacherSignature")
             .WithSummary("Upload the head teacher's signature")
             .WithDescription(
@@ -192,7 +189,7 @@ public sealed class SettingsEndpoints : IEndpointModule
                     _ => SchoolImageSizeVariant.Original,
                 };
                 var result = await sender.SendAsync(new GetSchoolImageQuery(SchoolImageKind.Logo, variant), cancellationToken);
-                return result.Match(content => ServeImage(httpContext, content));
+                return result.Match(content => FileResponses.Serve(httpContext, content));
             })
             .RequirePrivilege(Privileges.Settings.View)
             .WithName("GetSchoolLogo")
@@ -215,7 +212,7 @@ public sealed class SettingsEndpoints : IEndpointModule
             {
                 var result = await sender.SendAsync(
                     new GetSchoolImageQuery(SchoolImageKind.Signature, SchoolImageSizeVariant.Original), cancellationToken);
-                return result.Match(content => ServeImage(httpContext, content));
+                return result.Match(content => FileResponses.Serve(httpContext, content));
             })
             .RequirePrivilege(Privileges.Settings.View)
             .WithName("GetHeadTeacherSignature")
@@ -228,13 +225,6 @@ public sealed class SettingsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
-
-    private static Microsoft.AspNetCore.Http.HttpResults.FileStreamHttpResult ServeImage(HttpContext httpContext, SchoolImageContent content)
-    {
-        httpContext.Response.Headers.CacheControl = "private";
-        httpContext.Response.Headers.ContentDisposition = $"inline; filename={content.FileName}";
-        return TypedResults.Stream(content.Content, content.ContentType);
-    }
 
     private static void MapUpdateRegNumber(RouteGroupBuilder group) =>
         group.MapPatch("/reg-number", async (

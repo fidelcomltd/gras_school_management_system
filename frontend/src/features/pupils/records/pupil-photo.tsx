@@ -20,7 +20,9 @@ export function PupilPhoto({
   canEdit: boolean;
 }) {
   const inputId = useId();
-  const url = usePupilPhotoUrl(pupilId, photoUpdatedAtUtc);
+  // The box is 96 px, so the 96 px rendition: the full 400 px one would spend a clerk's data for nothing.
+  const photo = usePupilPhotoUrl(pupilId, photoUpdatedAtUtc, true);
+  const url = photo.data;
   const upload = useUploadPhoto(pupilId);
   const remove = useRemovePhoto(pupilId);
   const [confirming, setConfirming] = useState(false);
@@ -29,7 +31,17 @@ export function PupilPhoto({
   return (
     <div className="flex items-start gap-3">
       <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-xs text-muted-foreground">
-        {url.data ? <img src={url.data} alt={`Photograph of ${name}`} className="size-full object-cover" /> : photoUpdatedAtUtc ? 'Loading…' : 'No photograph'}
+        {url ? (
+          <img src={url} alt={`Photograph of ${name}`} className="size-full object-cover" />
+        ) : photo.isError ? (
+          <button type="button" className="px-1 text-center text-destructive underline" onClick={() => void photo.refetch()}>
+            Photograph unavailable. Retry
+          </button>
+        ) : photoUpdatedAtUtc ? (
+          'Loading…'
+        ) : (
+          'No photograph'
+        )}
       </div>
       {canEdit ? (
         <div className="flex flex-col gap-1">

@@ -47,3 +47,19 @@ export async function downscaleImage(file: File, maxEdge: number): Promise<File>
   if (!blob) return file;
   return new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg', { type: 'image/jpeg' });
 }
+
+/** Spec 9.6's caps, checked here too so an oversized file is refused before it costs the upload. */
+export const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+export const SCAN_MAX_BYTES = 5 * 1024 * 1024;
+
+/** A file refused in the browser, worded as the server would word it. */
+export class FileTooLargeError extends Error {}
+
+const megabytes = (bytes: number) => String(Math.ceil((bytes * 10) / (1024 * 1024)) / 10);
+
+/** Throws {@link FileTooLargeError} when `file` (after any downscale) is over `maxBytes`. */
+export function assertFileSize(file: File, maxBytes: number, noun: 'photograph' | 'file'): File {
+  if (file.size <= maxBytes) return file;
+  const advice = noun === 'photograph' ? ' Reduce the size or take the photograph again at a lower quality.' : '';
+  throw new FileTooLargeError(`This ${noun} is ${megabytes(file.size)} MB. The limit is ${maxBytes / (1024 * 1024)} MB.${advice}`);
+}

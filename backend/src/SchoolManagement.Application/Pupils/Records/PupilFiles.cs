@@ -116,7 +116,7 @@ internal sealed class UploadPupilPhotoHandler(
         var photo = processed.Value;
         var standardId = await store.PutAsync(photo.Standard.Bytes, photo.Standard.ContentType, cancellationToken).ConfigureAwait(false);
         var thumbnailId = await store.PutAsync(photo.Thumbnail.Bytes, photo.Thumbnail.ContentType, cancellationToken).ConfigureAwait(false);
-        var now = timeProvider.GetUtcNow();
+        var now = PupilFiles.StoredInstant(timeProvider.GetUtcNow());
         pupil.SetPhoto(standardId, thumbnailId, now);
 
         // Store ids only: opaque, and never a name.
@@ -240,7 +240,7 @@ internal sealed class UploadPupilDocumentFileHandler(
         var before = document.FileAssetId;
         var scan = processed.Value;
         var assetId = await store.PutAsync(scan.Bytes, scan.ContentType, cancellationToken).ConfigureAwait(false);
-        var now = timeProvider.GetUtcNow();
+        var now = PupilFiles.StoredInstant(timeProvider.GetUtcNow());
         var attached = document.AttachFile(
             assetId, scan.ContentType, scan.Bytes.Length, now, Weekly.WeeklyProjection.LagosToday(now), currentUser.UserId);
         if (attached.IsFailure)
@@ -341,6 +341,12 @@ internal static class PupilFiles
     public const string PupilEntityType = "pupil";
 
     public const string DocumentEntityType = "pupil_document";
+
+    /// <summary>
+    /// Truncated to the microsecond PostgreSQL stores, so the time an upload returns equals the time a later read returns
+    /// (<c>PupilDto.photoUpdatedAtUtc</c> is a client's cache key for the photograph).
+    /// </summary>
+    public static DateTimeOffset StoredInstant(DateTimeOffset instant) => instant.AddTicks(-(instant.Ticks % 10));
 
     public static Dictionary<string, object?> AssetMetadata(string assetId) => new(StringComparer.Ordinal) { ["assetId"] = assetId };
 

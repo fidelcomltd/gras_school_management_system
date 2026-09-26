@@ -1221,7 +1221,7 @@ export interface paths {
         get?: never;
         /**
          * Tick or untick one checklist document
-         * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. Needs `pupil.document.manage` over the pupil.
+         * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. While a scan is attached the row cannot be unticked (`422 document.file_attached`) and the Other row keeps its label. Needs `pupil.document.manage` over the pupil.
          */
         put: operations["SavePupilDocument"];
         post?: never;

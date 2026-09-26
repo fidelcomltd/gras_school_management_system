@@ -1,5 +1,5 @@
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
 import { renderWithProviders, screen, waitFor } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
@@ -26,7 +26,7 @@ function mockPupil(photoUpdatedAtUtc: () => string | null) {
     http.get(apiUrl('/api/v1/admissions/:id/completeness'), () =>
       HttpResponse.json({ pupilId: 'pupil-1', blocking: [], chased: [], chasedPercent: 100 }),
     ),
-    http.get(apiUrl('/api/v1/pupils/:pupilId/photo'), () => new HttpResponse(new Uint8Array([255, 216, 255]), { headers: { 'Content-Type': 'image/jpeg' } })),
+    http.get(apiUrl('/api/v1/pupils/:pupilId/photo/thumbnail'), () => new HttpResponse(new Uint8Array([255, 216, 255]), { headers: { 'Content-Type': 'image/jpeg' } })),
   );
 }
 
@@ -39,10 +39,6 @@ function renderScreen() {
     </MemoryRouter>,
   );
 }
-
-beforeEach(() => {
-  Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() });
-});
 
 describe('pupil photograph', () => {
   it('uploads the chosen file as multipart with an Idempotency-Key, then shows the photograph', async () => {
@@ -62,7 +58,7 @@ describe('pupil photograph', () => {
     expect(await screen.findByText('No photograph')).toBeInTheDocument();
     await user.upload(screen.getByLabelText(/Upload photograph/), new File(['jpeg'], 'child.jpg', { type: 'image/jpeg' }));
 
-    expect(await screen.findByRole('img', { name: /Photograph of/ })).toHaveAttribute('src', 'blob:photo');
+    expect(await screen.findByRole('img', { name: /Photograph of/ })).toHaveAttribute('src', expect.stringMatching(/^data:image\/jpeg;base64,/));
     expect(received?.key).toBeTruthy();
     expect((received?.file as Blob | null)?.type).toBe('image/jpeg'); // a File from the test realm, so not instanceof here
   });
@@ -140,5 +136,26 @@ describe('document scans', () => {
 
     await waitFor(() => expect(screen.queryByText('Scan attached (PDF, 2 KB)')).not.toBeInTheDocument());
     expect(screen.getByRole('checkbox', { name: 'Birth certificate' })).toBeChecked();
+  });
+
+  it("refuses a scan over 5 MB in the browser, with the server's wording, and never uploads it", async () => {
+    mockMe('pupil.view', 'pupil.document.manage');
+    mockPupil(() => null);
+    let posted = 0;
+    server.use(
+      http.get(apiUrl('/api/v1/pupils/:pupilId/documents'), () => HttpResponse.json(documents(null))),
+      http.post(apiUrl('/api/v1/pupils/:pupilId/documents/:documentType/file'), () => {
+        posted += 1;
+        return HttpResponse.json(documents(null));
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Documents' }));
+    const big = new File([new Uint8Array(8 * 1024 * 1024)], 'scan.pdf', { type: 'application/pdf' });
+    await user.upload(await screen.findByLabelText('Scan of Birth certificate'), big);
+
+    expect(await screen.findByText('This file is 8 MB. The limit is 5 MB.')).toBeInTheDocument();
+    expect(posted).toBe(0);
   });
 });

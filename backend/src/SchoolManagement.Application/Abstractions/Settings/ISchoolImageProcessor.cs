@@ -170,6 +170,18 @@ public static class SchoolImageLimits
 
     /// <summary>Maximum accepted document scan upload, in bytes.</summary>
     public const long MaxDocumentScanBytes = 5 * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum pixels any upload may DECLARE, checked from the header before decoding (a decompression-bomb guard): about
+    /// 100 MB of bitmap. A 24-megapixel phone photograph fits; a client downscales to far below it anyway.
+    /// </summary>
+    public const long MaxDecodedPixels = 25_000_000;
+
+    /// <summary>
+    /// The request-body limit on a pupil photograph or scan route: well above either file cap, so an 8 MB phone photograph
+    /// reaches the processor and gets the spec's own message rather than the host's bare 413.
+    /// </summary>
+    public const long MaxPupilUploadRequestBytes = 16 * 1024 * 1024;
 }
 
 /// <summary>
@@ -186,4 +198,7 @@ public static class SchoolImageErrorCodes
 
     /// <summary>Logo only: under the minimum pixel dimensions.</summary>
     public const string TooSmall = "school_image.too_small";
+
+    /// <summary>Declares more than <see cref="SchoolImageLimits.MaxDecodedPixels"/>; refused before decoding.</summary>
+    public const string TooManyPixels = "school_image.too_many_pixels";
 }

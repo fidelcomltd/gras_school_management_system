@@ -403,6 +403,23 @@ public sealed class SkiaSchoolImageProcessorTests
         _processor.ProcessDocumentScan([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]).Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentUnsupportedType);
     }
 
+    [Fact]
+    public void AnImageDeclaringMoreThan25Megapixels_IsRefusedFromItsHeader_OnEveryPupilPath()
+    {
+        // 5000 x 5001 = 25,005,000 pixels: just over the cap. Grey keeps the fixture itself small to build.
+        using var bitmap = new SKBitmap(new SKImageInfo(5000, 5001, SKColorType.Gray8, SKAlphaType.Opaque));
+        bitmap.Erase(SKColors.Gray);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+        var bytes = png.ToArray();
+
+        var photo = _processor.ProcessPupilPhoto(bytes);
+        photo.Error.Code.ShouldBe(PupilUploadErrorCodes.PhotoTooLarge);
+        photo.Error.Description.ShouldStartWith("This image is 5000 by 5001 pixels.");
+        _processor.ProcessDocumentScan(bytes).Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentTooLarge);
+        _processor.ProcessSignature(bytes).Error.Code.ShouldBe(SchoolImageErrorCodes.TooManyPixels);
+    }
+
     // --- Fixtures and helpers ------------------------------------------------------------------
 
     private static byte[] CreatePng(int width, int height)

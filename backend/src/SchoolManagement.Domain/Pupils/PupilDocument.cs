@@ -101,6 +101,18 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
     public Result Apply(bool received, DateOnly? receivedDate, string? remarks, string? otherLabel, DateOnly today, string? actor)
     {
         var label = DocumentType == PupilDocumentType.Other ? PersonFields.Clean(otherLabel) : null;
+
+        // An attached scan is what ticked the row, and the Other row's name is what the scan is filed under.
+        if (FileAssetId is not null && !received)
+        {
+            return Result.Failure(Error.Validation("document.file_attached", "Remove the attached scan before unticking this document."));
+        }
+
+        if (FileAssetId is not null && DocumentType == PupilDocumentType.Other && label is null)
+        {
+            return Result.Failure(Error.Validation("document.other_label_required", "Name the other document; it has a scan attached."));
+        }
+
         if (DocumentType == PupilDocumentType.Other && received && label is null)
         {
             return Result.Failure(Error.Validation("document.other_label_required", "Name the other document."));
