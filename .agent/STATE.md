@@ -129,10 +129,12 @@ CI prints `dotnet --version`. Re-run the `/analyzer:` check in that targets file
 
 ## Contract
 
-**Current: `f7743971ec50bd364185376f092d7c111600aa30c422a8961217c3d198a1c5e8`** · **118 paths** ·
-**277 schemas** · api version `v1` · moved 2026-09-25 by the same-day status undo (then a description-only re-promote after review, structurally identical by `jq`).
-Previous: `757869b5f159…` / 117 / 276, status changes and transfers on 2026-09-25; `2eecd88bcdce…` / 114 / 267, the incomplete-records report (§6.5.12) on 2026-09-23; `467ac28eb684…` / 113 / 264, bulk pupil import (§6.5.13) on 2026-09-23; `2fc484bf7672…` / 110 / 256, the admission health override (§6.5.16) on 2026-09-23; `9c7d96f34365…` / 110 / 256, admissions sections C-F/H on 2026-09-23; `1e89286e9a96…` / 103 paths / 233 schemas, weekly reports on 2026-09-23; before that `0a74f0192c73…` (annual computation), `bb29ee1ebe04…` (pin printing), `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
+**Current: `c8696abf50b83d5e264c61ff413c5b8beaadec88c5dccc2619ff0dae4a9b0552`** · **121 paths** ·
+**279 schemas** · api version `v1` · moved 2026-09-26 by pupil photographs and document scans (spec 6.5.4, 6.5.8).
+Previous: `f7743971ec50…` / 118 / 277, the same-day status undo on 2026-09-25; `757869b5f159…` / 117 / 276, status changes and transfers on 2026-09-25; `2eecd88bcdce…` / 114 / 267, the incomplete-records report (§6.5.12) on 2026-09-23; `467ac28eb684…` / 113 / 264, bulk pupil import (§6.5.13) on 2026-09-23; `2fc484bf7672…` / 110 / 256, the admission health override (§6.5.16) on 2026-09-23; `9c7d96f34365…` / 110 / 256, admissions sections C-F/H on 2026-09-23; `1e89286e9a96…` / 103 paths / 233 schemas, weekly reports on 2026-09-23; before that `0a74f0192c73…` (annual computation), `bb29ee1ebe04…` (pin printing), `5d01b0800150…` (pin batches), `b4bf1cf369f2…` (withdraw/reopen), `d1816d8c15b8…` (publication), `905632799f5c…` (TASK-0005b), `e7113c87a76b…` (TASK-0090), `584a4a3c9d5c…` (TASK-0088), `42d8e3b52ba4…` (TASK-0086), `9c2f8d55fe3a…` (TASK-0083), `8e3087d93f02…` (TASK-0072), `0ebca075110e…` (TASK-0071),
 `84b46211e9fc…` (TASK-0077), `c5c4d6c6b8d4…` (TASK-0076), `57ea95b44bd4…` (TASK-0070), `152dc1c27db7…` (TASK-0069).
+
+**Photographs and document scans additive verified mechanically** (`jq`, `MSYS_NO_PATHCONV=1`, `tr -d '\r'`, description/example/examples stripped, non-null probe on `/pupils/{id}` and `PupilDto`): +3 paths (`/pupils/{pupilId}/photo`, `/photo/thumbnail`, `/documents/{documentType}/file`), +2 schemas (`PupilPhotoDto`, `PupilDocumentFileDto`), 0 removed, 0 existing paths changed. Two existing schemas gain one property each, response-only (in no request body: checked): `PupilDto.photoUpdatedAtUtc` OPTIONAL (not in `required`), `PupilDocumentDto.file` response-required nullable (the `returnReason` precedent).
 
 **Status undo additive verified mechanically** (same `jq` recipe, non-null probe): +1 path (`/pupils/{id}/status/undo`), +1 schema (`UndoPupilStatusChangeCommand`), 0 removed, 0 existing paths or schemas changed.
 
@@ -211,7 +213,7 @@ the archive and not this block. Verified against the working tree, not prose.
 
 - `CONTRACT.lock` matches this hash — written by `-Promote` in the same run, and re-verified by
   `ci.ps1`'s contract-drift and ledger gates (both PASS) on 2026-09-18.
-- Frontend client is **CURRENT against this hash** (2026-09-23, `admissions-incomplete-report`); `No drift`; `npm run verify` 70 files / 442 tests / build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
+- Frontend client is **CURRENT against this hash** (2026-09-26, `pupil-photos-documents`: `generate:api` then `check:api-drift` No drift). Before that (2026-09-23, `admissions-incomplete-report`); `No drift`; `npm run verify` 70 files / 442 tests / build clean. Orchestrator re-ran `check:api-drift` (No drift) and verify (see TASK-0089). The orchestrator re-ran
   `check:api-drift` (No drift, exit 0) and `npm run verify` (55 files / 381 tests / build clean, exit 0). Types only, zero wrapper code.
 - **`apiPut` exists, so the whole contract surface is reachable** — `UpdateAssessment`, `UpdateGrading`,
   `ResetGrading`, `SaveScoreSheet` and now `UpdateResultRules` are all callable, though none is called

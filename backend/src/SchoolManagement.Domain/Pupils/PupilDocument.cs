@@ -67,6 +67,21 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
     /// <summary>The account that ticked it.</summary>
     public string? ReceivedBy { get; private set; }
 
+    /// <summary>The attached scan's store id, or <see langword="null"/>. A convenience, never a requirement.</summary>
+    public string? FileAssetId { get; private set; }
+
+    /// <summary><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>, decided by magic bytes.</summary>
+    public string? FileContentType { get; private set; }
+
+    /// <summary>The stored scan's size in bytes.</summary>
+    public int? FileSizeBytes { get; private set; }
+
+    /// <summary>When the scan was attached.</summary>
+    public DateTimeOffset? FileUploadedAtUtc { get; private set; }
+
+    /// <summary>The account that attached it.</summary>
+    public string? FileUploadedBy { get; private set; }
+
     /// <inheritdoc />
     public DateTimeOffset CreatedAtUtc { get; set; }
 
@@ -117,6 +132,58 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
         ReceivedBy = received ? ReceivedBy : null;
         Remarks = cleanRemarks;
         OtherLabel = label;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Attaches (or replaces) the row's one scan. An unticked row is ticked as received today by the uploader (human ruling
+    /// 2026-09-26: a scan proves the school saw the document), so the Other row needs its label first. A replaced scan stays
+    /// in the store, which never deletes.
+    /// </summary>
+    public Result AttachFile(string assetId, string contentType, int sizeBytes, DateTimeOffset uploadedAtUtc, DateOnly today, string? actor)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
+        var allowed = CheckAttach();
+        if (allowed.IsFailure)
+        {
+            return allowed;
+        }
+
+        if (!Received)
+        {
+            Received = true;
+            ReceivedDate = today;
+            ReceivedBy = actor;
+        }
+
+        FileAssetId = assetId;
+        FileContentType = contentType;
+        FileSizeBytes = sizeBytes;
+        FileUploadedAtUtc = uploadedAtUtc;
+        FileUploadedBy = actor;
+        return Result.Success();
+    }
+
+    /// <summary>Whether <see cref="AttachFile"/> would succeed, so a caller can refuse before storing any bytes.</summary>
+    public Result CheckAttach() =>
+        DocumentType == PupilDocumentType.Other && OtherLabel is null
+            ? Result.Failure(Error.Validation("document.other_label_required", "Name the other document before attaching a file."))
+            : Result.Success();
+
+    /// <summary>Removes the scan and leaves the tick alone: the paper still exists. Fails when there is none.</summary>
+    public Result RemoveFile()
+    {
+        if (FileAssetId is null)
+        {
+            return Result.Failure(Error.NotFound("document.file_not_found", "This document has no attached file."));
+        }
+
+        FileAssetId = null;
+        FileContentType = null;
+        FileSizeBytes = null;
+        FileUploadedAtUtc = null;
+        FileUploadedBy = null;
         return Result.Success();
     }
 }

@@ -140,6 +140,18 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     /// <summary>Section G free text. Optional.</summary>
     public string? OtherInformation { get; private set; }
 
+    /// <summary>
+    /// The 400 by 400 photograph's store id (spec 6.5.4, 9.6), or <see langword="null"/> when there is none. Chased, never
+    /// required: the school photographs a new intake in batches weeks after admission.
+    /// </summary>
+    public string? PhotoAssetId { get; private set; }
+
+    /// <summary>The 96 pixel thumbnail's store id; set and cleared with <see cref="PhotoAssetId"/>.</summary>
+    public string? PhotoThumbnailAssetId { get; private set; }
+
+    /// <summary>When the current photograph was uploaded; a client's cache key for it.</summary>
+    public DateTimeOffset? PhotoUpdatedAtUtc { get; private set; }
+
     /// <inheritdoc />
     public DateTimeOffset CreatedAtUtc { get; set; }
 
@@ -434,6 +446,33 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
             OtherInformation = otherInformation.Length == 0 ? null : otherInformation.Trim();
         }
 
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Points the pupil at a newly stored photograph. The previous assets are left in the store, which never deletes, so a
+    /// restored backup still finds whatever its rows point at.
+    /// </summary>
+    public void SetPhoto(string assetId, string thumbnailAssetId, DateTimeOffset uploadedAtUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(thumbnailAssetId);
+        PhotoAssetId = assetId;
+        PhotoThumbnailAssetId = thumbnailAssetId;
+        PhotoUpdatedAtUtc = uploadedAtUtc;
+    }
+
+    /// <summary>Removes the photograph (an audited action at the handler). Fails when there is none.</summary>
+    public Result RemovePhoto()
+    {
+        if (PhotoAssetId is null)
+        {
+            return Result.Failure(Error.NotFound("pupil.photo_not_found", "This pupil has no photograph."));
+        }
+
+        PhotoAssetId = null;
+        PhotoThumbnailAssetId = null;
+        PhotoUpdatedAtUtc = null;
         return Result.Success();
     }
 

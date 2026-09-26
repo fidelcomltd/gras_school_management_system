@@ -92,7 +92,22 @@ public sealed record PupilHealthDto(
 /// <param name="Received">The checkbox.</param>
 /// <param name="ReceivedDate">When it was received.</param>
 /// <param name="Remarks">The Remarks column.</param>
-public sealed record PupilDocumentDto(PupilDocumentType DocumentType, string? OtherLabel, bool Received, DateOnly? ReceivedDate, string? Remarks);
+/// <param name="File">The attached scan, or null; the bytes come from <c>GET /pupils/{id}/documents/{type}/file</c>.</param>
+public sealed record PupilDocumentDto(
+    PupilDocumentType DocumentType, string? OtherLabel, bool Received, DateOnly? ReceivedDate, string? Remarks, PupilDocumentFileDto? File);
+
+/// <summary>An attached document scan's metadata (spec 6.5.8).</summary>
+/// <param name="ContentType"><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>.</param>
+/// <param name="SizeBytes">The stored file's size.</param>
+/// <param name="UploadedAtUtc">When it was attached.</param>
+public sealed record PupilDocumentFileDto(string ContentType, int SizeBytes, DateTimeOffset UploadedAtUtc);
+
+/// <summary>A pupil's current photograph (spec 6.5.4): where to read each size, through the privilege-checked endpoints.</summary>
+/// <param name="PupilId">The pupil.</param>
+/// <param name="UpdatedAtUtc">When it was uploaded; matches <c>PupilDto.photoUpdatedAtUtc</c>.</param>
+/// <param name="PhotoUrl">The 400 by 400 JPEG.</param>
+/// <param name="ThumbnailUrl">The 96 pixel JPEG.</param>
+public sealed record PupilPhotoDto(string PupilId, DateTimeOffset UpdatedAtUtc, string PhotoUrl, string ThumbnailUrl);
 
 /// <summary>The whole document checklist, always five rows in form order.</summary>
 /// <param name="PupilId">The pupil.</param>

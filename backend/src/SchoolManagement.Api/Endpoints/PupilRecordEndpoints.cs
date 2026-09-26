@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using SchoolManagement.Api.Http;
+using SchoolManagement.Api.Idempotency;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Pupils.Records;
+using SchoolManagement.Application.Settings;
 
 namespace SchoolManagement.Api.Endpoints;
 
@@ -19,6 +23,9 @@ namespace SchoolManagement.Api.Endpoints;
 public sealed class PupilRecordEndpoints : IEndpointModule
 {
     private const string Tag = "Pupil records";
+
+    /// <summary>Bytes over the processor's own cap that a multipart envelope's boundaries and headers may add.</summary>
+    private const long MultipartOverheadBytes = 64 * 1024;
 
     /// <inheritdoc />
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
@@ -98,6 +105,8 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             "file: the school keeps paper. Needs `pupil.document.manage` over the pupil.")
             .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);
 
+        MapFiles(pupils);
+
         Read(endpoints.MapGet("/admissions/{id:guid}/completeness", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
                 (await sender.SendAsync(new GetAdmissionCompletenessQuery(id), cancellationToken)).Match(TypedResults.Ok)),
             "GetAdmissionCompleteness", "What an admission still lacks",
@@ -127,6 +136,92 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }
+
+    /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6).</summary>
+    private static void MapFiles(RouteGroupBuilder pupils)
+    {
+        Upload(pupils.MapPost("/photo", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
+                {
+                    var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                    return (await sender.SendAsync(new UploadPupilPhotoCommand(pupilId, bytes), cancellationToken)).Match(TypedResults.Ok);
+                }),
+            SchoolImageLimits.MaxPupilPhotoBytes, "UploadPupilPhoto", "Upload or replace a pupil's photograph",
+            "Multipart, one `file` part (spec 6.5.4, 9.6). JPEG or PNG only, verified by magic bytes; maximum 3 MB (the " +
+            "client downscales to 800 pixels first). Stored as a 400 by 400 centre-cropped JPEG at quality 80 and a 96 pixel " +
+            "thumbnail; EXIF orientation is applied, then all metadata including GPS is stripped, and the original is " +
+            "discarded. Returns where to read each size. Audited as `pupil.photo.update`. Needs `pupil.photo.update` over " +
+            "the pupil. `Idempotency-Key` is REQUIRED.")
+            .Produces<PupilPhotoDto>(StatusCodes.Status200OK);
+
+        Write(pupils.MapDelete("/photo", async (Guid pupilId, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new RemovePupilPhotoCommand(pupilId), cancellationToken)).Match(TypedResults.NoContent)),
+            "RemovePupilPhoto", "Remove a pupil's photograph",
+            "Audited as `pupil.photo.remove`. `404 pupil.photo_not_found` when there is none. Needs `pupil.photo.update` over " +
+            "the pupil.")
+            .Produces(StatusCodes.Status204NoContent);
+
+        Read(pupils.MapGet("/photo", async (Guid pupilId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetPupilPhotoQuery(pupilId, Thumbnail: false), cancellationToken))
+                .Match(content => Serve(httpContext, content, "inline"))),
+            "GetPupilPhoto", "Read a pupil's photograph",
+            "The 400 by 400 JPEG (spec 9.6: served only through a privilege-checked endpoint). `Content-Disposition: inline`, " +
+            "`nosniff`, `Cache-Control: private`. `404 pupil.photo_not_found` when there is none. Needs `pupil.view`.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/jpeg");
+
+        Read(pupils.MapGet("/photo/thumbnail", async (Guid pupilId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetPupilPhotoQuery(pupilId, Thumbnail: true), cancellationToken))
+                .Match(content => Serve(httpContext, content, "inline"))),
+            "GetPupilPhotoThumbnail", "Read a pupil's photograph thumbnail",
+            "The 96 pixel JPEG. Same headers and privilege as the photograph.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/jpeg");
+
+        Upload(pupils.MapPost("/documents/{documentType}/file", async (
+                    Guid pupilId, Domain.Pupils.PupilDocumentType documentType, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
+                {
+                    var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                    return (await sender.SendAsync(new UploadPupilDocumentFileCommand(pupilId, documentType, bytes), cancellationToken))
+                        .Match(TypedResults.Ok);
+                }),
+            SchoolImageLimits.MaxDocumentScanBytes, "UploadPupilDocumentFile", "Attach or replace a checklist document's scan",
+            "Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG " +
+            "is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as " +
+            "received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). " +
+            "Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is " +
+            "REQUIRED.")
+            .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);
+
+        Write(pupils.MapDelete("/documents/{documentType}/file", async (
+                    Guid pupilId, Domain.Pupils.PupilDocumentType documentType, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new RemovePupilDocumentFileCommand(pupilId, documentType), cancellationToken)).Match(TypedResults.Ok)),
+            "RemovePupilDocumentFile", "Remove a checklist document's scan",
+            "The tick stays: the paper still exists. Audited as `pupil.document.file_removed`. `404 document.file_not_found` " +
+            "when there is none. Needs `pupil.document.manage` over the pupil.")
+            .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);
+
+        Read(pupils.MapGet("/documents/{documentType}/file", async (
+                    Guid pupilId, Domain.Pupils.PupilDocumentType documentType, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetPupilDocumentFileQuery(pupilId, documentType), cancellationToken))
+                .Match(content => Serve(httpContext, content, "attachment"))),
+            "GetPupilDocumentFile", "Download a checklist document's scan",
+            "Spec 6.5.8, 9.6: `Content-Disposition: attachment` under a name derived from the document type, `nosniff`, " +
+            "`Cache-Control: private`. `404 document.file_not_found` when there is none. Needs `pupil.view`, as the record does.")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf", "image/jpeg", "image/png");
+    }
+
+    private static FileStreamHttpResult Serve(HttpContext httpContext, SchoolImageContent content, string disposition)
+    {
+        httpContext.Response.Headers.CacheControl = "private";
+        httpContext.Response.Headers.ContentDisposition = $"{disposition}; filename={content.FileName}";
+        return TypedResults.Stream(content.Content, content.ContentType);
+    }
+
+    private static RouteHandlerBuilder Upload(RouteHandlerBuilder route, long maxBytes, string name, string summary, string description) =>
+        Write(route, name, summary, description)
+            .RequireIdempotencyKey(required: true)
+            // Our own CSRF filter protects the route; ASP.NET's automatic IFormFile antiforgery check would otherwise 500.
+            .DisableAntiforgery()
+            .Accepts<IFormFile>("multipart/form-data")
+            .WithMetadata(new RequestSizeLimitAttribute(maxBytes + MultipartOverheadBytes));
 
     private static RouteHandlerBuilder Read(RouteHandlerBuilder route, string name, string summary, string description) =>
         route.RequireAuthenticatedCaller()

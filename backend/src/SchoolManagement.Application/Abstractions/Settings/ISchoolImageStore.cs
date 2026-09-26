@@ -1,7 +1,8 @@
 namespace SchoolManagement.Application.Abstractions.Settings;
 
 /// <summary>
-/// Private blob storage for a processed school logo or signature rendition (TASK-0005b). The seam
+/// Private blob storage for a processed school logo or signature rendition (TASK-0005b), and since spec 6.5.8's slice
+/// for pupil photographs and document scans too. The seam
 /// that keeps the choice of store (Cloudinary, stage D) out of Application. Implemented in
 /// Infrastructure: <c>InMemorySchoolImageStore</c> for tests, <c>CloudinaryImageStore</c> (stage D)
 /// everywhere else.
@@ -26,7 +27,7 @@ public interface ISchoolImageStore
     /// Stores one rendition's bytes and returns a new, opaque asset id.
     /// </summary>
     /// <param name="bytes">The processed, metadata-free image bytes (an <c>ISchoolImageProcessor</c> output).</param>
-    /// <param name="contentType">Either <c>image/png</c> or <c>image/jpeg</c>.</param>
+    /// <param name="contentType"><c>image/png</c>, <c>image/jpeg</c>, or <c>application/pdf</c> for a pupil's document scan.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>An opaque id that later resolves the same bytes through <see cref="OpenAsync"/>.</returns>
     Task<string> PutAsync(ReadOnlyMemory<byte> bytes, string contentType, CancellationToken cancellationToken);

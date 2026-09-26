@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useCompleteness, useDocuments, useSaveDocument, type PupilDocumentDto, type PupilDocumentType } from './api';
+import { DocumentScan } from './document-scan';
 import { errorText } from './format';
 
 const LABELS: Record<PupilDocumentType, string> = {
@@ -19,7 +20,9 @@ export function DocumentsPanel({ pupilId, canEdit }: { pupilId: string; canEdit:
   if (documents.isError) return <QueryErrorState error={documents.error} onRetry={() => void documents.refetch()} />;
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">Ticking a document records that the paper is on file. Nothing here stops an admission being approved.</p>
+      <p className="text-sm text-muted-foreground">
+        Ticking a document records that the paper is on file; a scan is optional. Nothing here stops an admission being approved.
+      </p>
       <ul className="flex flex-col gap-2">
         {documents.data.items.map((item) => (
           <DocumentRow key={`${item.documentType}-${String(item.received)}-${item.remarks ?? ''}`} pupilId={pupilId} item={item} canEdit={canEdit} />
@@ -74,6 +77,7 @@ function DocumentRow({ pupilId, item, canEdit }: { pupilId: string; item: PupilD
       ) : item.remarks ? (
         <span className="text-sm text-muted-foreground">{item.remarks}</span>
       ) : null}
+      <DocumentScan pupilId={pupilId} item={item} label={label} canEdit={canEdit} />
       <FormError message={errorText(save.error)} />
     </li>
   );

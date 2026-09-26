@@ -26,7 +26,7 @@ namespace SchoolManagement.Api.Bootstrap;
 /// wired, so it can never become reachable over HTTP.
 /// </para>
 /// <para>
-/// WHAT IT LEAVES BEHIND: one asset, a 73-byte 2×2 PNG, under the configured folder prefix. Assets
+/// WHAT IT LEAVES BEHIND: two assets, a 73-byte 2×2 PNG and a tiny PDF, under the configured folder prefix. Assets
 /// in this system are immutable and never deleted by design (a publication snapshot may reference
 /// one forever), so this command does not delete it either — it prints the id so a human can
 /// remove it from the Cloudinary dashboard if they want to.
@@ -41,7 +41,11 @@ internal static class CloudinarySmokeTestCli
     private const string TestImageBase64 =
         "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR42mNQz74BRAwQCgAk4gWpfbOgsAAAAABJRU5ErkJggg==";
 
-    /// <summary>Uploads one asset, reads it back and compares the bytes.</summary>
+    /// <summary>A minimal one-page PDF; a raw resource is never parsed, so it only needs the right magic bytes.</summary>
+    private static readonly byte[] TestPdf =
+        "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n"u8.ToArray();
+
+    /// <summary>Uploads a PNG and a PDF, reads each back and compares the bytes.</summary>
     /// <param name="store">The configured store, resolved from the application's own container.</param>
     /// <param name="storeDescription">What the container actually chose, for the operator to see.</param>
     /// <returns>0 on success; 1 on any failure, with the reason on stderr.</returns>
@@ -74,16 +78,30 @@ internal static class CloudinarySmokeTestCli
             return 1;
         }
 
-        var original = Convert.FromBase64String(TestImageBase64);
-
         Console.WriteLine($"Store:    {storeDescription}");
-        Console.WriteLine($"Uploading {original.Length} bytes as image/png ...");
+
+        // The PNG exercises the image path (logos, signatures, photographs); the PDF exercises the raw path document
+        // scans take, whose delivery Cloudinary can restrict per account.
+        var pngResult = await RoundTripAsync(store, Convert.FromBase64String(TestImageBase64), "image/png").ConfigureAwait(false);
+        if (pngResult != 0)
+        {
+            return pngResult;
+        }
+
+        Console.WriteLine();
+        return await RoundTripAsync(store, TestPdf, "application/pdf").ConfigureAwait(false);
+    }
+
+    /// <summary>Uploads <paramref name="original"/>, reads it back and compares the bytes.</summary>
+    private static async Task<int> RoundTripAsync(ISchoolImageStore store, byte[] original, string contentType)
+    {
+        Console.WriteLine($"Uploading {original.Length} bytes as {contentType} ...");
 
         string assetId;
 
         try
         {
-            assetId = await store.PutAsync(original, "image/png", CancellationToken.None).ConfigureAwait(false);
+            assetId = await store.PutAsync(original, contentType, CancellationToken.None).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // Do not catch general exception types.
         // Justified: this is a diagnostic command whose ENTIRE PURPOSE is to turn any failure into

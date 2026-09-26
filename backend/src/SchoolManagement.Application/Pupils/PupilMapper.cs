@@ -52,6 +52,7 @@ public static class PupilMapper
             admission,
             levelAppliedFor,
             dateApplicationReceived,
-            missing);
+            missing,
+            pupil.PhotoUpdatedAtUtc);
     }
 }

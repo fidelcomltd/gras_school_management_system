@@ -44,6 +44,9 @@ internal sealed class PupilConfiguration : IEntityTypeConfiguration<Pupil>
 
         builder.Property(pupil => pupil.OtherInformation).HasMaxLength(Pupil.OtherInformationMaxLength);
 
+        builder.Property(pupil => pupil.PhotoAssetId).HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
+        builder.Property(pupil => pupil.PhotoThumbnailAssetId).HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
+
         builder.Property(pupil => pupil.CreatedBy).HasMaxLength(AuditActorMaxLength);
         builder.Property(pupil => pupil.ModifiedBy).HasMaxLength(AuditActorMaxLength);
 

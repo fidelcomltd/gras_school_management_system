@@ -27,11 +27,14 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
     private const string PngContentType = "image/png";
     private const string JpegContentType = "image/jpeg";
     private const int JpegQuality = 90;
+    private const int PupilPhotoJpegQuality = 80;
+    private const string PdfContentType = "application/pdf";
 
     // Magic-byte signatures (spec 9.6: content type is decided by inspecting the file's bytes, never
     // a declared content type or extension — this port is never even given a file name).
     private static readonly byte[] PngMagic = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     private static readonly byte[] JpegMagic = [0xFF, 0xD8, 0xFF];
+    private static readonly byte[] PdfMagic = "%PDF-"u8.ToArray();
 
     /// <inheritdoc />
     public Result<ProcessedSchoolImage> ProcessLogo(byte[] fileBytes)
@@ -92,6 +95,90 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
         List<SchoolImageRendition> renditions = [Encode(bitmap, decoded.Value.ContentType, SchoolImageSizeVariant.Original)];
 
         return Result.Success(new ProcessedSchoolImage(renditions));
+    }
+
+    /// <inheritdoc />
+    public Result<ProcessedPupilPhoto> ProcessPupilPhoto(byte[] fileBytes)
+    {
+        ArgumentNullException.ThrowIfNull(fileBytes);
+
+        if (fileBytes.LongLength > SchoolImageLimits.MaxPupilPhotoBytes)
+        {
+            return Result.Failure<ProcessedPupilPhoto>(Error.Validation(
+                PupilUploadErrorCodes.PhotoTooLarge,
+                $"This photograph is {Megabytes(fileBytes.LongLength)} MB. The limit is {SchoolImageLimits.MaxPupilPhotoBytes / (1024 * 1024)} MB. " +
+                "Reduce the size or take the photograph again at a lower quality."));
+        }
+
+        var decoded = DecodeAndDetectType(fileBytes);
+        if (decoded.IsFailure)
+        {
+            return Result.Failure<ProcessedPupilPhoto>(Error.Validation(
+                PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
+        }
+
+        // Centre crop to the largest square, then both sizes come from that one crop. The original is dropped here.
+        using var bitmap = decoded.Value.Bitmap;
+        var side = Math.Min(bitmap.Width, bitmap.Height);
+        using var square = new SKBitmap();
+        bitmap.ExtractSubset(square, SKRectI.Create((bitmap.Width - side) / 2, (bitmap.Height - side) / 2, side, side));
+
+        return Result.Success(new ProcessedPupilPhoto(
+            EncodeSquareJpeg(square, 400, SchoolImageSizeVariant.Square400),
+            EncodeSquareJpeg(square, 96, SchoolImageSizeVariant.Square96)));
+    }
+
+    /// <inheritdoc />
+    public Result<ProcessedDocumentScan> ProcessDocumentScan(byte[] fileBytes)
+    {
+        ArgumentNullException.ThrowIfNull(fileBytes);
+
+        if (fileBytes.LongLength > SchoolImageLimits.MaxDocumentScanBytes)
+        {
+            return Result.Failure<ProcessedDocumentScan>(Error.Validation(
+                PupilUploadErrorCodes.DocumentTooLarge,
+                $"This file is {Megabytes(fileBytes.LongLength)} MB. The limit is {SchoolImageLimits.MaxDocumentScanBytes / (1024 * 1024)} MB."));
+        }
+
+        // A PDF cannot be re-encoded here, so it is stored as it came; it is only ever served as an attachment.
+        if (fileBytes.AsSpan().StartsWith(PdfMagic))
+        {
+            return Result.Success(new ProcessedDocumentScan(fileBytes, PdfContentType));
+        }
+
+        var decoded = DecodeAndDetectType(fileBytes);
+        if (decoded.IsFailure)
+        {
+            return Result.Failure<ProcessedDocumentScan>(Error.Validation(
+                PupilUploadErrorCodes.DocumentUnsupportedType, "Only PDF, JPEG and PNG files are accepted, verified by file content rather than name."));
+        }
+
+        using var bitmap = decoded.Value.Bitmap;
+        return Result.Success(new ProcessedDocumentScan(EncodeBitmap(bitmap, decoded.Value.ContentType), decoded.Value.ContentType));
+    }
+
+    /// <summary>Rounded UP to one decimal place, so a file just over the limit never reads as exactly the limit.</summary>
+    private static string Megabytes(long bytes) =>
+        (Math.Ceiling(bytes * 10.0 / (1024 * 1024)) / 10).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Resizes a square to <paramref name="size"/> and flattens it onto white: JPEG has no alpha, and a transparent PNG
+    /// pixel would otherwise encode as black.
+    /// </summary>
+    private static SchoolImageRendition EncodeSquareJpeg(SKBitmap square, int size, SchoolImageSizeVariant variant)
+    {
+        var info = new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var resized = square.Resize(info, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+        using var flattened = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Opaque));
+        using (var canvas = new SKCanvas(flattened))
+        {
+            canvas.Clear(SKColors.White);
+            canvas.DrawBitmap(resized, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+        }
+
+        using var image = SKImage.FromBitmap(flattened);
+        using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, PupilPhotoJpegQuality);
+        return new SchoolImageRendition(variant, encoded.ToArray(), size, size, JpegContentType);
     }
 
     private static Result CheckMaxSize(byte[] fileBytes, long maxBytes) =>

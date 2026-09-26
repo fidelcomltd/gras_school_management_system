@@ -31,8 +31,15 @@ namespace SchoolManagement.Infrastructure.Settings;
 internal sealed class CloudinaryImageStore(ICloudinaryGateway gateway, IOptions<CloudinaryOptions> options)
     : ISchoolImageStore
 {
+    /// <summary>
+    /// A raw resource's public id keeps its extension (Cloudinary appends none to a raw asset), so a PDF's asset id is its
+    /// public id and ends with this; <see cref="CloudinaryGateway.OpenAsync"/> reads it to pick the raw delivery URL.
+    /// </summary>
+    public const string RawAssetSuffix = ".pdf";
+
     private const string PngContentType = "image/png";
     private const string JpegContentType = "image/jpeg";
+    private const string PdfContentType = "application/pdf";
 
     /// <inheritdoc />
     public async Task<string> PutAsync(
@@ -42,10 +49,29 @@ internal sealed class CloudinaryImageStore(ICloudinaryGateway gateway, IOptions<
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
 
+        using var content = new MemoryStream(bytes.ToArray(), writable: false);
+
+        if (contentType == PdfContentType)
+        {
+            var rawPublicId = $"{options.Value.FolderPrefix}/{Guid.CreateVersion7()}{RawAssetSuffix}";
+
+            // The same private, immutable, opaque-id posture as an image below.
+            var rawParameters = new RawUploadParams
+            {
+                File = new FileDescription(rawPublicId, content),
+                PublicId = rawPublicId,
+                Type = "authenticated",
+                Overwrite = false,
+                UseFilename = false,
+                UniqueFilename = false,
+                Invalidate = false,
+            };
+
+            return await gateway.UploadRawAsync(rawParameters, cancellationToken).ConfigureAwait(false);
+        }
+
         var extension = ExtensionFor(contentType);
         var publicId = $"{options.Value.FolderPrefix}/{Guid.CreateVersion7()}";
-
-        using var content = new MemoryStream(bytes.ToArray(), writable: false);
 
         var parameters = new ImageUploadParams
         {
@@ -95,6 +121,6 @@ internal sealed class CloudinaryImageStore(ICloudinaryGateway gateway, IOptions<
         _ => throw new ArgumentOutOfRangeException(
             nameof(contentType),
             contentType,
-            $"Only '{PngContentType}' and '{JpegContentType}' are stored."),
+            $"Only '{PngContentType}', '{JpegContentType}' and '{PdfContentType}' are stored."),
     };
 }

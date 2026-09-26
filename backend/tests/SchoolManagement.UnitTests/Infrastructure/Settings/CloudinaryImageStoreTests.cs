@@ -70,6 +70,21 @@ public sealed class CloudinaryImageStoreTests
     }
 
     [Fact]
+    public async Task PutAsync_APdf_GoesUpAsAPrivateImmutableRawResource_WhoseIdKeepsItsExtension()
+    {
+        var assetId = await CreateStore().PutAsync("%PDF-1.4"u8.ToArray(), "application/pdf", CancellationToken.None);
+
+        _gateway.LastParameters.ShouldBeNull();
+        var parameters = _gateway.LastRawParameters.ShouldNotBeNull();
+        parameters.Type.ShouldBe("authenticated");
+        parameters.Overwrite.ShouldBe(false);
+        parameters.UseFilename.ShouldBe(false);
+        parameters.PublicId.ShouldStartWith("gras/prod/");
+        parameters.PublicId.ShouldEndWith(CloudinaryImageStore.RawAssetSuffix);
+        assetId.ShouldBe(parameters.PublicId);
+    }
+
+    [Fact]
     public async Task OpenAsync_AsksTheGatewayForTheIdItWasGiven()
     {
         using var stream = await CreateStore().OpenAsync("gras/prod/abc.png", CancellationToken.None);
@@ -83,6 +98,14 @@ public sealed class CloudinaryImageStoreTests
         public ImageUploadParams? LastParameters { get; private set; }
 
         public string? LastOpenedAssetId { get; private set; }
+
+        public RawUploadParams? LastRawParameters { get; private set; }
+
+        public Task<string> UploadRawAsync(RawUploadParams parameters, CancellationToken cancellationToken)
+        {
+            LastRawParameters = parameters;
+            return Task.FromResult(parameters.PublicId);
+        }
 
         public Task<string> UploadAsync(ImageUploadParams parameters, CancellationToken cancellationToken)
         {

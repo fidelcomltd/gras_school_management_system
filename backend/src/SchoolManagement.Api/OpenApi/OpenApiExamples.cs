@@ -3105,18 +3105,37 @@ internal static class OpenApiExamples
             """,
 
         [typeof(PupilDocumentDto)] = """
-            { "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen." }
+            {
+              "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
+              "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+            }
+            """,
+
+        [typeof(PupilDocumentFileDto)] = """
+            { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+            """,
+
+        [typeof(PupilPhotoDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}",
+              "updatedAtUtc": "2026-10-02T11:20:00+00:00",
+              "photoUrl": "/api/v1/pupils/{{ExamplePupilId}}/photo",
+              "thumbnailUrl": "/api/v1/pupils/{{ExamplePupilId}}/photo/thumbnail"
+            }
             """,
 
         [typeof(PupilDocumentListDto)] = $$"""
             {
               "pupilId": "{{ExamplePupilId}}",
               "items": [
-                { "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen." },
-                { "documentType": "PassportPhotograph", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
-                { "documentType": "PreviousSchoolResult", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
-                { "documentType": "TransferLetter", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null },
-                { "documentType": "Other", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null }
+                {
+                  "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
+                  "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+                },
+                { "documentType": "PassportPhotograph", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
+                { "documentType": "PreviousSchoolResult", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
+                { "documentType": "TransferLetter", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
+                { "documentType": "Other", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null }
               ]
             }
             """,

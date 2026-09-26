@@ -52,6 +52,54 @@ public interface ISchoolImageProcessor
     /// (over <see cref="SchoolImageLimits.MaxSignatureBytes"/>) — there is no minimum dimension.
     /// </returns>
     Result<ProcessedSchoolImage> ProcessSignature(byte[] fileBytes);
+
+    /// <summary>
+    /// Validates and processes a pupil photograph (spec 6.5.4, 9.6): a 400 by 400 centre-cropped JPEG at quality 80 and a
+    /// 96 pixel square thumbnail. The original is not returned, so it cannot be stored.
+    /// </summary>
+    /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
+    /// <returns>
+    /// On failure, <see cref="PupilUploadErrorCodes.PhotoUnsupportedType"/> or <see cref="PupilUploadErrorCodes.PhotoTooLarge"/>
+    /// (over <see cref="SchoolImageLimits.MaxPupilPhotoBytes"/>, with the spec's own message naming the file's size).
+    /// </returns>
+    Result<ProcessedPupilPhoto> ProcessPupilPhoto(byte[] fileBytes);
+
+    /// <summary>
+    /// Validates a document-checklist scan (spec 6.5.8): PDF, JPEG or PNG by magic bytes, at most
+    /// <see cref="SchoolImageLimits.MaxDocumentScanBytes"/>. A JPEG or PNG is re-encoded at its own size, which strips EXIF
+    /// and GPS (a phone photograph of a birth certificate carries where it was taken); a PDF is returned as it came.
+    /// </summary>
+    /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
+    /// <returns>
+    /// On failure, <see cref="PupilUploadErrorCodes.DocumentUnsupportedType"/> or <see cref="PupilUploadErrorCodes.DocumentTooLarge"/>.
+    /// </returns>
+    Result<ProcessedDocumentScan> ProcessDocumentScan(byte[] fileBytes);
+}
+
+/// <summary>The two stored renditions of a pupil photograph, both <c>image/jpeg</c>.</summary>
+/// <param name="Standard">400 by 400, centre-cropped.</param>
+/// <param name="Thumbnail">96 by 96, from the same crop.</param>
+public sealed record ProcessedPupilPhoto(SchoolImageRendition Standard, SchoolImageRendition Thumbnail);
+
+/// <summary>A checked document scan ready for <c>ISchoolImageStore</c>.</summary>
+/// <param name="Bytes">Metadata-free for an image; unchanged for a PDF.</param>
+/// <param name="ContentType"><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>.</param>
+public sealed record ProcessedDocumentScan(ReadOnlyMemory<byte> Bytes, string ContentType);
+
+/// <summary>Stable error codes for pupil photograph and document scan uploads (the contract's <c>422</c>s).</summary>
+public static class PupilUploadErrorCodes
+{
+    /// <summary>A photograph that is not PNG or JPEG by magic bytes.</summary>
+    public const string PhotoUnsupportedType = "pupil_photo.unsupported_type";
+
+    /// <summary>A photograph over 3 MB.</summary>
+    public const string PhotoTooLarge = "pupil_photo.too_large";
+
+    /// <summary>A scan that is not PDF, PNG or JPEG by magic bytes.</summary>
+    public const string DocumentUnsupportedType = "pupil_document.unsupported_type";
+
+    /// <summary>A scan over 5 MB.</summary>
+    public const string DocumentTooLarge = "pupil_document.too_large";
 }
 
 /// <summary>The size an <see cref="ISchoolImageProcessor"/> rendition was produced at.</summary>
@@ -65,6 +113,12 @@ public enum SchoolImageSizeVariant
 
     /// <summary>Logo derivative, 64 pixels on the long edge.</summary>
     Size64,
+
+    /// <summary>Pupil photograph, 400 by 400.</summary>
+    Square400,
+
+    /// <summary>Pupil photograph thumbnail, 96 by 96.</summary>
+    Square96,
 }
 
 /// <summary>One processed, re-encoded image ready to hand to <c>ISchoolImageStore</c>.</summary>
@@ -110,6 +164,12 @@ public static class SchoolImageLimits
 
     /// <summary>Minimum width and height a logo must meet, in pixels.</summary>
     public const int MinLogoDimensionPixels = 300;
+
+    /// <summary>Maximum accepted pupil photograph upload, in bytes (the client downscales to 800 pixels first).</summary>
+    public const long MaxPupilPhotoBytes = 3 * 1024 * 1024;
+
+    /// <summary>Maximum accepted document scan upload, in bytes.</summary>
+    public const long MaxDocumentScanBytes = 5 * 1024 * 1024;
 }
 
 /// <summary>
