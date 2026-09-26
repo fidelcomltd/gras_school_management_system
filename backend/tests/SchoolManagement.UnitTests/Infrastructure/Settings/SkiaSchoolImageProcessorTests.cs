@@ -268,6 +268,158 @@ public sealed class SkiaSchoolImageProcessorTests
         result.Value.Original.HeightPixels.ShouldBe(200);
     }
 
+    // --- Pupil photographs and document scans (spec 6.5.4, 6.5.8, 9.6) ---------------------------
+
+    [Fact]
+    public void ProcessPupilPhoto_ALandscapeImage_IsCentreCroppedToA400SquareAndA96Thumbnail_BothJpeg()
+    {
+        // 800x600 with a red 100px strip down each side: a centre crop to 600x600 removes both strips entirely.
+        using var bitmap = new SKBitmap(800, 600, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(new SKColor(30, 90, 200));
+            using var red = new SKPaint { Color = new SKColor(220, 30, 30) };
+            canvas.DrawRect(SKRect.Create(0, 0, 100, 600), red);
+            canvas.DrawRect(SKRect.Create(700, 0, 100, 600), red);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        var result = _processor.ProcessPupilPhoto(png.ToArray());
+
+        result.IsSuccess.ShouldBeTrue();
+        using var standard = SKBitmap.Decode(result.Value.Standard.Bytes.ToArray());
+        (standard.Width, standard.Height).ShouldBe((400, 400));
+        result.Value.Standard.ContentType.ShouldBe("image/jpeg");
+        IsBlueish(standard.GetPixel(2, 200)).ShouldBeTrue("the side strips must be cropped away");
+        IsBlueish(standard.GetPixel(397, 200)).ShouldBeTrue("the side strips must be cropped away");
+        using var thumbnail = SKBitmap.Decode(result.Value.Thumbnail.Bytes.ToArray());
+        (thumbnail.Width, thumbnail.Height).ShouldBe((96, 96));
+        result.Value.Thumbnail.ContentType.ShouldBe("image/jpeg");
+    }
+
+    [Fact]
+    public void ProcessPupilPhoto_WithAJpegCarryingExifGps_StripsAllMetadata()
+    {
+        var sourceBytes = ReadEmbeddedFixture("logo-with-gps-exif.jpg");
+        JpegHasExifSegment(sourceBytes).ShouldBeTrue("the fixture must actually carry EXIF, or this test proves nothing");
+
+        var result = _processor.ProcessPupilPhoto(sourceBytes);
+
+        result.IsSuccess.ShouldBeTrue();
+        JpegHasExifSegment(result.Value.Standard.Bytes.ToArray()).ShouldBeFalse();
+        JpegHasExifSegment(result.Value.Thumbnail.Bytes.ToArray()).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ProcessPupilPhoto_WithTransparency_FlattensOntoWhite()
+    {
+        var result = _processor.ProcessPupilPhoto(CreateTransparentPng(400, 400));
+
+        result.IsSuccess.ShouldBeTrue();
+        using var standard = SKBitmap.Decode(result.Value.Standard.Bytes.ToArray());
+        var corner = standard.GetPixel(10, 10);
+        (corner.Red > 240 && corner.Green > 240 && corner.Blue > 240).ShouldBeTrue($"a transparent pixel must be white, was {corner}");
+    }
+
+    [Fact]
+    public void ProcessPupilPhoto_OverThreeMegabytes_IsRefusedWithTheSpecMessage()
+    {
+        var result = _processor.ProcessPupilPhoto(new byte[8 * 1024 * 1024]);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(PupilUploadErrorCodes.PhotoTooLarge);
+        result.Error.Description.ShouldBe(
+            "This photograph is 8 MB. The limit is 3 MB. Reduce the size or take the photograph again at a lower quality.");
+    }
+
+    [Fact]
+    public void ProcessPupilPhoto_JustOverTheLimit_NeverReadsAsExactlyTheLimit()
+    {
+        var result = _processor.ProcessPupilPhoto(new byte[(3 * 1024 * 1024) + 1]);
+
+        result.Error.Description.ShouldStartWith("This photograph is 3.1 MB.");
+    }
+
+    [Fact]
+    public void ProcessPupilPhoto_WithSvgBytes_IsRefused()
+    {
+        var result = _processor.ProcessPupilPhoto("<svg xmlns=\"http://www.w3.org/2000/svg\"/>"u8.ToArray());
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(PupilUploadErrorCodes.PhotoUnsupportedType);
+    }
+
+    [Fact]
+    public void ProcessDocumentScan_APdf_IsReturnedByteForByte()
+    {
+        var pdf = "%PDF-1.7\n%âã\n1 0 obj<<>>endobj\n%%EOF\n"u8.ToArray();
+
+        var result = _processor.ProcessDocumentScan(pdf);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ContentType.ShouldBe("application/pdf");
+        result.Value.Bytes.ToArray().ShouldBe(pdf);
+    }
+
+    [Fact]
+    public void ProcessDocumentScan_AJpegWithGps_IsReEncodedAtItsOwnSizeWithoutMetadata()
+    {
+        var sourceBytes = ReadEmbeddedFixture("logo-with-gps-exif.jpg");
+        using var source = SKBitmap.Decode(sourceBytes);
+
+        var result = _processor.ProcessDocumentScan(sourceBytes);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ContentType.ShouldBe("image/jpeg");
+        JpegHasExifSegment(result.Value.Bytes.ToArray()).ShouldBeFalse();
+        using var output = SKBitmap.Decode(result.Value.Bytes.ToArray());
+        (output.Width, output.Height).ShouldBe((source.Width, source.Height));
+    }
+
+    [Fact]
+    public void ProcessDocumentScan_APng_StaysPng()
+    {
+        var result = _processor.ProcessDocumentScan(CreatePng(50, 40));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ContentType.ShouldBe("image/png");
+    }
+
+    [Fact]
+    public void ProcessDocumentScan_OverFiveMegabytes_IsRefusedAsTooLarge()
+    {
+        var result = _processor.ProcessDocumentScan(new byte[(5 * 1024 * 1024) + 1]);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentTooLarge);
+    }
+
+    [Fact]
+    public void ProcessDocumentScan_AGifOrAWordFile_IsRefused()
+    {
+        _processor.ProcessDocumentScan("GIF89a\x01\x00\x01\x00"u8.ToArray()).Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentUnsupportedType);
+        _processor.ProcessDocumentScan([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]).Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentUnsupportedType);
+    }
+
+    [Fact]
+    public void AnImageDeclaringMoreThan25Megapixels_IsRefusedFromItsHeader_OnEveryPupilPath()
+    {
+        // 5000 x 5001 = 25,005,000 pixels: just over the cap. Grey keeps the fixture itself small to build.
+        using var bitmap = new SKBitmap(new SKImageInfo(5000, 5001, SKColorType.Gray8, SKAlphaType.Opaque));
+        bitmap.Erase(SKColors.Gray);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+        var bytes = png.ToArray();
+
+        var photo = _processor.ProcessPupilPhoto(bytes);
+        photo.Error.Code.ShouldBe(PupilUploadErrorCodes.PhotoTooLarge);
+        photo.Error.Description.ShouldStartWith("This image is 5000 by 5001 pixels.");
+        _processor.ProcessDocumentScan(bytes).Error.Code.ShouldBe(PupilUploadErrorCodes.DocumentTooLarge);
+        _processor.ProcessSignature(bytes).Error.Code.ShouldBe(SchoolImageErrorCodes.TooManyPixels);
+    }
+
     // --- Fixtures and helpers ------------------------------------------------------------------
 
     private static byte[] CreatePng(int width, int height)

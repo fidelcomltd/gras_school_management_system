@@ -151,6 +151,7 @@ internal sealed class GetIncompleteRecordsHandler(
         AdmissionCompleteness.HealthUnansweredCode => "Health questions unanswered",
         "declaration.unsigned" => "Declaration not recorded",
         "assessment.outcome" => "Assessment outcome not recorded",
+        AdmissionCompleteness.PhotographCode => "No photograph",
         "pupil.previous_school" => "No previous school",
         "collection.pickup" => "No authorised pickup persons",
         "health.hospital" => "No preferred hospital",

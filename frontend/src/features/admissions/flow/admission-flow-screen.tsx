@@ -10,6 +10,7 @@ import { CollectionPanel } from '@/features/pupils/records/collection-panel';
 import { ContactsPanel } from '@/features/pupils/records/contacts-panel';
 import { DocumentsPanel } from '@/features/pupils/records/documents-panel';
 import { HealthPanel } from '@/features/pupils/records/health-panel';
+import { PupilPhoto } from '@/features/pupils/records/pupil-photo';
 import { pupilName } from '@/features/pupils/types';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
@@ -98,6 +99,9 @@ export function AdmissionFlowScreen() {
           <h2 id="step-heading" className="text-lg font-semibold text-foreground">
             Step {step}: {STEPS[step - 1]}
           </h2>
+          {step === 2 ? (
+            <PupilPhoto pupilId={record.id} name={pupilName(record)} photoUpdatedAtUtc={record.photoUpdatedAtUtc} canEdit={can('pupil.photo.update')} />
+          ) : null}
           {step === 2 && can('pupil.update') ? <PupilInfoForm pupil={record} onSaved={() => go(3)} submitLabel="Save and continue" /> : null}
           {step === 2 && !can('pupil.update') ? (
             <p className="text-sm text-muted-foreground">Editing the pupil information needs the pupil update privilege.</p>

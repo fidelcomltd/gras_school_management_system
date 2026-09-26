@@ -22,7 +22,15 @@ internal interface ICloudinaryGateway
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<string> UploadAsync(ImageUploadParams parameters, CancellationToken cancellationToken);
 
-    /// <summary>Opens a readable stream over a stored asset's bytes.</summary>
+    /// <summary>
+    /// Uploads one asset as a <c>raw</c> resource (a PDF document scan) and returns its public id. Cloudinary blocks PDF
+    /// delivery for image resources on accounts without that setting enabled; a raw resource is served byte for byte.
+    /// </summary>
+    /// <param name="parameters">Fully-populated upload parameters; the public id carries the file extension.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    Task<string> UploadRawAsync(RawUploadParams parameters, CancellationToken cancellationToken);
+
+    /// <summary>Opens a readable stream over a stored asset's bytes. An id ending <c>.pdf</c> is a raw resource.</summary>
     /// <param name="assetId">A public id with its format suffix, as <c>UploadAsync</c>'s caller built it.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<Stream> OpenAsync(string assetId, CancellationToken cancellationToken);
@@ -68,16 +76,16 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
         ArgumentNullException.ThrowIfNull(parameters);
 
         var result = await _cloudinary.UploadAsync(parameters, cancellationToken).ConfigureAwait(false);
+        return PublicIdOrThrow(result, parameters.PublicId);
+    }
 
-        // The SDK reports an upload failure in the result, not as an exception. Left unchecked, a
-        // rejected upload would return a public id of null and be written into a school_image row.
-        if (result.Error is { } error)
-        {
-            throw new InvalidOperationException(
-                $"Cloudinary rejected the upload of '{parameters.PublicId}': {error.Message}");
-        }
+    /// <inheritdoc />
+    public async Task<string> UploadRawAsync(RawUploadParams parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
 
-        return result.PublicId;
+        var result = await _cloudinary.UploadAsync(parameters, "raw", cancellationToken).ConfigureAwait(false);
+        return PublicIdOrThrow(result, parameters.PublicId);
     }
 
     /// <inheritdoc />
@@ -85,7 +93,10 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
 
-        var url = _cloudinary.Api.UrlImgUp
+        var builder = assetId.EndsWith(CloudinaryImageStore.RawAssetSuffix, StringComparison.Ordinal)
+            ? _cloudinary.Api.Url.ResourceType("raw")
+            : _cloudinary.Api.UrlImgUp;
+        var url = builder
             .Secure(true)
             .Type("authenticated")
             .Signed(true)
@@ -112,4 +123,11 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
 
         return buffer;
     }
+
+    // The SDK reports an upload failure in the result, not as an exception. Left unchecked, a rejected upload would
+    // return a public id of null and be written into a row.
+    private static string PublicIdOrThrow(UploadResult result, string publicId) =>
+        result.Error is { } error
+            ? throw new InvalidOperationException($"Cloudinary rejected the upload of '{publicId}': {error.Message}")
+            : result.PublicId;
 }

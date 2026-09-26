@@ -114,13 +114,17 @@ internal sealed class GetAdmissionCompletenessHandler(PupilRecordAccess access, 
 
 /// <summary>
 /// Spec 6.5.12's two lists. Blocking: one responsible adult, the primary emergency contact, a primary contact, the
-/// barred-persons answer, the three health answers, the declaration, and a required assessment's outcome. Chased: previous
-/// school, the pickup list, preferred hospital, blood group, genotype, other information, and each checklist document.
+/// barred-persons answer, the three health answers, the declaration, and a required assessment's outcome. Chased: the
+/// photograph, previous school, the pickup list, preferred hospital, blood group, genotype, other information, and each
+/// checklist document.
 /// </summary>
 internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdmissionRecordRepository admissions)
 {
     /// <summary>The blocking item a parent's declined health answers leave; the only one <c>pupil.admission.override</c> can waive (spec 6.5.16).</summary>
     public const string HealthUnansweredCode = "health.unanswered";
+
+    /// <summary>The chased photograph item (spec 6.5.12): the school photographs a new intake weeks after admission.</summary>
+    public const string PhotographCode = "pupil.photograph";
 
     /// <summary>
     /// Only the blocking items of steps 3 to 5 (contacts, the barred answer, health) — what approval checks on top of its
@@ -191,6 +195,7 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
             }
         }
 
+        Chase(pupil.PhotoAssetId is null, 2, PhotographCode, "Photograph.");
         Chase(pupil.PreviousSchool is null, 2, "pupil.previous_school", "Previous school.");
         Chase(pickup.Count == 0, 4, "collection.pickup", "Authorised pickup persons.");
         Chase(health?.PreferredHospital is null, 5, "health.hospital", "Preferred hospital.");
@@ -244,8 +249,13 @@ internal static class DocumentMapper
         var byType = documents.ToDictionary(document => document.DocumentType);
         return new PupilDocumentListDto(PupilContactsMapper.Id(pupilId), Enum.GetValues<PupilDocumentType>()
             .Select(type => byType.GetValueOrDefault(type) is { } document
-                ? new PupilDocumentDto(type, document.OtherLabel, document.Received, document.ReceivedDate, document.Remarks)
-                : new PupilDocumentDto(type, null, false, null, null))
+                ? new PupilDocumentDto(type, document.OtherLabel, document.Received, document.ReceivedDate, document.Remarks, FileOf(document))
+                : new PupilDocumentDto(type, null, false, null, null, null))
             .ToList());
     }
+
+    private static PupilDocumentFileDto? FileOf(PupilDocument document) =>
+        document is { FileContentType: { } contentType, FileSizeBytes: { } size, FileUploadedAtUtc: { } uploadedAt }
+            ? new PupilDocumentFileDto(contentType, size, uploadedAt)
+            : null;
 }

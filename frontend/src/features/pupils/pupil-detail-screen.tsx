@@ -15,6 +15,7 @@ import { CollectionPanel } from './records/collection-panel';
 import { ContactsPanel } from './records/contacts-panel';
 import { CompletenessCard, DocumentsPanel } from './records/documents-panel';
 import { HealthPanel } from './records/health-panel';
+import { PupilPhoto } from './records/pupil-photo';
 import { pupilName, type PupilDto } from './types';
 
 type Tab = 'details' | 'class' | 'contacts' | 'collection' | 'health' | 'documents';
@@ -74,7 +75,10 @@ export function PupilDetailScreen() {
         ← All pupils
       </Link>
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(record)}</h1>
+        <div className="flex flex-col gap-3">
+          <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(record)}</h1>
+          <PupilPhoto pupilId={record.id} name={pupilName(record)} photoUpdatedAtUtc={record.photoUpdatedAtUtc} canEdit={can('pupil.photo.update')} />
+        </div>
         <div className="flex gap-2">
           {canEdit ? (
             <Button variant="outline" onClick={() => setDialog('edit')}>

@@ -124,6 +124,9 @@ internal sealed class PupilDocumentConfiguration : IEntityTypeConfiguration<Pupi
         builder.Property(document => document.OtherLabel).HasMaxLength(PupilDocument.OtherLabelMaxLength);
         builder.Property(document => document.Remarks).HasMaxLength(PupilDocument.RemarksMaxLength);
         builder.Property(document => document.ReceivedBy).HasMaxLength(128);
+        builder.Property(document => document.FileAssetId).HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
+        builder.Property(document => document.FileContentType).HasMaxLength(Domain.Settings.SchoolImage.ContentTypeMaxLength);
+        builder.Property(document => document.FileUploadedBy).HasMaxLength(128);
         builder.Property(document => document.CreatedBy).HasMaxLength(128);
         builder.Property(document => document.ModifiedBy).HasMaxLength(128);
         builder.HasIndex(document => new { document.PupilId, document.DocumentType }).IsUnique().HasDatabaseName("ix_pupil_document_pupil_type_unique");

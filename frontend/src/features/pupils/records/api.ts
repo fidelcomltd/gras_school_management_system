@@ -15,6 +15,7 @@ export type BloodGroup = NonNullable<S['BloodGroup']>;
 export type Genotype = NonNullable<S['Genotype']>;
 export type PupilDocumentDto = S['PupilDocumentDto'];
 export type PupilDocumentType = S['PupilDocumentType'];
+export type PupilDocumentListDto = S['PupilDocumentListDto'];
 export type AdmissionCompletenessDto = S['AdmissionCompletenessDto'];
 
 /** Query keys for a pupil's admission-form sections (spec 6.5.5 to 6.5.8). */
@@ -25,12 +26,13 @@ export const RecordKeys = {
   Health: 'pupils.records.health',
   Documents: 'pupils.records.documents',
   Completeness: 'pupils.records.completeness',
+  Photo: 'pupils.records.photo',
 } as const;
 
 const options = { staleTime: 30_000, retry: false } as const;
 
 /** Every save can change what an admission still lacks. */
-function useSave<TBody, TResult>(key: string, pupilId: string, save: (body: TBody) => Promise<TResult>) {
+export function useSave<TBody, TResult>(key: string, pupilId: string, save: (body: TBody) => Promise<TResult>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: [key, 'save', pupilId],

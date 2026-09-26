@@ -75,4 +75,27 @@ public sealed class PupilRecordTests
         other.Apply(received: true, null, null, null, today, "admin-1").Error.Code.ShouldBe("document.other_label_required");
         other.Apply(received: true, today.AddDays(1), null, "Baptism card", today, "admin-1").Error.Code.ShouldBe("document.received_in_future");
     }
+
+    [Fact]
+    public void Document_AttachingAScan_TicksTheRow_AndWhileAttachedItCannotBeUntickedOrLoseTheOtherLabel()
+    {
+        var today = new DateOnly(2026, 9, 26);
+        var now = new DateTimeOffset(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
+        var document = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.BirthCertificate);
+
+        document.AttachFile("asset-1", "application/pdf", 1024, now, today, "admin-1").IsSuccess.ShouldBeTrue();
+        document.Received.ShouldBeTrue();
+        document.ReceivedDate.ShouldBe(today);
+        document.Apply(received: false, null, null, null, today, "admin-1").Error.Code.ShouldBe("document.file_attached");
+
+        document.RemoveFile().IsSuccess.ShouldBeTrue();
+        document.Received.ShouldBeTrue();
+        document.RemoveFile().Error.Code.ShouldBe("document.file_not_found");
+
+        var other = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.Other);
+        other.CheckAttach().Error.Code.ShouldBe("document.other_label_required");
+        other.Apply(received: true, null, null, "Baptism card", today, "admin-1").IsSuccess.ShouldBeTrue();
+        other.AttachFile("asset-2", "image/jpeg", 2048, now, today, "admin-1").IsSuccess.ShouldBeTrue();
+        other.Apply(received: true, null, null, null, today, "admin-1").Error.Code.ShouldBe("document.other_label_required");
+    }
 }

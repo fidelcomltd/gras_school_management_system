@@ -48,9 +48,6 @@ public sealed class PupilEndpoints : IEndpointModule
 
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    /// <summary>Bytes over the processor's own cap that a multipart envelope's boundaries and fields may add.</summary>
-    private const long MultipartOverheadBytes = 64 * 1024;
-
     private static void MapImportTemplate(RouteGroupBuilder group) =>
         group.MapGet("/import/template", async (ISender sender, CancellationToken cancellationToken) =>
             {
@@ -86,7 +83,7 @@ public sealed class PupilEndpoints : IEndpointModule
             // Our own CSRF filter protects this route; ASP.NET's automatic IFormFile antiforgery check would otherwise 500.
             .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data")
-            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + MultipartOverheadBytes))
+            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + FileResponses.MultipartOverheadBytes))
             .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
             .WithName("ValidatePupilImport")
             .WithSummary("Validate a bulk-import file")
@@ -124,7 +121,7 @@ public sealed class PupilEndpoints : IEndpointModule
             .RequireCsrfToken()
             .RequireIdempotencyKey(required: true)
             .DisableAntiforgery()
-            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + MultipartOverheadBytes))
+            .WithMetadata(new RequestSizeLimitAttribute(PupilImportLimits.MaxFileBytes + FileResponses.MultipartOverheadBytes))
             .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
             .WithName("CommitPupilImport")
             .WithSummary("Import a validated file")

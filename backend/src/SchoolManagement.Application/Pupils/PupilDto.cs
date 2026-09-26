@@ -52,6 +52,10 @@ namespace SchoolManagement.Application.Pupils;
 /// appear here — a known, recorded limitation, not a claim of completeness. Populated ONLY by the
 /// admissions queue — <see langword="null"/> everywhere else.
 /// </param>
+/// <param name="PhotoUpdatedAtUtc">
+/// When the current photograph was uploaded, or <see langword="null"/> when there is none (spec 6.5.4). A client's cache
+/// key: the bytes come from <c>GET /pupils/{id}/photo</c> and <c>/photo/thumbnail</c>.
+/// </param>
 public sealed record PupilDto(
     string Id,
     string? RegistrationNumber,
@@ -75,4 +79,5 @@ public sealed record PupilDto(
     AdmissionRecordDto? Admission = null,
     string? LevelAppliedFor = null,
     DateOnly? DateApplicationReceived = null,
-    IReadOnlyList<string>? Missing = null);
+    IReadOnlyList<string>? Missing = null,
+    DateTimeOffset? PhotoUpdatedAtUtc = null);

@@ -1221,11 +1221,87 @@ export interface paths {
         get?: never;
         /**
          * Tick or untick one checklist document
-         * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. Needs `pupil.document.manage` over the pupil.
+         * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. While a scan is attached the row cannot be unticked (`422 document.file_attached`) and the Other row keeps its label. Needs `pupil.document.manage` over the pupil.
          */
         put: operations["SavePupilDocument"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a pupil's photograph
+         * @description The 400 by 400 JPEG (spec 9.6: served only through a privilege-checked endpoint). `Content-Disposition: inline`, `nosniff`, `Cache-Control: private`. `404 pupil.photo_not_found` when there is none. Needs `pupil.view`.
+         */
+        get: operations["GetPupilPhoto"];
+        put?: never;
+        /**
+         * Upload or replace a pupil's photograph
+         * @description Multipart, one `file` part (spec 6.5.4, 9.6). JPEG or PNG only, verified by magic bytes; maximum 3 MB (the client downscales to 800 pixels first). Stored as a 400 by 400 centre-cropped JPEG at quality 80 and a 96 pixel thumbnail; EXIF orientation is applied, then all metadata including GPS is stripped, and the original is discarded. Returns where to read each size. Audited as `pupil.photo.update`. Needs `pupil.photo.update` over the pupil. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadPupilPhoto"];
+        /**
+         * Remove a pupil's photograph
+         * @description Audited as `pupil.photo.remove`. `404 pupil.photo_not_found` when there is none. Needs `pupil.photo.update` over the pupil.
+         */
+        delete: operations["RemovePupilPhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/photo/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a pupil's photograph thumbnail
+         * @description The 96 pixel JPEG. Same headers and privilege as the photograph.
+         */
+        get: operations["GetPupilPhotoThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/documents/{documentType}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a checklist document's scan
+         * @description Spec 6.5.8, 9.6: `Content-Disposition: attachment` under a name derived from the document type, `nosniff`, `Cache-Control: private`. `404 document.file_not_found` when there is none. Needs `pupil.view`, as the record does.
+         */
+        get: operations["GetPupilDocumentFile"];
+        put?: never;
+        /**
+         * Attach or replace a checklist document's scan
+         * @description Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadPupilDocumentFile"];
+        /**
+         * Remove a checklist document's scan
+         * @description The tick stays: the paper still exists. Audited as `pupil.document.file_removed`. `404 document.file_not_found` when there is none. Needs `pupil.document.manage` over the pupil.
+         */
+        delete: operations["RemovePupilDocumentFile"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6998,7 +7074,12 @@ export interface components {
          *       "otherLabel": null,
          *       "received": true,
          *       "receivedDate": "2026-09-14",
-         *       "remarks": "Photocopy; original seen."
+         *       "remarks": "Photocopy; original seen.",
+         *       "file": {
+         *         "contentType": "application/pdf",
+         *         "sizeBytes": 412736,
+         *         "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *       }
          *     }
          */
         PupilDocumentDto: {
@@ -7022,6 +7103,34 @@ export interface components {
              * @example Photocopy; original seen.
              */
             remarks: null | string;
+            file: null | components["schemas"]["PupilDocumentFileDto"];
+        };
+        /**
+         * @description An attached document scan's metadata (spec 6.5.8).
+         * @example {
+         *       "contentType": "application/pdf",
+         *       "sizeBytes": 412736,
+         *       "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *     }
+         */
+        PupilDocumentFileDto: {
+            /**
+             * @description `application/pdf`, `image/jpeg` or `image/png`.
+             * @example image/jpeg
+             */
+            contentType: string;
+            /**
+             * Format: int32
+             * @description The stored file's size.
+             * @example 538211
+             */
+            sizeBytes: number | string;
+            /**
+             * Format: date-time
+             * @description When it was attached.
+             * @example 2026-09-14T10:05:00+00:00
+             */
+            uploadedAtUtc: string;
         };
         /**
          * @description The body of the document route: one row's state.
@@ -7062,35 +7171,44 @@ export interface components {
          *           "otherLabel": null,
          *           "received": true,
          *           "receivedDate": "2026-09-14",
-         *           "remarks": "Photocopy; original seen."
+         *           "remarks": "Photocopy; original seen.",
+         *           "file": {
+         *             "contentType": "application/pdf",
+         *             "sizeBytes": 412736,
+         *             "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *           }
          *         },
          *         {
          *           "documentType": "PassportPhotograph",
          *           "otherLabel": null,
          *           "received": false,
          *           "receivedDate": null,
-         *           "remarks": null
+         *           "remarks": null,
+         *           "file": null
          *         },
          *         {
          *           "documentType": "PreviousSchoolResult",
          *           "otherLabel": null,
          *           "received": false,
          *           "receivedDate": null,
-         *           "remarks": null
+         *           "remarks": null,
+         *           "file": null
          *         },
          *         {
          *           "documentType": "TransferLetter",
          *           "otherLabel": null,
          *           "received": false,
          *           "receivedDate": null,
-         *           "remarks": null
+         *           "remarks": null,
+         *           "file": null
          *         },
          *         {
          *           "documentType": "Other",
          *           "otherLabel": null,
          *           "received": false,
          *           "receivedDate": null,
-         *           "remarks": null
+         *           "remarks": null,
+         *           "file": null
          *         }
          *       ]
          *     }
@@ -7109,35 +7227,44 @@ export interface components {
              *         "otherLabel": null,
              *         "received": true,
              *         "receivedDate": "2026-09-14",
-             *         "remarks": "Photocopy; original seen."
+             *         "remarks": "Photocopy; original seen.",
+             *         "file": {
+             *           "contentType": "application/pdf",
+             *           "sizeBytes": 412736,
+             *           "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+             *         }
              *       },
              *       {
              *         "documentType": "PassportPhotograph",
              *         "otherLabel": null,
              *         "received": false,
              *         "receivedDate": null,
-             *         "remarks": null
+             *         "remarks": null,
+             *         "file": null
              *       },
              *       {
              *         "documentType": "PreviousSchoolResult",
              *         "otherLabel": null,
              *         "received": false,
              *         "receivedDate": null,
-             *         "remarks": null
+             *         "remarks": null,
+             *         "file": null
              *       },
              *       {
              *         "documentType": "TransferLetter",
              *         "otherLabel": null,
              *         "received": false,
              *         "receivedDate": null,
-             *         "remarks": null
+             *         "remarks": null,
+             *         "file": null
              *       },
              *       {
              *         "documentType": "Other",
              *         "otherLabel": null,
              *         "received": false,
              *         "receivedDate": null,
-             *         "remarks": null
+             *         "remarks": null,
+             *         "file": null
              *       }
              *     ]
              */
@@ -7307,6 +7434,13 @@ export interface components {
              *     ]
              */
             missing?: null | string[];
+            /**
+             * Format: date-time
+             * @description When the current photograph was uploaded, or `null` when there is none (spec 6.5.4). A client's cache
+             *     key: the bytes come from `GET /pupils/{id}/photo` and `/photo/thumbnail`.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            photoUpdatedAtUtc?: null | string;
         };
         /**
          * @description One enrolment in the pupil's history (spec 02 §5.2).
@@ -8031,6 +8165,38 @@ export interface components {
             state: components["schemas"]["ResultSetState"];
             /** @description What the move does to it. */
             effect: components["schemas"]["PupilMovementEffect"];
+        };
+        /**
+         * @description A pupil's current photograph (spec 6.5.4): where to read each size, through the privilege-checked endpoints.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "updatedAtUtc": "2026-10-02T11:20:00+00:00",
+         *       "photoUrl": "/api/v1/pupils/0192f0c4-48fa-7667-5b49-f7a71699c2c1/photo",
+         *       "thumbnailUrl": "/api/v1/pupils/0192f0c4-48fa-7667-5b49-f7a71699c2c1/photo/thumbnail"
+         *     }
+         */
+        PupilPhotoDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * Format: date-time
+             * @description When it was uploaded; matches `PupilDto.photoUpdatedAtUtc`.
+             * @example 2026-10-02T11:20:00+00:00
+             */
+            updatedAtUtc: string;
+            /**
+             * @description The 400 by 400 JPEG.
+             * @example /api/v1/pupils/0192f0c4-48fa-7667-5b49-f7a71699c2c1/photo
+             */
+            photoUrl: string;
+            /**
+             * @description The 96 pixel JPEG.
+             * @example /api/v1/pupils/0192f0c4-48fa-7667-5b49-f7a71699c2c1/photo/thumbnail
+             */
+            thumbnailUrl: string;
         };
         /**
          * @description A Pupil's sex (spec 6.5.4). Required, no default.
@@ -20506,6 +20672,503 @@ export interface operations {
                 "application/json": components["schemas"]["PupilDocumentInput"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDocumentListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadPupilPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilPhotoDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemovePupilPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilPhotoThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+                documentType: components["schemas"]["PupilDocumentType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                    "image/jpeg": components["schemas"]["Stream"];
+                    "image/png": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadPupilDocumentFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                pupilId: string;
+                documentType: components["schemas"]["PupilDocumentType"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilDocumentListDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemovePupilDocumentFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+            };
+            path: {
+                pupilId: string;
+                documentType: components["schemas"]["PupilDocumentType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
