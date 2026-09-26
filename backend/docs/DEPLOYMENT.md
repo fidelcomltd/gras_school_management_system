@@ -55,7 +55,8 @@ Two of them are expensive to change later:
 | API | `api.goldenroyalark.com` | a config change and a redeploy |
 | Parent portal | `results.goldenroyalark.com` | **every pin slip already printed** — it is printed on the slip and in the QR code |
 | Admin web app | `app.goldenroyalark.com` | a `Cors__AllowedOrigins__0` change |
-| Staging API | `staging-api.goldenroyalark.com` | a Render setting |
+| Staging API | `staging-api.goldenroyalark.com` | a Render setting (`render.yaml`) |
+| Staging web app | `staging.goldenroyalark.com` | the staging API's `Cors__AllowedOrigins__0` (`render.yaml`) |
 
 Point A records for the API and portal names at the VPS **before** step 3, because certbot proves
 domain control over HTTP.
@@ -278,46 +279,61 @@ working when the API comes up.
 
 ## 7. Staging on Render
 
-Deploy from `backend/Dockerfile`, build context `backend/`. Render terminates TLS at its edge and
-sets `$PORT`, both of which the image handles.
+The staging API is described in [render.yaml](../../render.yaml), a Render Blueprint: a Docker web
+service built from `backend/Dockerfile` on the `staging` branch, in Frankfurt, serving
+`staging-api.goldenroyalark.com`, with every non-secret setting committed. Render terminates TLS at
+its edge and sets `$PORT`, both of which the image handles.
 
-Environment variables to set in the Render dashboard:
+**The image migrates on every boot.** The entrypoint runs the migration bundle (built into the image
+from the same commit) before starting the app. There is no backup-first step: staging holds nothing
+worth one. A migration that fails exits non-zero, the new version fails its health check, and Render
+keeps the previous one serving.
 
-```
-Database__ConnectionString=Host=<vps-host>;Port=5432;Database=gras_staging;Username=gras_staging;Password=...;SSL Mode=Require
-Cors__AllowedOrigins__0=https://staging.goldenroyalark.com
-Portal__PublicUrl=https://staging-api.goldenroyalark.com
-Proxy__Enabled=true
-Proxy__TrustAllProxies=true
-Pins__LookupKey=<a DIFFERENT key from production>
-Pins__EncryptionKey=<a DIFFERENT key from production>
-Cloudinary__CloudName=...        # same account
-Cloudinary__ApiKey=...
-Cloudinary__ApiSecret=...
-Cloudinary__FolderPrefix=gras/staging
-```
+The six secrets are asked for once, when the Blueprint is created, and are never in git:
 
-Generate staging's pin keys separately (`openssl rand -base64 32`). Sharing production's would mean
-a staging compromise hands over the ability to compute production lookup keys.
+| Variable | Where it comes from |
+|---|---|
+| `Database__ConnectionString` | printed by `deploy/open-staging-db.sh` on the VPS (below) |
+| `Pins__LookupKey`, `Pins__EncryptionKey` | `openssl rand -base64 32`, once each, for staging only |
+| `Cloudinary__CloudName`, `__ApiKey`, `__ApiSecret` | the same Cloudinary account as production |
+
+Generate staging's pin keys separately. Sharing production's would mean a staging compromise hands
+over the ability to compute production lookup keys. `Cloudinary__FolderPrefix=gras/staging` (in the
+blueprint) keeps staging's files apart from production's.
 
 `Proxy__TrustAllProxies` is right here and wrong on the VPS: Render's edge address is not
 published, and nothing but that edge can route to the container. On the VPS, Nginx is named by
 address instead.
 
+**Deploying staging** is a push to the `staging` branch (the blueprint auto-deploys on commit, and
+only when `backend/**` or `render.yaml` changed). Production is deployed separately, by hand, with
+the `deploy-production` workflow.
+
 ### Opening the staging database to Render
 
-Render reaches the VPS over the public internet, so this is a deliberate exposure of port 5432 —
-restricted to Render's published outbound addresses for your region, and to the staging role only.
-The production database stays unreachable from outside the box.
+Render reaches the VPS over the public internet, so this is a deliberate exposure of port 5432,
+restricted to Render's outbound addresses for the service's region, to the staging role and database
+only, and to TLS. The production database stays unreachable from outside the box.
 
-1. In `/etc/postgresql/16/main/postgresql.conf`: `listen_addresses = 'localhost,<vps-ip>'`
-2. In `pg_hba.conf`, one line per Render outbound address, TLS required:
-   `hostssl gras_staging gras_staging <render-ip>/32 scram-sha-256`
-3. `sudo ufw allow from <render-ip> to any port 5432 proto tcp`
-4. `sudo systemctl restart postgresql`
+[deploy/open-staging-db.sh](../../deploy/open-staging-db.sh) does all of it. Copy it to the VPS and
+run it with the addresses from the Render dashboard (the service's **Connect** menu, **Outbound**
+tab):
 
-Render publishes its outbound IPs per region in the dashboard. If they change, staging loses its
-database and production is unaffected — which is the intended blast radius.
+```bash
+sudo bash open-staging-db.sh <address> <address> ...
+```
+
+It creates the `gras_staging` role and database only if they are missing (`provision-vps.sh`
+normally made them already; an existing role keeps its password), caps the role at 12 connections
+so staging cannot starve production of the instance's 60, turns TLS on if it is off, adds the box's
+public address to `listen_addresses`, writes a marked `hostssl` block to `pg_hba.conf`, opens 5432
+in ufw to those addresses only, and prints the connection string for Render. A restart of Postgres
+is needed only the first time (listen address or TLS changed); production's API reconnects on its
+next request.
+
+Re-run it whenever Render's addresses change: the `pg_hba.conf` block and the ufw rules it owns are
+replaced by the new list. If they change without a re-run, staging loses its database and production
+is unaffected, which is the intended blast radius.
 
 ## 8. Backups
 

@@ -4,24 +4,45 @@
 #
 # Build context is the `backend/` directory.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# PINNED to a 10.0.1xx SDK because global.json asks for 10.0.100 with rollForward=latestPatch, i.e. the
+# 1xx feature band only (the band CI installs). The floating `sdk:10.0` tag follows the newest band
+# (10.0.4xx by 2026-09), which global.json refuses, and MCR stopped publishing 1xx images at 10.0.103.
+# Only the build stage is pinned: the runtime stage below stays on the floating, patched aspnet:10.0.
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103 AS build
 WORKDIR /src
 
 # Restore before copying the rest, so a source-only change reuses the restore layer. global.json
 # pins the SDK feature band; Directory.Packages.props is the only file holding package versions.
-COPY global.json nuget.config Directory.Build.props Directory.Build.targets Directory.Packages.props SchoolManagement.slnx ./
+COPY global.json nuget.config Directory.Build.props Directory.Build.targets Directory.Packages.props SchoolManagement.slnx dotnet-tools.json ./
 COPY src/SchoolManagement.Api/SchoolManagement.Api.csproj src/SchoolManagement.Api/
 COPY src/SchoolManagement.Application/SchoolManagement.Application.csproj src/SchoolManagement.Application/
 COPY src/SchoolManagement.Domain/SchoolManagement.Domain.csproj src/SchoolManagement.Domain/
 COPY src/SchoolManagement.Infrastructure/SchoolManagement.Infrastructure.csproj src/SchoolManagement.Infrastructure/
 RUN dotnet restore src/SchoolManagement.Api/SchoolManagement.Api.csproj
 
+# The analyzer severities (warnings are errors in Release). Without it the build applies the SDK's defaults
+# and fails on rules this codebase deliberately turns off, such as CA1034 for the privilege register.
+COPY .editorconfig ./
 COPY src/ src/
 RUN dotnet publish src/SchoolManagement.Api/SchoolManagement.Api.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
     /p:UseAppHost=false
+
+# The migration bundle, built from the same source as the app so schema and code can never be a version
+# apart (the production workflow builds its bundle the same way; see deploy-production.yml for why the
+# startup project is Infrastructure and why a placeholder connection string is enough at build time).
+RUN dotnet tool restore \
+    && SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION='Host=localhost;Database=unused;Username=unused;Password=unused' \
+       dotnet tool run dotnet-ef migrations bundle \
+         --project src/SchoolManagement.Infrastructure \
+         --startup-project src/SchoolManagement.Infrastructure \
+         --configuration Release \
+         --self-contained \
+         --target-runtime linux-x64 \
+         --output /app/efbundle \
+         --force
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
@@ -32,6 +53,7 @@ RUN useradd --create-home --shell /usr/sbin/nologin gras \
     && chown -R gras:gras /var/lib/gras
 
 COPY --from=build --chown=gras:gras /app/publish ./
+COPY --from=build --chown=gras:gras /app/efbundle /usr/local/bin/gras-efbundle
 USER gras
 
 # Render routes to $PORT and terminates TLS at its edge, so Kestrel serves plain HTTP here.
@@ -40,7 +62,12 @@ ENV ASPNETCORE_ENVIRONMENT=Staging \
 
 EXPOSE 8080
 
-# Binds $PORT when the platform sets one (Render does), 8080 otherwise. A shell form is needed
+# Staging migrates on every boot, before the app starts: a staging database holds nothing that needs the
+# production deploy's backup-then-migrate ceremony, and there is no deploy script on Render to run it.
+# The connection string reaches the bundle through the environment (both names, as in deploy.sh), never
+# as an argument. A failed migration exits non-zero, so Render keeps the previous version serving.
+#
+# Then binds $PORT when the platform sets one (Render does), 8080 otherwise. A shell form is needed
 # because the exec form does not expand variables; `exec` keeps the app as PID 1 so it receives
 # SIGTERM and shuts down gracefully.
-ENTRYPOINT ["/bin/sh", "-c", "exec dotnet SchoolManagement.Api.dll --urls http://+:${PORT:-8080}"]
+ENTRYPOINT ["/bin/sh", "-c", "SCHOOLMANAGEMENT_DESIGNTIME_CONNECTION=\"$Database__ConnectionString\" gras-efbundle && exec dotnet SchoolManagement.Api.dll --urls http://+:${PORT:-8080}"]

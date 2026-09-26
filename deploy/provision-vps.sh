@@ -10,7 +10,7 @@
 # What it does NOT do, on purpose:
 #   - issue TLS certificates (certbot needs DNS to be pointing here first — see DEPLOYMENT.md)
 #   - create the first admin account (a separate, deliberate command that prints a password)
-#   - open the staging database to Render (a decision with its own section in DEPLOYMENT.md)
+#   - open the staging database to Render (open-staging-db.sh, DEPLOYMENT.md section 7)
 
 set -euo pipefail
 
@@ -240,7 +240,7 @@ cat <<'EOF'
       1. Point DNS at this box:  api.<domain> and results.<domain>  (A records)
       2. sudo certbot --nginx -d api.<domain> -d results.<domain>
       3. Fill in the Cloudinary keys in /etc/gras/api.env
-      4. Deploy the app (CI does this on a merge to main, or run deploy.sh by hand)
+      4. Deploy the app: run the deploy-production workflow (manual; a merge to main does NOT deploy)
       5. Create the first admin:
            sudo -u gras dotnet /opt/gras/api/SchoolManagement.Api.dll bootstrap-admin ...
 EOF

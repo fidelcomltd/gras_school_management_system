@@ -1,0 +1,82 @@
+# Render Blueprint for the STAGING API (backend/docs/DEPLOYMENT.md section 7). Production is NOT here:
+# it runs on the VPS and deploys only through the manual deploy-production workflow.
+#
+# Render reads this file when you create a Blueprint from the repository (Dashboard -> New ->
+# Blueprint). Values marked `sync: false` are asked for ONCE, at creation, and are never in git.
+# Everything else is non-secret and identical on every deploy, so it lives here where it is reviewed.
+#
+# The image migrates the staging database on every boot (backend/Dockerfile), so there is no separate
+# migration step: a failed migration fails the deploy, and Render keeps the previous version serving.
+
+services:
+  - type: web
+    name: gras-staging-api
+    runtime: docker
+    # Built from the `staging` branch: push main to staging to deploy it here, then deploy the same commit
+    # to production with deploy-production once it has been checked.
+    branch: staging
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # The closest Render region to Nigeria. Its outbound addresses are what deploy/open-staging-db.sh
+    # lets into Postgres, so changing the region means re-running that script with the new list.
+    region: frankfurt
+    # Starter keeps the service awake. Free also works, but sleeps after 15 idle minutes and takes
+    # around a minute to wake (and to re-run its migration check) on the next request.
+    plan: starter
+    numInstances: 1
+    # /health/ready opens a real database connection, so a deploy that cannot reach Postgres never
+    # goes live.
+    healthCheckPath: /health/ready
+    autoDeployTrigger: commit
+    # Only backend changes (and this file) rebuild the API; a frontend or docs commit does not.
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+      ignoredPaths:
+        - backend/tests/**
+        - backend/docs/**
+    # Must stay a goldenroyalark.com subdomain: on *.onrender.com the __Host- session cookie is
+    # cross-site to the staging web app and every sign-in fails.
+    domains:
+      - staging-api.goldenroyalark.com
+    envVars:
+      # ── Secrets: asked for once, when the Blueprint is created ──
+      # Printed by deploy/open-staging-db.sh on the VPS.
+      - key: Database__ConnectionString
+        sync: false
+      # Each is `openssl rand -base64 32`, generated separately for staging. NEVER production's: a
+      # staging compromise would hand over the ability to compute production pin lookup keys.
+      - key: Pins__LookupKey
+        sync: false
+      - key: Pins__EncryptionKey
+        sync: false
+      # The same Cloudinary account as production; FolderPrefix below keeps the files apart.
+      - key: Cloudinary__CloudName
+        sync: false
+      - key: Cloudinary__ApiKey
+        sync: false
+      - key: Cloudinary__ApiSecret
+        sync: false
+
+      # ── Non-secret staging settings ──
+      - key: Cloudinary__FolderPrefix
+        value: gras/staging
+      - key: Cors__AllowedOrigins__0
+        value: https://staging.goldenroyalark.com
+      # Staging has no results. subdomain: the portal is served from the API's own host.
+      - key: Portal__PublicUrl
+        value: https://staging-api.goldenroyalark.com
+      # Render's edge terminates TLS and its address is not published, and nothing but that edge can
+      # reach the container, so all proxies are trusted here (wrong on the VPS, where Nginx is named).
+      - key: Proxy__Enabled
+        value: "true"
+      - key: Proxy__TrustAllProxies
+        value: "true"
+      # Both directories exist in the image, owned by the service user. The container disk is
+      # ephemeral, so a redeploy loses the key ring (outstanding CSRF tokens re-fetch, nothing more)
+      # and the PDF cache (results re-render).
+      - key: DataProtection__KeyRingPath
+        value: /var/lib/gras/dataprotection-keys
+      - key: Portal__PdfCacheDirectory
+        value: /var/lib/gras/result-pdf-cache
