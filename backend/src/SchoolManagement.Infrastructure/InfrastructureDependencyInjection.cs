@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Audit;
@@ -347,6 +348,9 @@ public static class InfrastructureDependencyInjection
         // Singleton so an in-memory upload persists for the lifetime of the process.
         services.AddSingleton<InMemorySchoolImageStore>();
         services.AddHttpClient(CloudinaryGateway.HttpClientName);
+        // The gateway signs short-lived download links. TryAdd: the API host registers TimeProvider.System first, and a
+        // container built from Infrastructure alone (a registration test, the smoke-test command) still resolves one.
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ICloudinaryGateway, CloudinaryGateway>();
         services.AddSingleton<CloudinaryImageStore>();
         services.AddSingleton<ISchoolImageStore>(provider =>

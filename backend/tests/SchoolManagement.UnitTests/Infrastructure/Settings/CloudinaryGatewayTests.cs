@@ -20,7 +20,7 @@ public sealed class CloudinaryGatewayTests : IDisposable
 
     private CloudinaryGateway CreateGateway() =>
         new(Options.Create(new CloudinaryOptions { CloudName = "cloud", ApiKey = "key", ApiSecret = "secret", FolderPrefix = "gras/test" }),
-            new SingleClientFactory(_handler));
+            new SingleClientFactory(_handler), TimeProvider.System);
 
     [Fact]
     public async Task OpenAsync_APdf_UsesTheSignedDownloadApi_ForAnAuthenticatedRawResource()

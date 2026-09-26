@@ -58,16 +58,19 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
 
     private readonly Cloudinary _cloudinary;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly TimeProvider _timeProvider;
 
-    public CloudinaryGateway(IOptions<CloudinaryOptions> options, IHttpClientFactory httpClientFactory)
+    public CloudinaryGateway(IOptions<CloudinaryOptions> options, IHttpClientFactory httpClientFactory, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(httpClientFactory);
+        ArgumentNullException.ThrowIfNull(timeProvider);
 
         var configured = options.Value;
         _cloudinary = new Cloudinary(new Account(configured.CloudName, configured.ApiKey, configured.ApiSecret));
         _cloudinary.Api.Secure = true;
         _httpClientFactory = httpClientFactory;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -103,7 +106,7 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
                 attachment: true,
                 format: string.Empty,
                 type: "authenticated",
-                expiresAt: DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+                expiresAt: _timeProvider.GetUtcNow().AddMinutes(5).ToUnixTimeSeconds(),
                 resourceType: "raw")
             : _cloudinary.Api.UrlImgUp
                 .Secure(true)
