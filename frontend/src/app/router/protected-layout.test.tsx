@@ -64,9 +64,10 @@ describe('ProtectedLayout', () => {
     renderGuardedApp(paths.root);
 
     expect(await screen.findByText('protected content')).toBeInTheDocument();
-    // The shell chrome — nav + identity + sign-out — is there too, not just the child route.
+    // The shell chrome — search, identity and the account menu — is there too, not just the child route.
     expect(screen.getByText('Chisom Maxwell')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Search pupils and pages' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Account: Chisom Maxwell/ })).toBeInTheDocument();
   });
   it('holds a flagged account on the password change, then opens the app once it succeeds', async () => {
     let sent: unknown;

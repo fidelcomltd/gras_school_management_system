@@ -1,6 +1,5 @@
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
-using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Infrastructure.Authorization;
@@ -35,8 +34,7 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// </remarks>
 internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     IAdminAccountRepository accounts,
-    IRoleAssignmentRepository assignments,
-    IRoleRepository roles)
+    ActiveRoleAssignmentLoader loader)
     : IEffectivePrivilegeProvider
 {
     private static readonly IReadOnlyCollection<PrivilegeGrant> NoGrants = [];
@@ -70,39 +68,17 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
             return SuperAdminGrants;
         }
 
-        var activeAssignments = await assignments
-            .ListActiveForAccountReadOnlyAsync(accountId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (activeAssignments.Count == 0)
-        {
-            return NoGrants;
-        }
-
+        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
         var grants = new List<PrivilegeGrant>();
-        var roleCache = new Dictionary<Guid, Role?>();
-
-        foreach (var assignment in activeAssignments)
+        foreach (var (assignment, role) in active)
         {
-            if (!roleCache.TryGetValue(assignment.RoleId, out var role))
-            {
-                role = await roles.FindReadOnlyByIdAsync(assignment.RoleId, cancellationToken).ConfigureAwait(false);
-                roleCache[assignment.RoleId] = role;
-            }
-
-            if (role is null)
-            {
-                continue;
-            }
-
             var armIds = new HashSet<Guid>(assignment.ArmIds);
-
             foreach (var privilege in role.Privileges)
             {
                 grants.Add(new PrivilegeGrant(privilege, assignment.ScopeType, armIds, assignment.SessionId));
             }
         }
 
-        return grants;
+        return grants.Count == 0 ? NoGrants : grants;
     }
 }

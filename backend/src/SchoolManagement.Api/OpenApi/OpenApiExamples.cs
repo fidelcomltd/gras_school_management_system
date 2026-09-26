@@ -869,6 +869,7 @@ internal static class OpenApiExamples
               "effectivePrivileges": [
                 { "privilege": "admin.view", "scope": "SchoolWide", "armIds": [] }
               ],
+              "roleNames": ["Super Admin"],
               "sessionExpiresAt": "{{CanonicalTimestamp}}",
               "sessionAbsoluteExpiresAt": "{{CanonicalTimestamp}}"
             }

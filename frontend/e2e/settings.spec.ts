@@ -96,6 +96,8 @@ test('sign-in, edit school settings from the nav, and sign out round-trips end t
 
   await expect(page.getByText('Settings updated.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  // Sign out lives in the header's account menu.
+  await page.getByRole('button', { name: /^Account:/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 });

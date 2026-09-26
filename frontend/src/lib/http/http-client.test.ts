@@ -19,6 +19,7 @@ function liveSession() {
     isSuperAdmin: true,
     mustChangePassword: false,
     effectivePrivileges: [],
+    roleNames: [],
     sessionExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
     sessionAbsoluteExpiresAt: new Date(Date.now() + 8 * 3_600_000).toISOString(),
   };

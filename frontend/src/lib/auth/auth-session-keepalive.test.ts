@@ -28,6 +28,7 @@ function sessionEndingIn(idleMs: number, absoluteMs = 8 * HOUR): AuthSession {
     isSuperAdmin: true,
     mustChangePassword: false,
     effectivePrivileges: [],
+    roleNames: [],
     sessionExpiresAt: new Date(NOW + idleMs).toISOString(),
     sessionAbsoluteExpiresAt: new Date(NOW + absoluteMs).toISOString(),
   };

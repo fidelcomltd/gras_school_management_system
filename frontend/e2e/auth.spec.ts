@@ -78,7 +78,9 @@ test('successful sign-in reaches the landing screen and can sign out again', asy
   await expect(page).toHaveURL('/');
   await expect(page.getByRole('heading', { name: 'Welcome, Chisom Maxwell' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  // Sign out lives in the header's account menu.
+  await page.getByRole('button', { name: /^Account:/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 

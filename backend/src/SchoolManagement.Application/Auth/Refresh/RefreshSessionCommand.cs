@@ -23,6 +23,7 @@ internal sealed class RefreshSessionCommandHandler(
     IAdminAccountRepository accounts,
     IAdminSessionRepository sessions,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
+    IAccountRoleNames accountRoleNames,
     ICurrentSession currentSession,
     TimeProvider timeProvider)
     : IRequestHandler<RefreshSessionCommand, Result<AuthSessionResponse>>
@@ -67,6 +68,10 @@ internal sealed class RefreshSessionCommandHandler(
             .GetGrantsAsync(account.Id.ToString(), cancellationToken)
             .ConfigureAwait(false);
 
+        var roleNames = await accountRoleNames
+            .GetActiveRoleNamesAsync(account.Id, account.IsSuperAdmin, cancellationToken)
+            .ConfigureAwait(false);
+
         var response = AuthSessionResponse.Create(
             account.Id,
             account.Email,
@@ -74,6 +79,7 @@ internal sealed class RefreshSessionCommandHandler(
             account.IsSuperAdmin,
             account.MustChangePassword,
             grants,
+            roleNames,
             session.IdleExpiresAtUtc,
             session.AbsoluteExpiresAtUtc);
 

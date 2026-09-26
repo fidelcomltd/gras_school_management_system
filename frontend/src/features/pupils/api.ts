@@ -36,6 +36,19 @@ export function usePupils(filters: PupilsFilters) {
   });
 }
 
+/**
+ * The header's quick pupil search: the first few matches for `term`. Keyed under the list key, so every pupil change
+ * that refreshes the list (an edit, a number correction) refreshes these results too.
+ */
+export function usePupilSearch(term: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [PupilsKeys.List, 'quick-search', term],
+    queryFn: ({ signal }) => apiGet(PUPILS_PATH, { search: term, pageSize: 6 }, { signal }),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
 /** Gated `pupil.view`. */
 export function usePupil(id: string) {
   return useQuery({

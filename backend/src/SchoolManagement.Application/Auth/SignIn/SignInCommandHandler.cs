@@ -31,6 +31,7 @@ internal sealed class SignInCommandHandler(
     IAdminSessionRepository sessions,
     IPasswordHasher passwordHasher,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
+    IAccountRoleNames accountRoleNames,
     TimeProvider timeProvider)
     : IRequestHandler<SignInCommand, Result<SignInResult>>
 {
@@ -95,6 +96,10 @@ internal sealed class SignInCommandHandler(
             .GetGrantsAsync(account.Id.ToString(), cancellationToken)
             .ConfigureAwait(false);
 
+        var roleNames = await accountRoleNames
+            .GetActiveRoleNamesAsync(account.Id, account.IsSuperAdmin, cancellationToken)
+            .ConfigureAwait(false);
+
         var response = AuthSessionResponse.Create(
             account.Id,
             account.Email,
@@ -102,6 +107,7 @@ internal sealed class SignInCommandHandler(
             account.IsSuperAdmin,
             account.MustChangePassword,
             grants,
+            roleNames,
             session.IdleExpiresAtUtc,
             session.AbsoluteExpiresAtUtc);
 

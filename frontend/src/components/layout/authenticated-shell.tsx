@@ -5,12 +5,17 @@ import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { APP_NAME } from '@/config/env-values';
 import type { AuthSession } from '@/lib/auth/auth-session';
+import { cn } from '@/lib/utils/cn';
+import { useSidebarStore } from '@/stores/sidebar-store';
 import { SkipLink } from './app-shell';
+import { GlobalSearch } from './global-search';
 import { Sidebar } from './sidebar';
+import { UserMenu } from './user-menu';
 
 /**
  * The back office's frame for every signed-in route with navigation (TASK-0041): a fixed sidebar on wide screens, the
- * same sidebar in a drawer below `lg`, and a top bar with the theme toggle. The drawer is a Base UI dialog, so focus is
+ * same sidebar in a drawer below `lg` (collapsible to icons on desktop), and a top bar with the app-wide search, the
+ * signed-in account and the theme toggle. The drawer is a Base UI dialog, so focus is
  * trapped inside it, `Escape` closes it and focus returns to the menu button.
  */
 export function AuthenticatedShell({
@@ -21,13 +26,20 @@ export function AuthenticatedShell({
   children: ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const collapsed = useSidebarStore((state) => state.collapsed);
+  const toggleCollapsed = useSidebarStore((state) => state.toggle);
 
   return (
     <div className="min-h-dvh bg-background">
       <SkipLink />
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface lg:block">
-        <Sidebar session={session} />
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-surface transition-[width] duration-200 lg:block',
+          collapsed ? 'w-16' : 'w-64',
+        )}
+      >
+        <Sidebar session={session} collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
       </aside>
 
       <BaseDialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -47,14 +59,16 @@ export function AuthenticatedShell({
         </BaseDialog.Portal>
       </BaseDialog.Root>
 
-      <div className="flex min-h-dvh flex-col lg:pl-64">
+      <div className={cn('flex min-h-dvh flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-16' : 'lg:pl-64')}>
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-surface/85 px-4 backdrop-blur sm:px-6">
           <Button variant="ghost" size="sm" aria-label="Open menu" className="lg:hidden" onClick={() => setDrawerOpen(true)}>
             <Menu className="size-5" aria-hidden="true" />
           </Button>
-          <p className="truncate text-sm font-semibold text-foreground lg:hidden">{APP_NAME}</p>
-          <div className="ml-auto">
+          <p className="hidden truncate text-sm font-semibold text-foreground sm:block lg:hidden">{APP_NAME}</p>
+          <GlobalSearch session={session} />
+          <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
+            <UserMenu session={session} />
           </div>
         </header>
 

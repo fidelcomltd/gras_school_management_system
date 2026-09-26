@@ -27,6 +27,7 @@ internal sealed class MeQueryHandler(
     IAdminAccountRepository accounts,
     IAdminSessionRepository sessions,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
+    IAccountRoleNames accountRoleNames,
     ICurrentUser currentUser,
     ICurrentSession currentSession)
     : IRequestHandler<MeQuery, Result<AuthSessionResponse>>
@@ -59,6 +60,10 @@ internal sealed class MeQueryHandler(
             .GetGrantsAsync(account.Id.ToString(), cancellationToken)
             .ConfigureAwait(false);
 
+        var roleNames = await accountRoleNames
+            .GetActiveRoleNamesAsync(account.Id, account.IsSuperAdmin, cancellationToken)
+            .ConfigureAwait(false);
+
         var response = AuthSessionResponse.Create(
             account.Id,
             account.Email,
@@ -66,6 +71,7 @@ internal sealed class MeQueryHandler(
             account.IsSuperAdmin,
             account.MustChangePassword,
             grants,
+            roleNames,
             session.IdleExpiresAtUtc,
             session.AbsoluteExpiresAtUtc);
 
