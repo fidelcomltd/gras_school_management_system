@@ -60,8 +60,8 @@ public sealed class Enrolment : Entity<Guid>, IAuditableEntity
     public DateOnly EffectiveFrom { get; private set; }
 
     /// <summary>
-    /// <see langword="null"/> while open. Set once, by <see cref="Close"/> — never cleared or
-    /// changed afterwards, matching <c>Pupil.RegistrationNumber</c>'s "set once" convention.
+    /// <see langword="null"/> while open. Set by <see cref="Close"/>, and cleared only by <see cref="Reopen"/>, which
+    /// undoes a leaving status change recorded in error the same day (human ruling 2026-09-25).
     /// </summary>
     public DateOnly? EffectiveTo { get; private set; }
 
@@ -136,6 +136,22 @@ public sealed class Enrolment : Entity<Guid>, IAuditableEntity
         }
 
         EffectiveTo = effectiveTo;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Reopens this enrolment, undoing the close a leaving status change made in error (human ruling 2026-09-25: same-day
+    /// undo). The caller checks it is the pupil's latest enrolment and that the pupil has no other open one; the partial
+    /// unique index backstops the second.
+    /// </summary>
+    public Result Reopen()
+    {
+        if (IsOpen)
+        {
+            return Result.Failure(Error.Conflict("enrolment.already_open", "This enrolment is already open."));
+        }
+
+        EffectiveTo = null;
         return Result.Success();
     }
 

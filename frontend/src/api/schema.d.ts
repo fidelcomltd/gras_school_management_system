@@ -966,9 +966,29 @@ export interface paths {
         put?: never;
         /**
          * Change a pupil's status: leave, graduate or reactivate
-         * @description Spec 6.5.14. `pupil.status.update`, checked in the handler (a leaver has no open enrolment for a route scope to resolve). Active to `transferred` or `withdrawn` closes the open enrolment on `effectiveDate` (not after today) and needs a `reason`; active to `graduated` closes it at the session end date and needs a `reason`; `transferred`, `withdrawn` or `graduated` to `active` (reactivation) opens a new enrolment in `armId` (an active arm of the active session) from `effectiveDate`, keeps the registration number and all history, and needs a `reason` only from graduated. The pupil leaves (or rejoins) score entry, the completeness gate and ranking from that date; marks are kept. Every non-Published result set of the arm is flagged for recompute (Awaiting Approval and Returned for Correction drop to Draft); Published results stay published. Capacity is a soft limit (`arm.capacity.override`). With `dryRun` nothing is written and the response lists the consequences. 409 `pupil.status_pending` for a pending admission (use the admissions queue), `pupil.status_unchanged`, `pupil.status_transition_not_allowed`, `pupil.reactivation_needs_admission` (a declined application), `arm.at_capacity`. 422 for a future or out-of-range date. `Idempotency-Key` is REQUIRED.
+         * @description Spec 6.5.14. `pupil.status.update`, checked in the handler (a leaver has no open enrolment for a route scope to resolve). Active to `transferred`, `withdrawn` or `graduated` closes the open enrolment on `effectiveDate` (not after today) and needs a `reason`; `transferred`, `withdrawn` or `graduated` to `active` (reactivation) opens a new enrolment in `armId` (an active arm of the active session) from `effectiveDate`, keeps the registration number and all history, and needs a `reason` only from graduated. The pupil leaves (or rejoins) score entry, the completeness gate and ranking from that date; marks are kept. Every non-Published result set of the arm is flagged for recompute (Awaiting Approval and Returned for Correction drop to Draft); Published results stay published. Capacity is a soft limit (`arm.capacity.override`). With `dryRun` nothing is written and the response lists the consequences. 409 `pupil.status_pending` for a pending admission (use the admissions queue), `pupil.status_unchanged`, `pupil.status_transition_not_allowed`, `pupil.reactivation_needs_admission` (a declined application), `arm.at_capacity`. 422 for a future or out-of-range date. `Idempotency-Key` is REQUIRED.
          */
         post: operations["ChangePupilStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{id}/status/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo today's leaving status change
+         * @description Human ruling 2026-09-25. `pupil.status.update`, checked in the handler. Undoes the pupil's most recent status change when it was a leave (`transferred`, `withdrawn` or `graduated`) recorded TODAY (Lagos date): the enrolment it closed is reopened, the pupil is active again, and every non-Published result set of that arm is flagged for recompute. The history keeps both rows: the undo is appended as its own status change. 409 `pupil.status_undo_unavailable` otherwise (reactivate from the status screen instead). `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UndoPupilStatusChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3595,8 +3615,9 @@ export interface components {
             newPassword: string;
         };
         /**
-         * @description `POST /api/v1/pupils/{id}/status` (spec 6.5.14, 6.5.17): the status screen. Active to transferred or withdrawn
-         *             closes the open enrolment on the effective date; active to graduated closes it at the session end date; transferred,
+         * @description `POST /api/v1/pupils/{id}/status` (spec 6.5.14, 6.5.17): the status screen. Active to transferred, withdrawn or
+         *             graduated closes the open enrolment on the effective date (a manual graduation included, human ruling 2026-09-25, so
+         *             a mistaken one can be reversed; promotion at the terminal level will close at the session end itself); transferred,
          *             withdrawn or graduated back to active (reactivation) opens a new enrolment in ArmId, keeping the
          *             registration number and all history. A pending admission is approved or declined from the admissions queue instead.
          * @example {
@@ -3619,7 +3640,7 @@ export interface components {
             targetStatus: components["schemas"]["PupilStatus"];
             /**
              * Format: date
-             * @description Required, not after today, except for graduated, which always takes the session end date.
+             * @description Required, not after today.
              * @example 2026-11-20
              */
             effectiveDate: null | string;
@@ -7941,7 +7962,7 @@ export interface components {
             toArmName: null | string;
             /**
              * Format: date
-             * @description When the change takes effect. For a graduation, the session end date.
+             * @description When the change takes effect.
              * @example 2026-10-14
              */
             effectiveDate: string;
@@ -8050,7 +8071,7 @@ export interface components {
              * @example Family relocated to Abuja.
              */
             reason: null | string;
-            /** @description The arm a reactivation enrolled the pupil into. */
+            /** @description The arm a reactivation enrolled the pupil into, or the arm a leave took them out of. */
             armName: null | string;
             /**
              * Format: date-time
@@ -12720,6 +12741,28 @@ export interface components {
              * @example true
              */
             dryRun: boolean;
+        };
+        /**
+         * @description `POST /api/v1/pupils/{id}/status/undo` (human ruling 2026-09-25): undoes the pupil's most recent status change
+         *             when it was a leave recorded today, reopening the enrolment it closed. A mistake found later, or a mistaken
+         *             reactivation, is corrected through the status screen instead.
+         * @example {
+         *       "id": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "reason": "Withdrawn on the wrong record."
+         *     }
+         */
+        UndoPupilStatusChangeCommand: {
+            /**
+             * Format: uuid
+             * @description The pupil. From the route.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            id: string;
+            /**
+             * @description Optional note on why the change was wrong. At most 492 characters: it is stored after "Undone: ".
+             * @example Withdrawn on the wrong record.
+             */
+            reason: null | string;
         };
         /**
          * @description `PATCH /api/v1/settings/abbreviation` (spec 6.2.4). Requires the literal confirmation token
@@ -19275,6 +19318,105 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChangePupilStatusCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilMovementOutcomeDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UndoPupilStatusChange: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UndoPupilStatusChangeCommand"];
             };
         };
         responses: {

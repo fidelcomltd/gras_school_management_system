@@ -1,9 +1,6 @@
-using System.Globalization;
 using FluentValidation;
-using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
-using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
@@ -18,14 +15,15 @@ using SchoolManagement.Domain.Security;
 namespace SchoolManagement.Application.Pupils.Movement;
 
 /// <summary>
-/// <c>POST /api/v1/pupils/{id}/status</c> (spec 6.5.14, 6.5.17): the status screen. Active to transferred or withdrawn
-/// closes the open enrolment on the effective date; active to graduated closes it at the session end date; transferred,
+/// <c>POST /api/v1/pupils/{id}/status</c> (spec 6.5.14, 6.5.17): the status screen. Active to transferred, withdrawn or
+/// graduated closes the open enrolment on the effective date (a manual graduation included, human ruling 2026-09-25, so
+/// a mistaken one can be reversed; promotion at the terminal level will close at the session end itself); transferred,
 /// withdrawn or graduated back to active (reactivation) opens a new enrolment in <paramref name="ArmId"/>, keeping the
 /// registration number and all history. A pending admission is approved or declined from the admissions queue instead.
 /// </summary>
 /// <param name="Id">The pupil. From the route.</param>
 /// <param name="TargetStatus">Active, transferred, withdrawn or graduated.</param>
-/// <param name="EffectiveDate">Required, not after today, except for graduated, which always takes the session end date.</param>
+/// <param name="EffectiveDate">Required, not after today.</param>
 /// <param name="Reason">Required when the pupil leaves, and when a graduated pupil is reactivated. At most 500 characters.</param>
 /// <param name="ArmId">The destination arm for a reactivation: an active arm in the active session. Omitted otherwise.</param>
 /// <param name="DryRun">When true, nothing is written and the response says what would happen.</param>
@@ -50,8 +48,7 @@ internal sealed class ChangePupilStatusCommandValidator : AbstractValidator<Chan
 
         RuleFor(command => command.EffectiveDate)
             .NotNull()
-            .WithMessage("Enter the date the change takes effect.")
-            .When(command => command.TargetStatus != PupilStatus.Graduated);
+            .WithMessage("Enter the date the change takes effect.");
 
         RuleFor(command => command.Reason)
             .NotEmpty()
@@ -87,11 +84,8 @@ internal sealed class ChangePupilStatusHandler(
     IEnrolmentRepository enrolments,
     IArmRepository arms,
     IAcademicSessionRepository sessions,
-    IPupilStatusChangeRepository statusChanges,
     PupilMovementEngine engine,
     ArmCapacityGuard capacityGuard,
-    ICurrentUser currentUser,
-    ISystemAuditSink auditSink,
     TimeProvider timeProvider)
     : IRequestHandler<ChangePupilStatusCommand, Result<PupilMovementOutcomeDto>>
 {
@@ -144,25 +138,11 @@ internal sealed class ChangePupilStatusHandler(
         var arm = open is null ? null : await arms.FindReadOnlyByIdAsync(open.ArmId, cancellationToken).ConfigureAwait(false);
         var armNames = await engine.DisplayNamesAsync(arm is null ? [] : [arm], cancellationToken).ConfigureAwait(false);
 
-        DateOnly effectiveDate;
-
-        if (request.TargetStatus == PupilStatus.Graduated)
+        var effectiveDate = request.EffectiveDate!.Value;
+        var future = PupilMovementEngine.RefuseIfFuture(effectiveDate, today);
+        if (future.IsFailure)
         {
-            // Spec 6.5.14: graduation "closes the enrolment at the session end date".
-            var session = arm is null
-                ? await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false)
-                : await sessions.FindReadOnlyByIdAsync(arm.SessionId, cancellationToken).ConfigureAwait(false);
-            effectiveDate = session?.EndDate ?? today;
-        }
-        else
-        {
-            effectiveDate = request.EffectiveDate!.Value;
-
-            var future = PupilMovementEngine.RefuseIfFuture(effectiveDate, today);
-            if (future.IsFailure)
-            {
-                return Result.Failure<PupilMovementOutcomeDto>(future.Error);
-            }
+            return Result.Failure<PupilMovementOutcomeDto>(future.Error);
         }
 
         if (open is not null && effectiveDate < open.EffectiveFrom)
@@ -198,7 +178,8 @@ internal sealed class ChangePupilStatusHandler(
             return Result.Failure<PupilMovementOutcomeDto>(leave.Error);
         }
 
-        var recorded = await RecordAsync(pupil, fromStatus, request.TargetStatus, effectiveDate, request.Reason, null, cancellationToken)
+        var recorded = await engine
+            .RecordStatusChangeAsync(pupil, fromStatus, effectiveDate, request.Reason, arm?.Id, null, undo: false, cancellationToken)
             .ConfigureAwait(false);
         if (recorded.IsFailure)
         {
@@ -207,8 +188,6 @@ internal sealed class ChangePupilStatusHandler(
 
         await engine.ApplyAsync(affected, PupilMovementEngine.CohortNote("a pupil leaving", effectiveDate), cancellationToken)
             .ConfigureAwait(false);
-
-        await AuditAsync(pupil, fromStatus, effectiveDate, arm?.Id, null, cancellationToken).ConfigureAwait(false);
 
         return PupilMovementEngine.Outcome(false, pupil, fromStatus, request.TargetStatus, arm, null, armNames, effectiveDate, open is null ? null : effectiveDate, affected, null, today);
     }
@@ -265,7 +244,7 @@ internal sealed class ChangePupilStatusHandler(
                 "pupil.enrolment_still_open", "This pupil still has an open enrolment. Close it before reactivating."));
         }
 
-        // No date may belong to two enrolments. A graduated pupil's enrolment runs to the end of their session.
+        // No date may belong to two enrolments.
         var lastDay = history.Max(enrolment => enrolment.EffectiveTo);
         if (lastDay is { } last && effectiveDate <= last)
         {
@@ -304,7 +283,8 @@ internal sealed class ChangePupilStatusHandler(
             return Result.Failure<PupilMovementOutcomeDto>(reactivate.Error);
         }
 
-        var recorded = await RecordAsync(pupil, fromStatus, PupilStatus.Active, effectiveDate, request.Reason, arm.Id, cancellationToken)
+        var recorded = await engine
+            .RecordStatusChangeAsync(pupil, fromStatus, effectiveDate, request.Reason, null, arm.Id, undo: false, cancellationToken)
             .ConfigureAwait(false);
         if (recorded.IsFailure)
         {
@@ -314,44 +294,6 @@ internal sealed class ChangePupilStatusHandler(
         await engine.ApplyAsync(affected, PupilMovementEngine.CohortNote("a pupil returning", effectiveDate), cancellationToken)
             .ConfigureAwait(false);
 
-        await AuditAsync(pupil, fromStatus, effectiveDate, null, arm.Id, cancellationToken).ConfigureAwait(false);
-
         return PupilMovementEngine.Outcome(false, pupil, fromStatus, PupilStatus.Active, null, arm, armNames, effectiveDate, null, affected, capacity, today);
     }
-
-    private async Task<Result> RecordAsync(
-        Pupil pupil, PupilStatus fromStatus, PupilStatus toStatus, DateOnly effectiveDate, string? reason, Guid? armId, CancellationToken cancellationToken)
-    {
-        var actorId = currentUser.UserId is { } actorIdText && Guid.TryParse(actorIdText, out var parsedActorId) ? parsedActorId : (Guid?)null;
-
-        var row = PupilStatusChange.Create(
-            Guid.CreateVersion7(), pupil.Id, fromStatus, toStatus, effectiveDate, reason, armId, actorId, timeProvider.GetUtcNow());
-        if (row.IsFailure)
-        {
-            return Result.Failure(row.Error);
-        }
-
-        await statusChanges.AddAsync(row.Value, cancellationToken).ConfigureAwait(false);
-        return Result.Success();
-    }
-
-    // Codes and ids only: the reason is free text and may describe the child, so it stays on the status-change row.
-    private Task AuditAsync(Pupil pupil, PupilStatus fromStatus, DateOnly effectiveDate, Guid? fromArmId, Guid? toArmId, CancellationToken cancellationToken) =>
-        auditSink.RecordAsync(
-            Privileges.Pupil.StatusUpdate,
-            "pupil",
-            pupil.Id.ToString("D", CultureInfo.InvariantCulture),
-            metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["status"] = pupil.Status.ToString(),
-                ["effectiveDate"] = effectiveDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                ["armId"] = toArmId?.ToString("D", CultureInfo.InvariantCulture),
-            },
-            actorAdminId: currentUser.UserId,
-            cancellationToken,
-            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["status"] = fromStatus.ToString(),
-                ["armId"] = fromArmId?.ToString("D", CultureInfo.InvariantCulture),
-            });
 }

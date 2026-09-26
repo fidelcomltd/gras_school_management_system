@@ -153,4 +153,17 @@ public sealed class EnrolmentTests
         result.Error.Code.ShouldBe("enrolment.transfer_date_not_after_start");
         current.IsOpen.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Reopen_ClearsTheClose_AndRefusesAnOpenEnrolment()
+    {
+        var enrolment = Enrolment.Open(Guid.CreateVersion7(), PupilId, ArmId, OpenedOn).Value;
+        enrolment.Reopen().Error.Code.ShouldBe("enrolment.already_open");
+
+        enrolment.Close(OpenedOn.AddDays(5));
+        enrolment.Reopen().IsSuccess.ShouldBeTrue();
+
+        enrolment.IsOpen.ShouldBeTrue();
+        enrolment.EffectiveTo.ShouldBeNull();
+    }
 }

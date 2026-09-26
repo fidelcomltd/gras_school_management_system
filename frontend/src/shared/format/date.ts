@@ -7,5 +7,10 @@ export function formatDate(iso: string | null | undefined): string {
 
 /** Today in Lagos (fixed UTC+1), as a date input wants it: YYYY-MM-DD. */
 export function lagosToday(): string {
-  return new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
+  return lagosDateOf(new Date().toISOString());
+}
+
+/** The Lagos calendar date (fixed UTC+1) of an ISO timestamp, as YYYY-MM-DD. */
+export function lagosDateOf(iso: string): string {
+  return new Date(Date.parse(iso) + 60 * 60 * 1000).toISOString().slice(0, 10);
 }

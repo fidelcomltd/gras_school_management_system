@@ -1,6 +1,8 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Identity;
+using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Results;
@@ -8,6 +10,7 @@ using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
+using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Application.Pupils.Movement;
 
@@ -28,6 +31,9 @@ internal sealed class PupilMovementEngine(
     IClassLevelRepository classLevels,
     ITermRepository terms,
     IResultSetRepository resultSets,
+    IPupilStatusChangeRepository statusChanges,
+    ICurrentUser currentUser,
+    TimeProvider timeProvider,
     ISystemAuditSink auditSink)
 {
     /// <summary>The composed display name of each arm, keyed by arm id.</summary>
@@ -147,6 +153,55 @@ internal sealed class PupilMovementEngine(
             auditSink,
             cancellationToken,
             cohortNote: note);
+
+    /// <summary>
+    /// Appends the status-change row and its audit event, the same shape for a leave, a reactivation and an undo. The
+    /// row's arm is the arm joined, or else the arm left, so an undo knows which enrolment a leave closed.
+    /// </summary>
+    public async Task<Result> RecordStatusChangeAsync(
+        Pupil pupil,
+        PupilStatus fromStatus,
+        DateOnly effectiveDate,
+        string? reason,
+        Guid? fromArmId,
+        Guid? toArmId,
+        bool undo,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupil);
+
+        var actorId = currentUser.UserId is { } actorIdText && Guid.TryParse(actorIdText, out var parsedActorId) ? parsedActorId : (Guid?)null;
+        var row = PupilStatusChange.Create(
+            Guid.CreateVersion7(), pupil.Id, fromStatus, pupil.Status, effectiveDate, reason, toArmId ?? fromArmId, actorId, timeProvider.GetUtcNow());
+        if (row.IsFailure)
+        {
+            return Result.Failure(row.Error);
+        }
+
+        await statusChanges.AddAsync(row.Value, cancellationToken).ConfigureAwait(false);
+
+        // Codes and ids only: the reason is free text and may describe the child, so it stays on the status-change row.
+        await auditSink.RecordAsync(
+            Privileges.Pupil.StatusUpdate,
+            "pupil",
+            Id(pupil.Id),
+            metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["status"] = pupil.Status.ToString(),
+                ["effectiveDate"] = effectiveDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ["armId"] = toArmId is { } to ? Id(to) : null,
+                ["undo"] = undo,
+            },
+            actorAdminId: currentUser.UserId,
+            cancellationToken,
+            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["status"] = fromStatus.ToString(),
+                ["armId"] = fromArmId is { } from ? Id(from) : null,
+            }).ConfigureAwait(false);
+
+        return Result.Success();
+    }
 
     /// <summary>A date is refused when it is after today in Lagos, the date the screens offer: rosters read the enrolment open now (human ruling 2026-09-25).</summary>
     public static Result RefuseIfFuture(DateOnly effectiveDate, DateOnly today) =>

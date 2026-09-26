@@ -59,6 +59,9 @@ public interface IEnrolmentRepository
     /// </summary>
     Task<IReadOnlyList<Enrolment>> ListByPupilReadOnlyAsync(Guid pupilId, CancellationToken cancellationToken);
 
+    /// <summary>Loads one enrolment TRACKED, for a command that will change it. <see langword="null"/> when none has that id.</summary>
+    Task<Enrolment?> FindTrackedByIdAsync(Guid enrolmentId, CancellationToken cancellationToken);
+
     /// <summary>
     /// The number of OPEN enrolments in <paramref name="armId"/>, excluding any pupil whose status
     /// is <see cref="Domain.Pupils.PupilStatus.Pending"/> — spec 07 §6.5.14's pending-exclusion

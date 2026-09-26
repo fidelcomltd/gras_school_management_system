@@ -24,7 +24,8 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
     private const string CsrfUrl = "/api/v1/auth/csrf";
     private const string SignInUrl = "/api/v1/auth/sign-in";
 
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    // The server's date, which is Lagos (UTC+1): the UTC date lags it by a day from 23:00 UTC.
+    private static readonly DateOnly Today = Application.Weekly.WeeklyProjection.LagosToday(DateTimeOffset.UtcNow);
     private static readonly DateOnly SessionStart = Today.AddDays(-60);
 
     // ---- Transfer ------------------------------------------------------------------------------
@@ -228,24 +229,104 @@ public sealed class PupilStatusAndTransferEndpointsTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Graduate_ClosesAtTheSessionEnd_AndReactivatingNeedsAReason()
+    public async Task Graduate_ClosesOnTheEffectiveDate_AndReactivatingNeedsAReason()
     {
         RequireDatabase();
         var world = await SeedWorldAsync();
         var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
         var jar = await SignInAsSuperAdminAsync();
+        var graduatedOn = Today.AddDays(-3);
 
-        var graduate = await PostAsync($"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Graduated", reason = "Completed Primary 6." });
+        var graduate = await PostAsync(
+            $"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Graduated", effectiveDate = graduatedOn, reason = "Completed Primary 6." });
 
         graduate.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await ReadAsync<PupilMovementOutcomeDto>(graduate);
-        body.EffectiveDate.ShouldBe(world.SessionEnd);
-        body.EnrolmentClosesOn.ShouldBe(world.SessionEnd);
+        (await ReadAsync<PupilMovementOutcomeDto>(graduate)).EnrolmentClosesOn.ShouldBe(graduatedOn);
 
         var withoutReason = await PostAsync(
             $"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Active", effectiveDate = Today, armId = world.ArmA.ToString() });
-
         withoutReason.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        // Reversible from the day after, rather than only after the session ends.
+        var reactivate = await PostAsync(
+            $"/api/v1/pupils/{pupilId}/status", jar,
+            new { targetStatus = "Active", effectiveDate = graduatedOn.AddDays(1), armId = world.ArmA.ToString(), reason = "Repeating Primary 6." });
+        reactivate.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Undo_OnTheSameDay_ReopensTheEnrolment_AndCannotBeRepeated()
+    {
+        RequireDatabase();
+        var world = await SeedWorldAsync();
+        var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
+        var set = await SeedResultSetAsync(world.ArmA, world.TermId, ResultSetState.Draft);
+        var jar = await SignInAsSuperAdminAsync();
+        await PostAsync($"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Withdrawn", effectiveDate = Today, reason = "Wrong pupil." });
+
+        var undo = await PostAsync($"/api/v1/pupils/{pupilId}/status/undo", jar, new { reason = "Withdrew the wrong child." });
+
+        undo.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<PupilMovementOutcomeDto>(undo)).Pupil.Status.ShouldBe(PupilStatus.Active);
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var enrolments = await context.Enrolments.AsNoTracking().Where(e => e.PupilId == pupilId)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            enrolments.Count.ShouldBe(1);
+            enrolments[0].EffectiveTo.ShouldBeNull();
+            var changes = await context.PupilStatusChanges.AsNoTracking().Where(c => c.PupilId == pupilId)
+                .OrderBy(c => c.ChangedAtUtc).ToListAsync(TestContext.Current.CancellationToken);
+            changes.Select(c => c.ToStatus).ShouldBe([PupilStatus.Withdrawn, PupilStatus.Active]);
+            changes[1].Reason.ShouldBe("Undone: Withdrew the wrong child.");
+            var resultSet = await context.ResultSets.AsNoTracking().SingleAsync(r => r.Id == set, TestContext.Current.CancellationToken);
+            resultSet.NeedsRecompute.ShouldBeTrue();
+        }
+
+        var again = await PostAsync($"/api/v1/pupils/{pupilId}/status/undo", jar, new { reason = (string?)null });
+        again.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await again.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("pupil.status_undo_unavailable");
+    }
+
+    [Fact]
+    public async Task Undo_ByAnArmScopedHolder_OfTheirOwnWithdrawal_Succeeds()
+    {
+        RequireDatabase();
+        var world = await SeedWorldAsync();
+        var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
+        var jar = await SignInWithArmGrantAsync(Privileges.Pupil.StatusUpdate, world.SessionId, world.ArmA);
+
+        var withdraw = await PostAsync(
+            $"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Withdrawn", effectiveDate = Today, reason = "Wrong pupil." });
+        withdraw.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // A leaver has no open enrolment, so scope is judged on the arm being reopened.
+        var undo = await PostAsync($"/api/v1/pupils/{pupilId}/status/undo", jar, new { reason = (string?)null });
+
+        undo.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Undo_OfAChangeRecordedOnAnEarlierDay_IsRefused()
+    {
+        RequireDatabase();
+        var world = await SeedWorldAsync();
+        var pupilId = await SeedActivePupilAsync(world.ArmA, "Okafor");
+        var jar = await SignInAsSuperAdminAsync();
+        await PostAsync($"/api/v1/pupils/{pupilId}/status", jar, new { targetStatus = "Withdrawn", effectiveDate = Today, reason = "Left." });
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE pupil_status_changes SET changed_at_utc = changed_at_utc - interval '2 days' WHERE pupil_id = {pupilId}",
+                TestContext.Current.CancellationToken);
+        }
+
+        var undo = await PostAsync($"/api/v1/pupils/{pupilId}/status/undo", jar, new { reason = (string?)null });
+
+        undo.StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
 
     [Fact]
