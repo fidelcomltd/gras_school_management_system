@@ -93,14 +93,23 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
 
-        var builder = assetId.EndsWith(CloudinaryImageStore.RawAssetSuffix, StringComparison.Ordinal)
-            ? _cloudinary.Api.Url.ResourceType("raw")
-            : _cloudinary.Api.UrlImgUp;
-        var url = builder
-            .Secure(true)
-            .Type("authenticated")
-            .Signed(true)
-            .BuildUrl(assetId);
+        // A PDF is fetched through the signed download API, not a delivery URL: Cloudinary's account-level "PDF and ZIP
+        // delivery" restriction answers a signed delivery URL for a PDF with 401 even for a raw resource (seen on
+        // staging, 2026-09-26). The API endpoint authenticates with the secret and is not subject to it. The link
+        // lives five minutes and never leaves this process.
+        var url = assetId.EndsWith(CloudinaryImageStore.RawAssetSuffix, StringComparison.Ordinal)
+            ? _cloudinary.DownloadPrivate(
+                assetId,
+                attachment: true,
+                format: string.Empty,
+                type: "authenticated",
+                expiresAt: DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+                resourceType: "raw")
+            : _cloudinary.Api.UrlImgUp
+                .Secure(true)
+                .Type("authenticated")
+                .Signed(true)
+                .BuildUrl(assetId);
 
         using var client = _httpClientFactory.CreateClient(HttpClientName);
         using var response = await client
@@ -111,8 +120,11 @@ internal sealed class CloudinaryGateway : ICloudinaryGateway
         {
             // Matches ISchoolImageStore.OpenAsync's contract: assets are never deleted, so a
             // non-success here means the id was never ours — a defect, not a branch to handle.
+            // Cloudinary names its reason in x-cld-error ("deny or ACL failure", "Resource not found"); without it a
+            // 401 cannot be told apart from a bad signature, a restriction or a wrong resource type.
+            var reason = response.Headers.TryGetValues("x-cld-error", out var values) ? $" ({string.Join("; ", values)})" : string.Empty;
             throw new InvalidOperationException(
-                $"Cloudinary returned {(int)response.StatusCode} for asset '{assetId}'.");
+                $"Cloudinary returned {(int)response.StatusCode} for asset '{assetId}'{reason}.");
         }
 
         // Buffered rather than handed back as the live network stream: the caller may outlive this
