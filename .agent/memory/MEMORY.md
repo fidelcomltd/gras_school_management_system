@@ -5,3 +5,4 @@
 - [Production hosting and NDPA](production-hosting-and-ndpa.md) — app + Postgres on one Namecheap Pulsar VPS, Cloudinary for files; NDPA relaxed, don't gate on it
 - [Probe WSL before declaring a tool absent](probe-wsl-before-declaring-a-tool-absent.md) — Bash is Git Bash, not WSL; check across the Windows/WSL boundary with a functional probe (`localhost`, `127.0.0.1`, `[::1]` — which one answers differs per machine) before reporting Docker or a port missing
 - [Two dev machines](two-dev-machines.md) — the project lead works from two Windows machines; repo changes must work on both, machine-local setup is redone per machine, pull before a session
+- [Never merge to main without consent](never-merge-to-main-without-consent.md) — ask before anything touches main; merging finished branches into staging is allowed (pushing staging is still blocked for agents)
