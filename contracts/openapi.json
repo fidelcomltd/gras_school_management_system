@@ -20780,7 +20780,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Display only: `[\"Super Admin\"]` for a super admin, else the names of the roles behind the active assignments,\nordered by name. Never an authorization input; IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges is.",
+            "description": "Display only: `[\"Super Admin\"]` for a super admin, else the names of the roles behind the active assignments,\nordered by name. Never an authorization input; `effectivePrivileges` is.",
             "example": [
               "Super Admin"
             ]

@@ -39,7 +39,9 @@ export function useSignOut() {
     mutationFn: () => apiPost(SIGN_OUT_PATH, undefined),
     onSuccess: () => {
       terminateSession();
-      queryClient.removeQueries({ queryKey: [AuthKeys.Me] });
+      // Everything, not just `me`: the next account to sign in on this tab must never be served the last one's cached
+      // pupils, search results or records, which its own privileges might not cover.
+      queryClient.clear();
     },
   });
 }

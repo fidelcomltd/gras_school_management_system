@@ -14,7 +14,7 @@ public sealed class RoleAssignmentRoleNamesTests
     [Fact]
     public async Task ASuperAdmin_IsShownAsSuperAdmin_WithoutReadingAssignments()
     {
-        var names = await new RoleAssignmentRoleNames(_assignments, _roles)
+        var names = await new RoleAssignmentRoleNames(new ActiveRoleAssignmentLoader(_assignments, _roles))
             .GetActiveRoleNamesAsync(Guid.NewGuid(), isSuperAdmin: true, TestContext.Current.CancellationToken);
 
         names.ShouldBe([RoleAssignmentRoleNames.SuperAdminName]);
@@ -36,10 +36,28 @@ public sealed class RoleAssignmentRoleNamesTests
         _roles.FindReadOnlyByIdAsync(teacher.Id, Arg.Any<CancellationToken>()).Returns(teacher);
         _roles.FindReadOnlyByIdAsync(bursar.Id, Arg.Any<CancellationToken>()).Returns(bursar);
 
-        var names = await new RoleAssignmentRoleNames(_assignments, _roles)
+        var names = await new RoleAssignmentRoleNames(new ActiveRoleAssignmentLoader(_assignments, _roles))
             .GetActiveRoleNamesAsync(accountId, isSuperAdmin: false, TestContext.Current.CancellationToken);
 
         names.ShouldBe(["Bursar", "Class Teacher"]);
+    }
+
+    [Fact]
+    public async Task TheLoader_ReadsAnAccountsAssignmentsOncePerScope_HoweverManyTimesItIsAsked()
+    {
+        var accountId = Guid.NewGuid();
+        var teacher = Role.Create(Guid.NewGuid(), "Class Teacher", null, [Privileges.Pupil.View]).Value;
+        _assignments.ListActiveForAccountReadOnlyAsync(accountId, Arg.Any<CancellationToken>())
+            .Returns([Assignment(accountId, teacher.Id)]);
+        _roles.FindReadOnlyByIdAsync(teacher.Id, Arg.Any<CancellationToken>()).Returns(teacher);
+        var loader = new ActiveRoleAssignmentLoader(_assignments, _roles);
+
+        await loader.LoadAsync(accountId, TestContext.Current.CancellationToken);
+        var again = await loader.LoadAsync(accountId, TestContext.Current.CancellationToken);
+
+        again.Count.ShouldBe(1);
+        await _assignments.Received(1).ListActiveForAccountReadOnlyAsync(accountId, Arg.Any<CancellationToken>());
+        await _roles.Received(1).FindReadOnlyByIdAsync(teacher.Id, Arg.Any<CancellationToken>());
     }
 
     private static RoleAssignment Assignment(Guid accountId, Guid roleId) =>

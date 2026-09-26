@@ -1,10 +1,9 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
-import { useQuery } from '@tanstack/react-query';
 import { FileText, Search, User } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { apiGet } from '@/api/client';
 import { paths } from '@/app/router/paths';
+import { usePupilSearch } from '@/features/pupils/api';
 import { pupilName } from '@/features/pupils/types';
 import { hasPrivilege, type AuthSession } from '@/lib/auth/auth-session';
 import { visibleNavGroups } from './nav-config';
@@ -43,6 +42,8 @@ export function GlobalSearch({ session }: { session: AuthSession }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Not while a modal is open: focus belongs inside it, and the input behind it is unreachable.
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         inputRef.current?.focus();
@@ -52,12 +53,9 @@ export function GlobalSearch({ session }: { session: AuthSession }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const pupils = useQuery({
-    queryKey: ['search.pupils', debounced],
-    queryFn: ({ signal }) => apiGet('/api/v1/pupils', { search: debounced, pageSize: 6 }, { signal }),
-    enabled: canSeePupils && debounced.length >= MIN_PUPIL_TERM,
-    staleTime: 30_000,
-  });
+  const pupils = usePupilSearch(debounced, canSeePupils && debounced.length >= MIN_PUPIL_TERM);
+  // Pupil results show only for the term actually in the box: never the previous term's during the debounce.
+  const pupilsCurrent = debounced === trimmed && trimmed.length >= MIN_PUPIL_TERM;
 
   const results = useMemo<Result[]>(() => {
     if (!trimmed) return [];
@@ -68,7 +66,7 @@ export function GlobalSearch({ session }: { session: AuthSession }) {
       .slice(0, 5)
       .map(({ item, group }) => ({ key: `page:${item.to}`, kind: 'page', label: item.label, detail: group ?? 'Page', to: item.to }));
     const found: Result[] =
-      debounced.length >= MIN_PUPIL_TERM
+      pupilsCurrent
         ? (pupils.data?.items ?? []).map((pupil) => ({
             key: `pupil:${pupil.id}`,
             kind: 'pupil',
@@ -77,8 +75,9 @@ export function GlobalSearch({ session }: { session: AuthSession }) {
             to: paths.pupilDetail(pupil.id),
           }))
         : [];
-    return [...found, ...pages];
-  }, [trimmed, debounced, session, pupils.data]);
+    // Pages first: they are known at once, so the pupils arriving later append below and never move the highlight.
+    return [...pages, ...found];
+  }, [trimmed, pupilsCurrent, session, pupils.data]);
 
   const searching = canSeePupils && trimmed.length >= MIN_PUPIL_TERM && (debounced !== trimmed || pupils.isFetching);
 
@@ -115,8 +114,13 @@ export function GlobalSearch({ session }: { session: AuthSession }) {
       <Autocomplete.Portal>
         <Autocomplete.Positioner sideOffset={4} className="z-50 w-[var(--anchor-width)]">
           <Autocomplete.Popup className="max-h-80 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg">
+            {canSeePupils && pupils.isError && pupilsCurrent ? (
+              <output className="block px-2 py-2 text-sm text-destructive">
+                Pupil search failed. Check the connection and try again.
+              </output>
+            ) : null}
             <Autocomplete.Empty className="px-2 py-2 text-sm text-muted-foreground empty:hidden">
-              {trimmed ? (searching ? 'Searching…' : 'No matches.') : null}
+              {trimmed && !(pupils.isError && pupilsCurrent) ? (searching ? 'Searching…' : 'No matches.') : null}
             </Autocomplete.Empty>
             <Autocomplete.List>
               {(result: Result) => (

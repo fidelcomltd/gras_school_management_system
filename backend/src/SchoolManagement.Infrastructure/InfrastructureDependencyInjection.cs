@@ -125,6 +125,8 @@ public static class InfrastructureDependencyInjection
         // non-super-admin account — replaces SuperAdminFlagEffectivePrivilegeProvider (TASK-0003),
         // DELETED, not left registered behind a flag. See the class remarks.
         services.AddScoped<IEffectivePrivilegeProvider, RoleAssignmentEffectivePrivilegeProvider>();
+        // One load of an account's assignments and roles per request, shared by the two above.
+        services.AddScoped<ActiveRoleAssignmentLoader>();
         services.AddScoped<IAccountRoleNames, RoleAssignmentRoleNames>();
         services.AddScoped<IAuthorizationAuditSink, AuthorizationAuditSink>();
         // TASK-0059: the real implementation, resolving a pupil's arm from their open enrolment —

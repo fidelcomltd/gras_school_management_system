@@ -79,6 +79,16 @@ describe('shell header', () => {
     expect(searched).toBe('Okafor');
   });
 
+  it('says so when the pupil search fails, rather than claiming there is no such pupil', async () => {
+    server.use(http.get(apiUrl('/api/v1/pupils'), () => new HttpResponse(null, { status: 500 })));
+    const user = renderShell(session([], 'pupil.view'));
+
+    await user.type(screen.getByRole('combobox', { name: 'Search pupils and pages' }), 'Okafor');
+
+    expect(await screen.findByText('Pupil search failed. Check the connection and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('No matches.')).not.toBeInTheDocument();
+  });
+
   it('finds a page the caller can open, and never one it cannot', async () => {
     const user = renderShell(session([], 'settings.view'));
 

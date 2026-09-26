@@ -1,5 +1,4 @@
 using SchoolManagement.Application.Abstractions.Authorization;
-using SchoolManagement.Application.Abstractions.Security;
 
 namespace SchoolManagement.Infrastructure.Authorization;
 
@@ -7,7 +6,7 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// <see cref="IAccountRoleNames"/> over the same active assignments <see cref="RoleAssignmentEffectivePrivilegeProvider"/>
 /// grants from, so the header never names a role the account's privileges do not come from.
 /// </summary>
-internal sealed class RoleAssignmentRoleNames(IRoleAssignmentRepository assignments, IRoleRepository roles) : IAccountRoleNames
+internal sealed class RoleAssignmentRoleNames(ActiveRoleAssignmentLoader loader) : IAccountRoleNames
 {
     /// <summary>What a super admin is shown as: the flag, not a role assignment, is where their privileges come from.</summary>
     public const string SuperAdminName = "Super Admin";
@@ -21,16 +20,8 @@ internal sealed class RoleAssignmentRoleNames(IRoleAssignmentRepository assignme
             return [SuperAdminName];
         }
 
-        var active = await assignments.ListActiveForAccountReadOnlyAsync(accountId, cancellationToken).ConfigureAwait(false);
-        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var roleId in active.Select(assignment => assignment.RoleId).Distinct())
-        {
-            if (await roles.FindReadOnlyByIdAsync(roleId, cancellationToken).ConfigureAwait(false) is { } role)
-            {
-                names.Add(role.Name);
-            }
-        }
-
+        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+        var names = new SortedSet<string>(active.Select(pair => pair.Role.Name), StringComparer.OrdinalIgnoreCase);
         return [.. names];
     }
 }

@@ -20,8 +20,17 @@ export function UserMenu({ session }: { session: AuthSession }) {
   const signOut = useSignOut();
   const navigate = useNavigate();
 
+  const failure = signOut.error instanceof ApiError ? signOut.error.message : null;
+
   return (
-    <Menu.Root>
+    <div className="flex items-center gap-2">
+      {/* Outside the menu, so a failed sign-out stays visible after the menu closes: the session is still live. */}
+      {failure ? (
+        <p role="alert" title={failure} className="max-w-56 truncate text-xs text-destructive">
+          Sign out failed: {failure}
+        </p>
+      ) : null}
+      <Menu.Root>
       <Menu.Trigger
         aria-label={`Account: ${session.staffName}, ${roleLabel(session)}`}
         className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted"
@@ -54,14 +63,10 @@ export function UserMenu({ session }: { session: AuthSession }) {
               <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
               {signOut.isPending ? 'Signing out…' : 'Sign out'}
             </Menu.Item>
-            {signOut.error instanceof ApiError ? (
-              <p role="alert" className="px-2 pt-1 text-xs text-destructive">
-                {signOut.error.message}
-              </p>
-            ) : null}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
-    </Menu.Root>
+      </Menu.Root>
+    </div>
   );
 }

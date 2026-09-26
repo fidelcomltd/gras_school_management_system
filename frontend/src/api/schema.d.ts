@@ -3438,7 +3438,7 @@ export interface components {
             effectivePrivileges: components["schemas"]["EffectivePrivilegeDto"][];
             /**
              * @description Display only: `["Super Admin"]` for a super admin, else the names of the roles behind the active assignments,
-             *     ordered by name. Never an authorization input; IReadOnlyList&lt;EffectivePrivilegeDto&gt; AuthSessionResponse.EffectivePrivileges is.
+             *     ordered by name. Never an authorization input; `effectivePrivileges` is.
              * @example [
              *       "Super Admin"
              *     ]

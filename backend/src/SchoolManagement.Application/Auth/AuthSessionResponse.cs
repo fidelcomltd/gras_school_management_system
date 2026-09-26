@@ -22,7 +22,7 @@ namespace SchoolManagement.Application.Auth;
 /// </param>
 /// <param name="RoleNames">
 /// Display only: <c>["Super Admin"]</c> for a super admin, else the names of the roles behind the active assignments,
-/// ordered by name. Never an authorization input; <see cref="EffectivePrivileges"/> is.
+/// ordered by name. Never an authorization input; <c>effectivePrivileges</c> is.
 /// </param>
 /// <param name="SessionExpiresAt">
 /// The sooner of the session's idle and absolute deadlines, recomputed on every response.
