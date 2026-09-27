@@ -100,6 +100,8 @@ describe('AdminsListScreen — create admin reveals the temporary password exact
           mustChangePassword: true,
           lastLoginAtUtc: null,
           createdAtUtc: '2026-09-08T00:00:00+00:00',
+          rolesHeld: [],
+          scopeSummary: '',
         };
         return HttpResponse.json(
           { ...created, temporaryPassword: TEMP_PASSWORD },

@@ -92,8 +92,9 @@ export function useUpdateAdmin() {
  * Gated `admin.suspend` / `admin.deactivate` (data-dependent, resolved by
  * the caller — see `AdminDetailScreen`'s `STATUS_TARGETS`). Patches the
  * detail cache AND every list page's matching row directly from the
- * response (AC: "reflects the new status without a full refetch") since
- * `AdminAccountDetailDto`/`AdminAccountSummaryDto` share the same fields.
+ * response (AC: "reflects the new status without a full refetch"). The
+ * detail shape lacks the list's roles columns, so the row is merged, not
+ * replaced; deactivation revokes every assignment (spec 6.1.10), so they clear.
  */
 export function useChangeAdminStatus() {
   const queryClient = useQueryClient();
@@ -109,7 +110,13 @@ export function useChangeAdminStatus() {
           ...old,
           pages: old.pages.map((page) => ({
             ...page,
-            items: page.items.map((item) => (item.id === account.id ? account : item)),
+            items: page.items.map((item) =>
+              item.id !== account.id
+                ? item
+                : account.status === 'Deactivated'
+                  ? { ...item, ...account, rolesHeld: [], scopeSummary: '' }
+                  : { ...item, ...account },
+            ),
           })),
         };
       });

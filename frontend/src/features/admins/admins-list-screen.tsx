@@ -88,6 +88,9 @@ export function AdminsListScreen() {
                 <span className="flex flex-col">
                   <span className="font-medium text-foreground">{admin.staffName}</span>
                   <span className="text-xs text-muted-foreground">{admin.email}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {admin.rolesHeld.length === 0 ? 'No roles yet' : `${admin.rolesHeld.join(', ')} · ${admin.scopeSummary}`}
+                  </span>
                 </span>
                 <span className="text-muted-foreground">{admin.status}</span>
               </Link>

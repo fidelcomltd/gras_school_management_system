@@ -3607,7 +3607,11 @@ export interface components {
          *       "isSuperAdmin": false,
          *       "mustChangePassword": false,
          *       "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "rolesHeld": [
+         *         "Class Teacher"
+         *       ],
+         *       "scopeSummary": "2 classes: Primary 2A, Primary 5B"
          *     }
          */
         AdminAccountSummaryDto: {
@@ -3655,6 +3659,18 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             createdAtUtc: string;
+            /**
+             * @description Distinct names of the roles the account actively holds, sorted (spec 6.1.8; TASK-0046).
+             * @example [
+             *       "Class Teacher"
+             *     ]
+             */
+            rolesHeld: string[];
+            /**
+             * @description `School-wide`, or the class count and the first two class names; empty when nothing is held.
+             * @example 2 classes: Primary 2A, Primary 5B
+             */
+            scopeSummary: string;
         };
         /**
          * @description What an admission still lacks (spec 6.5.12): blocking items stop approval; chased items are tracked after the pupil is
@@ -5652,7 +5668,11 @@ export interface components {
          *           "isSuperAdmin": false,
          *           "mustChangePassword": false,
          *           "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-         *           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "rolesHeld": [
+         *             "Class Teacher"
+         *           ],
+         *           "scopeSummary": "2 classes: Primary 2A, Primary 5B"
          *         }
          *       ],
          *       "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
@@ -5671,7 +5691,11 @@ export interface components {
              *         "isSuperAdmin": false,
              *         "mustChangePassword": false,
              *         "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-             *         "createdAtUtc": "2026-08-03T09:30:00+00:00"
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "rolesHeld": [
+             *           "Class Teacher"
+             *         ],
+             *         "scopeSummary": "2 classes: Primary 2A, Primary 5B"
              *       }
              *     ]
              */
@@ -12013,7 +12037,12 @@ export interface components {
          *       ],
          *       "grantedBy": "0192f0c4-d183-7f60-e472-8030af1b6295",
          *       "status": "Active",
-         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "roleName": "Class Teacher",
+         *       "sessionName": "2026/2027",
+         *       "armNames": [
+         *         "Primary 2A"
+         *       ]
          *     }
          */
         RoleAssignmentDto: {
@@ -12061,6 +12090,23 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             createdAtUtc: string;
+            /**
+             * @description The role's name (TASK-0046).
+             * @example Class Teacher
+             */
+            roleName: string;
+            /**
+             * @description The session's name; `null` exactly when SessionId is.
+             * @example 2026/2027
+             */
+            sessionName: null | string;
+            /**
+             * @description The classes' display names, in the order of ArmIds.
+             * @example [
+             *       "Primary 2A"
+             *     ]
+             */
+            armNames: string[];
         };
         /**
          * @description Lifecycle of a RoleAssignment (spec 6.1.5).

@@ -29,7 +29,9 @@ internal sealed class CreateRoleAssignmentCommandHandler(
     IArmRepository arms,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
-    ISystemAuditSink auditSink)
+    ISystemAuditSink auditSink,
+    AssignmentNames assignmentNames,
+    TimeProvider timeProvider)
     : IRequestHandler<CreateRoleAssignmentCommand, Result<RoleAssignmentDto>>
 {
     private const string EntityType = "role_assignment";
@@ -214,6 +216,10 @@ internal sealed class CreateRoleAssignmentCommandHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(RoleAssignmentMapper.ToDto(assignment));
+        // CreatedAtUtc is stamped by the auditing interceptor at SaveChanges, after this DTO is built, so the response
+        // carries the same clock's reading rather than a default (TASK-0046; the TASK-0086 approach).
+        var names = await assignmentNames.LoadAsync([assignment], cancellationToken).ConfigureAwait(false);
+        var dto = RoleAssignmentMapper.ToDto(assignment, names);
+        return Result.Success(dto.CreatedAtUtc == default ? dto with { CreatedAtUtc = timeProvider.GetUtcNow() } : dto);
     }
 }
