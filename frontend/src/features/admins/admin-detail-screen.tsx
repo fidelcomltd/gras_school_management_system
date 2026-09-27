@@ -9,6 +9,7 @@ import { ChangeStatusDialog } from './components/change-status-dialog';
 import { EditAdminDialog } from './components/edit-admin-dialog';
 import { ResetPasswordDialog } from './components/reset-password-dialog';
 import type { AdminAccountStatus } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /** The status an account of each current status could legally move to. */
 const STATUS_TARGETS: Record<AdminAccountStatus, AdminAccountStatus[]> = {
@@ -33,7 +34,7 @@ export function AdminDetailScreen() {
   const [showReset, setShowReset] = useState(false);
 
   if (admin.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading admin account…</output>;
+    return <LoadingState label="Loading admin account…" />;
   }
 
   if (admin.isError) {

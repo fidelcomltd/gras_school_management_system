@@ -1,3 +1,4 @@
+import { CalendarRange } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -7,6 +8,9 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useSessions } from './api';
 import { CreateSessionDialog } from './components/create-session-dialog';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * `/sessions` — the school-year list (spec 6.3.8), newest first. Four
@@ -20,7 +24,7 @@ export function SessionsListScreen() {
   const canCreate = !!me.data && hasPrivilege(me.data, 'session.create');
 
   if (sessions.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading sessions…</output>;
+    return <LoadingState label="Loading sessions…" />;
   }
 
   if (sessions.isError) {
@@ -50,7 +54,7 @@ export function SessionsListScreen() {
       </header>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No sessions yet.</p>
+        <EmptyState icon={CalendarRange} title="No sessions yet." />
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((session) => (
@@ -68,14 +72,7 @@ export function SessionsListScreen() {
       )}
 
       {sessions.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void sessions.fetchNextPage()}
-          disabled={sessions.isFetchingNextPage}
-        >
-          {sessions.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={sessions.isFetchingNextPage} onClick={() => void sessions.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateSessionDialog onClose={() => setShowCreate(false)} /> : null}

@@ -9,6 +9,7 @@ import { useArm, useDeleteArm } from './api';
 import { EditArmDialog } from './components/edit-arm-dialog';
 import { FormTeacherLabel } from './components/form-teacher-label';
 import { useFormTeacherNames } from './hooks/use-form-teacher-names';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /**
  * `/arms/:id` (spec 6.4.5, 6.4.7). Four required states (CONVENTIONS.md §11)
@@ -37,7 +38,7 @@ export function ArmDetailScreen() {
   );
 
   if (arm.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading arm…</output>;
+    return <LoadingState label="Loading arm…" />;
   }
 
   if (arm.isError) {

@@ -1,3 +1,4 @@
+import { UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -10,6 +11,9 @@ import { useAdmissionsQueue } from '../api';
 import type { AdmissionQueueRow } from '../types';
 import { ApproveAdmissionDialog } from './approve-admission-dialog';
 import { DeclineAdmissionDialog } from './decline-admission-dialog';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 function pupilName(row: AdmissionQueueRow): string {
   return [row.surname, row.firstName, row.middleName].filter(Boolean).join(' ');
@@ -37,7 +41,7 @@ export function AdmissionQueueList() {
   const items = admissions.data?.pages.flatMap((page) => page.items) ?? [];
 
   if (admissions.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading admissions queue…</output>;
+    return <LoadingState label="Loading admissions queue…" />;
   }
 
   if (admissions.isError) {
@@ -67,7 +71,7 @@ export function AdmissionQueueList() {
     return (
       <div className="flex flex-col gap-4">
         {newAdmission}
-        <p className="text-sm text-muted-foreground">No pending applications.</p>
+        <EmptyState icon={UserPlus} title="No pending applications." />
       </div>
     );
   }
@@ -116,14 +120,7 @@ export function AdmissionQueueList() {
       </ul>
 
       {admissions.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void admissions.fetchNextPage()}
-          disabled={admissions.isFetchingNextPage}
-        >
-          {admissions.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={admissions.isFetchingNextPage} onClick={() => void admissions.fetchNextPage()} />
       ) : null}
 
       {declining ? <DeclineAdmissionDialog pupil={declining} onClose={() => setDeclining(null)} /> : null}

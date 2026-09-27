@@ -1,3 +1,4 @@
+import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -9,6 +10,7 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { usePinBatches } from './api';
 import { GenerateBatchDialog } from './components/generate-batch-dialog';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/pins` — result-checking pin batches for a session (spec 6.8). */
 export function PinsScreen() {
@@ -25,7 +27,7 @@ export function PinsScreen() {
     if (batches.isPending) return <LoadingState label="Loading pin batches…" />;
     if (batches.isError) return <QueryErrorState error={batches.error} onRetry={() => void batches.refetch()} />;
     const items = batches.data.pages.flatMap((page) => page.items);
-    if (items.length === 0) return <p className="text-sm text-muted-foreground">No pins generated for this session yet.</p>;
+    if (items.length === 0) return <EmptyState icon={KeyRound} title="No pins generated for this session yet." />;
     return (
       <ul className="flex flex-col gap-2">
         {items.map((batch) => (

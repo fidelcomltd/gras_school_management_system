@@ -54,7 +54,7 @@ function renderScreen() {
 async function chooseAndCheck(user: ReturnType<typeof renderScreen>['user'], body: Report) {
   server.use(http.post(apiUrl('/api/v1/pupils/import/validate'), () => HttpResponse.json(body)));
   const file = new File(['xlsx'], 'register.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  await user.upload(screen.getByLabelText('Filled-in template (.xlsx)'), file);
+  await user.upload(screen.getByLabelText('Filled-in template (.xlsx)', { selector: 'input' }), file);
   await user.click(screen.getByRole('button', { name: 'Check file' }));
 }
 
@@ -169,7 +169,7 @@ describe('ImportPupilsScreen', () => {
       ),
     );
     const { user } = renderScreen();
-    await user.upload(screen.getByLabelText('Filled-in template (.xlsx)'), new File(['x'], 'bad.xlsx'));
+    await user.upload(screen.getByLabelText('Filled-in template (.xlsx)', { selector: 'input' }), new File(['x'], 'bad.xlsx'));
     await user.click(screen.getByRole('button', { name: 'Check file' }));
 
     expect(await screen.findByText('The file has no Surname column. Use the headers from the template.')).toBeInTheDocument();

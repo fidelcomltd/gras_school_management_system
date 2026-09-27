@@ -1,8 +1,10 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '@/api/schema';
 import { useSaveTraitRatings } from '../api-records';
 import { isEditable } from '../types';
 import { LockNotice, SaveBar } from './save-bar';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 type TraitRatingSheetDto = components['schemas']['TraitRatingSheetDto'];
 type Draft = Record<string, Record<string, string>>;
@@ -19,7 +21,7 @@ export function TraitRatingsEditor({ sheet, canEdit }: { sheet: TraitRatingSheet
   const state = sheet.resultSet?.state;
   const editable = canEdit && isEditable(state);
 
-  if (sheet.rows.length === 0) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (sheet.rows.length === 0) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   return (
     <div className="flex flex-col gap-5">

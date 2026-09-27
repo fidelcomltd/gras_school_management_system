@@ -83,7 +83,7 @@ public sealed class PupilRecordTests
         var now = new DateTimeOffset(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
         var document = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.BirthCertificate);
 
-        document.AttachFile("asset-1", "application/pdf", 1024, now, today, "admin-1").IsSuccess.ShouldBeTrue();
+        document.AttachFile("asset-1", "application/pdf", 1024, "cert.pdf", now, today, "admin-1").IsSuccess.ShouldBeTrue();
         document.Received.ShouldBeTrue();
         document.ReceivedDate.ShouldBe(today);
         document.Apply(received: false, null, null, null, today, "admin-1").Error.Code.ShouldBe("document.file_attached");
@@ -95,7 +95,35 @@ public sealed class PupilRecordTests
         var other = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.Other);
         other.CheckAttach().Error.Code.ShouldBe("document.other_label_required");
         other.Apply(received: true, null, null, "Baptism card", today, "admin-1").IsSuccess.ShouldBeTrue();
-        other.AttachFile("asset-2", "image/jpeg", 2048, now, today, "admin-1").IsSuccess.ShouldBeTrue();
+        other.AttachFile("asset-2", "image/jpeg", 2048, null, now, today, "admin-1").IsSuccess.ShouldBeTrue();
         other.Apply(received: true, null, null, null, today, "admin-1").Error.Code.ShouldBe("document.other_label_required");
+    }
+
+    [Theory]
+    [InlineData(@"C:\fakepath\Birth Cert.pdf", "Birth Cert.pdf")]
+    [InlineData("photos/IMG_2231.jpg", "IMG_2231.jpg")]
+    [InlineData("  scan\u0000\u0007.pdf  ", "scan.pdf")]
+    [InlineData("   ", null)]
+    [InlineData(null, null)]
+    public void Document_KeepsOnlyTheBaseNameOfTheUploadedFile_Cleaned(string? raw, string? kept)
+    {
+        var document = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.BirthCertificate);
+
+        document.AttachFile("asset", "application/pdf", 10, raw, DateTimeOffset.UnixEpoch, new DateOnly(2026, 9, 27), "admin-1");
+
+        document.FileName.ShouldBe(kept);
+    }
+
+    [Fact]
+    public void Document_ALongFileName_IsShortenedKeepingItsExtension()
+    {
+        var document = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.BirthCertificate);
+
+        document.AttachFile("asset", "application/pdf", 10, new string('a', 300) + ".pdf", DateTimeOffset.UnixEpoch, new DateOnly(2026, 9, 27), null);
+
+        document.FileName!.Length.ShouldBe(PupilDocument.FileNameMaxLength);
+        document.FileName.ShouldEndWith(".pdf");
+        document.RemoveFile();
+        document.FileName.ShouldBeNull();
     }
 }

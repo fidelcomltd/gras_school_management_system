@@ -44,7 +44,8 @@ internal sealed class GetPupilPhotoQueryValidator : AbstractValidator<GetPupilPh
 /// <param name="PupilId">From the route.</param>
 /// <param name="DocumentType">From the route.</param>
 /// <param name="FileBytes">The uploaded file.</param>
-public sealed record UploadPupilDocumentFileCommand(Guid PupilId, PupilDocumentType DocumentType, ReadOnlyMemory<byte> FileBytes)
+/// <param name="FileName">The name it had on the uploader's device, kept for display only.</param>
+public sealed record UploadPupilDocumentFileCommand(Guid PupilId, PupilDocumentType DocumentType, ReadOnlyMemory<byte> FileBytes, string? FileName)
     : ICommand<Result<PupilDocumentListDto>>;
 
 /// <summary>Enum member and a non-empty body; the processor owns the rest.</summary>
@@ -242,7 +243,7 @@ internal sealed class UploadPupilDocumentFileHandler(
         var assetId = await store.PutAsync(scan.Bytes, scan.ContentType, cancellationToken).ConfigureAwait(false);
         var now = PupilFiles.StoredInstant(timeProvider.GetUtcNow());
         var attached = document.AttachFile(
-            assetId, scan.ContentType, scan.Bytes.Length, now, Weekly.WeeklyProjection.LagosToday(now), currentUser.UserId);
+            assetId, scan.ContentType, scan.Bytes.Length, request.FileName, now, Weekly.WeeklyProjection.LagosToday(now), currentUser.UserId);
         if (attached.IsFailure)
         {
             return Result.Failure<PupilDocumentListDto>(attached.Error);

@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -10,6 +11,8 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { usePupils } from './api';
 import { CreatePupilDialog } from './components/create-pupil-dialog';
 import { PUPIL_STATUSES, pupilName, type PupilsFilters } from './types';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const ALL = 'all';
 const STATUS_ITEMS = [{ value: ALL, label: 'All statuses' }, ...PUPIL_STATUSES.map((status) => ({ value: status, label: status }))];
@@ -88,9 +91,11 @@ export function PupilsListScreen() {
       ) : (
         <>
           {pupils.data.pages[0]?.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {filters.search || filters.status ? 'No pupils match these filters.' : 'No pupils yet.'}
-            </p>
+            <EmptyState
+              icon={Users}
+              title={filters.search || filters.status ? 'No pupils match these filters.' : 'No pupils yet.'}
+              description={filters.search || filters.status ? 'Try a different name, number or status.' : undefined}
+            />
           ) : (
             <ul className="flex flex-col gap-2">
               {pupils.data.pages
@@ -112,9 +117,7 @@ export function PupilsListScreen() {
           )}
 
           {pupils.hasNextPage ? (
-            <Button variant="outline" size="sm" onClick={() => void pupils.fetchNextPage()} disabled={pupils.isFetchingNextPage}>
-              {pupils.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </Button>
+            <LoadMoreButton loading={pupils.isFetchingNextPage} onClick={() => void pupils.fetchNextPage()} />
           ) : null}
         </>
       )}

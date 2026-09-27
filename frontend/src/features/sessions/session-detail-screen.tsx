@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/http';
 import { useSession } from './api';
 import { EditSessionDialog } from './components/edit-session-dialog';
 import { TermCard } from './components/term-card';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /**
  * `/sessions/:id` — a session's own fields plus its three terms (spec 6.3.8,
@@ -24,7 +25,7 @@ export function SessionDetailScreen() {
   const [showEdit, setShowEdit] = useState(false);
 
   if (session.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading session…</output>;
+    return <LoadingState label="Loading session…" />;
   }
 
   if (session.isError) {

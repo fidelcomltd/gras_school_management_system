@@ -176,13 +176,14 @@ public sealed class PupilRecordEndpoints : IEndpointModule
                     Guid pupilId, Domain.Pupils.PupilDocumentType documentType, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
                 {
                     var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
-                    return (await sender.SendAsync(new UploadPupilDocumentFileCommand(pupilId, documentType, bytes), cancellationToken))
+                    return (await sender.SendAsync(new UploadPupilDocumentFileCommand(pupilId, documentType, bytes, file.FileName), cancellationToken))
                         .Match(TypedResults.Ok);
                 }),
             "UploadPupilDocumentFile", "Attach or replace a checklist document's scan",
             "Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG " +
             "is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as " +
-            "received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). " +
+            "received today by the uploader. The file's own name is kept for display only (never the download name, never " +
+            "audited). The Other row needs its label first (`422 document.other_label_required`). " +
             "Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is " +
             "REQUIRED.")
             .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);

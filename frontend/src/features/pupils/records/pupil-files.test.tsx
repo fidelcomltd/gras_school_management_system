@@ -9,7 +9,7 @@ import { pupil } from '../test-fixtures';
 
 const TYPES = ['BirthCertificate', 'PassportPhotograph', 'PreviousSchoolResult', 'TransferLetter', 'Other'] as const;
 
-function documents(file: { contentType: string; sizeBytes: number; uploadedAtUtc: string } | null) {
+function documents(file: { contentType: string; sizeBytes: number; uploadedAtUtc: string; fileName: string | null } | null) {
   return {
     pupilId: 'pupil-1',
     items: TYPES.map((documentType) =>
@@ -56,7 +56,7 @@ describe('pupil photograph', () => {
 
     const { user } = renderScreen();
     expect(await screen.findByText('No photograph')).toBeInTheDocument();
-    await user.upload(screen.getByLabelText(/Upload photograph/), new File(['jpeg'], 'child.jpg', { type: 'image/jpeg' }));
+    await user.upload(screen.getByLabelText(/Upload photograph/, { selector: 'input' }), new File(['jpeg'], 'child.jpg', { type: 'image/jpeg' }));
 
     expect(await screen.findByRole('img', { name: /Photograph of/ })).toHaveAttribute('src', expect.stringMatching(/^data:image\/jpeg;base64,/));
     expect(received?.key).toBeTruthy();
@@ -72,7 +72,7 @@ describe('pupil photograph', () => {
     );
 
     const { user } = renderScreen();
-    await user.upload(await screen.findByLabelText(/Upload photograph/), new File(['big'], 'big.jpg', { type: 'image/jpeg' }));
+    await user.upload(await screen.findByLabelText(/Upload photograph/, { selector: 'input' }), new File(['big'], 'big.jpg', { type: 'image/jpeg' }));
 
     expect(await screen.findByText(reason)).toBeInTheDocument();
   });
@@ -113,7 +113,7 @@ describe('document scans', () => {
   it('attaches a scan, which ticks the row, and removing it keeps the tick', async () => {
     mockMe('pupil.view', 'pupil.document.manage');
     mockPupil(() => null);
-    const file = { contentType: 'application/pdf', sizeBytes: 2048, uploadedAtUtc: '2026-09-26T10:00:00+00:00' };
+    const file = { contentType: 'application/pdf', sizeBytes: 2048, uploadedAtUtc: '2026-09-26T10:00:00+00:00', fileName: 'cert.pdf' };
     server.use(
       http.get(apiUrl('/api/v1/pupils/:pupilId/documents'), () => HttpResponse.json(documents(null))),
       http.post(apiUrl('/api/v1/pupils/:pupilId/documents/:documentType/file'), () => HttpResponse.json(documents(file))),
@@ -127,14 +127,16 @@ describe('document scans', () => {
 
     const { user } = renderScreen();
     await user.click(await screen.findByRole('tab', { name: 'Documents' }));
-    await user.upload(await screen.findByLabelText('Scan of Birth certificate'), new File(['%PDF-'], 'cert.pdf', { type: 'application/pdf' }));
+    await user.upload(await screen.findByLabelText('Attach a scan of Birth certificate', { selector: 'input' }), new File(['%PDF-'], 'cert.pdf', { type: 'application/pdf' }));
 
-    expect(await screen.findByText('Scan attached (PDF, 2 KB)')).toBeInTheDocument();
+    expect(await screen.findByText('cert.pdf')).toBeInTheDocument();
+    expect(screen.getByText('PDF · 2 KB')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Birth certificate' })).toBeChecked();
 
-    await user.click(screen.getByRole('button', { name: 'Remove scan' }));
+    await user.click(screen.getByRole('button', { name: 'Remove the scan of Birth certificate' }));
 
-    await waitFor(() => expect(screen.queryByText('Scan attached (PDF, 2 KB)')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('cert.pdf')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Attach a scan of Birth certificate' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Birth certificate' })).toBeChecked();
   });
 
@@ -153,7 +155,7 @@ describe('document scans', () => {
     const { user } = renderScreen();
     await user.click(await screen.findByRole('tab', { name: 'Documents' }));
     const big = new File([new Uint8Array(8 * 1024 * 1024)], 'scan.pdf', { type: 'application/pdf' });
-    await user.upload(await screen.findByLabelText('Scan of Birth certificate'), big);
+    await user.upload(await screen.findByLabelText('Attach a scan of Birth certificate', { selector: 'input' }), big);
 
     expect(await screen.findByText('This file is 8 MB. The limit is 5 MB.')).toBeInTheDocument();
     expect(posted).toBe(0);

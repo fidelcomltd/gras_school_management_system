@@ -1,3 +1,4 @@
+import { ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
@@ -7,6 +8,9 @@ import { useDeleteRole, useRoles } from './api';
 import { CreateRoleDialog } from './components/create-role-dialog';
 import { EditRoleDialog } from './components/edit-role-dialog';
 import type { RoleDto } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * `/roles` (TASK-0028 §2). Role *assignments* and scopes are out of scope
@@ -26,7 +30,7 @@ export function RolesListScreen() {
   const canDelete = !!me.data && hasPrivilege(me.data, 'role.delete');
 
   if (roles.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading roles…</output>;
+    return <LoadingState label="Loading roles…" />;
   }
 
   if (roles.isError) {
@@ -61,7 +65,7 @@ export function RolesListScreen() {
       ) : null}
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No roles yet.</p>
+        <EmptyState icon={ShieldCheck} title="No roles yet." />
       ) : (
         <ul aria-label="Roles" className="flex flex-col gap-2">
           {items.map((role) => (
@@ -104,14 +108,7 @@ export function RolesListScreen() {
       )}
 
       {roles.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void roles.fetchNextPage()}
-          disabled={roles.isFetchingNextPage}
-        >
-          {roles.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={roles.isFetchingNextPage} onClick={() => void roles.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateRoleDialog onClose={() => setShowCreate(false)} /> : null}

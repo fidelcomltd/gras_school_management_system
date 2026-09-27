@@ -1,8 +1,10 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '@/api/schema';
 import { useSaveDevelopmentRatings } from '../api-records';
 import { isEditable } from '../types';
 import { LockNotice, SaveBar } from './save-bar';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 type DevelopmentRatingSheetDto = components['schemas']['DevelopmentRatingSheetDto'];
 interface Cell {
@@ -36,7 +38,7 @@ export function DevelopmentRatingsEditor({ sheet, canEdit }: { sheet: Developmen
       return { ...current, [pupilId]: { ...current[pupilId], [indicatorId]: { ...cell, ...change } } };
     });
 
-  if (sheet.rows.length === 0) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (sheet.rows.length === 0) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   return (
     <div className="flex flex-col gap-5">
