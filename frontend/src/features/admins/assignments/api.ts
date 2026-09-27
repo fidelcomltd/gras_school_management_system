@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPost } from '@/api/client';
 import { AdminsKeys } from '../types';
-import { AssignmentsKeys, type CreateRoleAssignmentCommand } from './types';
+import { AssignmentsKeys, type CopyAssignmentsToSessionCommand, type CreateRoleAssignmentCommand } from './types';
 
 const ASSIGNMENTS_PATH = '/api/v1/admins/{id}/assignments';
 const ASSIGNMENT_PATH = '/api/v1/assignments/{id}';
+const COPY_PATH = '/api/v1/assignments/copy-to-session';
 
 /** Every assignment on the account, active and revoked (spec 6.1.5). Gated `admin.view`; each carries its role, session and class names. */
 export function useAssignments(adminId: string) {
@@ -43,6 +44,24 @@ export function useRevokeAssignment(adminId: string) {
       void queryClient.invalidateQueries({ queryKey: [AssignmentsKeys.List, adminId] });
       // The admin list shows each account's roles and scope.
       void queryClient.invalidateQueries({ queryKey: [AdminsKeys.List] });
+    },
+  });
+}
+
+/**
+ * Copies a session's assignments into another (spec 4.2.2, 6.1.14). Gated `role.assign`. With `dryRun` the server only
+ * reports what it would create and skip; a real run refreshes every assignments list and the admin list.
+ */
+export function useCopyAssignments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [AssignmentsKeys.Copy],
+    mutationFn: (body: CopyAssignmentsToSessionCommand) => apiPost(COPY_PATH, body, { idempotencyKey: crypto.randomUUID() }),
+    onSuccess: (result) => {
+      if (!result.dryRun) {
+        void queryClient.invalidateQueries({ queryKey: [AssignmentsKeys.List] });
+        void queryClient.invalidateQueries({ queryKey: [AdminsKeys.List] });
+      }
     },
   });
 }

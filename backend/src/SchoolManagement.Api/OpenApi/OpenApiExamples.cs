@@ -1070,6 +1070,46 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(CopyAssignmentsToSessionCommand)] = $$"""
+            {
+              "fromSessionId": "{{ExampleSessionId}}",
+              "toSessionId": "{{ExampleId}}",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(AssignmentCopyRowDto)] = $$"""
+            {
+              "sourceAssignmentId": "{{ExampleAssignmentId}}",
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "staffName": "Ngozi Adeyemi",
+              "roleName": "Class Teacher",
+              "scopeType": "ArmList",
+              "armNames": ["Primary 3B"],
+              "skipReason": "Primary 3B has no class in 2027/2028."
+            }
+            """,
+
+        [typeof(AssignmentCopyResultDto)] = $$"""
+            {
+              "dryRun": true,
+              "fromSessionName": "2026/2027",
+              "toSessionName": "2027/2028",
+              "copied": [
+                {
+                  "sourceAssignmentId": "{{ExampleAssignmentId}}",
+                  "adminAccountId": "{{ExampleAdminAccountId}}",
+                  "staffName": "Ngozi Adeyemi",
+                  "roleName": "Class Teacher",
+                  "scopeType": "ArmList",
+                  "armNames": ["Primary 2A"],
+                  "skipReason": null
+                }
+              ],
+              "skipped": []
+            }
+            """,
+
         [typeof(RoleAssignmentDto)] = $$"""
             {
               "id": "{{ExampleAssignmentId}}",
