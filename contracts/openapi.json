@@ -5200,6 +5200,172 @@
         }
       }
     },
+    "/api/v1/reports/safeguarding": {
+      "get": {
+        "tags": [
+          "Pupil records"
+        ],
+        "summary": "The class safeguarding sheet for one arm",
+        "description": "Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. Health answers read `None` or `Not asked`, never blank.",
+        "operationId": "GetSafeguardingSheet",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SafeguardingSheetDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/safeguarding/pdf": {
+      "get": {
+        "tags": [
+          "Pupil records"
+        ],
+        "summary": "The class safeguarding sheet as a printable PDF",
+        "description": "Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. A4 landscape with each pupil's photograph, marked confidential; `attachment`, `private`.",
+        "operationId": "GetSafeguardingSheetPdf",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admissions/{id}/completeness": {
       "get": {
         "tags": [
@@ -29455,6 +29621,190 @@
         ],
         "description": "Lifecycle state of a Role (spec 6.1.4). \"An archived role cannot be newly assigned\nbut existing assignments continue until the session ends.\"",
         "example": "Active"
+      },
+      "SafeguardingSheetDto": {
+        "required": [
+          "armId",
+          "armName",
+          "sessionName",
+          "generatedAtUtc",
+          "pupils"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The class.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31"
+          },
+          "armName": {
+            "type": "string",
+            "description": "E.g. \"Primary 2 Gold\".",
+            "example": "Primary 2 Gold"
+          },
+          "sessionName": {
+            "type": "string",
+            "description": "The session the arm belongs to.",
+            "example": "2026/2027"
+          },
+          "generatedAtUtc": {
+            "type": "string",
+            "description": "When this copy was generated; each generation is audited.",
+            "format": "date-time",
+            "example": "2026-10-05T07:45:00+00:00"
+          },
+          "pupils": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SafeguardingSheetRowDto"
+            },
+            "description": "By surname, then first name.",
+            "example": [
+              {
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "registrationNumber": "GRA/2026/0014",
+                "name": "OKAFOR Chidera Ngozi",
+                "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+                "allergies": "Groundnuts",
+                "medicalConditions": "None",
+                "medication": "Not asked",
+                "specialInstructions": "Inhaler in the office",
+                "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+                "pickupPersons": [
+                  "Ngozi Okafor (Aunt) 08059876543"
+                ],
+                "barredMarker": "Yes: see office"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "The class safeguarding sheet: every active pupil in one arm with their health and collection data.",
+        "example": {
+          "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31",
+          "armName": "Primary 2 Gold",
+          "sessionName": "2026/2027",
+          "generatedAtUtc": "2026-10-05T07:45:00+00:00",
+          "pupils": [
+            {
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "registrationNumber": "GRA/2026/0014",
+              "name": "OKAFOR Chidera Ngozi",
+              "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+              "allergies": "Groundnuts",
+              "medicalConditions": "None",
+              "medication": "Not asked",
+              "specialInstructions": "Inhaler in the office",
+              "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+              "pickupPersons": [
+                "Ngozi Okafor (Aunt) 08059876543"
+              ],
+              "barredMarker": "Yes: see office"
+            }
+          ]
+        }
+      },
+      "SafeguardingSheetRowDto": {
+        "required": [
+          "pupilId",
+          "registrationNumber",
+          "name",
+          "photoUpdatedAtUtc",
+          "allergies",
+          "medicalConditions",
+          "medication",
+          "specialInstructions",
+          "hospital",
+          "pickupPersons",
+          "barredMarker"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "The pupil.",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The pupil's number.",
+            "example": "GRA/2026/0014"
+          },
+          "name": {
+            "type": "string",
+            "description": "Surname first.",
+            "example": "OKAFOR Chidera Ngozi"
+          },
+          "photoUpdatedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The photograph's cache key, or null when there is none.",
+            "format": "date-time",
+            "example": "2026-10-02T11:20:00+00:00"
+          },
+          "allergies": {
+            "type": "string",
+            "description": "\"None\", \"Not asked\", or the detail.",
+            "example": "Groundnuts"
+          },
+          "medicalConditions": {
+            "type": "string",
+            "description": "\"None\", \"Not asked\", or the detail.",
+            "example": "None"
+          },
+          "medication": {
+            "type": "string",
+            "description": "\"None\", \"Not asked\", or the detail.",
+            "example": "Not asked"
+          },
+          "specialInstructions": {
+            "type": "string",
+            "description": "Free text, or empty.",
+            "example": "Inhaler in the office"
+          },
+          "hospital": {
+            "type": "string",
+            "description": "Preferred hospital and its phone, or empty.",
+            "example": "St. Charles Borromeo Hospital, Onitsha, 08037776666"
+          },
+          "pickupPersons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "\"Name (relationship) phone\", in the parent's order.",
+            "example": [
+              "Ngozi Okafor (Aunt) 08059876543"
+            ]
+          },
+          "barredMarker": {
+            "type": "string",
+            "description": "A marker only, never names: \"Yes: see office\", \"No\" or \"Not asked\".",
+            "example": "Yes: see office"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One pupil's line. Health answers read \"None\" or \"Not asked\" when there is no detail, never blank.",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "registrationNumber": "GRA/2026/0014",
+          "name": "OKAFOR Chidera Ngozi",
+          "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+          "allergies": "Groundnuts",
+          "medicalConditions": "None",
+          "medication": "Not asked",
+          "specialInstructions": "Inhaler in the office",
+          "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+          "pickupPersons": [
+            "Ngozi Okafor (Aunt) 08059876543"
+          ],
+          "barredMarker": "Yes: see office"
+        }
       },
       "SampleRecordDto": {
         "required": [

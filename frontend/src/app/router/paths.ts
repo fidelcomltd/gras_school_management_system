@@ -23,6 +23,7 @@ export const paths = {
   pupils: '/pupils',
   pupilImport: '/pupils/import',
   incompleteRecords: '/reports/incomplete-records',
+  safeguardingSheet: '/reports/safeguarding',
   pupilDetail: (id: string) => `/pupils/${id}`,
   subjects: '/subjects',
   subjectMapping: '/subjects/mapping',

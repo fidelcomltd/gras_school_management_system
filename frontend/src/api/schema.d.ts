@@ -679,6 +679,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/safeguarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The class safeguarding sheet for one arm
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. Health answers read `None` or `Not asked`, never blank.
+         */
+        get: operations["GetSafeguardingSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/safeguarding/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The class safeguarding sheet as a printable PDF
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. A4 landscape with each pupil's photograph, marked confidential; `attachment`, `private`.
+         */
+        get: operations["GetSafeguardingSheetPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admissions/{id}/completeness": {
         parameters: {
             query?: never;
@@ -9895,6 +9935,154 @@ export interface components {
          */
         RoleStatus: "Active" | "Archived";
         /**
+         * @description The class safeguarding sheet: every active pupil in one arm with their health and collection data.
+         * @example {
+         *       "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31",
+         *       "armName": "Primary 2 Gold",
+         *       "sessionName": "2026/2027",
+         *       "generatedAtUtc": "2026-10-05T07:45:00+00:00",
+         *       "pupils": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRA/2026/0014",
+         *           "name": "OKAFOR Chidera Ngozi",
+         *           "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+         *           "allergies": "Groundnuts",
+         *           "medicalConditions": "None",
+         *           "medication": "Not asked",
+         *           "specialInstructions": "Inhaler in the office",
+         *           "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+         *           "pickupPersons": [
+         *             "Ngozi Okafor (Aunt) 08059876543"
+         *           ],
+         *           "barredMarker": "Yes: see office"
+         *         }
+         *       ]
+         *     }
+         */
+        SafeguardingSheetDto: {
+            /**
+             * @description The class.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31
+             */
+            armId: string;
+            /**
+             * @description E.g. "Primary 2 Gold".
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * @description The session the arm belongs to.
+             * @example 2026/2027
+             */
+            sessionName: string;
+            /**
+             * Format: date-time
+             * @description When this copy was generated; each generation is audited.
+             * @example 2026-10-05T07:45:00+00:00
+             */
+            generatedAtUtc: string;
+            /**
+             * @description By surname, then first name.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRA/2026/0014",
+             *         "name": "OKAFOR Chidera Ngozi",
+             *         "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+             *         "allergies": "Groundnuts",
+             *         "medicalConditions": "None",
+             *         "medication": "Not asked",
+             *         "specialInstructions": "Inhaler in the office",
+             *         "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+             *         "pickupPersons": [
+             *           "Ngozi Okafor (Aunt) 08059876543"
+             *         ],
+             *         "barredMarker": "Yes: see office"
+             *       }
+             *     ]
+             */
+            pupils: components["schemas"]["SafeguardingSheetRowDto"][];
+        };
+        /**
+         * @description One pupil's line. Health answers read "None" or "Not asked" when there is no detail, never blank.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRA/2026/0014",
+         *       "name": "OKAFOR Chidera Ngozi",
+         *       "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+         *       "allergies": "Groundnuts",
+         *       "medicalConditions": "None",
+         *       "medication": "Not asked",
+         *       "specialInstructions": "Inhaler in the office",
+         *       "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+         *       "pickupPersons": [
+         *         "Ngozi Okafor (Aunt) 08059876543"
+         *       ],
+         *       "barredMarker": "Yes: see office"
+         *     }
+         */
+        SafeguardingSheetRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description The pupil's number.
+             * @example GRA/2026/0014
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Surname first.
+             * @example OKAFOR Chidera Ngozi
+             */
+            name: string;
+            /**
+             * Format: date-time
+             * @description The photograph's cache key, or null when there is none.
+             * @example 2026-10-02T11:20:00+00:00
+             */
+            photoUpdatedAtUtc: null | string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example Groundnuts
+             */
+            allergies: string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example None
+             */
+            medicalConditions: string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example Not asked
+             */
+            medication: string;
+            /**
+             * @description Free text, or empty.
+             * @example Inhaler in the office
+             */
+            specialInstructions: string;
+            /**
+             * @description Preferred hospital and its phone, or empty.
+             * @example St. Charles Borromeo Hospital, Onitsha, 08037776666
+             */
+            hospital: string;
+            /**
+             * @description "Name (relationship) phone", in the parent's order.
+             * @example [
+             *       "Ngozi Okafor (Aunt) 08059876543"
+             *     ]
+             */
+            pickupPersons: string[];
+            /**
+             * @description A marker only, never names: "Yes: see office", "No" or "Not asked".
+             * @example Yes: see office
+             */
+            barredMarker: string;
+        };
+        /**
          * @description REFERENCE SLICE — read model for a sample record.
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
@@ -18210,6 +18398,140 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSafeguardingSheet: {
+        parameters: {
+            query: {
+                armId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafeguardingSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSafeguardingSheetPdf: {
+        parameters: {
+            query: {
+                armId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Too Many Requests */

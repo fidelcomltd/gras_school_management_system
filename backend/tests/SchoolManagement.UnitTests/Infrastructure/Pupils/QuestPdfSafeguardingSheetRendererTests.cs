@@ -1,0 +1,43 @@
+using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Infrastructure.Pupils;
+using SkiaSharp;
+
+namespace SchoolManagement.UnitTests.Infrastructure.Pupils;
+
+/// <summary>The class safeguarding sheet PDF renders, with and without photographs, across more than one page.</summary>
+public sealed class QuestPdfSafeguardingSheetRendererTests
+{
+    [Fact]
+    public void Render_ProducesAPdf_ForRowsWithAndWithoutPhotographs_OverSeveralPages()
+    {
+        var photo = Jpeg();
+        var rows = Enumerable.Range(1, 40).Select(index => new SafeguardingSheetRow(
+            $"PUPIL {index} Chidera",
+            index % 2 == 0 ? photo : (ReadOnlyMemory<byte>?)null,
+            index % 3 == 0 ? "Groundnuts" : "None",
+            "None",
+            "Not asked",
+            string.Empty,
+            "St. Charles Borromeo, 08037776666",
+            ["Ngozi Okafor (Aunt) 08059876543", "Emeka Okafor (Father) 08031234567"],
+            index % 5 == 0 ? "Yes: see office" : "No")).ToList();
+
+        var bytes = new QuestPdfSafeguardingSheetRenderer().Render(
+            new SafeguardingSheetDocument("Golden Royal Ark School", "Primary 2 Gold", "2026/2027", new DateTime(2026, 10, 5, 8, 45, 0), rows));
+
+        bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8).ShouldBeTrue();
+    }
+
+    private static byte[] Jpeg()
+    {
+        using var bitmap = new SKBitmap(96, 96);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.SteelBlue);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 80);
+        return data.ToArray();
+    }
+}
