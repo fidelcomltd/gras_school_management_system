@@ -36,9 +36,9 @@ internal sealed class PrintResultSheetsQueryValidator : AbstractValidator<PrintR
 }
 
 /// <summary>
-/// Handles <see cref="PrintResultSheetsQuery"/>. Reads each pupil through the same <see cref="IResultSheetReader"/> the portal
-/// uses, and skips any whose arm of record for the term is another arm (a mid-term move), so a sheet prints under one arm
-/// only. Never touches <see cref="IResultPdfCache"/>, which holds parent-view PDFs.
+/// Handles <see cref="PrintResultSheetsQuery"/>. Reads through <see cref="IResultSheetReader.ReadSetAsync"/>, bound to this arm's
+/// own result set, so a pupil who moved arm mid-term still prints from the arm that published their lines. Never touches
+/// <see cref="IResultPdfCache"/>, which holds parent-view PDFs.
 /// </summary>
 internal sealed class PrintResultSheetsHandler(
     IArmRepository arms,
@@ -59,14 +59,17 @@ internal sealed class PrintResultSheetsHandler(
         var termId = Guid.Parse(request.TermId);
         Guid? onlyPupil = string.IsNullOrEmpty(request.PupilId) ? null : Guid.Parse(request.PupilId);
 
-        if (await arms.FindReadOnlyByIdAsync(request.ArmId, cancellationToken).ConfigureAwait(false) is null)
+        var arm = await arms.FindReadOnlyByIdAsync(request.ArmId, cancellationToken).ConfigureAwait(false);
+        if (arm is null)
         {
             return Result.Failure<PdfFile>(Error.NotFound("arm.not_found", "No arm was found with that id."));
         }
 
-        if (await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false) is null)
+        // A term from another session can never have a result set for this arm: not found, not "not yet published".
+        var term = await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false);
+        if (term is null || term.SessionId != arm.SessionId)
         {
-            return Result.Failure<PdfFile>(Error.NotFound("term.not_found", "No term was found with that id."));
+            return Result.Failure<PdfFile>(Error.NotFound("term.not_found", "No term was found with that id in this arm's session."));
         }
 
         var resultSet = await resultSets.FindReadOnlyByArmTermAsync(request.ArmId, termId, cancellationToken).ConfigureAwait(false);
@@ -76,25 +79,14 @@ internal sealed class PrintResultSheetsHandler(
                 "result_set.not_published", "Result sheets can be printed only once the arm's results for this term are published."));
         }
 
-        var pupilIds = onlyPupil is { } only
-            ? [only]
-            : await reader.ListPupilsWithLinesAsync(resultSet.Id, cancellationToken).ConfigureAwait(false);
-
-        var sheets = new List<ResultSheet>(pupilIds.Count);
-        var keys = new List<ResultPdfKey>(pupilIds.Count);
-        foreach (var pupilId in pupilIds)
-        {
-            var data = await reader.ReadAsync(pupilId, termId, cancellationToken).ConfigureAwait(false);
-            if (data is not { State: ResultSetState.Published } || data.ResultSetId != resultSet.Id || data.Lines.Count == 0
-                || ResultSheetBuilder.Build(data, forParent: false) is not { } sheet)
-            {
-                continue;
-            }
-
-            sheets.Add(sheet);
-            keys.Add(new ResultPdfKey(data.ResultSetId, pupilId, data.RevisionNumber));
-        }
-
+        var sheets = (await reader.ReadSetAsync(resultSet.Id, onlyPupil, cancellationToken).ConfigureAwait(false))
+            .Where(entry => entry.Value.Lines.Count > 0)
+            .Select(entry => (PupilId: entry.Key, Sheet: ResultSheetBuilder.Build(entry.Value, forParent: false)))
+            .Where(entry => entry.Sheet is not null)
+            .Select(entry => (entry.PupilId, Sheet: entry.Sheet!))
+            .OrderBy(entry => entry.Sheet.PupilName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Sheet.RegistrationNumber, StringComparer.Ordinal)
+            .ToList();
         if (sheets.Count == 0)
         {
             return Result.Failure<PdfFile>(onlyPupil is null
@@ -102,26 +94,21 @@ internal sealed class PrintResultSheetsHandler(
                 : Error.NotFound("result_sheet.not_found", "This pupil has no result in this arm for this term."));
         }
 
-        // Every sheet in one set shares the snapshot, so the logo and signature are read once.
-        var logo = await SnapshotImages.ReadAsync(schoolImages, imageStore, sheets[0].LogoUploadGroupId, DomainSizeVariant.Size200, cancellationToken)
+        // Every sheet in one set shares the snapshot and the revision: the images and tokens are read once for all of them.
+        var first = sheets[0].Sheet;
+        var logo = await SnapshotImages.ReadAsync(schoolImages, imageStore, first.LogoUploadGroupId, DomainSizeVariant.Size200, cancellationToken)
             .ConfigureAwait(false);
-        var signature = await SnapshotImages.ReadAsync(schoolImages, imageStore, sheets[0].SignatureUploadGroupId, DomainSizeVariant.Original, cancellationToken)
+        var signature = await SnapshotImages.ReadAsync(schoolImages, imageStore, first.SignatureUploadGroupId, DomainSizeVariant.Original, cancellationToken)
             .ConfigureAwait(false);
+        var tokens = await verifications.FindTokensAsync(resultSet.Id, resultSet.RevisionNumber, cancellationToken).ConfigureAwait(false);
         var printedAt = timeProvider.GetUtcNow();
 
-        var order = Enumerable.Range(0, sheets.Count)
-            .OrderBy(index => sheets[index].PupilName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(index => sheets[index].RegistrationNumber, StringComparer.Ordinal)
-            .ToList();
-        var pages = new List<(ResultSheet Sheet, ResultSheetPdfExtras Extras)>(sheets.Count);
-        foreach (var index in order)
+        var pages = sheets.ConvertAll(entry =>
         {
-            var key = keys[index];
-            var token = await verifications.FindTokenAsync(key.ResultSetId, key.PupilId, key.RevisionNumber, cancellationToken).ConfigureAwait(false);
-            pages.Add((sheets[index], new ResultSheetPdfExtras(logo, signature, token, token is null ? null : renderer.VerificationUrl(token), printedAt)));
-        }
+            var token = tokens.GetValueOrDefault(entry.PupilId);
+            return (entry.Sheet, new ResultSheetPdfExtras(logo, signature, token, token is null ? null : renderer.VerificationUrl(token), printedAt));
+        });
 
-        var first = sheets[0];
         var fileName = onlyPupil is null
             ? GetPortalResultPdfHandler.FileName(first.ClassName, first.TermName, first.AcademicYear)
             : GetPortalResultPdfHandler.FileName(first.RegistrationNumber, first.TermName, first.AcademicYear);

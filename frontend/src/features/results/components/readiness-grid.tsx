@@ -22,7 +22,7 @@ export function ReadinessGrid({
   printing = false,
 }: {
   readiness: ResultSetReadinessDto;
-  /** Present when the set is published and the viewer may print: adds a per-pupil Print column. */
+  /** Present when the set is published and the viewer may print: adds a per-pupil Print column (pupils with marks only). */
   onPrint?: ((pupilId: string) => void) | undefined;
   printing?: boolean;
 }) {
@@ -82,15 +82,17 @@ export function ReadinessGrid({
                 <td className="px-2 py-1.5 text-center">{tick(pupil.headTeacherRemarkPresent)}</td>
                 {onPrint ? (
                   <td className="px-2 py-1 text-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={printing}
-                      aria-label={`Print ${pupil.displayName}'s result sheet`}
-                      onClick={() => onPrint(pupil.pupilId)}
-                    >
-                      Print
-                    </Button>
+                    {pupil.marks.some((mark) => mark.status !== 'Empty') ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={printing}
+                        aria-label={`Print ${pupil.displayName}'s result sheet`}
+                        onClick={() => onPrint(pupil.pupilId)}
+                      >
+                        Print
+                      </Button>
+                    ) : null}
                   </td>
                 ) : null}
               </tr>

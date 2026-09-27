@@ -13408,7 +13408,7 @@
           "Result sheets"
         ],
         "summary": "Print an arm's published result sheets",
-        "description": "The A4 result sheets for a published arm-term, as one PDF: every pupil with a result, in name order, each starting on a fresh page and numbered within itself; or one pupil's sheet with `pupilId`. The same sheet the parent downloads, except that the outstanding-fee line always shows. 409 `result_set.not_published` until the arm's results for the term are published; 404 `result_sheet.not_found` when the pupil has no result in this arm, `result_sheet.none` when no pupil does. Fetch it and save the blob.",
+        "description": "The A4 result sheets for a published arm-term, as one PDF: every pupil with a result, in name order, each starting on a fresh page and numbered within itself; or one pupil's sheet with `pupilId`. The same sheet the parent downloads, except that the outstanding-fee line always shows. 409 `result_set.not_published` until the arm's results for the term are published; 404 `result_sheet.not_found` when the pupil has no result in this arm, `result_sheet.none` when no pupil does; 404 `term.not_found` for a term outside the arm's session. Rendered on every request, so it takes the sensitive rate limit. Fetch it and save the blob.",
         "operationId": "PrintResultSheets",
         "parameters": [
           {

@@ -37,6 +37,9 @@ public interface IResultVerificationReader
     /// <summary>The token printed on a pupil's sheet for a revision, or null when none was issued.</summary>
     Task<string?> FindTokenAsync(Guid resultSetId, Guid pupilId, int revisionNumber, CancellationToken cancellationToken);
 
+    /// <summary>Every token issued for a revision, by pupil, in one read.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> FindTokensAsync(Guid resultSetId, int revisionNumber, CancellationToken cancellationToken);
+
     /// <summary>What <paramref name="token"/> (normalised) resolves to, or null when unknown.</summary>
     Task<ResultVerificationRecord?> FindAsync(string token, CancellationToken cancellationToken);
 }

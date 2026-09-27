@@ -3,7 +3,7 @@ import type { components } from '@/api/schema';
 import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/http';
-import { useComputeAnnual, usePrintResultSheets, useTransition, type Transition } from '../api-workflow';
+import { useComputeAnnual, useTransition, type Transition } from '../api-workflow';
 import { ReasonDialog } from '@/shared/dialogs/reason-dialog';
 
 type ResultSetSummaryDto = components['schemas']['ResultSetSummaryDto'];
@@ -19,6 +19,8 @@ export function WorkflowActions({
   resultSet,
   canSubmitNow,
   can,
+  onPrint,
+  printing,
 }: {
   armId: string;
   termId: string;
@@ -26,10 +28,12 @@ export function WorkflowActions({
   resultSet: ResultSetSummaryDto;
   canSubmitNow: boolean;
   can: (privilege: string) => boolean;
+  /** Prints the whole class; the screen owns the request so the grid's per-pupil prints share its state. */
+  onPrint: () => void;
+  printing: boolean;
 }) {
   const transition = useTransition(armId, termId);
   const annual = useComputeAnnual(armId);
-  const print = usePrintResultSheets(armId, termId);
   const [asking, setAsking] = useState<'return' | 'withdraw' | null>(null);
   const run = (name: Transition, reason?: string) =>
     transition.mutate({ transition: name, resultSetId: resultSet.id, reason }, { onSuccess: () => setAsking(null) });
@@ -48,7 +52,6 @@ export function WorkflowActions({
     <div className="flex flex-col gap-3">
       <FormError message={!asking && transition.error instanceof ApiError ? transition.error.message : null} />
       <FormError message={annual.error instanceof ApiError ? annual.error.message : null} />
-      <FormError message={print.error instanceof ApiError ? print.error.message : null} />
       {annual.isSuccess ? (
         <output className="block text-sm text-success">
           Annual results computed for {annual.data.pupilCount} pupils ({annual.data.proposedPromoted} proposed for promotion,{' '}
@@ -71,8 +74,8 @@ export function WorkflowActions({
           </Button>
         ) : null}
         {state === 'Published' && can('result.print') ? (
-          <Button variant="outline" disabled={print.isPending} onClick={() => print.mutate(undefined)}>
-            {print.isPending ? 'Preparing…' : 'Print result sheets'}
+          <Button variant="outline" disabled={printing} onClick={onPrint}>
+            {printing ? 'Preparing…' : 'Print result sheets'}
           </Button>
         ) : null}
         {state === 'Withdrawn' ? button('Reopen for correction', 'reopen', 'result.unpublish') : null}

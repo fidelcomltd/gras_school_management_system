@@ -18,7 +18,14 @@ export function ProgressScreen() {
   const term = useTermChoice();
   const klass = useClassChoice(term.sessionId, 'result.view');
   const readiness = useReadiness(klass.armId, term.termId);
-  const print = usePrintResultSheets(klass.armId, term.termId);
+  const print = usePrintResultSheets();
+  // One request for the class button and the grid; its error belongs to the class and term it was for, not the next one.
+  const printError =
+    print.error instanceof ApiError && print.variables?.armId === klass.armId && print.variables.termId === term.termId
+      ? print.error.message
+      : null;
+  const printFor = (pupilId?: string) =>
+    print.mutate(pupilId ? { armId: klass.armId, termId: term.termId, pupilId } : { armId: klass.armId, termId: term.termId });
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilegeInArm(me.data, privilege, klass.armId);
 
@@ -56,22 +63,22 @@ export function ProgressScreen() {
               resultSet={set}
               canSubmitNow={data.canSubmit}
               can={can}
+              onPrint={() => printFor()}
+              printing={print.isPending}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Results start when the first mark, rating or remark is saved.</p>
           )}
+          <FormError message={printError} />
         </section>
         {data.pupils.length === 0 ? (
           <EmptyState icon={Users} title="No active pupils in this class." />
         ) : (
-          <div className="flex flex-col gap-2">
-            <FormError message={print.error instanceof ApiError ? print.error.message : null} />
-            <ReadinessGrid
-              readiness={data}
-              onPrint={set?.state === 'Published' && can('result.print') ? (pupilId) => print.mutate(pupilId) : undefined}
-              printing={print.isPending}
-            />
-          </div>
+          <ReadinessGrid
+            readiness={data}
+            onPrint={set?.state === 'Published' && can('result.print') ? printFor : undefined}
+            printing={print.isPending}
+          />
         )}
       </div>
     );

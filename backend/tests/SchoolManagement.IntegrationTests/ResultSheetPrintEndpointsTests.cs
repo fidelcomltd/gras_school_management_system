@@ -52,6 +52,12 @@ public sealed class ResultSheetPrintEndpointsTests(ApiTestFixture fixture) : Int
             one.Content.Headers.ContentDisposition!.FileNameStar.ShouldStartWith("GRAS-");
         }
 
+        // Moved to another arm after publication: still prints from the arm that published their lines.
+        using (var moved = await GetAsync(admin.Jar, $"{armUrl}&pupilId={seeded.PupilIds[3]}"))
+        {
+            moved.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
         using var none = await GetAsync(admin.Jar, $"{armUrl}&pupilId={seeded.PupilIds[2]}");
         none.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await none.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("result_sheet.not_found");
@@ -59,7 +65,10 @@ public sealed class ResultSheetPrintEndpointsTests(ApiTestFixture fixture) : Int
 
     private sealed record Seeded(Guid ArmId, Guid TermId, Guid ResultSetId, IReadOnlyList<Guid> PupilIds);
 
-    /// <summary>An Approved, computed set with three pupils: the first two have a subject line, the third has none.</summary>
+    /// <summary>
+    /// An Approved, computed set with four pupils: the third has no subject line; the fourth has one but has since moved to
+    /// another arm in the same session.
+    /// </summary>
     private async Task<Seeded> SeedAsync(Guid adminId)
     {
         await using var scope = Fixture.CreateScope();
@@ -77,6 +86,8 @@ public sealed class ResultSheetPrintEndpointsTests(ApiTestFixture fixture) : Int
         context.Add(term);
         var arm = Arm.Create(Guid.CreateVersion7(), levelId, session.Id, "A", null, null).Value;
         context.Add(arm);
+        var otherArm = Arm.Create(Guid.CreateVersion7(), levelId, session.Id, "B", null, null).Value;
+        context.Add(otherArm);
         var resultSet = ResultSet.Create(Guid.CreateVersion7(), arm.Id, term.Id).Value;
         typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
         context.Add(resultSet);
@@ -88,25 +99,32 @@ public sealed class ResultSheetPrintEndpointsTests(ApiTestFixture fixture) : Int
         var marks = System.Text.Json.JsonSerializer.Serialize(components.Where(component => !component.IsExamination).ToDictionary(component => component.Id.ToString("D"), _ => 17));
 
         var pupilIds = new List<Guid>();
-        foreach (var (surname, index) in new[] { "Okafor", "Eze", "Nwosu" }.Select((surname, index) => (surname, index)))
+        foreach (var (surname, index) in new[] { "Okafor", "Eze", "Nwosu", "Obi" }.Select((surname, index) => (surname, index)))
         {
             var pupil = Pupil.Create(
                 Guid.CreateVersion7(), surname, "Chidera", middleName: null, PupilSex.Female, new DateOnly(2018, 1, 1), asOfDate: new DateOnly(2026, 9, 9),
                 nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka", previousSchool: null, previousClass: null, otherInformation: null).Value;
             context.Add(pupil);
-            context.Add(Enrolment.Open(Guid.CreateVersion7(), pupil.Id, arm.Id, new DateOnly(year, 9, 1)).Value);
+            var enrolment = Enrolment.Open(Guid.CreateVersion7(), pupil.Id, arm.Id, new DateOnly(year, 9, 1)).Value;
+            context.Add(enrolment);
+            if (index == 3)
+            {
+                enrolment.Close(new DateOnly(year, 10, 31)).IsSuccess.ShouldBeTrue();
+                context.Add(Enrolment.Open(Guid.CreateVersion7(), pupil.Id, otherArm.Id, new DateOnly(year, 11, 1)).Value);
+            }
+
             context.Add(PupilRemark.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, RemarkKind.HeadTeacher, "Keep working hard.", adminId, "Mr Bello", DateTimeOffset.UtcNow).Value);
-            if (index < 2)
+            if (index != 2)
             {
                 context.Add(SubjectScore.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, term.Id, marks, null, examAbsent: true).Value);
                 context.Add(SubjectResultLine.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, 34, null, 34, "E", "Not Now", 1, false, false));
-                context.Add(PupilTermResult.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 1, 100, 34, 34.00m, "E", 1, true, 2, 1, true, 2));
+                context.Add(PupilTermResult.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 1, 100, 34, 34.00m, "E", 1, true, 3, 1, true, 3));
             }
 
             pupilIds.Add(pupil.Id);
         }
 
-        resultSet.MarkComputed(null, DateTimeOffset.UtcNow, 2);
+        resultSet.MarkComputed(null, DateTimeOffset.UtcNow, 3);
         var profile = await context.Set<SchoolManagement.Domain.Settings.SchoolProfile>().SingleAsync(TestContext.Current.CancellationToken);
         profile.SetCurrentLogo(Guid.CreateVersion7());
         profile.SetCurrentSignature(Guid.CreateVersion7());

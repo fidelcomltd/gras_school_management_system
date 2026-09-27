@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Options;
 using QRCoder;
 using QuestPDF.Fluent;
@@ -8,6 +9,7 @@ using SchoolManagement.Application.Abstractions.Results;
 using SchoolManagement.Application.Results.Sheets;
 using SchoolManagement.Domain.Results;
 using SchoolManagement.Infrastructure.Pins;
+using PdfImage = QuestPDF.Infrastructure.Image;
 
 namespace SchoolManagement.Infrastructure.Results;
 
@@ -49,11 +51,36 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
         ArgumentNullException.ThrowIfNull(sheets);
         ArgumentOutOfRangeException.ThrowIfZero(sheets.Count);
         var first = sheets[0].Sheet;
+
+        // One image object per distinct byte array, so a logo and signature shared by forty sheets are embedded once.
+        var images = new Dictionary<byte[], PdfImage>(ReferenceEqualityComparer.Instance);
+        PdfImage? Shared(ReadOnlyMemory<byte> bytes)
+        {
+            if (bytes.IsEmpty)
+            {
+                return null;
+            }
+
+            var array = MemoryMarshal.TryGetArray(bytes, out var segment) && segment.Offset == 0 && segment.Count == segment.Array!.Length
+                ? segment.Array
+                : bytes.ToArray();
+            if (!images.TryGetValue(array, out var image))
+            {
+                image = PdfImage.FromBinaryData(array);
+                images[array] = image;
+            }
+
+            return image;
+        }
+
         return Document.Create(document =>
             {
                 for (var index = 0; index < sheets.Count; index++)
                 {
-                    ComposeSheet(document, sheets[index].Sheet, sheets[index].Extras, $"sheet-{index}");
+                    var (sheet, extras) = sheets[index];
+                    ArgumentNullException.ThrowIfNull(sheet);
+                    ArgumentNullException.ThrowIfNull(extras);
+                    ComposeSheet(document, sheet, extras, Shared(extras.Logo), Shared(extras.Signature), $"sheet-{index}");
                 }
             })
             .WithMetadata(new DocumentMetadata { Title = $"{first.TermName} result, {first.AcademicYear}", Author = first.SchoolName, Creator = first.SchoolName })
@@ -62,12 +89,9 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
     }
 
     /// <summary>One sheet as its own page set. The section keeps "Page n of N" counting this sheet, not the document.</summary>
-    private static void ComposeSheet(IDocumentContainer document, ResultSheet sheet, ResultSheetPdfExtras extras, string section)
+    private static void ComposeSheet(
+        IDocumentContainer document, ResultSheet sheet, ResultSheetPdfExtras extras, PdfImage? logo, PdfImage? signature, string section)
     {
-        ArgumentNullException.ThrowIfNull(sheet);
-        ArgumentNullException.ThrowIfNull(extras);
-        var logo = extras.Logo.IsEmpty ? null : extras.Logo.ToArray();
-        var signature = extras.Signature.IsEmpty ? null : extras.Signature.ToArray();
         var qr = extras.VerificationUrl is { } url ? QrPng(url.AbsoluteUri) : null;
 
         document.Page(page =>
@@ -85,8 +109,8 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(sheet);
         ArgumentNullException.ThrowIfNull(extras);
-        var logo = extras.Logo.IsEmpty ? null : extras.Logo.ToArray();
-        var signature = extras.Signature.IsEmpty ? null : extras.Signature.ToArray();
+        var logo = extras.Logo.IsEmpty ? null : PdfImage.FromBinaryData(extras.Logo.ToArray());
+        var signature = extras.Signature.IsEmpty ? null : PdfImage.FromBinaryData(extras.Signature.ToArray());
 
         return Document.Create(document => document.Page(page =>
             {
@@ -233,7 +257,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             }
         });
 
-    private static void SchoolBlock(ColumnDescriptor column, string schoolName, string? motto, string? address, string title, byte[]? logo) =>
+    private static void SchoolBlock(ColumnDescriptor column, string schoolName, string? motto, string? address, string title, PdfImage? logo) =>
         column.Item().Row(row =>
         {
             if (logo is not null)
@@ -264,7 +288,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             }
         });
 
-    private static void Header(IContainer container, ResultSheet sheet, byte[]? logo) =>
+    private static void Header(IContainer container, ResultSheet sheet, PdfImage? logo) =>
         container.Column(column =>
         {
             SchoolBlock(column, sheet.SchoolName, sheet.SchoolMotto, sheet.SchoolAddress,
@@ -305,7 +329,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
         }
     }
 
-    private static void Content(IContainer container, ResultSheet sheet, byte[]? signature) =>
+    private static void Content(IContainer container, ResultSheet sheet, PdfImage? signature) =>
         container.Column(column =>
         {
             column.Spacing(7);
@@ -497,7 +521,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             }
         });
 
-    private static void Remarks(IContainer container, ResultSheet sheet, byte[]? signature) =>
+    private static void Remarks(IContainer container, ResultSheet sheet, PdfImage? signature) =>
         container.Row(row =>
         {
             row.Spacing(8);
@@ -513,7 +537,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             Stamp(row);
         });
 
-    private static void Signature(ColumnDescriptor column, string? headTeacherName, byte[]? signature, DateTimeOffset? issuedAt) =>
+    private static void Signature(ColumnDescriptor column, string? headTeacherName, PdfImage? signature, DateTimeOffset? issuedAt) =>
         column.Item().Row(signed =>
         {
             signed.RelativeItem().Column(block =>

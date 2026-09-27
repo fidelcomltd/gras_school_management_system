@@ -65,10 +65,12 @@ export function useTransition(armId: string, termId: string) {
  * A published arm's result sheets as one PDF, or one pupil's with `pupilId`, saved under the server's name. Staff sheets
  * always show the outstanding-fee line. Not audited: it reprints what is already published.
  */
-export function usePrintResultSheets(armId: string, termId: string) {
+export type PrintRequest = { armId: string; termId: string; pupilId?: string };
+
+export function usePrintResultSheets() {
   return useMutation({
-    mutationKey: [WorkflowKeys.Transition, 'print', armId, termId],
-    mutationFn: async (pupilId?: string) => {
+    mutationKey: [WorkflowKeys.Transition, 'print'],
+    mutationFn: async ({ armId, termId, pupilId }: PrintRequest) => {
       const query = new URLSearchParams({ termId });
       if (pupilId) query.set('pupilId', pupilId);
       saveFile(await getFile(`/api/v1/arms/${encodeURIComponent(armId)}/result-sheets/pdf?${query.toString()}`, 'result-sheets.pdf'));

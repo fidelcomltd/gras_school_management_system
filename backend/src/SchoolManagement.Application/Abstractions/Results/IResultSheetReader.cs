@@ -75,6 +75,10 @@ public interface IResultSheetReader
     /// </summary>
     Task<ResultSheetData?> ReadAsync(Guid pupilId, Guid termId, CancellationToken cancellationToken);
 
-    /// <summary>The pupils with at least one computed subject line in <paramref name="resultSetId"/>, in no particular order.</summary>
-    Task<IReadOnlyList<Guid>> ListPupilsWithLinesAsync(Guid resultSetId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Sheet data bound to <paramref name="resultSetId"/> itself, whatever arm a pupil is enrolled in now: every pupil with
+    /// at least one computed subject line, or just <paramref name="pupilId"/> (lines or not), keyed by pupil. A fixed number
+    /// of queries however many pupils.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, ResultSheetData>> ReadSetAsync(Guid resultSetId, Guid? pupilId, CancellationToken cancellationToken);
 }

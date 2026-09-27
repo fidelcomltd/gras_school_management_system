@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SchoolManagement.Api.Configuration;
 using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Authorization;
@@ -38,6 +39,7 @@ public sealed class ResultSheetEndpoints : IEndpointModule
                 return result.Match(file => TypedResults.File(file.Content.ToArray(), "application/pdf", file.FileName));
             })
             .RequirePrivilege(Privileges.Results.Print, ScopeParameterKind.Arm, "armId")
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
             .WithName("PrintResultSheets")
             .WithSummary("Print an arm's published result sheets")
             .WithDescription(
@@ -45,7 +47,7 @@ public sealed class ResultSheetEndpoints : IEndpointModule
                 "starting on a fresh page and numbered within itself; or one pupil's sheet with `pupilId`. The same sheet the " +
                 "parent downloads, except that the outstanding-fee line always shows. 409 `result_set.not_published` until the " +
                 "arm's results for the term are published; 404 `result_sheet.not_found` when the pupil has no result in this " +
-                "arm, `result_sheet.none` when no pupil does. Fetch it and save the blob.")
+                "arm, `result_sheet.none` when no pupil does; 404 `term.not_found` for a term outside the arm's session. Rendered on every request, so it takes the sensitive rate limit. Fetch it and save the blob.")
             .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
