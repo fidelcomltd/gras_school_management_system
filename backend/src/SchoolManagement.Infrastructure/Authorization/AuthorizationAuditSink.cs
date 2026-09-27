@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using SchoolManagement.Application.Abstractions.Authorization;
-using SchoolManagement.Domain.Audit;
 using SchoolManagement.Infrastructure.Audit;
 
 namespace SchoolManagement.Infrastructure.Authorization;
@@ -44,18 +43,9 @@ internal sealed class AuthorizationAuditSink(
             ? null
             : new Dictionary<string, object?>(StringComparer.Ordinal) { ["routePath"] = routePath };
 
-        var auditEvent = await factory
-            .BuildAsync(
-                AuditOutcome.Rejected,
-                privilege,
-                EntityType,
-                entityId: null,
-                metadata,
-                userId,
-                reason: null,
-                cancellationToken)
+        // A failed write is logged, never thrown: the 403 stands (TASK-0058).
+        await RejectedAuditWrite
+            .WriteOrLogAsync(factory, rejectedWriter, logger, privilege, EntityType, entityId: null, metadata, userId, reason: null, cancellationToken)
             .ConfigureAwait(false);
-
-        await rejectedWriter.WriteAsync(auditEvent, cancellationToken).ConfigureAwait(false);
     }
 }
