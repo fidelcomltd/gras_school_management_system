@@ -141,11 +141,13 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
             .Where(endpoint => endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods.Contains("POST") == true)
             .ToArray();
 
-        // Exactly one POST route mentions "sessions" at all, and it is the collection-level create —
-        // not, for example, a hypothetical "POST /sessions/{id}/terms" that could produce a
-        // two-or-fewer-term session.
-        postSessionRoutes.Length.ShouldBe(1);
-        (postSessionRoutes[0].RoutePattern.RawText ?? string.Empty).ShouldNotContain("{id}");
+        // Exactly two POST routes mention "sessions": the collection-level create, and end-of-session
+        // promotion (TASK-0036), which moves pupils into an EXISTING next session and creates none
+        // (CreateSessionHandler is the only caller of AcademicSession.Create). A new one, for example a
+        // hypothetical "POST /sessions/{id}/terms" that could produce a two-or-fewer-term session, fails here
+        // until it is reviewed and added.
+        postSessionRoutes.Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
+            .ShouldBe(["/api/v1/sessions", "/api/v1/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
     }
 
     // Review criterion 1, session half: the partial unique index is what stops two active sessions,
