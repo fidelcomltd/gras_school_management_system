@@ -58,7 +58,7 @@ internal sealed class GetPupilQueryHandler(
             }
         }
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
         return Result.Success(PupilMapper.ToDto(pupil, today));
     }
 }

@@ -15,11 +15,6 @@ namespace SchoolManagement.Application.Pupils;
 /// <param name="FirstName">Exact match, case-insensitive.</param>
 /// <param name="DateOfBirth">Exact match.</param>
 /// <param name="ContactPhone">Optional; either Nigerian form. Surname plus any contact phone also matches (spec 6.5.11).</param>
-/// <remarks>
-/// Contact-phone matching (spec 6.5.11's other half of duplicate detection) is the NEXT card's —
-/// <c>pupil_contact</c> does not exist yet. Only the surname+first-name+date-of-birth half is built
-/// here, disclosed rather than silently narrowed.
-/// </remarks>
 public sealed record FindPupilDuplicatesQuery(string Surname, string FirstName, DateOnly DateOfBirth, string? ContactPhone = null)
     : IQuery<Result<IReadOnlyList<PupilDto>>>;
 

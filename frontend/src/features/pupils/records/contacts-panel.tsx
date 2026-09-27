@@ -40,7 +40,7 @@ export function ContactsPanel({ pupilId, canEdit }: { pupilId: string; canEdit: 
   if (contacts.isError) return <QueryErrorState error={contacts.error} onRetry={() => void contacts.refetch()} />;
   return (
     <div className="flex flex-col gap-4">
-      <PhoneDuplicateWarning pupilId={pupilId} phones={contacts.data.items.flatMap((item) => [item.phone, item.whatsappNumber])} />
+      <PhoneDuplicateWarning pupilId={pupilId} />
       <ContactsForm key={JSON.stringify(contacts.data.items)} pupilId={pupilId} items={contacts.data.items} canEdit={canEdit} />
     </div>
   );

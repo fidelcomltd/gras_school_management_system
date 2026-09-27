@@ -57,8 +57,8 @@ describe('register extras', () => {
     await waitFor(() => expect(slips).toBe(1));
   });
 
-  it('warns on a pending admission whose contact phone another record shares', async () => {
-    mockMe('pupil.view', 'contact.view', 'contact.update');
+  it('warns on a pending admission whose contact phone another record shares, until the office ticks it has checked', async () => {
+    mockMe('pupil.view', 'contact.view', 'contact.update', 'pupil.create');
     server.use(
       // Before /pupils/:id, which would otherwise match /pupils/duplicates too.
       http.get(apiUrl('/api/v1/pupils/duplicates'), ({ request }) =>
@@ -85,5 +85,8 @@ describe('register extras', () => {
 
     expect(await screen.findByText(/shares a contact phone/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'OKAFOR Emeka' })).toHaveAttribute('href', '/pupils/pupil-9');
+    const tick = screen.getByRole('checkbox', { name: 'I have checked, this is a different pupil' });
+    await user.click(tick);
+    expect(tick).toBeChecked();
   });
 });

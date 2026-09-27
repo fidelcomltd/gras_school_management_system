@@ -57,6 +57,11 @@ public sealed class PupilRegisterExtrasEndpointsTests(ApiTestFixture fixture) : 
 
         (await GetAsync($"/api/v1/pupils/duplicates?surname={surname}&firstName=Emeka&dateOfBirth=2019-02-02&contactPhone=12", jar))
             .StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        // "%" is a literal, never a wildcard: the phone half stays a same-surname check, not a reverse phone lookup.
+        var wildcard = await ReadAsync<List<PupilDto>>(await GetAsync(
+            "/api/v1/pupils/duplicates?surname=%25&firstName=%25&dateOfBirth=2019-02-02&contactPhone=08031234567", jar));
+        wildcard.ShouldNotContain(pupil => pupil.Id == admitted.ToString());
     }
 
     [Fact]

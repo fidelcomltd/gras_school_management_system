@@ -1,8 +1,8 @@
 using FluentValidation;
 using SchoolManagement.Application.Abstractions.Admissions;
 using SchoolManagement.Application.Abstractions.Auth;
-using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
@@ -29,7 +29,7 @@ internal sealed class GetAdmissionSlipQueryValidator : AbstractValidator<GetAdmi
 internal sealed class GetAdmissionSlipHandler(
     PupilRecordAccess access,
     IAdmissionRecordRepository admissions,
-    IPupilArmOfRecordLookup armOfRecord,
+    IEnrolmentRepository enrolments,
     IArmRepository arms,
     IClassLevelRepository classLevels,
     IAcademicSessionRepository sessions,
@@ -51,15 +51,30 @@ internal sealed class GetAdmissionSlipHandler(
         }
 
         var pupil = allowed.Value;
-        var record = await admissions.FindReadOnlyByPupilIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
-        if (pupil.RegistrationNumber is null || record is null)
+        if (pupil.RegistrationNumber is null)
         {
             return Result.Failure<SchoolImageContent>(Error.Conflict(
                 "pupil.not_admitted", "This pupil has no registration number yet. Approve the admission first."));
         }
 
-        var className = await ClassNameAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
-        var session = await sessions.FindReadOnlyByIdAsync(record.SessionId, cancellationToken).ConfigureAwait(false);
+        // The slip records the admission, so it prints the arm the pupil was admitted into (the first enrolment), never the
+        // current one: a reprint years later must still read as the day it happened. The admission record supplies the date
+        // and session where it exists; older or imported records fall back to that first enrolment.
+        var record = await admissions.FindReadOnlyByPupilIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
+        var first = (await enrolments.ListByPupilReadOnlyAsync(pupil.Id, cancellationToken).ConfigureAwait(false))
+            .OrderBy(enrolment => enrolment.EffectiveFrom)
+            .FirstOrDefault();
+        var arm = first is null ? null : await arms.FindReadOnlyByIdAsync(first.ArmId, cancellationToken).ConfigureAwait(false);
+        var dateAdmitted = record?.DateAdmitted ?? first?.EffectiveFrom;
+        var sessionId = record?.SessionId ?? arm?.SessionId;
+        if (dateAdmitted is null || sessionId is null)
+        {
+            return Result.Failure<SchoolImageContent>(Error.Conflict(
+                "pupil.no_admission_details", "There is no admission record or enrolment to print this pupil's slip from."));
+        }
+
+        var className = arm is null ? null : await ClassNameAsync(arm, cancellationToken).ConfigureAwait(false);
+        var session = await sessions.FindReadOnlyByIdAsync(sessionId.Value, cancellationToken).ConfigureAwait(false);
         var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var printedBy = Guid.TryParse(currentUser.UserId, out var accountId)
             ? (await accounts.FindReadOnlyByIdAsync(accountId, cancellationToken).ConfigureAwait(false))?.StaffName
@@ -75,22 +90,16 @@ internal sealed class GetAdmissionSlipHandler(
             pupil.DateOfBirth,
             className ?? "Not yet placed",
             session?.Name ?? string.Empty,
-            record.DateAdmitted,
+            dateAdmitted.Value,
             timeProvider.GetUtcNow().ToOffset(WeeklyProjection.LagosOffset).DateTime,
             printedBy ?? "Unknown account");
         var bytes = renderer.Render(slip);
         return Result.Success(new SchoolImageContent(new MemoryStream(bytes, writable: false), "application/pdf", "admission-slip.pdf"));
     }
 
-    /// <summary>The arm of the pupil's open enrolment, composed as the school writes it.</summary>
-    private async Task<string?> ClassNameAsync(Guid pupilId, CancellationToken cancellationToken)
+    /// <summary>The admission arm, composed as the school writes it.</summary>
+    private async Task<string> ClassNameAsync(Arm arm, CancellationToken cancellationToken)
     {
-        if (await armOfRecord.GetArmIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not { } armId
-            || await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false) is not { } arm)
-        {
-            return null;
-        }
-
         var level = (await classLevels.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false)).FirstOrDefault(candidate => candidate.Id == arm.ClassLevelId);
         return level is null ? arm.Label : ArmDisplayName.Compose(level.Name, arm.Label);
     }

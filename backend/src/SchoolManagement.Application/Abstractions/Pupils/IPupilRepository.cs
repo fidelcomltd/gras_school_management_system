@@ -97,9 +97,6 @@ public interface IPupilRepository
         DateOnly asOfDate,
         CancellationToken cancellationToken);
 
-    /// <summary>The pupils with these ids, any status, read-only; unknown ids are skipped.</summary>
-    Task<IReadOnlyList<Pupil>> ListReadOnlyByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
-
     /// <summary>
     /// How many pupils, in ANY status, currently hold a non-null <c>registration_number</c> beginning
     /// with <paramref name="abbreviationPrefix"/> — spec 6.2.4's confirmation-dialogue count

@@ -9,7 +9,8 @@ namespace SchoolManagement.Infrastructure.Pupils;
 /// <summary>
 /// <see cref="IAdmissionSlipRenderer"/> over QuestPDF (Community licence): the slip fills the top half of an A4 portrait page
 /// and the lower half is left blank (spec 9.x print rules: "half A4, printed one to a page with the lower half blank, since
-/// the school files them"). Monochrome; the registration number is printed large.
+/// the school files them"). Monochrome; the registration number is printed large. Long text is clamped to two lines, so no
+/// school name, address or pupil name can overflow the fixed half page and fail the print.
 /// </summary>
 internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
 {
@@ -31,8 +32,8 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
             page.Content().Height(PageSizes.A4.Height / 2 - 32).Border(1).Padding(18).Column(column =>
             {
                 column.Spacing(6);
-                column.Item().AlignCenter().Text(slip.SchoolName).Bold().FontSize(15);
-                column.Item().AlignCenter().Text(slip.SchoolAddress).FontColor(Colors.Grey.Darken2);
+                column.Item().AlignCenter().Text(slip.SchoolName).Bold().FontSize(15).ClampLines(2);
+                column.Item().AlignCenter().Text(slip.SchoolAddress).FontColor(Colors.Grey.Darken2).ClampLines(2);
                 column.Item().PaddingTop(4).AlignCenter().Text("ADMISSION SLIP").Bold().FontSize(12).LetterSpacing(0.1f);
                 column.Item().PaddingVertical(8).AlignCenter().Column(number =>
                 {
@@ -68,6 +69,6 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
     private static void Row(TableDescriptor table, string label, string value)
     {
         table.Cell().PaddingVertical(3).Text(label).FontColor(Colors.Grey.Darken2);
-        table.Cell().PaddingVertical(3).Text(value).Bold();
+        table.Cell().PaddingVertical(3).Text(value).Bold().ClampLines(2);
     }
 }

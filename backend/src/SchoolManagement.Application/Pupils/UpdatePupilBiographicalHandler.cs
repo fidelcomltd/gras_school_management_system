@@ -74,7 +74,7 @@ internal sealed class UpdatePupilBiographicalHandler(
             }
         }
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         var update = pupil.UpdateBiographical(
             request.Surname,

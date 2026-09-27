@@ -91,12 +91,16 @@ internal sealed class ListPupilsQueryHandler(
         }
 
         var ids = page.Items.Select(item => Guid.Parse(item.Id)).ToList();
-        var entities = (await pupils.ListReadOnlyByIdsAsync(ids, cancellationToken).ConfigureAwait(false)).ToDictionary(pupil => pupil.Id);
-        var set = await records.LoadForPupilsAsync(ids, cancellationToken).ConfigureAwait(false);
+        var set = await records.LoadChasedForPupilsAsync(ids, cancellationToken).ConfigureAwait(false);
         var items = page.Items
-            .Select(item => entities.TryGetValue(Guid.Parse(item.Id), out var pupil)
-                ? item with { ChasedPercent = Records.AdmissionCompleteness.Evaluate(pupil, set).ChasedPercent }
-                : item)
+            .Select(item =>
+            {
+                var id = Guid.Parse(item.Id);
+                var inputs = new Records.ChasedInputs(
+                    item.PhotoUpdatedAtUtc is not null, item.PreviousSchool, item.OtherInformation, set.Pickup[id].Count(),
+                    set.Health.GetValueOrDefault(id), [.. set.Documents[id]]);
+                return item with { ChasedPercent = Records.AdmissionCompleteness.ChasedPercent(inputs) };
+            })
             .ToList();
         return page with { Items = items };
     }

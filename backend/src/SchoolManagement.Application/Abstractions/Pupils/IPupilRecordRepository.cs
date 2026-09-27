@@ -33,6 +33,9 @@ public interface IPupilRecordRepository
     /// </summary>
     Task<PupilRecordSet> LoadForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
 
+    /// <summary>Only what the chased set reads (health, pickup list, documents), for a page of the pupil list.</summary>
+    Task<ChasedRecordSet> LoadChasedForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
+
     /// <summary>Only what the class safeguarding sheet prints (health, pickup list, barred answer), for many pupils at once.</summary>
     Task<SafeguardingRecordSet> LoadSafeguardingForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
 
@@ -42,6 +45,13 @@ public interface IPupilRecordRepository
     /// <summary>Stages a delete. Does NOT commit.</summary>
     Task RemoveAsync(object entity, CancellationToken cancellationToken);
 }
+
+/// <summary>The chased set's records for many pupils, keyed by pupil.</summary>
+/// <param name="Health">Section F, where recorded.</param>
+/// <param name="Pickup">The authorised pickup lists.</param>
+/// <param name="Documents">The checklist rows.</param>
+public sealed record ChasedRecordSet(
+    IReadOnlyDictionary<Guid, PupilHealth> Health, ILookup<Guid, AuthorisedPickupPerson> Pickup, ILookup<Guid, PupilDocument> Documents);
 
 /// <summary>The class safeguarding sheet's records for many pupils, keyed by pupil.</summary>
 /// <param name="Health">Section F, where recorded.</param>
