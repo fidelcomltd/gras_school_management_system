@@ -59,6 +59,20 @@ internal sealed class PupilRecordRepository(ApplicationDbContext context) : IPup
     }
 
     /// <inheritdoc />
+    public async Task<SafeguardingRecordSet> LoadSafeguardingForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+
+        var health = await Query<PupilHealth>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var pickup = await Query<AuthorisedPickupPerson>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var barred = await Query<BarredPersonAnswer>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new SafeguardingRecordSet(health.ToDictionary(row => row.PupilId), pickup.ToLookup(row => row.PupilId), barred.ToDictionary(row => row.PupilId));
+    }
+
+    /// <inheritdoc />
     public Task AddAsync(object entity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entity);

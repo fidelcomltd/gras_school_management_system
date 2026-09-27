@@ -425,6 +425,16 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken) =>
+        await (
+                from enrolment in context.Enrolments.AsNoTracking()
+                join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                where enrolment.EffectiveTo == null && enrolment.ArmId == armId && pupil.Status == PupilStatus.Active
+                select pupil)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ListTakenRegistrationNumbersAsync(
         IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken)
     {

@@ -9,6 +9,9 @@ export interface ClassChoice {
   arm: ArmDto | undefined;
   arms: ArmDto[];
   isPending: boolean;
+  /** The arms could not be loaded: never read that as "no classes". */
+  isError: boolean;
+  retry: () => void;
   setArmId: (id: string) => void;
 }
 
@@ -30,6 +33,8 @@ export function useClassChoice(sessionId: string, privilege: string): ClassChoic
     arm: arms.find((arm) => arm.id === armId),
     arms,
     isPending: sessionId !== '' && (query.isPending || me.isPending),
+    isError: query.isError,
+    retry: () => void query.refetch(),
     setArmId: setChoice,
   };
 }

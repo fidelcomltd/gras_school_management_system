@@ -14,3 +14,15 @@ export function lagosToday(): string {
 export function lagosDateOf(iso: string): string {
   return new Date(Date.parse(iso) + 60 * 60 * 1000).toISOString().slice(0, 10);
 }
+
+/** An ISO timestamp as the school reads it, in Lagos time: DD/MM/YYYY, HH:MM. */
+export function lagosDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Africa/Lagos',
+  });
+}

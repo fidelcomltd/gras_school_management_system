@@ -4,6 +4,7 @@ import {
   CalendarRange,
   ChartColumn,
   FileWarning,
+  HeartPulse,
   House,
   KeyRound,
   Layers,
@@ -47,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Pupils', to: paths.pupils, icon: Users, requires: 'pupil.view' },
       { label: 'Admissions', to: paths.admissions, icon: UserPlus, requires: 'pupil.view' },
       { label: 'Incomplete records', to: paths.incompleteRecords, icon: FileWarning, requires: 'report.view' },
+      { label: 'Safeguarding sheet', to: paths.safeguardingSheet, icon: HeartPulse, requires: 'pupil.safeguarding.view' },
     ],
   },
   {

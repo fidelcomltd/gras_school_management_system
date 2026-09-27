@@ -103,6 +103,7 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);
 
         MapFiles(pupils);
+        MapSafeguardingSheet(endpoints);
 
         Read(endpoints.MapGet("/admissions/{id:guid}/completeness", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
                 (await sender.SendAsync(new GetAdmissionCompletenessQuery(id), cancellationToken)).Match(TypedResults.Ok)),
@@ -132,6 +133,40 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+    }
+
+    /// <summary>The class safeguarding sheet (spec 15 section 10.2), on screen and as a PDF.</summary>
+    private static void MapSafeguardingSheet(IEndpointRouteBuilder endpoints)
+    {
+        const string Description =
+            "Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special " +
+            "instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only " +
+            "export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check " +
+            "cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only.";
+
+        // Health data: never kept in a browser's disk cache on a shared staff-room computer.
+        Read(endpoints.MapGet("/reports/safeguarding", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    return (await sender.SendAsync(new GenerateSafeguardingSheetCommand(armId), cancellationToken)).Match(TypedResults.Ok);
+                }),
+                "GetSafeguardingSheet", "The class safeguarding sheet for one arm",
+                Description + " Each pupil's thumbnail travels in the sheet, under the sheet's own privilege. Health answers read " +
+                "`None` or `Not asked`, never blank. `Cache-Control: no-store`.")
+            .WithTags(Tag)
+            .Produces<SafeguardingSheetDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        Read(endpoints.MapGet("/reports/safeguarding/pdf", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                    (await sender.SendAsync(new GenerateSafeguardingSheetPdfCommand(armId), cancellationToken))
+                    .Match(content => FileResponses.Serve(httpContext, content, "attachment", "no-store"))),
+                "GetSafeguardingSheetPdf", "The class safeguarding sheet as a printable PDF",
+                Description + " A4 landscape with each pupil's photograph, marked confidential; `attachment`, `no-store`.")
+            .WithTags(Tag)
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
     /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6).</summary>

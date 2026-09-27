@@ -10,9 +10,7 @@ import { formatDate, weekLabel } from './types';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { PageTrail } from '@/components/layout/page-trail';
 import { paths } from '@/app/router/paths';
-
-const lagosDateTime = (iso: string) =>
-  new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+import { lagosDateTime } from '@/shared/format/date';
 
 /**
  * `/weekly/completion` — spec 6.10.12: which classes wrote what, per week, and (for safeguarding staff) the pupils with

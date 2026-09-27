@@ -33,12 +33,22 @@ public interface IPupilRecordRepository
     /// </summary>
     Task<PupilRecordSet> LoadForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
 
+    /// <summary>Only what the class safeguarding sheet prints (health, pickup list, barred answer), for many pupils at once.</summary>
+    Task<SafeguardingRecordSet> LoadSafeguardingForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
+
     /// <summary>Stages a new row of any of the entities above. Does NOT commit.</summary>
     Task AddAsync(object entity, CancellationToken cancellationToken);
 
     /// <summary>Stages a delete. Does NOT commit.</summary>
     Task RemoveAsync(object entity, CancellationToken cancellationToken);
 }
+
+/// <summary>The class safeguarding sheet's records for many pupils, keyed by pupil.</summary>
+/// <param name="Health">Section F, where recorded.</param>
+/// <param name="Pickup">The authorised pickup lists.</param>
+/// <param name="Barred">The barred-persons answers (never the names: the sheet prints a marker).</param>
+public sealed record SafeguardingRecordSet(
+    IReadOnlyDictionary<Guid, PupilHealth> Health, ILookup<Guid, AuthorisedPickupPerson> Pickup, IReadOnlyDictionary<Guid, BarredPersonAnswer> Barred);
 
 /// <summary>Read-only sub-records for a set of pupils, keyed by pupil id.</summary>
 /// <param name="Contacts">Each pupil's contacts.</param>
