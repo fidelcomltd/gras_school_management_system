@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { RequirePrivilege } from '@/app/router/require-privilege';
+import { PromotionScreen } from './promotion-screen';
 import { SessionDetailScreen } from './session-detail-screen';
 import { SessionsListScreen } from './sessions-list-screen';
 
@@ -22,6 +23,14 @@ export const sessionsRoutes: RouteObject[] = [
     element: (
       <RequirePrivilege privilege="session.view">
         <SessionDetailScreen />
+      </RequirePrivilege>
+    ),
+  },
+  {
+    path: 'sessions/:id/promotion',
+    element: (
+      <RequirePrivilege privilege="promotion.run">
+        <PromotionScreen />
       </RequirePrivilege>
     ),
   },

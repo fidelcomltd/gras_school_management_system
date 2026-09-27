@@ -298,6 +298,7 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0059: enrolment — dated membership of a pupil in an arm (spec 02 §5.2).
         services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
+        services.AddScoped<Application.Abstractions.Promotion.IPromotionRepository, PromotionRepository>();
 
         // TASK-0062: admission_record — sections A, I and J of the admission form (spec 6.5.9).
         services.AddScoped<IAdmissionRecordRepository, AdmissionRecordRepository>();

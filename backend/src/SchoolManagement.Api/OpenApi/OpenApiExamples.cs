@@ -9,6 +9,7 @@ using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Pins;
+using SchoolManagement.Application.Promotion;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Pupils.Import;
 using SchoolManagement.Application.Pupils.Movement;
@@ -3145,6 +3146,94 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(PromotionSessionDto)] = $$"""
+            { "id": "{{ExampleSessionId}}", "name": "2026/2027", "startDate": "2026-09-14", "endDate": "2027-07-23" }
+            """,
+
+        [typeof(PromotionBlockerDto)] = """
+            { "code": "promotion.receiving_level_without_arm", "message": "Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion." }
+            """,
+
+        [typeof(PromotionCoreResultDto)] = $$"""
+            { "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }
+            """,
+
+        [typeof(PromotionCoreSubjectDto)] = $$"""
+            { "subjectId": "{{ExampleSubjectId}}", "name": "Mathematics" }
+            """,
+
+        [typeof(PromotionRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014",
+              "currentArmId": "{{ExampleArmId}}", "currentArmName": "Primary 2A", "classLevelId": "{{ExampleLevelId}}",
+              "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "annualAverage": 71.25,
+              "coreResults": [{ "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }],
+              "proposedOutcome": "Promoted", "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+            }
+            """,
+
+        [typeof(PromotionTargetArmDto)] = """
+            { "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "name": "Primary 3A", "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "capacity": 30, "enrolledCount": 2 }
+            """,
+
+        [typeof(PromotionExcludedPupilDto)] = $$"""
+            { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "status": "Withdrawn" }
+            """,
+
+        [typeof(PromotionBatchDto)] = $$"""
+            {
+              "id": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938", "sourceSessionId": "{{ExampleSessionId}}",
+              "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49", "targetSessionName": "2027/2028", "state": "Committed",
+              "committedAtUtc": "2027-07-28T10:15:00+00:00", "reversedAtUtc": null,
+              "promoted": 182, "repeated": 9, "promotedOnTrial": 3, "graduated": 41
+            }
+            """,
+
+        [typeof(PromotionPreviewDto)] = $$"""
+            {
+              "sourceSession": { "id": "{{ExampleSessionId}}", "name": "2026/2027", "startDate": "2026-09-14", "endDate": "2027-07-23" },
+              "targetSession": { "id": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49", "name": "2027/2028", "startDate": "2027-09-13", "endDate": "2028-07-21" },
+              "blockers": [],
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014",
+                  "currentArmId": "{{ExampleArmId}}", "currentArmName": "Primary 2A", "classLevelId": "{{ExampleLevelId}}",
+                  "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "annualAverage": 71.25,
+                  "coreResults": [{ "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }],
+                  "proposedOutcome": "Promoted", "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+                }
+              ],
+              "targetArms": [
+                { "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "name": "Primary 3A", "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "capacity": 30, "enrolledCount": 2 }
+              ],
+              "coreSubjects": [{ "subjectId": "{{ExampleSubjectId}}", "name": "Mathematics" }],
+              "excluded": [
+                { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "status": "Withdrawn" }
+              ],
+              "committedBatch": null,
+              "canDecide": true
+            }
+            """,
+
+        [typeof(PromotionDecisionInput)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "outcome": "PromotedOnTrial", "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "reason": "Missed most of Second Term through illness; strong Third Term." }
+            """,
+
+        [typeof(CommitPromotionCommand)] = $$"""
+            {
+              "sessionId": "{{ExampleSessionId}}",
+              "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+              "decisions": [
+                { "pupilId": "{{ExamplePupilId}}", "outcome": "Promoted", "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "reason": null },
+                { "pupilId": "{{ExampleSecondPupilId}}", "outcome": "Repeat", "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a", "reason": null }
+              ]
+            }
+            """,
+
+        [typeof(ReversePromotionCommand)] = """
+            { "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938", "reason": "Committed into the wrong session; the new session's dates were being corrected." }
+            """,
+
         [typeof(PupilPhotoDto)] = $$"""
             {
               "pupilId": "{{ExamplePupilId}}",
@@ -3396,6 +3485,8 @@ internal static class OpenApiExamples
         // the XML doc comment on T does not reach.
         [typeof(SchoolManagement.Domain.Pupils.BloodGroup?)] = "A blood group (spec 6.5.7): A+, A-, B+, B-, AB+, AB-, O+ or O-, spelled out. Free text is not accepted.",
         [typeof(SchoolManagement.Domain.Pupils.Genotype?)] = "A genotype (spec 6.5.7): AA, AS, SS, AC or SC.",
+        [typeof(SchoolManagement.Domain.Promotion.PromotionDecisionOutcome?)] =
+            "A promotion outcome (spec 6.3.7): Promoted, Repeat, PromotedOnTrial (never proposed, chosen with a reason) or Graduated (terminal level only).",
 
         [typeof(Microsoft.AspNetCore.Mvc.ProblemDetails)] =
             "An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` " +

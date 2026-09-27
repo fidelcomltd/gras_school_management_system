@@ -1007,6 +1007,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{sessionId}/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit a session's promotion
+         * @description Spec 6.3.7: one decision per active pupil, exactly once, applied in ONE transaction: each current enrolment closes on the old session's end date and a new one opens in the target arm on the new session's start date; a graduate changes status and gets no enrolment. Changing a proposed outcome, or choosing `PromotedOnTrial` (which also needs a reason of 10 to 500 characters), needs `promotion.decide`. Over capacity is allowed (spec 6.4.9 warns, never blocks). 409 while any preview blocker remains or when the pupils changed since the preview. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CommitPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{sessionId}/promotion/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview a session's promotion
+         * @description Spec 6.3.7's review screen: one row per active pupil with the annual average, core subject results, the proposed outcome (Promoted, Repeat, or Graduated at the terminal level; blank with no annual result) and a default target arm dealt round-robin by descending average; the target session's arms with capacity and current counts; pupils no longer active, listed apart; and every unmet precondition in `blockers`. `targetSessionId` defaults to the next session by start date. When promotion has already run, `rows` is empty and `committedBatch` describes the batch.
+         */
+        get: operations["GetPromotionPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion-batches/{batchId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a promotion
+         * @description Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters. `Idempotency-Key` is accepted, not required.
+         */
+        post: operations["ReversePromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils": {
         parameters: {
             query?: never;
@@ -3824,6 +3884,61 @@ export interface components {
              * @example true
              */
             dryRun: boolean;
+        };
+        /**
+         * @description `POST /api/v1/sessions/{sessionId}/promotion` (spec 6.3.7): commits the whole school's promotion in one transaction.
+         *             Every active pupil appears exactly once. Needs `promotion.run`; changing a proposal or choosing on trial also needs
+         *             `promotion.decide`.
+         * @example {
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *       "decisions": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "outcome": "Promoted",
+         *           "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *           "reason": null
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "outcome": "Repeat",
+         *           "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a",
+         *           "reason": null
+         *         }
+         *       ]
+         *     }
+         */
+        CommitPromotionCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /**
+             * Format: uuid
+             * @description The session promoted into, as the preview named it.
+             * @example 0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49
+             */
+            targetSessionId: string;
+            /**
+             * @description One per active pupil.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "outcome": "Promoted",
+             *         "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+             *         "reason": null
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "outcome": "Repeat",
+             *         "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a",
+             *         "reason": null
+             *       }
+             *     ]
+             */
+            decisions: components["schemas"]["PromotionDecisionInput"][];
         };
         /**
          * @description One missing item on an admission (spec 6.5.12), keyed to the step that fixes it.
@@ -7043,6 +7158,526 @@ export interface components {
             lockedUntil?: string;
         };
         /**
+         * @description A promotion batch and its tallies.
+         * @example {
+         *       "id": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
+         *       "sourceSessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *       "targetSessionName": "2027/2028",
+         *       "state": "Committed",
+         *       "committedAtUtc": "2027-07-28T10:15:00+00:00",
+         *       "reversedAtUtc": null,
+         *       "promoted": 182,
+         *       "repeated": 9,
+         *       "promotedOnTrial": 3,
+         *       "graduated": 41
+         *     }
+         */
+        PromotionBatchDto: {
+            /**
+             * Format: uuid
+             * @description The batch.
+             * @example 0192f0c4-bf71-7d9e-c2b0-6e1ed2093938
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Promoted from.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sourceSessionId: string;
+            /**
+             * Format: uuid
+             * @description Promoted into.
+             * @example 0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49
+             */
+            targetSessionId: string;
+            /**
+             * @description For the screen's summary line.
+             * @example 2027/2028
+             */
+            targetSessionName: string;
+            /** @description Committed or Reversed. */
+            state: components["schemas"]["PromotionBatchState"];
+            /**
+             * Format: date-time
+             * @description When it was committed.
+             * @example 2027-07-28T10:15:00+00:00
+             */
+            committedAtUtc: string;
+            /**
+             * Format: date-time
+             * @description When it was reversed, if it was.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            reversedAtUtc: null | string;
+            /**
+             * Format: int32
+             * @description Pupils promoted.
+             * @example 182
+             */
+            promoted: number | string;
+            /**
+             * Format: int32
+             * @description Pupils repeating.
+             * @example 9
+             */
+            repeated: number | string;
+            /**
+             * Format: int32
+             * @description Pupils promoted on trial.
+             * @example 3
+             */
+            promotedOnTrial: number | string;
+            /**
+             * Format: int32
+             * @description Pupils graduated.
+             * @example 41
+             */
+            graduated: number | string;
+        };
+        /**
+         * @description A committed promotion's lifecycle (spec 6.3.7). A reversed batch is kept, marked, never deleted.
+         * @example Committed
+         * @enum {unknown}
+         */
+        PromotionBatchState: "Committed" | "Reversed";
+        /**
+         * @description One unmet precondition, with spec 6.3.7's wording where it gives one.
+         * @example {
+         *       "code": "promotion.receiving_level_without_arm",
+         *       "message": "Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion."
+         *     }
+         */
+        PromotionBlockerDto: {
+            /**
+             * @description Stable, for example `promotion.receiving_level_without_arm`.
+             * @example promotion.receiving_level_without_arm
+             */
+            code: string;
+            /**
+             * @description Shown as written.
+             * @example Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion.
+             */
+            message: string;
+        };
+        /**
+         * @description A pupil's annual mean in one core subject.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "mean": 68.5,
+         *       "passed": true
+         *     }
+         */
+        PromotionCoreResultDto: {
+            /**
+             * Format: uuid
+             * @description The core subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * Format: double
+             * @description Null when the pupil did not take it (which never counts against them).
+             * @example 68.5
+             */
+            mean: null | number | string;
+            /**
+             * @description At or above the pass mark; null when not taken.
+             * @example true
+             */
+            passed: null | boolean;
+        };
+        /**
+         * @description A core subject's name for the screen's column headings.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": "Mathematics"
+         *     }
+         */
+        PromotionCoreSubjectDto: {
+            /**
+             * Format: uuid
+             * @description The subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description As configured.
+             * @example Mathematics
+             */
+            name: string;
+        };
+        /**
+         * @description One pupil's decision as the review screen submits it.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "outcome": "PromotedOnTrial",
+         *       "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *       "reason": "Missed most of Second Term through illness; strong Third Term."
+         *     }
+         */
+        PromotionDecisionInput: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /** @description Promoted, Repeat, PromotedOnTrial or Graduated. */
+            outcome: components["schemas"]["PromotionDecisionOutcome"];
+            /**
+             * Format: uuid
+             * @description An arm of the destination level in the target session; null for a graduate.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            targetArmId: null | string;
+            /**
+             * @description Required for PromotedOnTrial; optional otherwise.
+             * @example Missed most of Second Term through illness; strong Third Term.
+             */
+            reason: null | string;
+        };
+        /**
+         * @description What happened to one pupil in a promotion batch.
+         * @example PromotedOnTrial
+         * @enum {unknown}
+         */
+        PromotionDecisionOutcome: "Promoted" | "Repeat" | "PromotedOnTrial" | "Graduated";
+        /**
+         * @description A pupil enrolled in the session who is no longer active.
+         * @example {
+         *       "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *       "displayName": "Bello Amina",
+         *       "registrationNumber": "GRA/2025/0031",
+         *       "status": "Withdrawn"
+         *     }
+         */
+        PromotionExcludedPupilDto: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-590b-7768-6c5a-08b827aad3d2
+             */
+            pupilId: string;
+            /**
+             * @description Surname first.
+             * @example Bello Amina
+             */
+            displayName: string;
+            /**
+             * @description As issued.
+             * @example GRA/2025/0031
+             */
+            registrationNumber: null | string;
+            /** @description Transferred, withdrawn or graduated. */
+            status: components["schemas"]["PupilStatus"];
+        };
+        /**
+         * @description Spec 6.3.7's review screen: every active pupil with the system's proposal and a default target arm, the destination
+         *     arms with their counts, and whatever blocks the run. When a committed batch already exists the rows are empty and
+         *     CommittedBatch describes it, so the screen can offer reversal instead.
+         * @example {
+         *       "sourceSession": {
+         *         "id": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *         "name": "2026/2027",
+         *         "startDate": "2026-09-14",
+         *         "endDate": "2027-07-23"
+         *       },
+         *       "targetSession": {
+         *         "id": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *         "name": "2027/2028",
+         *         "startDate": "2027-09-13",
+         *         "endDate": "2028-07-21"
+         *       },
+         *       "blockers": [],
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "registrationNumber": "GRA/2026/0014",
+         *           "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "currentArmName": "Primary 2A",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *           "annualAverage": 71.25,
+         *           "coreResults": [
+         *             {
+         *               "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *               "mean": 68.5,
+         *               "passed": true
+         *             }
+         *           ],
+         *           "proposedOutcome": "Promoted",
+         *           "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+         *         }
+         *       ],
+         *       "targetArms": [
+         *         {
+         *           "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *           "name": "Primary 3A",
+         *           "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *           "capacity": 30,
+         *           "enrolledCount": 2
+         *         }
+         *       ],
+         *       "coreSubjects": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "name": "Mathematics"
+         *         }
+         *       ],
+         *       "excluded": [
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "displayName": "Bello Amina",
+         *           "registrationNumber": "GRA/2025/0031",
+         *           "status": "Withdrawn"
+         *         }
+         *       ],
+         *       "committedBatch": null,
+         *       "canDecide": true
+         *     }
+         */
+        PromotionPreviewDto: {
+            /** @description The session promoted from. */
+            sourceSession: components["schemas"]["PromotionSessionDto"];
+            targetSession: null | components["schemas"]["PromotionSessionDto"];
+            /**
+             * @description Every unmet precondition; commit is refused while any remains.
+             * @example []
+             */
+            blockers: components["schemas"]["PromotionBlockerDto"][];
+            /**
+             * @description One per active pupil, ordered by current arm then name.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "registrationNumber": "GRA/2026/0014",
+             *         "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "currentArmName": "Primary 2A",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+             *         "annualAverage": 71.25,
+             *         "coreResults": [
+             *           {
+             *             "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *             "mean": 68.5,
+             *             "passed": true
+             *           }
+             *         ],
+             *         "proposedOutcome": "Promoted",
+             *         "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["PromotionRowDto"][];
+            /**
+             * @description The target session's active arms, with capacity and the pupils already enrolled in each.
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+             *         "name": "Primary 3A",
+             *         "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+             *         "capacity": 30,
+             *         "enrolledCount": 2
+             *       }
+             *     ]
+             */
+            targetArms: components["schemas"]["PromotionTargetArmDto"][];
+            /**
+             * @description The core subjects the rows' core results are reported against, in settings order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "name": "Mathematics"
+             *       }
+             *     ]
+             */
+            coreSubjects: components["schemas"]["PromotionCoreSubjectDto"][];
+            /**
+             * @description Pupils enrolled in the session who are no longer active (spec 6.3.9): shown apart, never promoted.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "displayName": "Bello Amina",
+             *         "registrationNumber": "GRA/2025/0031",
+             *         "status": "Withdrawn"
+             *       }
+             *     ]
+             */
+            excluded: components["schemas"]["PromotionExcludedPupilDto"][];
+            committedBatch: null | components["schemas"]["PromotionBatchDto"];
+            /**
+             * @description Whether the caller holds `promotion.decide`: changing a proposal and on trial need it.
+             * @example true
+             */
+            canDecide: boolean;
+        };
+        /**
+         * @description One pupil on the review screen.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "registrationNumber": "GRA/2026/0014",
+         *       "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "currentArmName": "Primary 2A",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *       "annualAverage": 71.25,
+         *       "coreResults": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "mean": 68.5,
+         *           "passed": true
+         *         }
+         *       ],
+         *       "proposedOutcome": "Promoted",
+         *       "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+         *     }
+         */
+        PromotionRowDto: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Surname first.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description As issued.
+             * @example GRA/2026/0014
+             */
+            registrationNumber: null | string;
+            /**
+             * Format: uuid
+             * @description The arm the pupil ends the session in.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            currentArmId: string;
+            /**
+             * @description For example Primary 2A.
+             * @example Primary 2A
+             */
+            currentArmName: string;
+            /**
+             * Format: uuid
+             * @description The current level: a repeat goes to an arm of this level.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: uuid
+             * @description The level promotion moves to; null at the terminal level, where promotion is graduation.
+             * @example 0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716
+             */
+            nextLevelId: null | string;
+            /**
+             * Format: double
+             * @description The annual cumulative average; null when no annual result exists (the administrator must choose).
+             * @example 71.25
+             */
+            annualAverage: null | number | string;
+            /**
+             * @description One per core subject, in IReadOnlyList&lt;PromotionCoreSubjectDto&gt; PromotionPreviewDto.CoreSubjects order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "mean": 68.5,
+             *         "passed": true
+             *       }
+             *     ]
+             */
+            coreResults: components["schemas"]["PromotionCoreResultDto"][];
+            proposedOutcome: null | components["schemas"]["PromotionDecisionOutcome"];
+            /**
+             * Format: uuid
+             * @description The balanced round-robin default; null for a graduate or a blank proposal.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            proposedTargetArmId: null | string;
+        };
+        /**
+         * @description A session as the promotion screen names it.
+         * @example {
+         *       "id": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-23"
+         *     }
+         */
+        PromotionSessionDto: {
+            /**
+             * Format: uuid
+             * @description The session.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            id: string;
+            /**
+             * @description For example 2027/2028.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description The new enrolments start on the target's start date.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The old enrolments close on the source's end date.
+             * @example 2027-07-23
+             */
+            endDate: string;
+        };
+        /**
+         * @description A destination arm in the target session.
+         * @example {
+         *       "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *       "name": "Primary 3A",
+         *       "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *       "capacity": 30,
+         *       "enrolledCount": 2
+         *     }
+         */
+        PromotionTargetArmDto: {
+            /**
+             * Format: uuid
+             * @description The arm.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            armId: string;
+            /**
+             * @description For example Primary 3B.
+             * @example Primary 3A
+             */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Its level.
+             * @example 0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Over capacity warns, never blocks (spec 6.4.9).
+             * @example 30
+             */
+            capacity: number | string;
+            /**
+             * Format: int32
+             * @description Pupils already enrolled in it, before this promotion adds any.
+             * @example 2
+             */
+            enrolledCount: number | string;
+        };
+        /**
          * @description The published set.
          * @example {
          *       "resultSet": {
@@ -9830,6 +10465,27 @@ export interface components {
         ReturnResultSetResponse: {
             /** @description The set's new state (Returned for Correction) and its other summary fields. */
             resultSet: components["schemas"]["ResultSetSummaryDto"];
+        };
+        /**
+         * @description `POST /api/v1/promotion-batches/{batchId}/reverse` (spec 6.3.7): undoes a committed promotion, while no mark has been
+         *             entered and no pin used in the new session. Needs `promotion.reverse` and a reason. The batch row is kept, marked.
+         * @example {
+         *       "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
+         *       "reason": "Committed into the wrong session; the new session's dates were being corrected."
+         *     }
+         */
+        ReversePromotionCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-bf71-7d9e-c2b0-6e1ed2093938
+             */
+            batchId: string;
+            /**
+             * @description 10 to 500 characters.
+             * @example Committed into the wrong session; the new session's dates were being corrected.
+             */
+            reason: string;
         };
         /**
          * @description Wire shape of a RoleAssignment (spec 6.1.5).
@@ -19760,6 +20416,275 @@ export interface operations {
             /** @description Too Many Requests */
             429: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CommitPromotion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitPromotionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionBatchDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPromotionPreview: {
+        parameters: {
+            query?: {
+                targetSessionId?: string;
+            };
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionPreviewDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReversePromotion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversePromotionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
                     [name: string]: unknown;
                 };
                 content: {
