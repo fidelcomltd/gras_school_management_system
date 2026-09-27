@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarRange,
   ChartColumn,
+  ClipboardList,
   FileWarning,
   HeartPulse,
   House,
@@ -60,6 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Class records', to: paths.classRecords, icon: NotebookTabs, requires: 'result.view' },
       { label: 'Weekly reports', to: paths.weekly, icon: CalendarCheck, requires: 'weekly.view' },
       { label: 'Pins', to: paths.pins, icon: KeyRound, requires: 'pin.view' },
+      { label: 'Reports', to: paths.reports, icon: ClipboardList, requires: 'report.view', end: true },
     ],
   },
   {

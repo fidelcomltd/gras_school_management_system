@@ -10,6 +10,7 @@ import { authRoutes, publicAuthRoutes } from '@/features/auth/auth-routes';
 import { classesRoutes } from '@/features/classes/classes-routes';
 import { pinsRoutes } from '@/features/pins/pins-routes';
 import { pupilsRoutes } from '@/features/pupils/pupils-routes';
+import { reportsRoutes } from '@/features/reports/reports-routes';
 import { resultsRoutes } from '@/features/results/results-routes';
 import { weeklyRoutes } from '@/features/weekly/weekly-routes';
 import { subjectsRoutes } from '@/features/subjects/subjects-routes';
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
       ...pupilsRoutes,
       ...subjectsRoutes,
       ...resultsRoutes,
+      ...reportsRoutes,
       ...weeklyRoutes,
       ...pinsRoutes,
       ...auditRoutes,
