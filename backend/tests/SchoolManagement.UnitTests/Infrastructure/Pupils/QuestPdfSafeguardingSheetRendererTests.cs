@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace SchoolManagement.UnitTests.Infrastructure.Pupils;
 
-/// <summary>The class safeguarding sheet PDF renders, with and without photographs, across more than one page.</summary>
+/// <summary>The class safeguarding sheet PDF renders with, without and with a corrupt photograph, across more than one page.</summary>
 public sealed class QuestPdfSafeguardingSheetRendererTests
 {
     [Fact]
@@ -13,7 +13,7 @@ public sealed class QuestPdfSafeguardingSheetRendererTests
         var photo = Jpeg();
         var rows = Enumerable.Range(1, 40).Select(index => new SafeguardingSheetRow(
             $"PUPIL {index} Chidera",
-            index % 2 == 0 ? photo : (ReadOnlyMemory<byte>?)null,
+            index switch { 1 => new byte[] { 1, 2, 3, 4 }, _ when index % 2 == 0 => photo, _ => (ReadOnlyMemory<byte>?)null },
             index % 3 == 0 ? "Groundnuts" : "None",
             "None",
             "Not asked",

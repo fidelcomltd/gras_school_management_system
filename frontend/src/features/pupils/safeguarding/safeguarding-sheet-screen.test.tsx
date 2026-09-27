@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
-import { renderWithProviders, screen } from '@/test/render';
+import { renderWithProviders, screen, waitFor } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { SafeguardingSheetScreen } from './safeguarding-sheet-screen';
@@ -29,7 +29,7 @@ const SHEET = {
   generatedAtUtc: '2026-10-05T07:45:00+00:00',
   pupils: [
     {
-      pupilId: 'p-1', registrationNumber: 'GRAS/2026/0041', name: 'OKAFOR Chidera', photoUpdatedAtUtc: null, allergies: 'Groundnuts',
+      pupilId: 'p-1', registrationNumber: 'GRAS/2026/0041', name: 'OKAFOR Chidera', thumbnail: null, allergies: 'Groundnuts',
       medicalConditions: 'None', medication: 'Not asked', specialInstructions: '', hospital: 'St. Charles Borromeo, 08037776666',
       pickupPersons: ['Ngozi Okafor (Aunt) 08059876543'], barredMarker: 'Yes: see office',
     },
@@ -37,7 +37,7 @@ const SHEET = {
 };
 
 describe('SafeguardingSheetScreen', () => {
-  it('generates the sheet only when asked, since every generation is audited, then shows the class', async () => {
+  it('generates the sheet only when asked, and afresh each time, since every generation is audited', async () => {
     mockMe('pupil.safeguarding.view');
     mockClass();
     let generated = 0;
@@ -56,6 +56,21 @@ describe('SafeguardingSheetScreen', () => {
     expect(screen.getByText('Groundnuts')).toBeInTheDocument();
     expect(screen.getByText('Yes: see office')).toBeInTheDocument();
     expect(generated).toBe(1);
+    expect(screen.getByText(/Generated /)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show again' }));
+    await waitFor(() => expect(generated).toBe(2));
+  });
+
+  it('says the classes could not be loaded, with a retry, rather than that there are none', async () => {
+    mockMe('pupil.safeguarding.view');
+    mockClass();
+    server.use(http.get(apiUrl('/api/v1/arms'), () => new HttpResponse(null, { status: 500 })));
+
+    renderWithProviders(<SafeguardingSheetScreen />);
+
+    expect(await screen.findByText('The classes could not be loaded. Check the connection and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('There are no classes whose safeguarding details you can view.')).not.toBeInTheDocument();
   });
 
   it('says so when the caller can view no class', async () => {

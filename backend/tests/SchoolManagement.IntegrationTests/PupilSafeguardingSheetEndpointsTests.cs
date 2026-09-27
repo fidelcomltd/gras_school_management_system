@@ -3,13 +3,16 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Pupils;
+using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
+using SkiaSharp;
 
 namespace SchoolManagement.IntegrationTests;
 
@@ -25,16 +28,18 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
     public async Task Sheet_ListsTheArmsPupils_WithHealthPickupAndAMarkerOnly_AndEachGenerationIsAudited()
     {
         RequireDatabase();
-        var (armId, otherPupilId) = await SeedArmWithPupilAsync();
+        var (armId, _, otherPupilId, _) = await SeedArmWithPupilAsync();
         var jar = await SignInAsync();
 
         var screen = await GetAsync($"/api/v1/reports/safeguarding?armId={armId}", jar);
 
         screen.StatusCode.ShouldBe(HttpStatusCode.OK);
+        screen.Headers.CacheControl!.NoStore.ShouldBeTrue(); // health data never reaches a disk cache
         var sheet = await ReadAsync<SafeguardingSheetDto>(screen);
         sheet.ArmName.ShouldEndWith("A");
         var row = sheet.Pupils.ShouldHaveSingleItem();
         row.Name.ShouldBe("OKAFOR Chidera");
+        row.Thumbnail.ShouldStartWith("data:image/jpeg;base64,"); // travels in the sheet, under the sheet's privilege
         row.Allergies.ShouldBe("Groundnuts");
         row.MedicalConditions.ShouldBe("None");
         row.Medication.ShouldBe("Not asked");
@@ -47,6 +52,7 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
         var pdf = await GetAsync($"/api/v1/reports/safeguarding/pdf?armId={armId}", jar);
         pdf.StatusCode.ShouldBe(HttpStatusCode.OK);
         pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        pdf.Headers.CacheControl!.NoStore.ShouldBeTrue();
         var bytes = await pdf.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
         bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8).ShouldBeTrue();
 
@@ -60,6 +66,25 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task Sheet_IsRefusedForAnotherArm_OrWithoutTheGrant_AndABadArmIdIs422()
+    {
+        RequireDatabase();
+        var (armId, otherArmId, _, sessionId) = await SeedArmWithPupilAsync();
+
+        var otherArmOnly = await SignInWithGrantAsync(ScopeType.ArmList, [otherArmId], sessionId);
+        (await GetAsync($"/api/v1/reports/safeguarding?armId={armId}", otherArmOnly)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await GetAsync($"/api/v1/reports/safeguarding/pdf?armId={armId}", otherArmOnly)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await GetAsync($"/api/v1/reports/safeguarding?armId={otherArmId}", otherArmOnly)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var (_, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
+        var noGrant = await SignInAsync(email);
+        (await GetAsync($"/api/v1/reports/safeguarding?armId={armId}", noGrant)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        (await GetAsync("/api/v1/reports/safeguarding?armId=not-a-guid", otherArmOnly)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await GetAsync("/api/v1/reports/safeguarding", otherArmOnly)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task Sheet_ForAnUnknownArm_Is404_AndUnauthenticatedIs401()
     {
         RequireDatabase();
@@ -70,7 +95,7 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
     }
 
     /// <summary>An arm with one fully recorded active pupil, plus a pupil in another arm who must not appear.</summary>
-    private async Task<(Guid ArmId, Guid OtherPupilId)> SeedArmWithPupilAsync()
+    private async Task<(Guid ArmId, Guid OtherArmId, Guid OtherPupilId, Guid SessionId)> SeedArmWithPupilAsync()
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -84,6 +109,9 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
         context.AddRange(arm, otherArm);
 
         var pupil = NewPupil("Okafor");
+        var store = scope.ServiceProvider.GetRequiredService<ISchoolImageStore>();
+        var thumbnail = await store.PutAsync(Jpeg(), "image/jpeg", TestContext.Current.CancellationToken);
+        pupil.SetPhoto(thumbnail, thumbnail, DateTimeOffset.UtcNow);
         var other = NewPupil("Bello");
         context.AddRange(pupil, other);
         context.AddRange(
@@ -100,16 +128,50 @@ public sealed class PupilSafeguardingSheetEndpointsTests(ApiTestFixture fixture)
 
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE pupils SET status = {nameof(PupilStatus.Active)} WHERE id IN ({pupil.Id}, {other.Id})", TestContext.Current.CancellationToken);
-        return (arm.Id, other.Id);
+        return (arm.Id, otherArm.Id, other.Id, session.Id);
+    }
+
+    private static byte[] Jpeg()
+    {
+        using var bitmap = new SKBitmap(96, 96);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.SteelBlue);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 80);
+        return data.ToArray();
     }
 
     private static Pupil NewPupil(string surname) => Pupil.Create(
         Guid.CreateVersion7(), surname, "Chidera", middleName: null, PupilSex.Female, new DateOnly(2018, 1, 1), asOfDate: new DateOnly(2026, 9, 9),
         nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka", previousSchool: null, previousClass: null, otherInformation: null).Value;
 
+    /// <summary>A regular account holding pupil.safeguarding.view with the given scope.</summary>
+    private async Task<CookieJar> SignInWithGrantAsync(ScopeType scope, IReadOnlyCollection<Guid> armIds, Guid sessionId)
+    {
+        var (accountId, email, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture, mustChangePassword: false);
+        await using (var scopeHandle = Fixture.CreateScope())
+        {
+            var context = scopeHandle.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var role = Role.Create(Guid.CreateVersion7(), $"Role-{Guid.NewGuid():N}", null, [Privileges.Pupil.SafeguardingView]).Value;
+            context.Add(role);
+            context.Add(RoleAssignment.Create(Guid.CreateVersion7(), accountId, role.Id, sessionId, scope, armIds, accountId).Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        return await SignInAsync(email);
+    }
+
     private async Task<CookieJar> SignInAsync()
     {
         var (_, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        return await SignInAsync(email);
+    }
+
+    private async Task<CookieJar> SignInAsync(string email)
+    {
         var jar = new CookieJar();
         await GetAsync("/api/v1/auth/csrf", jar);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/sign-in")

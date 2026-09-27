@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { apiGet } from '@/api/client';
 import type { components } from '@/api/schema';
 import { getFile, saveFile } from '@/lib/http';
@@ -8,22 +8,22 @@ export type SafeguardingSheetDto = components['schemas']['SafeguardingSheetDto']
 export type SafeguardingSheetRowDto = components['schemas']['SafeguardingSheetRowDto'];
 
 /**
- * The class safeguarding sheet (spec 15 section 10.2). Every generation is audited server-side, so it is fetched only on an
- * explicit request (`enabled`), never refetched behind the reader's back, and each class is kept once fetched.
+ * Generates the class safeguarding sheet (spec 15 section 10.2). A mutation, not a cached query: every generation is an
+ * audited act on the server, so each Show sheet asks again (fresh data, a fresh audit record) and nothing is re-shown from
+ * a cache without being recorded.
  */
-export function useSafeguardingSheet(armId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: [PupilsKeys.Safeguarding, armId],
-    queryFn: ({ signal }) => apiGet('/api/v1/reports/safeguarding', { armId }, { signal }),
-    enabled: enabled && armId !== '',
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    retry: false,
+export function useGenerateSafeguardingSheet() {
+  return useMutation({
+    mutationKey: [PupilsKeys.Safeguarding, 'generate'],
+    mutationFn: (armId: string) => apiGet('/api/v1/reports/safeguarding', { armId }),
   });
 }
 
 /** The printable PDF, saved under the server's own name. Also audited. */
-export async function downloadSafeguardingSheet(armId: string): Promise<void> {
-  saveFile(await getFile(`/api/v1/reports/safeguarding/pdf?armId=${encodeURIComponent(armId)}`, 'safeguarding-sheet.pdf'));
+export function useDownloadSafeguardingSheet() {
+  return useMutation({
+    mutationKey: [PupilsKeys.Safeguarding, 'download'],
+    mutationFn: async (armId: string) =>
+      saveFile(await getFile(`/api/v1/reports/safeguarding/pdf?armId=${encodeURIComponent(armId)}`, 'safeguarding-sheet.pdf')),
+  });
 }

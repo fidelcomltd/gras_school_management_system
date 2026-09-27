@@ -688,7 +688,7 @@ export interface paths {
         };
         /**
          * The class safeguarding sheet for one arm
-         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. Health answers read `None` or `Not asked`, never blank.
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. Each pupil's thumbnail travels in the sheet, under the sheet's own privilege. Health answers read `None` or `Not asked`, never blank. `Cache-Control: no-store`.
          */
         get: operations["GetSafeguardingSheet"];
         put?: never;
@@ -708,7 +708,7 @@ export interface paths {
         };
         /**
          * The class safeguarding sheet as a printable PDF
-         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. A4 landscape with each pupil's photograph, marked confidential; `attachment`, `private`.
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. A4 landscape with each pupil's photograph, marked confidential; `attachment`, `no-store`.
          */
         get: operations["GetSafeguardingSheetPdf"];
         put?: never;
@@ -9946,7 +9946,7 @@ export interface components {
          *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
          *           "registrationNumber": "GRA/2026/0014",
          *           "name": "OKAFOR Chidera Ngozi",
-         *           "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+         *           "thumbnail": null,
          *           "allergies": "Groundnuts",
          *           "medicalConditions": "None",
          *           "medication": "Not asked",
@@ -9989,7 +9989,7 @@ export interface components {
              *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
              *         "registrationNumber": "GRA/2026/0014",
              *         "name": "OKAFOR Chidera Ngozi",
-             *         "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+             *         "thumbnail": null,
              *         "allergies": "Groundnuts",
              *         "medicalConditions": "None",
              *         "medication": "Not asked",
@@ -10010,7 +10010,7 @@ export interface components {
          *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
          *       "registrationNumber": "GRA/2026/0014",
          *       "name": "OKAFOR Chidera Ngozi",
-         *       "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00",
+         *       "thumbnail": null,
          *       "allergies": "Groundnuts",
          *       "medicalConditions": "None",
          *       "medication": "Not asked",
@@ -10039,11 +10039,10 @@ export interface components {
              */
             name: string;
             /**
-             * Format: date-time
-             * @description The photograph's cache key, or null when there is none.
-             * @example 2026-10-02T11:20:00+00:00
+             * @description The 96 pixel photograph as a `data:image/jpeg` URL, or null (none, or it could not be fetched). Carried in the sheet,
+             *     so the photograph is governed by the sheet's own privilege in both formats (spec 10.2 lists it as a column).
              */
-            photoUpdatedAtUtc: null | string;
+            thumbnail: null | string;
             /**
              * @description "None", "Not asked", or the detail.
              * @example Groundnuts
@@ -18413,8 +18412,8 @@ export interface operations {
     };
     GetSafeguardingSheet: {
         parameters: {
-            query: {
-                armId: string;
+            query?: {
+                armId?: string;
             };
             header?: never;
             path?: never;
@@ -18480,8 +18479,8 @@ export interface operations {
     };
     GetSafeguardingSheetPdf: {
         parameters: {
-            query: {
-                armId: string;
+            query?: {
+                armId?: string;
             };
             header?: never;
             path?: never;

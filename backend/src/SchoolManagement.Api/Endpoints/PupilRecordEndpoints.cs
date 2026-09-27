@@ -144,35 +144,29 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             "export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check " +
             "cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only.";
 
-        endpoints.MapGet("/reports/safeguarding", async ([FromQuery(Name = "armId")] Guid armId, ISender sender, CancellationToken cancellationToken) =>
-                (await sender.SendAsync(new GenerateSafeguardingSheetCommand(armId), cancellationToken)).Match(TypedResults.Ok))
-            .RequireAuthenticatedCaller()
+        // Health data: never kept in a browser's disk cache on a shared staff-room computer.
+        Read(endpoints.MapGet("/reports/safeguarding", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    return (await sender.SendAsync(new GenerateSafeguardingSheetCommand(armId), cancellationToken)).Match(TypedResults.Ok);
+                }),
+                "GetSafeguardingSheet", "The class safeguarding sheet for one arm",
+                Description + " Each pupil's thumbnail travels in the sheet, under the sheet's own privilege. Health answers read " +
+                "`None` or `Not asked`, never blank. `Cache-Control: no-store`.")
             .WithTags(Tag)
-            .WithName("GetSafeguardingSheet")
-            .WithSummary("The class safeguarding sheet for one arm")
-            .WithDescription(Description + " Health answers read `None` or `Not asked`, never blank.")
             .Produces<SafeguardingSheetDto>(StatusCodes.Status200OK)
-            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
-            .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
-        endpoints.MapGet("/reports/safeguarding/pdf", async (
-                [FromQuery(Name = "armId")] Guid armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
-                (await sender.SendAsync(new GenerateSafeguardingSheetPdfCommand(armId), cancellationToken))
-                .Match(content => FileResponses.Serve(httpContext, content, "attachment")))
-            .RequireAuthenticatedCaller()
+        Read(endpoints.MapGet("/reports/safeguarding/pdf", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                    (await sender.SendAsync(new GenerateSafeguardingSheetPdfCommand(armId), cancellationToken))
+                    .Match(content => FileResponses.Serve(httpContext, content, "attachment", "no-store"))),
+                "GetSafeguardingSheetPdf", "The class safeguarding sheet as a printable PDF",
+                Description + " A4 landscape with each pupil's photograph, marked confidential; `attachment`, `no-store`.")
             .WithTags(Tag)
-            .WithName("GetSafeguardingSheetPdf")
-            .WithSummary("The class safeguarding sheet as a printable PDF")
-            .WithDescription(Description + " A4 landscape with each pupil's photograph, marked confidential; `attachment`, `private`.")
             .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
-            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
-            .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
     /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6).</summary>

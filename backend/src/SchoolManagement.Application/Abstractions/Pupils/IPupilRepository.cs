@@ -129,6 +129,9 @@ public interface IPupilRepository
     /// </summary>
     Task<IReadOnlyList<(Pupil Pupil, Guid ArmId)>> ListActiveEnrolledInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
 
+    /// <summary>The active pupils with an open enrolment in one arm: a class's roll, without loading the whole session.</summary>
+    Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken);
+
     /// <summary>
     /// Which of <paramref name="registrationNumbers"/> a pupil in ANY status already holds: the issuer's pre-check, so a
     /// clash re-draws one serial instead of retrying a whole batch.

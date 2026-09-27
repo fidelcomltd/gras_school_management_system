@@ -3130,7 +3130,7 @@ internal static class OpenApiExamples
             """,
 
         [typeof(SafeguardingSheetRowDto)] = $$"""
-            { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00", "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
+            { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "thumbnail": null, "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
             """,
 
         [typeof(SafeguardingSheetDto)] = $$"""
@@ -3140,7 +3140,7 @@ internal static class OpenApiExamples
               "sessionName": "2026/2027",
               "generatedAtUtc": "2026-10-05T07:45:00+00:00",
               "pupils": [
-                { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "photoUpdatedAtUtc": "2026-10-02T11:20:00+00:00", "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
+                { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "thumbnail": null, "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
               ]
             }
             """,

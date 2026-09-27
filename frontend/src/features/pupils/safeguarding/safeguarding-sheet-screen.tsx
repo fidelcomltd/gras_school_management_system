@@ -1,36 +1,27 @@
 import { FileDown, HeartPulse, ShieldAlert, UserRound } from 'lucide-react';
-import { useState } from 'react';
-import { EmptyState } from '@/components/feedback/empty-state';
-import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/feedback/empty-state';
+import { FormError, LoadingState } from '@/components/feedback/query-states';
 import { Spinner } from '@/components/ui/spinner';
-import { usePupilPhotoUrl } from '../records/files-api';
-import { errorText } from '../records/format';
+import { lagosDateTime } from '@/shared/format/date';
+import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
-import { LabelledSelect } from '@/shared/pickers/labelled-select';
-import { downloadSafeguardingSheet, useSafeguardingSheet, type SafeguardingSheetRowDto } from './api';
+import { errorText } from '../records/format';
+import { useDownloadSafeguardingSheet, useGenerateSafeguardingSheet, type SafeguardingSheetRowDto } from './api';
 
 /**
  * `/reports/safeguarding` (spec 15 section 10.2): the class safeguarding sheet, printed before an excursion and kept at the
- * gate. The one screen that shows a class's health data together; every generation (on screen or PDF) is audited, so the
- * sheet is only generated when asked for.
+ * gate. The one screen that shows a class's health data together. Each Show sheet or Download PDF is a fresh generation,
+ * audited on the server, and the sheet says when it was generated, so a stale copy is recognisable.
  */
 export function SafeguardingSheetScreen() {
   const term = useTermChoice();
   const klass = useClassChoice(term.sessionId, 'pupil.safeguarding.view');
-  const [requested, setRequested] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<unknown>(null);
-  const sheet = useSafeguardingSheet(klass.armId, requested === klass.armId);
-
-  const download = () => {
-    setDownloading(true);
-    setDownloadError(null);
-    downloadSafeguardingSheet(klass.armId)
-      .catch(setDownloadError)
-      .finally(() => setDownloading(false));
-  };
+  const generate = useGenerateSafeguardingSheet();
+  const download = useDownloadSafeguardingSheet();
+  // Only the sheet for the class now chosen is shown: switching class hides the previous one.
+  const shown = generate.data?.armId === klass.armId ? generate.data : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,6 +35,13 @@ export function SafeguardingSheetScreen() {
 
       {term.isPending || klass.isPending ? (
         <LoadingState label="Loading classes…" />
+      ) : klass.isError ? (
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <p className="text-sm text-destructive">The classes could not be loaded. Check the connection and try again.</p>
+          <Button variant="outline" size="sm" onClick={klass.retry}>
+            Try again
+          </Button>
+        </div>
       ) : klass.arms.length === 0 ? (
         <EmptyState icon={ShieldAlert} title="There are no classes whose safeguarding details you can view." />
       ) : (
@@ -57,25 +55,30 @@ export function SafeguardingSheetScreen() {
               onChange={klass.setArmId}
               className="w-48"
             />
-            <Button onClick={() => setRequested(klass.armId)} disabled={!klass.armId || (requested === klass.armId && sheet.isFetching)}>
-              <HeartPulse aria-hidden="true" />
-              Show sheet
+            <Button onClick={() => generate.mutate(klass.armId)} disabled={!klass.armId || generate.isPending}>
+              {generate.isPending ? <Spinner className="size-4 text-primary-foreground" /> : <HeartPulse aria-hidden="true" />}
+              {shown ? 'Show again' : 'Show sheet'}
             </Button>
-            <Button variant="outline" onClick={download} disabled={!klass.armId || downloading}>
-              {downloading ? <Spinner className="size-4" /> : <FileDown aria-hidden="true" />}
-              {downloading ? 'Preparing PDF…' : 'Download PDF'}
+            <Button variant="outline" onClick={() => download.mutate(klass.armId)} disabled={!klass.armId || download.isPending}>
+              {download.isPending ? <Spinner className="size-4" /> : <FileDown aria-hidden="true" />}
+              {download.isPending ? 'Preparing PDF…' : 'Download PDF'}
             </Button>
           </div>
-          <FormError message={errorText(downloadError)} />
-          {requested !== klass.armId ? null : sheet.isPending ? (
+          <FormError message={errorText(download.error) ?? errorText(generate.error)} />
+          {generate.isPending ? (
             <LoadingState label="Preparing the sheet…" />
-          ) : sheet.isError ? (
-            <QueryErrorState error={sheet.error} onRetry={() => void sheet.refetch()} />
-          ) : sheet.data.pupils.length === 0 ? (
-            <EmptyState icon={UserRound} title="No active pupils in this class." />
-          ) : (
-            <SheetTable rows={sheet.data.pupils} />
-          )}
+          ) : shown ? (
+            shown.pupils.length === 0 ? (
+              <EmptyState icon={UserRound} title="No active pupils in this class." />
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {shown.armName}, {shown.sessionName}. Generated {lagosDateTime(shown.generatedAtUtc)}.
+                </p>
+                <SheetTable rows={shown.pupils} />
+              </>
+            )
+          ) : null}
         </>
       )}
     </div>
@@ -87,7 +90,7 @@ const HEADINGS = ['Pupil', 'Allergies', 'Medical conditions', 'Medication', 'Spe
 function SheetTable({ rows }: { rows: SafeguardingSheetRowDto[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[960px] text-left text-sm">
+      <table className="w-full min-w-240 text-left text-sm">
         <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
           <tr>
             {HEADINGS.map((heading) => (
@@ -102,7 +105,13 @@ function SheetTable({ rows }: { rows: SafeguardingSheetRowDto[] }) {
             <tr key={row.pupilId} className="border-t border-border align-top">
               <th scope="row" className="px-3 py-2 font-medium text-foreground">
                 <span className="flex items-center gap-2">
-                  <Thumbnail row={row} />
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-muted">
+                    {row.thumbnail ? (
+                      <img src={row.thumbnail} alt="" className="size-full object-cover" />
+                    ) : (
+                      <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </span>
                   {row.name}
                 </span>
               </th>
@@ -124,14 +133,5 @@ function SheetTable({ rows }: { rows: SafeguardingSheetRowDto[] }) {
         </tbody>
       </table>
     </div>
-  );
-}
-
-function Thumbnail({ row }: { row: SafeguardingSheetRowDto }) {
-  const photo = usePupilPhotoUrl(row.pupilId, row.photoUpdatedAtUtc, true);
-  return (
-    <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-muted">
-      {photo.data ? <img src={photo.data} alt="" className="size-full object-cover" /> : <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />}
-    </span>
   );
 }

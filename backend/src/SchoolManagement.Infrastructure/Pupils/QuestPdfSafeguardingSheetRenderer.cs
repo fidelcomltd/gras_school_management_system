@@ -3,6 +3,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SkiaSharp;
 
 namespace SchoolManagement.Infrastructure.Pupils;
 
@@ -64,7 +65,7 @@ internal sealed class QuestPdfSafeguardingSheetRenderer : ISafeguardingSheetRend
                 foreach (var row in sheet.Rows)
                 {
                     var photo = table.Cell().Element(Cell).Height(40).Width(40);
-                    if (row.Photo is { Length: > 0 } bytes)
+                    if (row.Photo is { Length: > 0 } bytes && Decodable(bytes))
                     {
                         photo.Image(bytes.ToArray()).FitArea();
                     }
@@ -102,6 +103,9 @@ internal sealed class QuestPdfSafeguardingSheetRenderer : ISafeguardingSheetRend
             });
         })).GeneratePdf();
     }
+
+    /// <summary>Whether the bytes are an image QuestPDF can draw; a corrupt asset prints "No photo" rather than failing the sheet.</summary>
+    private static bool Decodable(ReadOnlyMemory<byte> bytes) => SKBitmap.DecodeBounds(bytes.ToArray()).Width > 0;
 
     private static IContainer Cell(IContainer container) =>
         container.BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten1).PaddingVertical(3).PaddingRight(3);
