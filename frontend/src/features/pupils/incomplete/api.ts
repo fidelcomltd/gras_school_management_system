@@ -28,9 +28,10 @@ function toReport(dto: ReportDto): IncompleteRecordsReport {
 }
 
 /** Gated `report.view` in the handler; an arm-scoped grant gets only its arms. Fetched whole and filtered on screen. */
-export function useIncompleteRecords() {
+export function useIncompleteRecords(enabled = true) {
   return useQuery({
     queryKey: [IncompleteRecordsKeys.Report],
+    enabled,
     queryFn: async ({ signal }) => toReport(await apiGet('/api/v1/reports/incomplete-records', {}, { signal })),
   });
 }
