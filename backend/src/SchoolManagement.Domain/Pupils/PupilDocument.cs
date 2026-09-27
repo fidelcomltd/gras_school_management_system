@@ -1,3 +1,4 @@
+using System.Globalization;
 using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Domain.Pupils;
@@ -212,8 +213,10 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
-    /// The base name only (a browser may send a path), with control characters removed and at most
-    /// <see cref="FileNameMaxLength"/> characters, shortening the stem so the extension survives. Blank becomes null.
+    /// The base name only (a browser may send a path), with control and invisible format characters removed (a
+    /// right-to-left override, U+202E, between "cert" and "gpj.pdf" displays the name as "certfdp.jpg") and at most
+    /// <see cref="FileNameMaxLength"/> characters, shortening the stem so the extension survives and never splitting a
+    /// surrogate pair (a lone surrogate cannot be stored as UTF-8). Blank becomes null.
     /// </summary>
     private static string? CleanFileName(string? raw)
     {
@@ -223,7 +226,8 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
         }
 
         var baseName = raw[(raw.LastIndexOfAny(['/', '\\']) + 1)..];
-        var clean = new string([.. baseName.Where(character => !char.IsControl(character))]).Trim();
+        var clean = new string([.. baseName.Where(character =>
+            char.GetUnicodeCategory(character) is not (UnicodeCategory.Control or UnicodeCategory.Format))]).Trim();
         if (clean.Length == 0)
         {
             return null;
@@ -236,7 +240,11 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
 
         var extension = System.IO.Path.GetExtension(clean);
         return extension.Length is > 0 and <= 10
-            ? clean[..(FileNameMaxLength - extension.Length)] + extension
-            : clean[..FileNameMaxLength];
+            ? Prefix(clean, FileNameMaxLength - extension.Length) + extension
+            : Prefix(clean, FileNameMaxLength);
     }
+
+    /// <summary>The first <paramref name="length"/> UTF-16 units, one fewer when the cut would split a surrogate pair.</summary>
+    private static string Prefix(string value, int length) =>
+        char.IsHighSurrogate(value[length - 1]) ? value[..(length - 1)] : value[..length];
 }

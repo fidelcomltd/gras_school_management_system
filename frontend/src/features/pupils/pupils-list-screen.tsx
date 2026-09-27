@@ -23,6 +23,7 @@ export function PupilsListScreen() {
   const [draft, setDraft] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const pupils = usePupils(filters);
+  const filtered = !!(filters.search || filters.status);
   const me = useMe();
   const navigate = useNavigate();
   const canCreate = !!me.data && hasPrivilege(me.data, 'pupil.create');
@@ -93,8 +94,8 @@ export function PupilsListScreen() {
           {pupils.data.pages[0]?.items.length === 0 ? (
             <EmptyState
               icon={Users}
-              title={filters.search || filters.status ? 'No pupils match these filters.' : 'No pupils yet.'}
-              description={filters.search || filters.status ? 'Try a different name, number or status.' : undefined}
+              title={filtered ? 'No pupils match these filters.' : 'No pupils yet.'}
+              description={filtered ? 'Try a different name, number or status.' : undefined}
             />
           ) : (
             <ul className="flex flex-col gap-2">

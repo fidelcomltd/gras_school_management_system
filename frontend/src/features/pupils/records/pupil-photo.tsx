@@ -36,7 +36,10 @@ export function PupilPhoto({
       <div className="relative size-24 shrink-0">
         <div className="flex size-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-xs text-muted-foreground">
           {upload.isPending || (hasPhoto && photo.isPending) ? (
-            <Spinner />
+            <output>
+              <Spinner />
+              <span className="sr-only">{upload.isPending ? 'Uploading the photograph…' : 'Loading the photograph…'}</span>
+            </output>
           ) : photo.data ? (
             <img src={photo.data} alt={`Photograph of ${name}`} className="size-full object-cover" />
           ) : photo.isError ? (
@@ -52,7 +55,8 @@ export function PupilPhoto({
         </div>
         {canEdit ? (
           <FileButton
-            label={hasPhoto ? 'Replace photograph' : 'Upload photograph'}
+            inputLabel={hasPhoto ? 'Replace photograph' : 'Upload photograph'}
+            buttonLabel={hasPhoto ? 'Replace photograph' : 'Upload photograph'}
             accept="image/png,image/jpeg"
             onFile={(file) => upload.mutate(file)}
             disabled={busy}

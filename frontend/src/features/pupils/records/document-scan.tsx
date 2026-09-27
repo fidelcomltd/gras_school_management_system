@@ -44,7 +44,8 @@ export function DocumentScan({ pupilId, item, label, canEdit }: { pupilId: strin
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Download the scan of ${label}`}
+              aria-label={`Download scan: ${label}`}
+              disabled={busy}
               onClick={() => {
                 setDownloadError(null);
                 downloadDocumentFile(pupilId, item.documentType).catch(setDownloadError);
@@ -55,11 +56,11 @@ export function DocumentScan({ pupilId, item, label, canEdit }: { pupilId: strin
             </Button>
             {canEdit ? (
               <>
-                <FileButton label={`Replace the scan of ${label}`} accept={ACCEPT} onFile={attach} disabled={busy} variant="ghost">
+                <FileButton inputLabel={`Replace scan: ${label}`} buttonLabel={`Replace scan: ${label}`} accept={ACCEPT} onFile={attach} disabled={busy} variant="ghost">
                   <RefreshCw aria-hidden="true" />
                   Replace
                 </FileButton>
-                <Button variant="ghost" size="sm" aria-label={`Remove the scan of ${label}`} disabled={busy} onClick={() => remove.mutate(item.documentType)}>
+                <Button variant="ghost" size="sm" aria-label={`Remove scan: ${label}`} disabled={busy} onClick={() => remove.mutate(item.documentType)}>
                   <Trash2 aria-hidden="true" />
                   Remove
                 </Button>
@@ -67,7 +68,7 @@ export function DocumentScan({ pupilId, item, label, canEdit }: { pupilId: strin
             ) : null}
           </>
         ) : canEdit ? (
-          <FileButton label={`Attach a scan of ${label}`} accept={ACCEPT} onFile={attach} disabled={busy} variant="primary">
+          <FileButton inputLabel={`Attach scan: ${label}`} buttonLabel={`Attach scan: ${label}`} accept={ACCEPT} onFile={attach} disabled={busy} variant="primary">
             <Paperclip aria-hidden="true" />
             Attach scan
           </FileButton>

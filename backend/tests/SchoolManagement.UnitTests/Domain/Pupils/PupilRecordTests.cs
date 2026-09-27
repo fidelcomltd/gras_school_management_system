@@ -103,6 +103,8 @@ public sealed class PupilRecordTests
     [InlineData(@"C:\fakepath\Birth Cert.pdf", "Birth Cert.pdf")]
     [InlineData("photos/IMG_2231.jpg", "IMG_2231.jpg")]
     [InlineData("  scan\u0000\u0007.pdf  ", "scan.pdf")]
+    [InlineData("cert\u202Egpj.pdf", "certgpj.pdf")]
+    [InlineData("a\u200Bb\uFEFF.pdf", "ab.pdf")]
     [InlineData("   ", null)]
     [InlineData(null, null)]
     public void Document_KeepsOnlyTheBaseNameOfTheUploadedFile_Cleaned(string? raw, string? kept)
@@ -125,5 +127,20 @@ public sealed class PupilRecordTests
         document.FileName.ShouldEndWith(".pdf");
         document.RemoveFile();
         document.FileName.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Document_ShorteningAName_NeverSplitsASurrogatePair()
+    {
+        // The emoji's two halves straddle the cut: 115 letters, then a surrogate pair at units 115 and 116.
+        var raw = new string('a', 115) + "U0001F600" + new string('b', 20) + ".pdf";
+        var document = PupilDocument.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), PupilDocumentType.BirthCertificate);
+
+        document.AttachFile("asset", "application/pdf", 10, raw, DateTimeOffset.UnixEpoch, new DateOnly(2026, 9, 27), null);
+
+        document.FileName.ShouldNotBeNull();
+        document.FileName.ShouldEndWith(".pdf");
+        char.IsHighSurrogate(document.FileName[^5]).ShouldBeFalse();
+        document.FileName.Length.ShouldBeLessThanOrEqualTo(PupilDocument.FileNameMaxLength);
     }
 }

@@ -1,14 +1,17 @@
-import { useId, useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Button, type ButtonProps } from './button';
 
 /**
  * A styled button that opens the file picker: never the browser's "Choose File / No file chosen" control. The real input
- * is hidden but labelled with the button's text, so it stays reachable for tests and assistive technology alike.
+ * is hidden and carries `inputLabel`, so tests and assistive technology can still reach it. The button's own name is its
+ * visible text; pass `buttonLabel` only for an icon-only button, or to add context that still contains the visible text
+ * (WCAG 2.5.3, label in name).
  */
 export function FileButton({
   accept,
   onFile,
-  label,
+  inputLabel,
+  buttonLabel,
   children,
   disabled,
   variant = 'outline',
@@ -17,28 +20,26 @@ export function FileButton({
 }: {
   accept: string;
   onFile: (file: File) => void;
-  /** The accessible name, when `children` is an icon or not the full sentence. */
-  label: string;
+  inputLabel: string;
+  buttonLabel?: string;
   children: ReactNode;
   disabled?: boolean;
   variant?: ButtonProps['variant'];
   size?: ButtonProps['size'];
   className?: string;
 }) {
-  const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
 
   return (
     <>
-      <Button variant={variant} size={size} className={className} disabled={disabled} aria-label={label} onClick={() => input.current?.click()}>
+      <Button variant={variant} size={size} className={className} disabled={disabled} aria-label={buttonLabel} onClick={() => input.current?.click()}>
         {children}
       </Button>
       <input
-        id={inputId}
         ref={input}
         type="file"
         accept={accept}
-        aria-label={label}
+        aria-label={inputLabel}
         disabled={disabled}
         tabIndex={-1}
         hidden

@@ -1,4 +1,4 @@
-import { CircleCheck } from 'lucide-react';
+import { CalendarX, CircleCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -85,7 +85,7 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
   const canExport = !!me.data && report.pupils.some((pupil) => hasPrivilegeInArm(me.data, 'report.export', pupil.armId));
 
   if (report.sessionName === null) {
-    return <EmptyState icon={CircleCheck} title="No session is active, so there is no roll to check." />;
+    return <EmptyState icon={CalendarX} title="No session is active, so there is no roll to check." description="Activate a session under Sessions to see its roll here." />;
   }
 
   return (

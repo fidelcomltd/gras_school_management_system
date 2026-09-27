@@ -127,16 +127,16 @@ describe('document scans', () => {
 
     const { user } = renderScreen();
     await user.click(await screen.findByRole('tab', { name: 'Documents' }));
-    await user.upload(await screen.findByLabelText('Attach a scan of Birth certificate', { selector: 'input' }), new File(['%PDF-'], 'cert.pdf', { type: 'application/pdf' }));
+    await user.upload(await screen.findByLabelText('Attach scan: Birth certificate', { selector: 'input' }), new File(['%PDF-'], 'cert.pdf', { type: 'application/pdf' }));
 
     expect(await screen.findByText('cert.pdf')).toBeInTheDocument();
     expect(screen.getByText('PDF · 2 KB')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Birth certificate' })).toBeChecked();
 
-    await user.click(screen.getByRole('button', { name: 'Remove the scan of Birth certificate' }));
+    await user.click(screen.getByRole('button', { name: 'Remove scan: Birth certificate' }));
 
     await waitFor(() => expect(screen.queryByText('cert.pdf')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Attach a scan of Birth certificate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Attach scan: Birth certificate' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Birth certificate' })).toBeChecked();
   });
 
@@ -155,7 +155,7 @@ describe('document scans', () => {
     const { user } = renderScreen();
     await user.click(await screen.findByRole('tab', { name: 'Documents' }));
     const big = new File([new Uint8Array(8 * 1024 * 1024)], 'scan.pdf', { type: 'application/pdf' });
-    await user.upload(await screen.findByLabelText('Attach a scan of Birth certificate', { selector: 'input' }), big);
+    await user.upload(await screen.findByLabelText('Attach scan: Birth certificate', { selector: 'input' }), big);
 
     expect(await screen.findByText('This file is 8 MB. The limit is 5 MB.')).toBeInTheDocument();
     expect(posted).toBe(0);

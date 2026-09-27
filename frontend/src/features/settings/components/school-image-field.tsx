@@ -25,7 +25,18 @@ export function SchoolImageField({ kind, image, canEdit }: { kind: 'logo' | 'sig
         {url.data ? (
           <img src={url.data} alt={`Current ${label.toLowerCase()}`} className={kind === 'logo' ? 'size-20 object-contain' : 'h-12 max-w-48 object-contain'} />
         ) : (
-          image ? <Spinner /> : <span className="text-sm text-muted-foreground">None uploaded yet.</span>
+          url.isError ? (
+            <button type="button" className="text-sm text-destructive underline" onClick={() => void url.refetch()}>
+              The {kind === 'logo' ? 'logo' : 'signature'} could not be loaded. Retry
+            </button>
+          ) : image ? (
+            <output className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner />
+              <span className="sr-only">Loading the {kind === 'logo' ? 'logo' : 'signature'}…</span>
+            </output>
+          ) : (
+            <span className="text-sm text-muted-foreground">None uploaded yet.</span>
+          )
         )}
         {image ? (
           <span className="text-xs text-muted-foreground">
@@ -36,7 +47,7 @@ export function SchoolImageField({ kind, image, canEdit }: { kind: 'logo' | 'sig
       <FormError message={upload.error instanceof ApiError ? upload.error.message : null} />
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-3">
-          <FileButton label={action} accept="image/png,image/jpeg" onFile={(file) => upload.mutate(file)} disabled={upload.isPending}>
+          <FileButton inputLabel={action} accept="image/png,image/jpeg" onFile={(file) => upload.mutate(file)} disabled={upload.isPending}>
             {upload.isPending ? <Spinner className="size-4" /> : <Upload aria-hidden="true" />}
             {upload.isPending ? 'Uploading…' : action}
           </FileButton>

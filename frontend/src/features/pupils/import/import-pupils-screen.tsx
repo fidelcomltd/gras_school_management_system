@@ -83,7 +83,7 @@ export function ImportPupilsScreen() {
         <p className="text-sm font-medium text-foreground">Filled-in template (.xlsx)</p>
         <div className="flex flex-wrap items-center gap-3">
           <FileButton
-            label="Filled-in template (.xlsx)"
+            inputLabel="Filled-in template (.xlsx)"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onFile={(chosen) => reset(chosen)}
           >
