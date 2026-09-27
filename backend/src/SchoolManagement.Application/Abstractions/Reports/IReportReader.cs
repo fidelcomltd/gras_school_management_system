@@ -90,7 +90,9 @@ public interface IReportReader
     /// <summary>These pupils' names and numbers, by id.</summary>
     Task<IReadOnlyDictionary<Guid, ReportPupil>> FindPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
 
-    /// <summary>The subjects mapped to these levels for the term (active mappings), plus every subject's name by id.</summary>
-    Task<(IReadOnlyList<ReportSubject> Mapped, IReadOnlyDictionary<Guid, string> Names)> ListSubjectsAsync(
-        Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+    /// <summary>The subjects mapped to these levels for the term (active mappings), in display order.</summary>
+    Task<IReadOnlyList<ReportSubject>> ListMappedSubjectsAsync(Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+
+    /// <summary>These subjects' names, by id.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);
 }

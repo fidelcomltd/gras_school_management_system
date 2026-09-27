@@ -60,18 +60,18 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
             row => new ReportPupil(row.Id, row.Surname, string.Join(' ', new[] { row.FirstName, row.MiddleName }.Where(name => !string.IsNullOrWhiteSpace(name))), row.RegistrationNumber));
     }
 
-    public async Task<(IReadOnlyList<ReportSubject> Mapped, IReadOnlyDictionary<Guid, string> Names)> ListSubjectsAsync(
-        Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken)
-    {
-        var mapped = await (
+    public async Task<IReadOnlyList<ReportSubject>> ListMappedSubjectsAsync(
+        Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken) =>
+        await (
                 from mapping in context.SubjectMappings.AsNoTracking()
                 join subject in context.Subjects.AsNoTracking() on mapping.SubjectId equals subject.Id
                 where mapping.TermId == termId && levelIds.Contains(mapping.ClassLevelId) && mapping.Status == SubjectMappingStatus.Active
                 orderby mapping.DisplayOrder, subject.Name
                 select new ReportSubject(mapping.ClassLevelId, subject.Id, subject.Name, mapping.DisplayOrder))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var names = await context.Subjects.AsNoTracking()
+
+    public async Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken) =>
+        await context.Subjects.AsNoTracking()
+            .Where(subject => subjectIds.Contains(subject.Id))
             .ToDictionaryAsync(subject => subject.Id, subject => subject.Name, cancellationToken).ConfigureAwait(false);
-        return (mapped, names);
-    }
 }

@@ -39,7 +39,7 @@ export function ReportScreen() {
 
 function ReportView({ definition }: { definition: TableReport }) {
   const term = useTermChoice();
-  const klass = useClassChoice(term.sessionId, 'report.view');
+  const klass = useClassChoice(term.sessionId, 'report.view', true);
   const me = useMe();
   const [scope, setScope] = useState<string | null>(null);
   const [top, setTop] = useState('');
@@ -50,7 +50,12 @@ function ReportView({ definition }: { definition: TableReport }) {
     value,
     label,
   }));
-  const scopeValue = scope ?? (klass.armId ? `arm:${klass.armId}` : '');
+  const scopeOptions = [
+    ...klass.arms.map((arm) => ({ value: `arm:${arm.id}`, label: arm.displayName })),
+    ...levels.map((level) => ({ value: `level:${level.value}`, label: `All of ${level.label}` })),
+  ];
+  // A choice from another session's classes falls back to the first class, as the class picker does.
+  const scopeValue = scope !== null && scopeOptions.some((option) => option.value === scope) ? scope : (scopeOptions[0]?.value ?? '');
   const [scopeKind, scopeId] = scopeValue.split(':');
   const topNumber = Number(top);
 
@@ -64,7 +69,7 @@ function ReportView({ definition }: { definition: TableReport }) {
     case 'term-scope-top':
       if (scopeKind === 'level' && scopeId) params.levelId = scopeId;
       else if (scopeId) params.armId = scopeId;
-      if (Number.isInteger(topNumber) && topNumber > 0) params.top = topNumber;
+      if (Number.isInteger(topNumber) && topNumber > 0) params.top = Math.min(topNumber, 500);
       ready &&= !!scopeId;
       break;
     case 'term-level-state':
@@ -80,6 +85,7 @@ function ReportView({ definition }: { definition: TableReport }) {
   const body = () => {
     if (term.isPending || klass.isPending) return <LoadingState label="Loading classes…" />;
     if (!term.termId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
+    if (klass.isError) return <QueryErrorState error={new Error('The classes could not be loaded.')} onRetry={klass.retry} />;
     if (!ready) return <p className="text-sm text-muted-foreground">There are no classes you can report on in this session.</p>;
     if (report.isPending) return <LoadingState label="Building the report…" />;
     if (report.isError) return <QueryErrorState error={report.error} onRetry={() => void report.refetch()} />;
@@ -122,10 +128,7 @@ function ReportView({ definition }: { definition: TableReport }) {
               label="Class or level"
               placeholder="Class or level"
               value={scopeValue}
-              options={[
-                ...klass.arms.map((arm) => ({ value: `arm:${arm.id}`, label: arm.displayName })),
-                ...levels.map((level) => ({ value: `level:${level.value}`, label: `All of ${level.label}` })),
-              ]}
+              options={scopeOptions}
               onChange={setScope}
               className="w-52"
             />

@@ -21,7 +21,9 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
     public byte[] Render(ReportDto report, string schoolName)
     {
         ArgumentNullException.ThrowIfNull(report);
-        var size = report.Columns.Count > 14 ? 6.5f : 8f;
+        var count = report.Columns.Count;
+        var size = count > 40 ? 5f : count > 20 ? 5.5f : count > 14 ? 6.5f : 8f;
+        var padding = count > 20 ? 1f : 3f;
         var widths = Widths(report);
 
         return Document.Create(document => document.Page(page =>
@@ -41,19 +43,19 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
                 page.Content().Column(column =>
                 {
                     column.Spacing(6);
-                    if (report.TwoUp && report.Rows.Count > 1)
+                    if (report.TwoUp)
                     {
-                        var half = (report.Rows.Count + 1) / 2;
-                        column.Item().Row(row =>
+                        // Down the left column, then the right, page by page: position order reads straight through.
+                        column.Item().MultiColumn(columns =>
                         {
-                            row.Spacing(10);
-                            row.RelativeItem().Element(item => Table(item, report, widths, report.Rows.Take(half).ToList()));
-                            row.RelativeItem().Element(item => Table(item, report, widths, report.Rows.Skip(half).ToList()));
+                            columns.Columns(2);
+                            columns.Spacing(10);
+                            columns.Content().Element(item => Table(item, report, widths, padding));
                         });
                     }
                     else
                     {
-                        column.Item().Element(item => Table(item, report, widths, report.Rows));
+                        column.Item().Element(item => Table(item, report, widths, padding));
                     }
 
                     if (report.Rows.Count == 0)
@@ -84,7 +86,8 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
             .GeneratePdf();
     }
 
-    // Relative widths from the longest text in each column, bounded so one long name cannot starve the numbers.
+    // Relative widths from the longest text in each column (its label included), bounded so one long name cannot starve
+    // the numbers: a broadsheet's CA, Exam and Total columns keep room for their headings.
     private static float[] Widths(ReportDto report) =>
         report.Columns.Select((column, index) =>
             {
@@ -92,11 +95,11 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
                     .Select(row => row.Cells[index]?.Length ?? 0)
                     .DefaultIfEmpty(0)
                     .Max();
-                return (float)Math.Clamp(Math.Max(longest, column.Label.Length), 3, 28);
+                return (float)Math.Clamp(Math.Max(longest, column.Label.Length), 3, 22);
             })
             .ToArray();
 
-    private static void Table(IContainer container, ReportDto report, float[] widths, IReadOnlyList<ReportRowDto> rows) =>
+    private static void Table(IContainer container, ReportDto report, float[] widths, float padding) =>
         container.Table(table =>
         {
             table.ColumnsDefinition(columns =>
@@ -120,18 +123,18 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
                             span++;
                         }
 
-                        header.Cell().ColumnSpan((uint)span).Element(cell => HeadCell(cell, group ?? string.Empty));
+                        header.Cell().ColumnSpan((uint)span).Element(cell => HeadCell(cell, group ?? string.Empty, padding));
                         index += span;
                     }
                 }
 
                 foreach (var column in report.Columns)
                 {
-                    header.Cell().Element(cell => HeadCell(cell, column.Label));
+                    header.Cell().Element(cell => HeadCell(cell, column.Label, padding));
                 }
             });
 
-            foreach (var row in rows)
+            foreach (var row in report.Rows)
             {
                 if (row.Kind == ReportRowKind.Heading)
                 {
@@ -143,7 +146,7 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
                 for (var index = 0; index < report.Columns.Count; index++)
                 {
                     var text = index < row.Cells.Count ? row.Cells[index] ?? string.Empty : string.Empty;
-                    var cell = table.Cell().Border(0.5f).PaddingVertical(1.5f).PaddingHorizontal(3);
+                    var cell = table.Cell().Border(0.5f).PaddingVertical(1.5f).PaddingHorizontal(padding);
                     cell = report.Columns[index].Align switch
                     {
                         ReportAlign.Right => cell.AlignRight(),
@@ -159,6 +162,6 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
             }
         });
 
-    private static void HeadCell(IContainer cell, string text) =>
-        cell.Border(0.75f).Background(Tint).PaddingVertical(2).PaddingHorizontal(3).AlignCenter().AlignMiddle().Text(text).Bold();
+    private static void HeadCell(IContainer cell, string text, float padding) =>
+        cell.Border(0.75f).Background(Tint).PaddingVertical(2).PaddingHorizontal(padding).AlignCenter().AlignMiddle().Text(text).Bold();
 }

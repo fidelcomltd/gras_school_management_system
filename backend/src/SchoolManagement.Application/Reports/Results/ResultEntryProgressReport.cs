@@ -60,7 +60,10 @@ internal sealed class ResultEntryProgressReport(
         var catalogue = (await reader.ListArmsAsync(term.SessionId, cancellationToken).ConfigureAwait(false))
             .Where(arm => (levelId is null || arm.LevelId == levelId) && context.Scope.Allows(arm.ArmId))
             .ToList();
-        var entities = (await arms.ListBySessionTrackedAsync(term.SessionId, cancellationToken).ConfigureAwait(false)).ToDictionary(arm => arm.Id);
+        var wanted = catalogue.Select(arm => arm.ArmId).ToHashSet();
+        var entities = (await arms.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false))
+            .Where(arm => wanted.Contains(arm.Id))
+            .ToDictionary(arm => arm.Id);
 
         var rows = new List<ReportRowDto>();
         foreach (var arm in catalogue)
