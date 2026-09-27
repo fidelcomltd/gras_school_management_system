@@ -16,6 +16,9 @@ namespace SchoolManagement.Application.Security.Assignments;
 /// <param name="GrantedBy">The acting account that created this assignment.</param>
 /// <param name="Status">Either <c>Active</c> or <c>Revoked</c>.</param>
 /// <param name="CreatedAtUtc">When this assignment was created.</param>
+/// <param name="RoleName">The role's name (TASK-0046).</param>
+/// <param name="SessionName">The session's name; <see langword="null"/> exactly when <paramref name="SessionId"/> is.</param>
+/// <param name="ArmNames">The classes' display names, in the order of <paramref name="ArmIds"/>.</param>
 public sealed record RoleAssignmentDto(
     string Id,
     string AdminAccountId,
@@ -25,4 +28,7 @@ public sealed record RoleAssignmentDto(
     IReadOnlyList<string> ArmIds,
     string GrantedBy,
     RoleAssignmentStatus Status,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    string RoleName,
+    string? SessionName,
+    IReadOnlyList<string> ArmNames);

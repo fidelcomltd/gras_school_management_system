@@ -8,6 +8,7 @@ import { AssignmentsSection } from './assignments-section';
 const assignment = {
   id: 'as-1', adminAccountId: 'admin-1', roleId: 'role-ct', sessionId: 's-1', scopeType: 'ArmList', armIds: ['arm-1'],
   grantedBy: 'acc-1', status: 'Active', createdAtUtc: '2026-09-20T09:00:00Z',
+  roleName: 'Class Teacher', sessionName: '2026/2027', armNames: ['Primary 4A'],
 };
 
 function mockReads(assignments: unknown[]) {

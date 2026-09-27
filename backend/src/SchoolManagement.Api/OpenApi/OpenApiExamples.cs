@@ -909,7 +909,9 @@ internal static class OpenApiExamples
               "isSuperAdmin": false,
               "mustChangePassword": false,
               "lastLoginAtUtc": "{{CanonicalTimestamp}}",
-              "createdAtUtc": "{{CanonicalTimestamp}}"
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "rolesHeld": ["Class Teacher"],
+              "scopeSummary": "2 classes: Primary 2A, Primary 5B"
             }
             """,
 
@@ -925,7 +927,9 @@ internal static class OpenApiExamples
                   "isSuperAdmin": false,
                   "mustChangePassword": false,
                   "lastLoginAtUtc": "{{CanonicalTimestamp}}",
-                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                  "createdAtUtc": "{{CanonicalTimestamp}}",
+                  "rolesHeld": ["Class Teacher"],
+                  "scopeSummary": "2 classes: Primary 2A, Primary 5B"
                 }
               ],
               "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
@@ -1076,7 +1080,10 @@ internal static class OpenApiExamples
               "armIds": ["{{ExampleArmId}}"],
               "grantedBy": "{{ExampleGrantedById}}",
               "status": "Active",
-              "createdAtUtc": "{{CanonicalTimestamp}}"
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "roleName": "Class Teacher",
+              "sessionName": "2026/2027",
+              "armNames": ["Primary 2A"]
             }
             """,
 

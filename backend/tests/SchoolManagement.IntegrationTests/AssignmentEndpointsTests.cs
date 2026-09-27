@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Auth.AdminAccounts;
 using SchoolManagement.Application.Auth.SignIn;
+using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Application.Security.Assignments;
 using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Auth;
@@ -92,6 +93,48 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         var body = await ReadAsync<RoleAssignmentDto>(response);
         body.ScopeType.ShouldBe(ScopeType.ArmList);
         body.ArmIds.ShouldBe([armId.ToString("D", CultureInfo.InvariantCulture)]);
+
+        // TASK-0046: names travel with the ids, and the creation time is real, not a default.
+        body.RoleName.ShouldBe("Class Reader");
+        body.SessionName.ShouldBe("2026/2027");
+        body.ArmNames.ShouldHaveSingleItem().ShouldEndWith("1A");
+        body.CreatedAtUtc.ShouldNotBe(default);
+    }
+
+    [Fact]
+    public async Task ListAdmins_ShowsRolesHeldAndScopeSummary()
+    {
+        // TASK-0046, spec 6.1.8's "Roles held" and "Scope summary" columns.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var sessionId = await SeedSessionAsync("2026/2027");
+        var armA = await SeedArmAsync(sessionId, "2A");
+        var armB = await SeedArmAsync(sessionId, "5B");
+        var (granterId, _) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        var teacherRole = await SeedRoleAsync("Class Teacher Copy", [Privileges.Pupil.View]);
+        var headRole = await SeedRoleAsync("Head Copy", [Privileges.Pupil.View]);
+
+        var (teacherId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(teacherId, teacherRole, sessionId, ScopeType.ArmList, [armA, armB], granterId);
+        var (headId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(headId, headRole, sessionId, ScopeType.SchoolWide, [], granterId);
+        await SeedAssignmentAsync(headId, teacherRole, sessionId, ScopeType.ArmList, [armA], granterId);
+        var (idleId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+
+        var response = await GetAsync($"{AdminsUrl}?pageSize=50", jar);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var items = (await ReadAsync<CursorPage<AdminAccountSummaryDto>>(response)).Items;
+        AdminAccountSummaryDto Row(Guid id) => items.Single(item => item.Id == id.ToString("D", CultureInfo.InvariantCulture));
+
+        Row(teacherId).RolesHeld.ShouldBe(["Class Teacher Copy"]);
+        Row(teacherId).ScopeSummary.ShouldStartWith("2 classes: ");
+        Row(headId).RolesHeld.ShouldBe(["Class Teacher Copy", "Head Copy"]);
+        Row(headId).ScopeSummary.ShouldBe("School-wide");
+        Row(idleId).RolesHeld.ShouldBeEmpty();
+        Row(idleId).ScopeSummary.ShouldBeEmpty();
+        Row(granterId).RolesHeld.ShouldBe(["Super Admin"]);
     }
 
     [Fact]
@@ -430,7 +473,8 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await ReadAsync<List<RoleAssignmentDto>>(response);
-        body.ShouldContain(item => item.Id == activeId.ToString("D", CultureInfo.InvariantCulture) && item.Status == RoleAssignmentStatus.Active);
+        body.ShouldContain(item => item.Id == activeId.ToString("D", CultureInfo.InvariantCulture) && item.Status == RoleAssignmentStatus.Active
+            && item.RoleName == "Listed Role" && item.SessionName == "2026/2027" && item.ArmNames.Count == 0);
         body.ShouldContain(item => item.Id == revokedId.ToString("D", CultureInfo.InvariantCulture) && item.Status == RoleAssignmentStatus.Revoked);
     }
 

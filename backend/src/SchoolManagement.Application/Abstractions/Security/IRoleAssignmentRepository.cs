@@ -25,6 +25,10 @@ public interface IRoleAssignmentRepository
     Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountReadOnlyAsync(
         Guid adminAccountId, CancellationToken cancellationToken);
 
+    /// <summary>Every ACTIVE assignment held by any of <paramref name="adminAccountIds"/>, <c>AsNoTracking</c> — one page of <c>GET /admins</c>.</summary>
+    Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountsReadOnlyAsync(
+        IReadOnlyCollection<Guid> adminAccountIds, CancellationToken cancellationToken);
+
     /// <summary>
     /// Every ACTIVE assignment for <paramref name="adminAccountId"/>, TRACKED — used to revoke every
     /// one of them in the same transaction that deactivates the account (spec 6.1.10).

@@ -17,6 +17,8 @@ namespace SchoolManagement.Application.Auth.AdminAccounts;
 /// <param name="MustChangePassword">Whether the forced-change gate currently applies.</param>
 /// <param name="LastLoginAtUtc"><see langword="null"/> if the account has never signed in.</param>
 /// <param name="CreatedAtUtc">When the account was created.</param>
+/// <param name="RolesHeld">Distinct names of the roles the account actively holds, sorted (spec 6.1.8; TASK-0046).</param>
+/// <param name="ScopeSummary"><c>School-wide</c>, or the class count and the first two class names; empty when nothing is held.</param>
 public sealed record AdminAccountSummaryDto(
     string Id,
     string StaffName,
@@ -26,7 +28,9 @@ public sealed record AdminAccountSummaryDto(
     bool IsSuperAdmin,
     bool MustChangePassword,
     DateTimeOffset? LastLoginAtUtc,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    IReadOnlyList<string> RolesHeld,
+    string ScopeSummary);
 
 /// <summary>
 /// <c>GET /api/v1/admins/{id}</c> (spec 6.1.8). Deliberately omits assignments, the resolved
@@ -71,7 +75,9 @@ internal static class AdminAccountMapper
             account.IsSuperAdmin,
             account.MustChangePassword,
             account.LastLoginAtUtc,
-            account.CreatedAtUtc);
+            account.CreatedAtUtc,
+            RolesHeld: [],
+            ScopeSummary: string.Empty);
     }
 
     /// <summary>Projects to the detail shape.</summary>

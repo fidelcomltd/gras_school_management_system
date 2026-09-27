@@ -164,7 +164,9 @@ internal sealed class AdminAccountRepository(
                 row.IsSuperAdmin,
                 row.MustChangePassword,
                 row.LastLoginAtUtc,
-                row.CreatedAtUtc))
+                row.CreatedAtUtc,
+                RolesHeld: [],
+                ScopeSummary: string.Empty))
             .ToArray();
 
         string? nextCursor = null;

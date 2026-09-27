@@ -52,6 +52,7 @@ public static class ApplicationDependencyInjection
         services.AddScoped<Fees.OutstandingFeeReader>();
         services.AddScoped<Pupils.Records.SafeguardingSheetBuilder>();
         services.AddScoped<Reports.ReportServices>();
+        services.AddScoped<Security.Assignments.AssignmentNames>();
 
         // Spec 15 section 10: every report is one IReportBuilder, found by its filters type. Scanned, like the handlers.
         foreach (var report in Assembly.GetTypes().Where(type => type is { IsAbstract: false, IsInterface: false } && typeof(Reports.IReportBuilder).IsAssignableFrom(type)))

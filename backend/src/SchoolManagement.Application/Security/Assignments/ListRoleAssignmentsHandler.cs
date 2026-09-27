@@ -8,7 +8,8 @@ namespace SchoolManagement.Application.Security.Assignments;
 /// <summary>Handles <see cref="ListRoleAssignmentsQuery"/>.</summary>
 internal sealed class ListRoleAssignmentsQueryHandler(
     IAdminAccountRepository accounts,
-    IRoleAssignmentRepository assignments)
+    IRoleAssignmentRepository assignments,
+    AssignmentNames assignmentNames)
     : IRequestHandler<ListRoleAssignmentsQuery, Result<IReadOnlyList<RoleAssignmentDto>>>
 {
     /// <inheritdoc />
@@ -30,7 +31,8 @@ internal sealed class ListRoleAssignmentsQueryHandler(
         var rows = await assignments.ListForAccountReadOnlyAsync(accountId, cancellationToken)
             .ConfigureAwait(false);
 
-        IReadOnlyList<RoleAssignmentDto> items = rows.Select(RoleAssignmentMapper.ToDto).ToArray();
+        var names = await assignmentNames.LoadAsync(rows, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<RoleAssignmentDto> items = rows.Select(row => RoleAssignmentMapper.ToDto(row, names)).ToArray();
 
         return Result.Success(items);
     }
