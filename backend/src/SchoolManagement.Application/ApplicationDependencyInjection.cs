@@ -48,6 +48,8 @@ public static class ApplicationDependencyInjection
         services.AddScoped<Pupils.Movement.PupilMovementEngine>();
         services.AddScoped<Pupils.Records.AdmissionCompleteness>();
         services.AddScoped<Promotion.PromotionPlanner>();
+        services.AddScoped<Fees.FeeNoticeGridReader>();
+        services.AddScoped<Fees.OutstandingFeeReader>();
         services.AddScoped<Pupils.Records.SafeguardingSheetBuilder>();
 
         // Spec 6.5.10: the one registration-number issuance path, shared by admission approval and bulk import.

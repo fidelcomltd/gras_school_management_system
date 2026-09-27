@@ -124,7 +124,7 @@ public static class SeededRoles
         // named individually
         Privileges.Promotion.Run, Privileges.Role.ScopeAssign, Privileges.Admin.View,
         Privileges.Settings.View, Privileges.Pin.View, Privileges.Pin.UsageView, Privileges.Results.View,
-        Privileges.Results.Print,
+        Privileges.Results.Print, Privileges.Fee.Manage,
 
         // report.*
         Privileges.Report.View, Privileges.Report.Export,
@@ -179,9 +179,9 @@ public static class SeededRoles
     /// <summary>
     /// Bursar (spec 4.5): "<c>pin.view</c>, <c>pin.generate</c>, <c>pin.print</c>,
     /// <c>pin.revoke</c>, <c>pin.usage.view</c>, <c>pupil.view</c>, <c>contact.view</c>,
-    /// <c>weekly.view</c>, <c>arm.view</c>, <c>session.view</c>, <c>level.view</c>. No result
+    /// <c>weekly.view</c>, <c>arm.view</c>, <c>session.view</c>, <c>level.view</c>" (plus <c>fee.manage</c> by human ruling 2026-09-27). No result
     /// privilege of any kind, and no safeguarding privilege: a bursar has no reason to read a
-    /// child's allergy list." 11 codes. NOT <c>subject.view</c> — see the class remarks.
+    /// child's allergy list." 11 codes, 12 with fee.manage. NOT <c>subject.view</c> — see the class remarks.
     /// </summary>
     public static readonly IReadOnlyList<string> BursarPrivileges = Sorted(
     [
@@ -189,6 +189,9 @@ public static class SeededRoles
         Privileges.Pin.UsageView,
         Privileges.Pupil.View, Privileges.Contact.View, Privileges.Weekly.View,
         Privileges.Arm.View, Privileges.Session.View, Privileges.Level.View,
+
+        // Human ruling 2026-09-27: the fee notice (spec 6.2.13, "an administrator or bursar") is the Bursar's to keep.
+        Privileges.Fee.Manage,
     ]);
 
     /// <summary>

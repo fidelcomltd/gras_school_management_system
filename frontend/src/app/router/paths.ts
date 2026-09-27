@@ -13,6 +13,7 @@ export const paths = {
   sessions: '/sessions',
   sessionDetail: (id: string) => `/sessions/${id}`,
   sessionPromotion: (id: string) => `/sessions/${id}/promotion`,
+  feeNotices: '/fees',
   classes: '/classes',
   admins: '/admins',
   adminDetail: (id: string) => `/admins/${id}`,

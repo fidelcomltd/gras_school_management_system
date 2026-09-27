@@ -158,6 +158,9 @@ public sealed class PrivilegeRegistryTests
             "Compute annual cumulative results for an arm once Third Term is published."),
         ("result.print", true, PrivilegeModule.Results, "Render and download the result PDF from inside the back office."),
         ("promotion.decide", false, PrivilegeModule.Results, "Override the system-proposed promotion status on a Third Term result."),
+        // NOT from spec 4.4: human ruling 2026-09-27 (spec 6.2.13's fee notice).
+        ("fee.manage", false, PrivilegeModule.PinsAndReports,
+            "Set the next-term fee notice lines and amounts, and type pupils' outstanding-fee figures, per 6.2.13. A printed notice, not a finance module."),
 
         // 4.4.6 Pins and reports
         ("pin.view", false, PrivilegeModule.PinsAndReports, "List pin batches and open a batch."),
@@ -171,7 +174,7 @@ public sealed class PrivilegeRegistryTests
     ];
 
     [Fact]
-    public void TheRegisterHasExactlyNinetyThreeSpecPrivilegesPlusThreeApprovedAdditions()
+    public void TheRegisterHasExactlyNinetyThreeSpecPrivilegesPlusFourApprovedAdditions()
     {
         // Spec 4.4 itself still enumerates exactly 93: 15 + 10 + 18 + 27 + 16 + 7. TASK-0072 stage 1
         // and stage 2b each added one privilege beyond that table (settings.ratingscales.update,
@@ -179,9 +182,10 @@ public sealed class PrivilegeRegistryTests
         // see the two entries' own comments above. 95 is therefore the correct total, not a rounding
         // of 93; if a future spec revision folds these into 4.4.2 directly, this comment (and the
         // "NOT from spec" comments above) is what should be deleted, not the count. The human ruling of
-        // 2026-09-23 added a third, pupil.admission.override (spec 6.5.16), so 96.
-        ExpectedFromSpec.Length.ShouldBe(96, "the transcription above is wrong, not the production code");
-        PrivilegeRegistry.All.Count.ShouldBe(96);
+        // 2026-09-23 added a third, pupil.admission.override (spec 6.5.16), and that of 2026-09-27 a fourth, fee.manage
+        // (spec 6.2.13), so 97.
+        ExpectedFromSpec.Length.ShouldBe(97, "the transcription above is wrong, not the production code");
+        PrivilegeRegistry.All.Count.ShouldBe(97);
     }
 
     [Fact]

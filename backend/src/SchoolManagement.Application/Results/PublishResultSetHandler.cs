@@ -34,6 +34,7 @@ internal sealed class PublishResultSetHandler(
     Subjects.SubjectsInEffectResolver subjectsInEffect,
     Abstractions.Auth.IAdminAccountRepository adminAccounts,
     IAcademicSessionRepository academicSessions,
+    Abstractions.Fees.IFeeNoticeRepository feeNotices,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     TimeProvider timeProvider)
@@ -148,6 +149,8 @@ internal sealed class PublishResultSetHandler(
             ? await adminAccounts.FindReadOnlyByIdAsync(teacherId, cancellationToken).ConfigureAwait(false)
             : null;
 
+        var feeNotice = await FeeNoticeAsync(section?.Id, level?.Id, term.Id, cancellationToken).ConfigureAwait(false);
+
         var now = timeProvider.GetUtcNow();
         var snapshot = new
         {
@@ -166,6 +169,7 @@ internal sealed class PublishResultSetHandler(
             pupilCount = resultSet.PupilCount,
             subjects,
             formTeacherName = formTeacher?.StaffName,
+            feeNotice,
         };
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJson);
 
@@ -202,6 +206,35 @@ internal sealed class PublishResultSetHandler(
         var dto = new ResultSetSummaryDto(
             resultSet.Id.ToString("D", CultureInfo.InvariantCulture), resultSet.State, resultSet.NeedsRecompute, resultSet.ReturnReason);
         return Result.Success(new PublishResultSetResponse(dto, now, resultSet.RevisionNumber));
+    }
+
+    // Spec 6.2.13 / 09's snapshot rule: the fee lines as they stood, so a reprint never picks up next year's prices. Null when
+    // the section has set no lines, and the sheet prints no fees block.
+    private async Task<object?> FeeNoticeAsync(Guid? sectionId, Guid? levelId, Guid termId, CancellationToken cancellationToken)
+    {
+        if (sectionId is not { } section || levelId is not { } levelOfArm)
+        {
+            return null;
+        }
+
+        var labels = await feeNotices.ListLabelsReadOnlyAsync(section, cancellationToken).ConfigureAwait(false);
+        if (labels.Count == 0)
+        {
+            return null;
+        }
+
+        var amounts = (await feeNotices.ListAmountsReadOnlyAsync(termId, levelOfArm, cancellationToken).ConfigureAwait(false))
+            .ToDictionary(amount => amount.FeeLabelId, amount => amount.Amount);
+        return new
+        {
+            lines = labels.OrderBy(label => label.DisplayOrder).Select(label => new
+            {
+                label = label.Label,
+                kind = label.Kind,
+                amount = amounts.TryGetValue(label.Id, out var value) ? value : (int?)null,
+                showOnPortal = label.ShowOnPortal,
+            }).ToList(),
+        };
     }
 
     private static Result<PublishResultSetResponse> Fail(Error error) => Result.Failure<PublishResultSetResponse>(error);

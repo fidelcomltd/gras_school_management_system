@@ -194,6 +194,15 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     internal DbSet<Domain.Promotion.PromotionBatch> PromotionBatches => Set<Domain.Promotion.PromotionBatch>();
 
+    /// <summary>Spec 6.2.13's fee notice lines, per section.</summary>
+    internal DbSet<Domain.Fees.FeeLabel> FeeLabels => Set<Domain.Fees.FeeLabel>();
+
+    /// <summary>Spec 6.2.13's fee notice amounts, per line, class level and printing term.</summary>
+    internal DbSet<Domain.Fees.FeeAmount> FeeAmounts => Set<Domain.Fees.FeeAmount>();
+
+    /// <summary>Spec 6.2.13's per-pupil outstanding-fee figures, per result set.</summary>
+    internal DbSet<Domain.Fees.OutstandingFee> OutstandingFees => Set<Domain.Fees.OutstandingFee>();
+
     internal DbSet<Domain.Portal.PortalAttempt> PortalAttempts => Set<Domain.Portal.PortalAttempt>();
 
     /// <summary>

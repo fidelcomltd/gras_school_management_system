@@ -203,6 +203,10 @@ public static class PrivilegeRegistry
         new(Privileges.Promotion.Decide, Scopable: false, Module: PrivilegeModule.Results,
             Permits: "Override the system-proposed promotion status on a Third Term result."),
 
+        // NOT from spec 4.4's table: human ruling 2026-09-27 gives spec 6.2.13's fee notice its own privilege.
+        new(Privileges.Fee.Manage, Scopable: false, Module: PrivilegeModule.PinsAndReports,
+            Permits: "Set the next-term fee notice lines and amounts, and type pupils' outstanding-fee figures, per 6.2.13. A printed notice, not a finance module."),
+
         // 4.4.6 Pins and reports
         new(Privileges.Pin.View, Scopable: false, Module: PrivilegeModule.PinsAndReports,
             Permits: "List pin batches and open a batch."),

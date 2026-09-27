@@ -8,6 +8,7 @@ using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Fees;
 using SchoolManagement.Application.Pins;
 using SchoolManagement.Application.Promotion;
 using SchoolManagement.Application.Pupils;
@@ -3232,6 +3233,79 @@ internal static class OpenApiExamples
 
         [typeof(ReversePromotionCommand)] = """
             { "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938", "reason": "Committed into the wrong session; the new session's dates were being corrected." }
+            """,
+
+        [typeof(FeeGridLevelDto)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "name": "Primary 3" }
+            """,
+
+        [typeof(FeeGridAmountDto)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }
+            """,
+
+        [typeof(FeeGridLineDto)] = $$"""
+            { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] }
+            """,
+
+        [typeof(FeeNoticeGridDto)] = $$"""
+            {
+              "sectionId": "00000000-0000-0000-0000-000000000302", "sectionName": "Primary",
+              "termId": "{{ExampleTermId}}", "termName": "First Term", "sessionName": "2026/2027",
+              "previousTermId": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02", "previousTermLabel": "Third Term 2025/2026",
+              "isDefault": false,
+              "levels": [{ "classLevelId": "{{ExampleLevelId}}", "name": "Primary 3" }],
+              "lines": [
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03", "label": "Exam & PTA", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 5000 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
+              ]
+            }
+            """,
+
+        [typeof(FeeGridAmountInput)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }
+            """,
+
+        [typeof(FeeGridLineInput)] = $$"""
+            { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] }
+            """,
+
+        [typeof(SaveFeeNoticeGridCommand)] = $$"""
+            {
+              "sectionId": "00000000-0000-0000-0000-000000000302",
+              "termId": "{{ExampleTermId}}",
+              "lines": [
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
+                { "id": null, "label": "Uniform", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 0 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
+              ]
+            }
+            """,
+
+        [typeof(OutstandingFeeRowDto)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014", "amount": 12500 }
+            """,
+
+        [typeof(OutstandingFeeSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}", "armName": "Primary 3A", "termId": "{{ExampleTermId}}", "termName": "First Term", "locked": false,
+              "rows": [
+                { "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014", "amount": 12500 },
+                { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "amount": null }
+              ]
+            }
+            """,
+
+        [typeof(OutstandingFeeInput)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "amount": 12500 }
+            """,
+
+        [typeof(SaveOutstandingFeesCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "rows": [{ "pupilId": "{{ExamplePupilId}}", "amount": 12500 }, { "pupilId": "{{ExampleSecondPupilId}}", "amount": null }]
+            }
             """,
 
         [typeof(PupilPhotoDto)] = $$"""

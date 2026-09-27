@@ -341,8 +341,42 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
 
             // C.8 rule 5: the remarks and signature block is never split or orphaned.
             column.Item().ShowEntire().Element(item => Remarks(item, sheet, signature));
+            if (sheet.Fees is { Count: > 0 } fees)
+            {
+                column.Item().ShowEntire().Element(item => FeeNotice(item, fees, sheet.FeeTotal));
+            }
+
             column.Item().Element(item => GradeKey(item, sheet.GradeKey));
         });
+
+    // E.6 / F.5: a label and an amount per line, with the printed total. Naira with separators and no kobo; zero or blank is a dash.
+    private static void FeeNotice(IContainer container, IReadOnlyList<SheetFeeLine> fees, int? total) =>
+        container.Row(row =>
+        {
+            row.RelativeItem().Column(column =>
+            {
+                column.Item().Text("NEXT TERM FEES").Bold().FontSize(7.5f);
+                column.Item().Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(3);
+                        columns.RelativeColumn(2);
+                    });
+                    foreach (var line in fees)
+                    {
+                        BodyCell(table.Cell()).Text(line.Label).FontSize(7.5f);
+                        BodyCell(table.Cell()).AlignRight().Text(Naira(line.Amount)).FontSize(7.5f);
+                    }
+
+                    BodyCell(table.Cell()).Text("Total").Bold().FontSize(7.5f);
+                    BodyCell(table.Cell()).AlignRight().Text(Naira(total)).Bold().FontSize(7.5f);
+                });
+            });
+            row.RelativeItem();
+        });
+
+    private static string Naira(int? amount) => amount is null or 0 ? "–" : amount.Value.ToString("N0", CultureInfo.InvariantCulture);
 
     private static void Subjects(IContainer container, ResultSheet sheet) =>
         container.Table(table =>

@@ -43,6 +43,7 @@ public sealed record SheetRatingRow(Guid ItemId, Guid PointId, string? Comment);
 /// <param name="TimesPresent">Stored attendance.</param>
 /// <param name="TeacherComment">Class teacher's remark.</param>
 /// <param name="HeadTeacherComment">Head teacher's remark.</param>
+/// <param name="OutstandingFee">Spec 6.2.13: the pupil's typed outstanding-fee figure for this result set; null when blank.</param>
 public sealed record ResultSheetData(
     Guid ResultSetId,
     ResultSetState State,
@@ -62,7 +63,8 @@ public sealed record ResultSheetData(
     IReadOnlyList<SheetRatingRow> DevelopmentRatings,
     int? TimesPresent,
     string? TeacherComment,
-    string? HeadTeacherComment);
+    string? HeadTeacherComment,
+    int? OutstandingFee = null);
 
 /// <summary>Reads everything a result sheet needs for one pupil in one arm-term, in one place.</summary>
 public interface IResultSheetReader

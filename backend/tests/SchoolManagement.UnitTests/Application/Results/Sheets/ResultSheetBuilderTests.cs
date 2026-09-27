@@ -55,6 +55,45 @@ public sealed class ResultSheetBuilderTests
     }
 
     [Fact]
+    public void TheFeesBlock_PrintsTheFrozenLinesWithThePupilsOwnOutstandingFigure_AndTheirTotal()
+    {
+        var sheet = ResultSheetBuilder.Build(Data(WithFees(showOnPortal: false), revision: 1) with { OutstandingFee = 12500 })!;
+
+        sheet.Fees!.Select(line => (line.Label, line.Amount)).ShouldBe(
+            [("Tuition Fee", 45000), ("Books", null), ("Party Fee", 0), ("Outstanding Fee", 12500)]);
+        sheet.FeeTotal.ShouldBe(57500);
+    }
+
+    [Fact]
+    public void OnThePortal_TheOutstandingLineIsLeftOff_UnlessTheSchoolSwitchedItOn()
+    {
+        var hidden = ResultSheetBuilder.Build(Data(WithFees(showOnPortal: false), revision: 1) with { OutstandingFee = 12500 }, forParent: true)!;
+        hidden.Fees!.Select(line => line.Label).ShouldNotContain("Outstanding Fee");
+        hidden.FeeTotal.ShouldBe(45000);
+
+        var shown = ResultSheetBuilder.Build(Data(WithFees(showOnPortal: true), revision: 1) with { OutstandingFee = 12500 }, forParent: true)!;
+        shown.FeeTotal.ShouldBe(57500);
+    }
+
+    [Fact]
+    public void ASectionWithNoFeeLines_PrintsNoFeesBlock()
+    {
+        var sheet = ResultSheetBuilder.Build(Data(NurserySnapshot, revision: 1))!;
+
+        sheet.Fees.ShouldBeEmpty();
+        sheet.FeeTotal.ShouldBeNull();
+    }
+
+    private static string WithFees(bool showOnPortal) => NurserySnapshot.Replace(
+        "\"formTeacherName\": \"Mrs Adeyemi\"",
+        "\"formTeacherName\": \"Mrs Adeyemi\", \"feeNotice\": { \"lines\": ["
+        + "{ \"label\": \"Tuition Fee\", \"kind\": \"Amount\", \"amount\": 45000, \"showOnPortal\": false },"
+        + "{ \"label\": \"Books\", \"kind\": \"Amount\", \"amount\": null, \"showOnPortal\": false },"
+        + "{ \"label\": \"Party Fee\", \"kind\": \"Amount\", \"amount\": 0, \"showOnPortal\": false },"
+        + $"{{ \"label\": \"Outstanding Fee\", \"kind\": \"Outstanding\", \"amount\": null, \"showOnPortal\": {(showOnPortal ? bool.TrueString : bool.FalseString).ToLowerInvariant()} }}] }}",
+        StringComparison.Ordinal);
+
+    [Fact]
     public void ASetNeverPublished_HasNoSheet() =>
         ResultSheetBuilder.Build(Data(null, revision: 0)).ShouldBeNull();
 

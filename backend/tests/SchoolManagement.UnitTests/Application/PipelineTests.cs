@@ -203,6 +203,7 @@ public sealed class PipelineTests
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pupils.ISafeguardingSheetRenderer>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pupils.IAdmissionSlipRenderer>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Promotion.IPromotionRepository>());
+        services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Fees.IFeeNoticeRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinBatchRepository>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSecrets>());
         services.AddSingleton(Substitute.For<SchoolManagement.Application.Abstractions.Pins.IPinSlipRenderer>());

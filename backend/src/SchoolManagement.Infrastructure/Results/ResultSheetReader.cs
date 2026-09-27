@@ -63,6 +63,10 @@ internal sealed class ResultSheetReader(ApplicationDbContext context) : IResultS
             .Where(entry => entry.ResultSetId == setId && entry.PupilId == pupilId)
             .Select(entry => (int?)entry.TimesPresent)
             .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        var outstanding = await context.OutstandingFees.AsNoTracking()
+            .Where(fee => fee.ResultSetId == setId && fee.PupilId == pupilId)
+            .Select(fee => (int?)fee.Amount)
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         var remarks = await context.PupilRemarks.AsNoTracking()
             .Where(remark => remark.ResultSetId == setId && remark.PupilId == pupilId)
             .Select(remark => new { remark.Kind, remark.Text })
@@ -94,6 +98,7 @@ internal sealed class ResultSheetReader(ApplicationDbContext context) : IResultS
             development,
             present,
             remarks.FirstOrDefault(remark => remark.Kind == RemarkKind.ClassTeacher)?.Text,
-            remarks.FirstOrDefault(remark => remark.Kind == RemarkKind.HeadTeacher)?.Text);
+            remarks.FirstOrDefault(remark => remark.Kind == RemarkKind.HeadTeacher)?.Text,
+            outstanding);
     }
 }
