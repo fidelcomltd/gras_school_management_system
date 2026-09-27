@@ -52,17 +52,23 @@ internal sealed class ListAdminAccountsQueryHandler(
         var names = await assignmentNames.LoadAsync(active, cancellationToken).ConfigureAwait(false);
         var byAccount = active.ToLookup(assignment => assignment.AdminAccountId.ToString("D", CultureInfo.InvariantCulture));
 
-        return items.Select(item => item.IsSuperAdmin
-                ? item with { RolesHeld = [SuperAdminRoleName], ScopeSummary = SchoolWide }
-                : item with
+        return items.Select(item =>
+            {
+                if (item.IsSuperAdmin)
                 {
-                    RolesHeld = [.. byAccount[item.Id].Select(assignment => names.Role(assignment.RoleId)).Distinct().Order(StringComparer.OrdinalIgnoreCase)],
-                    ScopeSummary = ScopeSummary(byAccount[item.Id].ToList(), names),
-                })
+                    return item with { RolesHeld = [Role.ReservedName], ScopeSummary = SchoolWide };
+                }
+
+                // A Closed session's assignments reach only last year's records, so they are not what the account "holds".
+                var current = byAccount[item.Id].Where(assignment => !names.IsClosed(assignment.SessionId)).ToList();
+                return item with
+                {
+                    RolesHeld = [.. current.Select(assignment => names.Role(assignment.RoleId)).Distinct().Order(StringComparer.OrdinalIgnoreCase)],
+                    ScopeSummary = ScopeSummary(current, names),
+                };
+            })
             .ToArray();
     }
-
-    private const string SuperAdminRoleName = "Super Admin";
 
     private const string SchoolWide = "School-wide";
 
@@ -73,8 +79,7 @@ internal sealed class ListAdminAccountsQueryHandler(
             return SchoolWide;
         }
 
-        var classes = held.SelectMany(assignment => assignment.ArmIds).Distinct().Select(names.Arm)
-            .Order(StringComparer.OrdinalIgnoreCase).ToList();
+        var classes = names.ClassesInOrder(held.SelectMany(assignment => assignment.ArmIds));
         return classes.Count switch
         {
             0 => string.Empty,

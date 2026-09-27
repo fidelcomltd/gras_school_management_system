@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPost } from '@/api/client';
+import { AdminsKeys } from '../types';
 import { AssignmentsKeys, type CreateRoleAssignmentCommand } from './types';
 
 const ASSIGNMENTS_PATH = '/api/v1/admins/{id}/assignments';
 const ASSIGNMENT_PATH = '/api/v1/assignments/{id}';
 
-/** Every assignment on the account, active and revoked (spec 6.1.5). Gated `admin.view`; ids only, names resolved on screen. */
+/** Every assignment on the account, active and revoked (spec 6.1.5). Gated `admin.view`; each carries its role, session and class names. */
 export function useAssignments(adminId: string) {
   return useQuery({
     queryKey: [AssignmentsKeys.List, adminId],
@@ -25,6 +26,8 @@ export function useCreateAssignment(adminId: string) {
       apiPost(ASSIGNMENTS_PATH, { ...body, adminAccountId: adminId }, { pathParams: { id: adminId }, idempotencyKey: crypto.randomUUID() }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [AssignmentsKeys.List, adminId] });
+      // The admin list shows each account's roles and scope.
+      void queryClient.invalidateQueries({ queryKey: [AdminsKeys.List] });
     },
   });
 }
@@ -38,6 +41,8 @@ export function useRevokeAssignment(adminId: string) {
       apiDelete(ASSIGNMENT_PATH, { pathParams: { id: assignmentId }, idempotencyKey: crypto.randomUUID() }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [AssignmentsKeys.List, adminId] });
+      // The admin list shows each account's roles and scope.
+      void queryClient.invalidateQueries({ queryKey: [AdminsKeys.List] });
     },
   });
 }

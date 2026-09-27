@@ -217,7 +217,8 @@ internal sealed class CreateRoleAssignmentCommandHandler(
             cancellationToken).ConfigureAwait(false);
 
         // CreatedAtUtc is stamped by the auditing interceptor at SaveChanges, after this DTO is built, so the response
-        // carries the same clock's reading rather than a default (TASK-0046; the TASK-0086 approach).
+        // carries the clock's reading now rather than a default (TASK-0046; the TASK-0086 approach). The stored value
+        // is stamped moments later, at commit.
         var names = await assignmentNames.LoadAsync([assignment], cancellationToken).ConfigureAwait(false);
         var dto = RoleAssignmentMapper.ToDto(assignment, names);
         return Result.Success(dto.CreatedAtUtc == default ? dto with { CreatedAtUtc = timeProvider.GetUtcNow() } : dto);

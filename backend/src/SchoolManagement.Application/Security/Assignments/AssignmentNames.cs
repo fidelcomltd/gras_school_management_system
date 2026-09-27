@@ -3,6 +3,7 @@ using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Sessions;
 
 namespace SchoolManagement.Application.Security.Assignments;
 
@@ -30,24 +31,30 @@ internal sealed class AssignmentNames(
         }
 
         var sessionNames = new Dictionary<Guid, string>();
+        var closedSessions = new HashSet<Guid>();
         foreach (var sessionId in assignments.Select(assignment => assignment.SessionId).OfType<Guid>().Distinct())
         {
             var session = await sessions.FindReadOnlyByIdAsync(sessionId, cancellationToken).ConfigureAwait(false);
             sessionNames[sessionId] = session?.Name ?? "Unknown session";
-        }
-
-        var armNames = new Dictionary<Guid, string>();
-        if (assignments.Any(assignment => assignment.ArmIds.Count > 0))
-        {
-            var levelNames = (await levels.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false))
-                .ToDictionary(level => level.Id, level => level.Name);
-            foreach (var arm in await arms.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false))
+            if (session?.State == SessionState.Closed)
             {
-                armNames[arm.Id] = ArmDisplayName.Compose(levelNames.GetValueOrDefault(arm.ClassLevelId, "Class"), arm.Label);
+                closedSessions.Add(sessionId);
             }
         }
 
-        return new AssignmentNameLookup(roleNames, sessionNames, armNames);
+        var armClasses = new Dictionary<Guid, (string Name, int Order, string LabelKey)>();
+        if (assignments.Any(assignment => assignment.ArmIds.Count > 0))
+        {
+            var levelsById = (await levels.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false)).ToDictionary(level => level.Id);
+            foreach (var arm in await arms.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // ArmMapper's own fallback, so a class reads the same here as in the arms list.
+                var level = levelsById.GetValueOrDefault(arm.ClassLevelId);
+                armClasses[arm.Id] = (ArmDisplayName.Compose(level?.Name ?? "Unknown level", arm.Label), level?.ProgressionOrder ?? int.MaxValue, arm.LabelKey);
+            }
+        }
+
+        return new AssignmentNameLookup(roleNames, sessionNames, closedSessions, armClasses);
     }
 }
 
@@ -55,11 +62,27 @@ internal sealed class AssignmentNames(
 internal sealed class AssignmentNameLookup(
     IReadOnlyDictionary<Guid, string> roleNames,
     IReadOnlyDictionary<Guid, string> sessionNames,
-    IReadOnlyDictionary<Guid, string> armNames)
+    IReadOnlySet<Guid> closedSessions,
+    IReadOnlyDictionary<Guid, (string Name, int Order, string LabelKey)> armClasses)
 {
+    /// <summary>What an arm deleted since it was assigned reads as (TASK-0046 C removes it from the assignment).</summary>
+    public const string RemovedClass = "a removed class";
+
     public string Role(Guid roleId) => roleNames.GetValueOrDefault(roleId, "Unknown role");
 
     public string? Session(Guid? sessionId) => sessionId is { } id ? sessionNames.GetValueOrDefault(id, "Unknown session") : null;
 
-    public string Arm(Guid armId) => armNames.GetValueOrDefault(armId, "Unknown class");
+    /// <summary>Whether the assignment's session is Closed (a sessionless assignment never is).</summary>
+    public bool IsClosed(Guid? sessionId) => sessionId is { } id && closedSessions.Contains(id);
+
+    public string Arm(Guid armId) => armClasses.TryGetValue(armId, out var arm) ? arm.Name : RemovedClass;
+
+    /// <summary>
+    /// The named classes behind <paramref name="armIds"/>, in class order (level progression, then label), each name
+    /// once; a removed arm is left out.
+    /// </summary>
+    public IReadOnlyList<string> ClassesInOrder(IEnumerable<Guid> armIds) =>
+        [.. armIds.Where(armClasses.ContainsKey).Select(id => armClasses[id])
+            .OrderBy(arm => arm.Order).ThenBy(arm => arm.LabelKey, StringComparer.Ordinal)
+            .Select(arm => arm.Name).Distinct()];
 }
