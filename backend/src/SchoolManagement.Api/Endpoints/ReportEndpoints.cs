@@ -42,6 +42,39 @@ internal sealed record ResultEntryProgressParameters(
     public ResultEntryProgressFilters ToFilters() => new(TermId, LevelId, State);
 }
 
+/// <summary><c>termId</c>, <c>armId</c> or <c>levelId</c>.</summary>
+internal sealed record GradeDistributionParameters(
+    [FromQuery(Name = "termId")] string? TermId,
+    [FromQuery(Name = "armId")] string? ArmId,
+    [FromQuery(Name = "levelId")] string? LevelId) : IReportParameters<GradeDistributionFilters>
+{
+    public GradeDistributionFilters ToFilters() => new(TermId, ArmId, LevelId);
+}
+
+/// <summary><c>termId</c>, <c>levelId</c>.</summary>
+internal sealed record SubjectPerformanceParameters(
+    [FromQuery(Name = "termId")] string? TermId,
+    [FromQuery(Name = "levelId")] string? LevelId) : IReportParameters<SubjectPerformanceFilters>
+{
+    public SubjectPerformanceFilters ToFilters() => new(TermId, LevelId);
+}
+
+/// <summary><c>termId</c>, <c>armId</c>.</summary>
+internal sealed record DevelopmentSummaryParameters(
+    [FromQuery(Name = "termId")] string? TermId,
+    [FromQuery(Name = "armId")] string? ArmId) : IReportParameters<DevelopmentSummaryFilters>
+{
+    public DevelopmentSummaryFilters ToFilters() => new(TermId, ArmId);
+}
+
+/// <summary><c>termId</c>, <c>levelId</c>.</summary>
+internal sealed record FeeNoticeAuditParameters(
+    [FromQuery(Name = "termId")] string? TermId,
+    [FromQuery(Name = "levelId")] string? LevelId) : IReportParameters<FeeNoticeAuditFilters>
+{
+    public FeeNoticeAuditFilters ToFilters() => new(TermId, LevelId);
+}
+
 /// <summary>
 /// Spec 15 section 10's reports. Each report is two routes: <c>GET /reports/{name}</c> (the table as JSON) and
 /// <c>GET /reports/{name}/export?format=csv|pdf</c> (a file, <c>report.export</c>, audited as <c>report.export</c> with the
@@ -76,6 +109,24 @@ public sealed class ReportEndpoints : IEndpointModule
             "One row per arm for the term: pupils, subjects mapped, mark cells, ratings, attendance, teacher's and head's " +
             "remarks complete of total, and the result set's state. Filters: `levelId`, `state` (`NotStarted` or a " +
             "result-set state). The same figures as each class's readiness grid. `report.view`.");
+        Map<GradeDistributionParameters, GradeDistributionFilters>(
+            group, "grade-distribution", "GradeDistribution", "Grade distribution",
+            "Counts and percentages of pupils in each grade band, per subject and overall (the term grade), for one arm " +
+            "(`armId`) or a level (`levelId`). Every band appears, zero counts included; a text bar (#, 5% each) survives " +
+            "photocopying. `report.view`.");
+        Map<SubjectPerformanceParameters, SubjectPerformanceFilters>(
+            group, "subject-performance", "SubjectPerformance", "Subject performance",
+            "Per subject, each arm of the level side by side: average, highest, lowest, counted, absent from the exam, passing " +
+            "and pass rate, then the level as a whole. `levelId` is required. `report.view`. PDF prints landscape.");
+        Map<DevelopmentSummaryParameters, DevelopmentSummaryFilters>(
+            group, "development-summary", "DevelopmentSummary", "Development domain summary",
+            "Nursery only (spec 15 section 10.2): per indicator, grouped by domain, how many pupils sit at each rating point, " +
+            "and how many are not rated. An arm whose section rates traits returns no rows and a note. `report.view`.");
+        Map<FeeNoticeAuditParameters, FeeNoticeAuditFilters>(
+            group, "fee-notice-audit", "FeeNoticeAudit", "Fee notice audit",
+            "Spec 15 section 10.2: per level, the configured fee lines and amounts for the term, their total, and how many " +
+            "pupils carry a typed outstanding figure and its total. Amounts are the notice as configured now (a published " +
+            "sheet printed its frozen copy). `levelId` optional. `report.view`.");
     }
 
     private static void Map<TParameters, TFilters>(RouteGroupBuilder group, string path, string name, string summary, string description)

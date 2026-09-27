@@ -66,6 +66,33 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
+    public async Task DistributionPerformanceDevelopmentAndFees_ReadTheSameArm()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        var query = $"termId={seeded.TermId}";
+
+        var distribution = await GetReportAsync(jar, $"/api/v1/reports/grade-distribution?{query}&armId={seeded.ArmId}");
+        distribution.Rows.ShouldContain(row => row.Kind == ReportRowKind.Heading && row.Cells[0] == seeded.SubjectName);
+        distribution.Rows.ShouldContain(row => row.Kind == ReportRowKind.Data && row.Cells[0] == "B" && row.Cells[2] == "2" && row.Cells[3] == "100%");
+
+        var performance = await GetReportAsync(jar, $"/api/v1/reports/subject-performance?{query}&levelId={seeded.LevelId}");
+        var armRow = performance.Rows.Single(row => row.Cells[0] == seeded.ArmName);
+        armRow.Cells[1].ShouldBe("72.50"); // (61 + 84) / 2
+        armRow.Cells[2].ShouldBe("84");
+        armRow.Cells[3].ShouldBe("61");
+        armRow.Cells[7].ShouldBe("100%");
+
+        var development = await GetReportAsync(jar, $"/api/v1/reports/development-summary?{query}&armId={seeded.ArmId}");
+        development.Rows.ShouldBeEmpty();
+        development.Notes.ShouldContain(note => note.Contains("nursery", StringComparison.Ordinal));
+
+        var fees = await GetReportAsync(jar, $"/api/v1/reports/fee-notice-audit?{query}&levelId={seeded.LevelId}");
+        fees.Rows.ShouldContain(row => row.Cells[0] == "Pupils with an outstanding figure" && row.Cells[1] == "0");
+    }
+
+    [Fact]
     public async Task Broadsheet_WithoutAnArm_IsAValidationError()
     {
         RequireDatabase();

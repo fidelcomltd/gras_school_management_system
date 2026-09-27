@@ -69,6 +69,40 @@ public sealed record ReportSubjectLine(Guid ResultSetId, Guid PupilId, Guid Subj
 /// <param name="DisplayOrder">Its place on the sheet.</param>
 public sealed record ReportSubject(Guid LevelId, Guid SubjectId, string Name, int DisplayOrder);
 
+/// <summary>A grading band, in display order.</summary>
+/// <param name="Letter">The grade letter.</param>
+/// <param name="LowerBound">Lowest total in the band.</param>
+/// <param name="UpperBound">Highest total in the band.</param>
+/// <param name="Remark">The band's word.</param>
+public sealed record ReportGradeBand(string Letter, int LowerBound, int UpperBound, string Remark);
+
+/// <summary>A development indicator with its domain (nursery, spec 6.2.9).</summary>
+/// <param name="IndicatorId">The indicator.</param>
+/// <param name="Name">Its wording.</param>
+/// <param name="DomainName">Its domain.</param>
+/// <param name="RatingScaleId">The domain's rating scale.</param>
+public sealed record ReportIndicator(Guid IndicatorId, string Name, string DomainName, Guid RatingScaleId);
+
+/// <summary>A rating-scale point.</summary>
+/// <param name="PointId">The point.</param>
+/// <param name="RatingScaleId">Its scale.</param>
+/// <param name="Label">Its wording.</param>
+/// <param name="Order">Its place on the scale.</param>
+public sealed record ReportRatingPoint(Guid PointId, Guid RatingScaleId, string Label, int Order);
+
+/// <summary>A pupil's development rating.</summary>
+/// <param name="PupilId">The pupil.</param>
+/// <param name="IndicatorId">The indicator.</param>
+/// <param name="PointId">The point given.</param>
+public sealed record ReportDevelopmentRating(Guid PupilId, Guid IndicatorId, Guid PointId);
+
+/// <summary>A configured fee line and its amount for one level in one term (spec 6.2.13).</summary>
+/// <param name="LevelId">The level.</param>
+/// <param name="Label">The line's wording.</param>
+/// <param name="DisplayOrder">Its place on the notice.</param>
+/// <param name="Amount">Naira, or null when no amount is set for this level.</param>
+public sealed record ReportFeeLine(Guid LevelId, string Label, int DisplayOrder, int? Amount);
+
 /// <summary>Read-only projections the reports assemble from (spec 15 section 10). Every list is small: one session's worth.</summary>
 public interface IReportReader
 {
@@ -92,6 +126,24 @@ public interface IReportReader
 
     /// <summary>The subjects mapped to these levels for the term (active mappings), in display order.</summary>
     Task<IReadOnlyList<ReportSubject>> ListMappedSubjectsAsync(Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+
+    /// <summary>The grading bands, in display order.</summary>
+    Task<IReadOnlyList<ReportGradeBand>> ListGradeBandsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The development indicators of the domains for this section, in domain then indicator order.</summary>
+    Task<IReadOnlyList<ReportIndicator>> ListIndicatorsAsync(Guid sectionId, CancellationToken cancellationToken);
+
+    /// <summary>The points of these rating scales.</summary>
+    Task<IReadOnlyList<ReportRatingPoint>> ListRatingPointsAsync(IReadOnlyCollection<Guid> ratingScaleIds, CancellationToken cancellationToken);
+
+    /// <summary>The development ratings in this result set.</summary>
+    Task<IReadOnlyList<ReportDevelopmentRating>> ListDevelopmentRatingsAsync(Guid resultSetId, CancellationToken cancellationToken);
+
+    /// <summary>Every amount-type fee line of these levels' sections, with each level's amount for the term (null when unset).</summary>
+    Task<IReadOnlyList<ReportFeeLine>> ListFeeLinesAsync(Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+
+    /// <summary>The typed outstanding figures in these result sets, by set: pupils carrying one and their total.</summary>
+    Task<IReadOnlyDictionary<Guid, (int Pupils, long Total)>> SumOutstandingAsync(IReadOnlyCollection<Guid> resultSetIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>
     Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);

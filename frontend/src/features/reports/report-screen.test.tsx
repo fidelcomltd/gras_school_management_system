@@ -95,6 +95,24 @@ describe('ReportScreen', () => {
     expect(screen.queryByRole('button', { name: 'CSV' })).not.toBeInTheDocument();
   });
 
+  it('asks subject performance for the first level the caller can see', async () => {
+    mockMe('report.view');
+    mockClasses();
+    let asked = new URLSearchParams();
+    server.use(
+      http.get(apiUrl('/api/v1/reports/subject-performance'), ({ request }) => {
+        asked = new URL(request.url).searchParams;
+        return HttpResponse.json({ ...broadsheet, key: 'subject-performance', title: 'Subject performance' });
+      }),
+    );
+
+    renderReport('subject-performance');
+
+    expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
+    expect(asked.get('levelId')).toBe('p4');
+    expect(asked.get('armId')).toBeNull();
+  });
+
   it('lists only the reports the caller may open', () => {
     mockMe('report.view');
 

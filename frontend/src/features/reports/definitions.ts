@@ -6,10 +6,26 @@ export type ReportColumnDto = components['schemas']['ReportColumnDto'];
 export type ReportRowDto = components['schemas']['ReportRowDto'];
 
 /** The reports served by the shared table shape, each with its own filters. */
-export type ReportKey = 'broadsheet' | 'merit-list' | 'result-entry-progress';
+export type ReportKey =
+  | 'broadsheet'
+  | 'merit-list'
+  | 'result-entry-progress'
+  | 'grade-distribution'
+  | 'subject-performance'
+  | 'development-summary'
+  | 'fee-notice-audit';
 
-/** Which filter set a report's screen shows. */
-export type ReportFilterKind = 'term-arm' | 'term-scope-top' | 'term-level-state';
+/**
+ * Which filter set a report's screen shows: a class; a class or a whole level (with a top N for the merit list); a required
+ * level; an optional level (with a result-set state for progress).
+ */
+export type ReportFilterKind =
+  | 'term-arm'
+  | 'term-scope'
+  | 'term-scope-top'
+  | 'term-level'
+  | 'term-level-state'
+  | 'term-level-any';
 
 export interface TableReport {
   kind: 'table';
@@ -61,6 +77,42 @@ export const REPORTS: ReportDefinition[] = [
     group: 'Results',
     privilege: 'report.view',
     filters: 'term-level-state',
+  },
+  {
+    kind: 'table',
+    key: 'grade-distribution',
+    title: 'Grade distribution',
+    description: 'How many pupils earned each grade, per subject and overall, for a class or a level.',
+    group: 'Results',
+    privilege: 'report.view',
+    filters: 'term-scope',
+  },
+  {
+    kind: 'table',
+    key: 'subject-performance',
+    title: 'Subject performance',
+    description: 'Each subject’s average, range and pass rate, class by class across a level.',
+    group: 'Results',
+    privilege: 'report.view',
+    filters: 'term-level',
+  },
+  {
+    kind: 'table',
+    key: 'development-summary',
+    title: 'Development domain summary',
+    description: 'Nursery: how many children sit at each rating point of each indicator.',
+    group: 'Results',
+    privilege: 'report.view',
+    filters: 'term-arm',
+  },
+  {
+    kind: 'table',
+    key: 'fee-notice-audit',
+    title: 'Fee notice audit',
+    description: 'The fee lines each level’s sheets print, and the outstanding figures typed against them.',
+    group: 'Fees',
+    privilege: 'report.view',
+    filters: 'term-level-any',
   },
   {
     kind: 'link',
