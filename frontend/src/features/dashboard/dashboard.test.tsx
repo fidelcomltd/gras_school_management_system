@@ -73,6 +73,28 @@ describe('Dashboard', () => {
     expect(await screen.findByText(/Eze Chidera/)).toBeInTheDocument();
   });
 
+  it('says there is no session yet instead of spinning, and reports a failed session list as a failure', async () => {
+    mockReads();
+    server.use(http.get(apiUrl('/api/v1/sessions'), () => HttpResponse.json({ items: [], nextCursor: null })));
+
+    const { unmount } = renderWithProviders(
+      <MemoryRouter>
+        <Dashboard session={session('report.view')} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('No term has been set up yet.')).toBeInTheDocument();
+    expect(screen.getByText('No session has been set up yet.')).toBeInTheDocument();
+    unmount();
+
+    server.use(http.get(apiUrl('/api/v1/sessions'), () => HttpResponse.json({}, { status: 500 })));
+    renderWithProviders(
+      <MemoryRouter>
+        <Dashboard session={session('report.view')} />
+      </MemoryRouter>,
+    );
+    expect((await screen.findAllByText('Could not load this. Open it to try again.')).length).toBeGreaterThanOrEqual(2);
+  });
+
   it('shows no illness tile without the safeguarding privilege, and no tiles without report.view', () => {
     mockReads();
 

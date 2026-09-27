@@ -10,19 +10,22 @@ import { useWeeklyIllness } from '@/features/weekly/api';
 import { hasPrivilege, type AuthSession } from '@/lib/auth/auth-session';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 
+/** What a tile shows: loading, failed, a sentence instead of a figure (nothing to report), or its figure. */
+type TileState = 'loading' | 'failed' | 'empty' | 'ready';
+
 /** One figure with its context and where to go next. Loads and fails on its own, so one slow report never blanks the page. */
 function Tile({
   title,
   to,
-  pending,
-  failed,
+  state,
+  empty,
   value,
   children,
 }: {
   title: string;
   to: string;
-  pending: boolean;
-  failed: boolean;
+  state: TileState;
+  empty?: string;
   value?: string | undefined;
   children?: ReactNode;
 }) {
@@ -35,44 +38,68 @@ function Tile({
           <ChevronRight aria-hidden="true" className="size-3" />
         </Link>
       </div>
-      {pending ? (
-        <Spinner className="size-5" />
-      ) : failed ? (
-        <p className="text-sm text-destructive">Could not load this. Open it to try again.</p>
-      ) : (
+      {state === 'loading' ? <Spinner className="size-5" /> : null}
+      {state === 'failed' ? <p className="text-sm text-destructive">Could not load this. Open it to try again.</p> : null}
+      {state === 'empty' ? <p className="text-sm text-muted-foreground">{empty}</p> : null}
+      {state === 'ready' ? (
         <>
           {value !== undefined ? <p className="font-display text-3xl font-semibold text-foreground tabular-nums">{value}</p> : null}
           {children}
         </>
-      )}
+      ) : null}
     </section>
   );
 }
 
-const count = (report: ReportDto | undefined) => report?.rows.filter((row) => row.kind === 'Data') ?? [];
+/** A query's tile state; a query switched off for want of a session or term is "empty", never an endless spinner. */
+function stateOf(query: { isLoading: boolean; isError: boolean; isSuccess: boolean }, needs: { pending: boolean; failed: boolean; missing: boolean }): TileState {
+  if (needs.pending) return 'loading';
+  if (needs.failed) return 'failed';
+  if (needs.missing) return 'empty';
+  if (query.isError) return 'failed';
+  return query.isSuccess ? 'ready' : 'loading';
+}
+
+const dataRows = (report: ReportDto | undefined) => report?.rows.filter((row) => row.kind === 'Data') ?? [];
+
+const listed = (names: string[], shown = 4) =>
+  names.slice(0, shown).join(', ') + (names.length > shown ? ` and ${names.length - shown} more` : '');
 
 /**
- * The head teacher's dashboard (spec 15; spec 20's illness marker): this term's results by state and the classes still
- * entering marks, the school's roll, admissions waiting, records to chase, and pupils with illness noted on several days.
- * Every tile reads an existing report, shows only to a holder of that report's privileges, and links to the full report.
+ * The head teacher's dashboard (spec 15; spec 20's illness marker). School-wide figures, so it shows only to a holder of
+ * `report.view` over the whole school: a class-scoped holder would see their classes' numbers under school-wide headings.
  */
 export function Dashboard({ session }: { session: AuthSession }) {
-  const can = (privilege: string) => hasPrivilege(session, privilege);
+  const schoolWide =
+    session.isSuperAdmin || session.effectivePrivileges.some((grant) => grant.privilege === 'report.view' && grant.scope === 'SchoolWide');
+  return schoolWide ? (
+    <Tiles illness={hasPrivilege(session, 'pupil.safeguarding.view')} />
+  ) : (
+    <p className="text-sm text-muted-foreground">Choose a page from the menu to begin.</p>
+  );
+}
+
+/**
+ * The tiles: this term's results by state and the classes still entering marks, the roll, admissions waiting, records to
+ * chase, and pupils with illness noted on several days. Every tile reads an existing report and links to it. Between terms
+ * the term is the latest one that has begun, not the first.
+ */
+function Tiles({ illness }: { illness: boolean }) {
   const term = useTermChoice();
-  const reports = can('report.view');
-  const illness = reports && can('pupil.safeguarding.view');
+  const current =
+    term.terms.find((candidate) => candidate.state === 'Active') ??
+    [...term.terms].reverse().find((candidate) => candidate.state !== 'Upcoming') ??
+    term.terms[0];
+  const termId = current?.id ?? '';
 
-  const progress = useReport('result-entry-progress', { termId: term.termId }, reports && term.termId !== '');
-  const roll = useReport('enrolment-summary', { sessionId: term.sessionId }, reports && term.sessionId !== '');
-  const admissions = useReport('admissions-pipeline', {}, reports);
-  const records = useIncompleteRecords(reports);
-  const ill = useWeeklyIllness(term.termId, illness);
+  const progress = useReport('result-entry-progress', { termId }, termId !== '');
+  const roll = useReport('enrolment-summary', { sessionId: term.sessionId }, term.sessionId !== '');
+  const admissions = useReport('admissions-pipeline', {}, true);
+  const records = useIncompleteRecords(true);
+  const ill = useWeeklyIllness(termId, illness);
 
-  if (!reports) {
-    return <p className="text-sm text-muted-foreground">Choose a page from the menu to begin.</p>;
-  }
-
-  const classes = count(progress.data);
+  const period = { pending: term.isPending, failed: term.isError };
+  const classes = dataRows(progress.data);
   const byState = classes.reduce<Record<string, number>>((tally, row) => {
     const state = row.cells[8] ?? 'Not started';
     tally[state] = (tally[state] ?? 0) + 1;
@@ -84,16 +111,18 @@ export function Dashboard({ session }: { session: AuthSession }) {
     return done !== undefined && total !== undefined && done < total;
   });
   const total = roll.data?.rows.find((row) => row.kind === 'Total');
-  const waiting = count(admissions.data);
+  const spaceLeft = Number(total?.cells[5] ?? 0);
+  const waiting = dataRows(admissions.data);
   const oldest = Math.max(0, ...waiting.map((row) => Number(row.cells[3] ?? 0)));
+  const flagged = ill.data?.items ?? [];
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <Tile
-        title={`Results, ${term.term?.name ?? 'this term'}`}
+        title={`Results, ${current?.name ?? 'this term'}`}
         to={paths.report('result-entry-progress')}
-        pending={term.isPending || progress.isPending}
-        failed={progress.isError}
+        state={stateOf(progress, { ...period, missing: termId === '' })}
+        empty="No term has been set up yet."
         value={`${byState['Published'] ?? 0} of ${classes.length}`}
       >
         <p className="text-sm text-muted-foreground">classes published</p>
@@ -107,26 +136,31 @@ export function Dashboard({ session }: { session: AuthSession }) {
             ))}
         </ul>
         {entering.length > 0 ? (
-          <p className="text-sm text-warning">
-            Still entering marks: {entering.slice(0, 4).map((row) => row.cells[0]).join(', ')}
-            {entering.length > 4 ? ` and ${entering.length - 4} more` : ''}
-          </p>
+          <p className="text-sm text-warning">Still entering marks: {listed(entering.map((row) => row.cells[0] ?? ''))}</p>
         ) : null}
       </Tile>
 
       <Tile
         title="Pupils on roll"
         to={paths.report('enrolment-summary')}
-        pending={term.isPending || roll.isPending}
-        failed={roll.isError}
+        state={stateOf(roll, { ...period, missing: term.sessionId === '' })}
+        empty="No session has been set up yet."
         value={total?.cells[3] ?? '0'}
       >
         <p className="text-sm text-muted-foreground">
-          {total ? `${total.cells[1] ?? '0'} boys, ${total.cells[2] ?? '0'} girls; ${total.cells[5] ?? '0'} places left` : 'No classes this session yet.'}
+          {total
+            ? `${total.cells[1] ?? '0'} boys, ${total.cells[2] ?? '0'} girls; ` +
+              (spaceLeft < 0 ? `over capacity by ${-spaceLeft}` : `${spaceLeft} ${spaceLeft === 1 ? 'place' : 'places'} left`)
+            : 'No classes this session yet.'}
         </p>
       </Tile>
 
-      <Tile title="Admissions waiting" to={paths.admissions} pending={admissions.isPending} failed={admissions.isError} value={String(waiting.length)}>
+      <Tile
+        title="Admissions waiting"
+        to={paths.report('admissions-pipeline')}
+        state={stateOf(admissions, { pending: false, failed: false, missing: false })}
+        value={String(waiting.length)}
+      >
         <p className="text-sm text-muted-foreground">
           {waiting.length === 0 ? 'Nothing pending.' : `The oldest has waited ${oldest} ${oldest === 1 ? 'day' : 'days'}.`}
         </p>
@@ -135,8 +169,7 @@ export function Dashboard({ session }: { session: AuthSession }) {
       <Tile
         title="Records to chase"
         to={paths.incompleteRecords}
-        pending={records.isPending}
-        failed={records.isError}
+        state={stateOf(records, { pending: false, failed: false, missing: false })}
         value={String(records.data?.pupils.length ?? 0)}
       >
         <p className="text-sm text-muted-foreground">
@@ -148,17 +181,18 @@ export function Dashboard({ session }: { session: AuthSession }) {
         <Tile
           title="Illness noted on several days"
           to={paths.weeklyCompletion}
-          pending={term.isPending || ill.isPending}
-          failed={ill.isError}
-          value={String(ill.data?.items.length ?? 0)}
+          state={stateOf(ill, { ...period, missing: termId === '' })}
+          empty="No term has been set up yet."
+          value={String(flagged.length)}
         >
           <ul className="flex flex-col gap-0.5 text-sm text-foreground">
-            {(ill.data?.items ?? []).slice(0, 4).map((item) => (
+            {flagged.slice(0, 4).map((item) => (
               <li key={item.pupilId}>
                 {item.displayName} <span className="text-muted-foreground">({item.armName}, {item.observations.length} days)</span>
               </li>
             ))}
           </ul>
+          {flagged.length > 4 ? <p className="text-sm text-muted-foreground">and {flagged.length - 4} more</p> : null}
         </Tile>
       ) : null}
     </div>
