@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
 import { AdmittedNotice, DeclarationStep, OtherInformationStep } from './flow-steps';
 import { ReviewStep } from './review-step';
+import { PageTrail } from '@/components/layout/page-trail';
 
 /** Spec 6.5.11's nine steps. Step 1 is the create dialog; this screen resumes from step 2. */
 const STEPS = [
@@ -59,9 +60,7 @@ export function AdmissionFlowScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.admissions} className="text-sm text-primary hover:underline">
-        ← Admissions queue
-      </Link>
+      <PageTrail trail={[{ label: 'Admissions', to: paths.admissions }, { label: pupilName(record) }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Admission: {pupilName(record)}</h1>
         <p className="text-sm text-muted-foreground">Pending. Each section saves on its own button; you can leave and come back.</p>

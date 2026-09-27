@@ -8,6 +8,8 @@ import { useSession } from './api';
 import { EditSessionDialog } from './components/edit-session-dialog';
 import { TermCard } from './components/term-card';
 import { LoadingState } from '@/components/feedback/query-states';
+import { PageTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
 
 /**
  * `/sessions/:id` — a session's own fields plus its three terms (spec 6.3.8,
@@ -50,6 +52,7 @@ export function SessionDetailScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTrail trail={[{ label: 'Sessions', to: paths.sessions }, { label: detail.name }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.name}</h1>

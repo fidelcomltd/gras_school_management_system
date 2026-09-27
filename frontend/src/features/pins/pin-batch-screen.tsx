@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { ReasonDialog } from '@/shared/dialogs/reason-dialog';
 import { usePinAction, usePinBatch, usePinDownload } from './api';
 import { PinTable } from './components/pin-table';
 import { formatDateTime, type PinSummaryDto } from './types';
+import { PageTrail } from '@/components/layout/page-trail';
 
 type Asking = { kind: 'revoke-batch' } | { kind: 'revoke-pin' | 'reinstate-pin'; pin: PinSummaryDto };
 
@@ -34,9 +35,7 @@ export function PinBatchScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.pins} className="text-sm text-primary hover:underline">
-        ← All pin batches
-      </Link>
+      <PageTrail trail={[{ label: 'Pins', to: paths.pins }, { label: batch.name }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">{batch.name}</h1>
         <p className="text-sm text-muted-foreground">

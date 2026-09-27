@@ -10,6 +10,8 @@ import { EditAdminDialog } from './components/edit-admin-dialog';
 import { ResetPasswordDialog } from './components/reset-password-dialog';
 import type { AdminAccountStatus } from './types';
 import { LoadingState } from '@/components/feedback/query-states';
+import { PageTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
 
 /** The status an account of each current status could legally move to. */
 const STATUS_TARGETS: Record<AdminAccountStatus, AdminAccountStatus[]> = {
@@ -72,6 +74,7 @@ export function AdminDetailScreen() {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
+      <PageTrail trail={[{ label: 'Admins', to: paths.admins }, { label: detail.staffName }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.staffName}</h1>

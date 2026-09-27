@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { ChangePreview } from './components/change-preview';
 import { CopyFromTerm } from './components/copy-from-term';
 import { MappingGrid } from './components/mapping-grid';
 import { cellKey, type SaveSubjectMappingGridResponse, type SubjectMappingGridDto, type SubjectMappingGridEntryInput } from './types';
+import { PageTrail } from '@/components/layout/page-trail';
 
 type Pending = { kind: 'grid' } | { kind: 'copy'; sourceTermId: string } | { kind: 'prefill' };
 
@@ -74,9 +74,7 @@ export function MappingScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.subjects} className="text-sm text-primary hover:underline">
-        ← Subjects
-      </Link>
+      <PageTrail trail={[{ label: 'Subjects', to: paths.subjects }, { label: 'Subjects by class' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Subjects by class</h1>
         <p className="text-sm text-muted-foreground">Tick the subjects each class takes this term. Changes are previewed before they are saved.</p>

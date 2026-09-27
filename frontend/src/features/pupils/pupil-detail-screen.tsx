@@ -17,6 +17,7 @@ import { CompletenessCard, DocumentsPanel } from './records/documents-panel';
 import { HealthPanel } from './records/health-panel';
 import { PupilPhoto } from './records/pupil-photo';
 import { pupilName, type PupilDto } from './types';
+import { PageTrail } from '@/components/layout/page-trail';
 
 type Tab = 'details' | 'class' | 'contacts' | 'collection' | 'health' | 'documents';
 
@@ -71,9 +72,7 @@ export function PupilDetailScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.pupils} className="text-sm text-primary hover:underline">
-        ← All pupils
-      </Link>
+      <PageTrail trail={[{ label: 'Pupils', to: paths.pupils }, { label: pupilName(record) }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-3">
           <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(record)}</h1>
