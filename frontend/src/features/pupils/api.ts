@@ -49,6 +49,19 @@ export function usePupilSearch(term: string, enabled: boolean) {
   });
 }
 
+/**
+ * The states and LGAs a pupil record accepts (spec 6.5.4), the same list the server validates against. It never changes
+ * while the app runs, so it is fetched once and kept.
+ */
+export function useNigerianGeography() {
+  return useQuery({
+    queryKey: [PupilsKeys.Geography],
+    queryFn: ({ signal }) => apiGet('/api/v1/geography/states', undefined, { signal }),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
 /** Gated `pupil.view`. */
 export function usePupil(id: string) {
   return useQuery({

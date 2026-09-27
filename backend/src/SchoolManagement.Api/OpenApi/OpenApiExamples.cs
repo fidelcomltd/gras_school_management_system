@@ -3116,6 +3116,19 @@ internal static class OpenApiExamples
             { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "IMG_2231.jpg" }
             """,
 
+        [typeof(NigerianStateDto)] = """
+            { "name": "Anambra", "lgas": ["Aguata", "Anambra East", "Awka North", "Awka South"] }
+            """,
+
+        [typeof(NigerianGeographyDto)] = """
+            {
+              "states": [
+                { "name": "Abia", "lgas": ["Aba North", "Aba South", "Arochukwu"] },
+                { "name": "Anambra", "lgas": ["Aguata", "Anambra East", "Awka South"] }
+              ]
+            }
+            """,
+
         [typeof(PupilPhotoDto)] = $$"""
             {
               "pupilId": "{{ExamplePupilId}}",
