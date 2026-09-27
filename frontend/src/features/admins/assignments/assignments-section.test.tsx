@@ -19,10 +19,25 @@ function mockReads(assignments: unknown[]) {
         : HttpResponse.json({
             items: [
               { id: 'role-sa', name: 'Super Admin', description: null, isSystem: true, status: 'Active', privileges: [] },
-              { id: 'role-ct', name: 'Class Teacher', description: null, isSystem: false, status: 'Active', privileges: [] },
+              { id: 'role-ct', name: 'Class Teacher', description: null, isSystem: false, status: 'Active', privileges: ['result.score.enter'] },
+              { id: 'role-bu', name: 'Bursar', description: null, isSystem: false, status: 'Active', privileges: ['fee.manage'] },
             ],
             nextCursor: null,
           }),
+    ),
+    http.get(apiUrl('/api/v1/privileges'), () =>
+      HttpResponse.json({
+        groups: [
+          {
+            key: 'results',
+            title: 'Results',
+            privileges: [
+              { code: 'result.score.enter', permits: 'Enter scores', scopable: true },
+              { code: 'fee.manage', permits: 'Manage fees', scopable: false },
+            ],
+          },
+        ],
+      }),
     ),
     http.get(apiUrl('/api/v1/sessions'), () =>
       HttpResponse.json({ items: [{ id: 's-1', name: '2026/2027', startDate: '2026-09-14', endDate: '2027-07-25', state: 'Active' }], nextCursor: null }),
@@ -51,11 +66,11 @@ describe('AssignmentsSection', () => {
     expect(await screen.findByText('Class Teacher')).toBeInTheDocument();
     expect(await screen.findByText(/2026\/2027 · Primary 4A/)).toBeInTheDocument();
     expect(screen.getByText(/1 revoked assignment is kept/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Revoke Class Teacher' }));
+    await user.click(screen.getByRole('button', { name: 'Revoke Class Teacher, 2026/2027' }));
     await waitFor(() => expect(revoked).toBe('as-1'));
   });
 
-  it('assigns a role over chosen classes, never offering Super Admin', async () => {
+  it('assigns a role over chosen classes, never offering Super Admin or a role that cannot be scoped', async () => {
     mockMe('admin.view', 'role.scope.assign', 'role.view');
     mockReads([]);
     let sent: Record<string, unknown> | null = null;
@@ -74,6 +89,7 @@ describe('AssignmentsSection', () => {
     await user.click(screen.getByRole('button', { name: 'Assign role' }));
     await user.click(await screen.findByRole('combobox', { name: 'Role' }));
     expect(screen.queryByRole('option', { name: 'Super Admin' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Bursar' })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('option', { name: 'Class Teacher' }));
     // Only the arm-scoped choice is offered to a role.scope.assign holder, so it is already selected.
     expect(screen.queryByLabelText('The whole school')).not.toBeInTheDocument();

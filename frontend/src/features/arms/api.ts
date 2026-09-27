@@ -29,9 +29,10 @@ export interface ArmsFilters {
  * (TASK-0045 AC), unlike `useLevels`, which re-sorts because its own list
  * endpoint makes no such ordering promise.
  */
-export function useArms(filters: ArmsFilters) {
+export function useArms(filters: ArmsFilters, enabled = true) {
   return useInfiniteQuery({
     queryKey: [ArmsKeys.List, filters],
+    enabled,
     queryFn: ({ pageParam, signal }) =>
       apiGet(
         ARMS_PATH,

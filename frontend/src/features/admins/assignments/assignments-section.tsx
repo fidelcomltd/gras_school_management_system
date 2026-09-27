@@ -5,22 +5,25 @@ import { useArms } from '@/features/arms/api';
 import { useRoles } from '@/features/roles/api';
 import { useSessions } from '@/features/sessions/api';
 import { ApiError } from '@/lib/http';
-import { useAssignments, useRevokeAssignment, type RoleAssignmentDto } from './api';
+import { useAllPages } from '@/lib/query/use-all-pages';
+import { useAssignments, useRevokeAssignment } from './api';
 import { AssignRoleDialog } from './assign-role-dialog';
+import type { RoleAssignmentDto } from './types';
 
-/** "Whole school", or the classes by name; any the first page of arms cannot name are counted instead. */
-function ScopeText({ assignment }: { assignment: RoleAssignmentDto }) {
-  const arms = useArms({ sessionId: assignment.sessionId ?? '' });
-  if (assignment.scopeType === 'SchoolWide') return <>Whole school</>;
-  const known = arms.data?.pages.flatMap((page) => page.items) ?? [];
-  const names = assignment.armIds.flatMap((id) => known.filter((arm) => arm.id === id).map((arm) => arm.displayName));
-  const unnamed = assignment.armIds.length - names.length;
-  return <>{[...names, ...(unnamed > 0 ? [`${unnamed} more ${unnamed === 1 ? 'class' : 'classes'}`] : [])].join(', ')}</>;
+/** An arm-scoped assignment's classes by name, from every page of its session's arms. */
+function ArmNames({ assignment }: { assignment: RoleAssignmentDto }) {
+  const enabled = assignment.sessionId !== null;
+  const query = useArms({ sessionId: assignment.sessionId ?? '' }, enabled);
+  const arms = useAllPages(query, enabled);
+  if (query.isPending || query.hasNextPage) return <>loading classes…</>;
+  const names = assignment.armIds.map((id) => arms.find((arm) => arm.id === id)?.displayName ?? 'a removed class');
+  return <>{names.join(', ')}</>;
 }
 
 /**
  * The account's roles (spec 6.1.5, 6.1.14): what they hold, for which session, over the whole school or chosen classes, and
  * assign or revoke. Never on your own account (escalation rule 1): the buttons are absent there, and the server refuses anyway.
+ * Names come from the roles and sessions lists; a viewer without `role.view` sees that the name is hidden, not a wrong one.
  */
 export function AssignmentsSection({
   adminId,
@@ -37,16 +40,18 @@ export function AssignmentsSection({
 }) {
   const assignments = useAssignments(adminId);
   const revoke = useRevokeAssignment(adminId);
-  const active = useRoles();
-  const archived = useRoles('Archived');
-  const sessions = useSessions();
+  const activeQuery = useRoles();
+  const archivedQuery = useRoles('Archived');
+  const sessionsQuery = useSessions();
+  const roles = [...useAllPages(activeQuery), ...useAllPages(archivedQuery)];
+  const sessions = useAllPages(sessionsQuery);
   const [assigning, setAssigning] = useState(false);
 
   const roleName = (id: string) =>
-    [...(active.data?.pages ?? []), ...(archived.data?.pages ?? [])].flatMap((page) => page.items).find((role) => role.id === id)
-      ?.name ?? 'Unknown role';
+    roles.find((role) => role.id === id)?.name ?? (activeQuery.isError ? 'Role (name needs role.view)' : 'Unknown role');
   const sessionName = (id: string | null) =>
-    id === null ? 'Every session' : (sessions.data?.pages.flatMap((page) => page.items).find((session) => session.id === id)?.name ?? '—');
+    id === null ? 'Every session' : (sessions.find((session) => session.id === id)?.name ?? 'Unknown session');
+  const describe = (assignment: RoleAssignmentDto) => `${roleName(assignment.roleId)}, ${sessionName(assignment.sessionId)}`;
 
   const canGrant = !isSelf && (canAssign || canScopeAssign);
   const revokeError = revoke.error instanceof ApiError ? revoke.error.message : null;
@@ -67,7 +72,8 @@ export function AssignmentsSection({
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-foreground">{roleName(assignment.roleId)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {sessionName(assignment.sessionId)} · <ScopeText assignment={assignment} />
+                    {sessionName(assignment.sessionId)} ·{' '}
+                    {assignment.scopeType === 'SchoolWide' ? 'Whole school' : <ArmNames assignment={assignment} />}
                   </span>
                 </div>
                 {canAssign && !isSelf ? (
@@ -75,9 +81,9 @@ export function AssignmentsSection({
                     variant="outline"
                     size="sm"
                     disabled={revoke.isPending}
-                    aria-label={`Revoke ${roleName(assignment.roleId)}`}
+                    aria-label={`Revoke ${describe(assignment)}`}
                     onClick={() => {
-                      if (window.confirm(`Revoke ${roleName(assignment.roleId)} from ${staffName}? They lose its privileges at once.`)) {
+                      if (window.confirm(`Revoke ${describe(assignment)} from ${staffName}? They lose its privileges at once.`)) {
                         revoke.mutate(assignment.id);
                       }
                     }}

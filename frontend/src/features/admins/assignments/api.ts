@@ -1,15 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPost } from '@/api/client';
-import type { components } from '@/api/schema';
-
-export type RoleAssignmentDto = components['schemas']['RoleAssignmentDto'];
-export type CreateRoleAssignmentCommand = components['schemas']['CreateRoleAssignmentCommand'];
-
-export const AssignmentsKeys = {
-  List: 'admins.assignments',
-  Create: 'admins.assignments.create',
-  Revoke: 'admins.assignments.revoke',
-} as const;
+import { AssignmentsKeys, type CreateRoleAssignmentCommand } from './types';
 
 const ASSIGNMENTS_PATH = '/api/v1/admins/{id}/assignments';
 const ASSIGNMENT_PATH = '/api/v1/assignments/{id}';
