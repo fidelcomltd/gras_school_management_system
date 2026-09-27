@@ -17,6 +17,7 @@ namespace SchoolManagement.IntegrationTests;
 public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
     private static int _nextYear = 9700;
+    private static int _nextFeeOrder = 50_000;
 
     [Fact]
     public async Task ResultsReports_ReadTheComputedArm_AndAnExportIsAudited()
@@ -93,6 +94,95 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
+    public async Task FeeAudit_ShowsTheTermsLinesAndCountsATypedZero_AndDistributionRefusesArmAndLevelTogether()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        var label = $"Levy {Guid.NewGuid():N}"[..16];
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var fee = SchoolManagement.Domain.Fees.FeeLabel.Create(Guid.CreateVersion7(), SeededClassLevels.PrimarySectionId, label, Interlocked.Increment(ref _nextFeeOrder), SchoolManagement.Domain.Fees.FeeLabelKind.Amount, false).Value;
+            context.Add(fee);
+            context.Add(SchoolManagement.Domain.Fees.FeeAmount.Create(Guid.CreateVersion7(), fee.Id, seeded.TermId, seeded.LevelId, 12500).Value);
+            context.Add(SchoolManagement.Domain.Fees.OutstandingFee.Create(Guid.CreateVersion7(), seeded.ResultSetId, seeded.PupilIds[0], 0).Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var fees = await GetReportAsync(jar, $"/api/v1/reports/fee-notice-audit?termId={seeded.TermId}&levelId={seeded.LevelId}");
+        fees.Rows.ShouldContain(row => row.Cells[0] == label && row.Cells[1] == "12,500");
+        fees.Rows.ShouldContain(row => row.Cells[0] == "Total fees" && row.Cells[1] == "12,500");
+        fees.Rows.ShouldContain(row => row.Cells[0] == "Pupils with an outstanding figure" && row.Cells[1] == "1");
+
+        using var both = await GetAsync(jar, $"/api/v1/reports/grade-distribution?termId={seeded.TermId}&armId={seeded.ArmId}&levelId={seeded.LevelId}");
+        both.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task DevelopmentSummary_CountsRatingsPerPoint_AndTheUnratedOfTheWholeClass()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+        Guid termId;
+        Guid armId;
+        string indicatorName;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var level = await context.ClassLevels.AsNoTracking()
+                .FirstAsync(candidate => candidate.SectionId == SeededClassLevels.NurserySectionId, TestContext.Current.CancellationToken);
+            var indicator = await (
+                    from item in context.DevelopmentIndicators.AsNoTracking()
+                    join domain in context.DevelopmentDomains.AsNoTracking() on item.DomainId equals domain.Id
+                    where domain.SectionId == SeededClassLevels.NurserySectionId
+                        && domain.Status == SchoolManagement.Domain.Settings.DevelopmentDomainStatus.Active
+                        && item.Status == SchoolManagement.Domain.Settings.DevelopmentIndicatorStatus.Active
+                    orderby domain.DisplayOrder, item.DisplayOrder
+                    select new { item.Id, item.Name, domain.RatingScaleId })
+                .FirstAsync(TestContext.Current.CancellationToken);
+            var point = await context.RatingScalePoints.AsNoTracking()
+                .Where(candidate => candidate.RatingScaleId == indicator.RatingScaleId)
+                .OrderBy(candidate => candidate.PointOrder)
+                .FirstAsync(TestContext.Current.CancellationToken);
+            indicatorName = indicator.Name;
+
+            var year = Interlocked.Increment(ref _nextYear);
+            var session = AcademicSession.Create(Guid.CreateVersion7(), $"{year}/{year + 1}", new DateOnly(year, 9, 1), new DateOnly(year + 1, 7, 31)).Value;
+            context.Add(session);
+            var term = Term.Create(Guid.CreateVersion7(), session.Id, 1, "First Term", new DateOnly(year, 9, 1), new DateOnly(year, 12, 15)).Value;
+            context.Add(term);
+            var arm = Arm.Create(Guid.CreateVersion7(), level.Id, session.Id, "A", null, null).Value;
+            context.Add(arm);
+            var resultSet = ResultSet.Create(Guid.CreateVersion7(), arm.Id, term.Id).Value;
+            context.Add(resultSet);
+            var pupils = new[] { "Obi", "Nnaji" }.Select(surname => Pupil.Create(
+                Guid.CreateVersion7(), surname, "Ada", middleName: null, PupilSex.Female, new DateOnly(2022, 1, 1), asOfDate: new DateOnly(2026, 9, 9),
+                nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka", previousSchool: null, previousClass: null, otherInformation: null).Value).ToList();
+            foreach (var pupil in pupils)
+            {
+                context.Add(pupil);
+                context.Add(Enrolment.Open(Guid.CreateVersion7(), pupil.Id, arm.Id, new DateOnly(year, 9, 1)).Value);
+            }
+
+            context.Add(DevelopmentRating.Create(Guid.CreateVersion7(), resultSet.Id, pupils[0].Id, indicator.Id, point.Id, null).Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE pupils SET status = {nameof(PupilStatus.Active)} WHERE id IN (SELECT pupil_id FROM enrolments WHERE arm_id = {arm.Id})",
+                TestContext.Current.CancellationToken);
+            termId = term.Id;
+            armId = arm.Id;
+        }
+
+        var report = await GetReportAsync(jar, $"/api/v1/reports/development-summary?termId={termId}&armId={armId}");
+
+        var row = report.Rows.First(candidate => candidate.Kind == ReportRowKind.Data && candidate.Cells[0] == indicatorName);
+        row.Cells[1].ShouldBe("1");
+        row.Cells[^1].ShouldBe("1"); // two in the class, one rated
+        report.Notes.ShouldContain("Out of the 2 pupils enrolled in the class during the term.");
+    }
+
+    [Fact]
     public async Task Broadsheet_WithoutAnArm_IsAValidationError()
     {
         RequireDatabase();
@@ -103,7 +193,7 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
     }
 
-    private sealed record Seeded(Guid TermId, Guid ArmId, string ArmName, Guid LevelId, string SubjectName);
+    private sealed record Seeded(Guid TermId, Guid ArmId, string ArmName, Guid LevelId, string SubjectName, Guid ResultSetId, IReadOnlyList<Guid> PupilIds);
 
     /// <summary>An Approved, computed arm: Eze first, Okafor second, one subject.</summary>
     private async Task<Seeded> SeedAsync()
@@ -130,6 +220,7 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         context.Add(subject);
         context.Add(SchoolManagement.Domain.Subjects.SubjectMapping.Create(Guid.CreateVersion7(), subject.Id, level.Id, session.Id, term.Id, 1).Value);
 
+        var pupilIds = new List<Guid>();
         foreach (var (surname, position, total) in new[] { ("Okafor", 2, 61), ("Eze", 1, 84) })
         {
             var pupil = Pupil.Create(
@@ -137,6 +228,7 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
                 nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka", previousSchool: null, previousClass: null, otherInformation: null).Value;
             context.Add(pupil);
             context.Add(Enrolment.Open(Guid.CreateVersion7(), pupil.Id, arm.Id, new DateOnly(year, 9, 1)).Value);
+            pupilIds.Add(pupil.Id);
             context.Add(SubjectResultLine.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, total / 2, total - (total / 2), total, "B", "Good", position, false, true));
             context.Add(PupilTermResult.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 1, 100, total, total, "B", position, false, 2, position, false, 2));
         }
@@ -146,7 +238,7 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE pupils SET status = {nameof(PupilStatus.Active)} WHERE id IN (SELECT pupil_id FROM enrolments WHERE arm_id = {arm.Id})",
             TestContext.Current.CancellationToken);
-        return new Seeded(term.Id, arm.Id, ArmDisplayName.Compose(level.Name, "A"), level.Id, subjectName);
+        return new Seeded(term.Id, arm.Id, ArmDisplayName.Compose(level.Name, "A"), level.Id, subjectName, resultSet.Id, pupilIds);
     }
 
     private async Task<ReportDto> GetReportAsync(CookieJar jar, string url)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Reports;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Fees;
+using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
 
@@ -82,8 +83,9 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
                 from indicator in context.DevelopmentIndicators.AsNoTracking()
                 join domain in context.DevelopmentDomains.AsNoTracking() on indicator.DomainId equals domain.Id
                 where domain.SectionId == sectionId
+                    && domain.Status == DevelopmentDomainStatus.Active && indicator.Status == DevelopmentIndicatorStatus.Active
                 orderby domain.DisplayOrder, indicator.DisplayOrder
-                select new ReportIndicator(indicator.Id, indicator.Name, domain.Name, domain.RatingScaleId))
+                select new ReportIndicator(indicator.Id, indicator.Name, domain.Id, domain.Name, domain.RatingScaleId))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
     public async Task<IReadOnlyList<ReportRatingPoint>> ListRatingPointsAsync(IReadOnlyCollection<Guid> ratingScaleIds, CancellationToken cancellationToken) =>
@@ -117,11 +119,22 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
             .ToList();
     }
 
+    public async Task<IReadOnlyList<Guid>> ListRosterAsync(Guid armId, Guid termId, CancellationToken cancellationToken) =>
+        await (
+                from enrolment in context.Enrolments.AsNoTracking()
+                join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                join term in context.Terms.AsNoTracking() on termId equals term.Id
+                where enrolment.ArmId == armId
+                    && enrolment.EffectiveFrom <= term.EndDate && (enrolment.EffectiveTo == null || enrolment.EffectiveTo >= term.StartDate)
+                select pupil.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyDictionary<Guid, (int Pupils, long Total)>> SumOutstandingAsync(
         IReadOnlyCollection<Guid> resultSetIds, CancellationToken cancellationToken)
     {
         var rows = await context.OutstandingFees.AsNoTracking()
-            .Where(fee => resultSetIds.Contains(fee.ResultSetId) && fee.Amount > 0)
+            .Where(fee => resultSetIds.Contains(fee.ResultSetId))
             .GroupBy(fee => fee.ResultSetId)
             .Select(group => new { group.Key, Pupils = group.Count(), Total = group.Sum(fee => (long)fee.Amount) })
             .ToListAsync(cancellationToken).ConfigureAwait(false);

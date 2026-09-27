@@ -79,9 +79,10 @@ public sealed record ReportGradeBand(string Letter, int LowerBound, int UpperBou
 /// <summary>A development indicator with its domain (nursery, spec 6.2.9).</summary>
 /// <param name="IndicatorId">The indicator.</param>
 /// <param name="Name">Its wording.</param>
-/// <param name="DomainName">Its domain.</param>
+/// <param name="DomainId">Its domain.</param>
+/// <param name="DomainName">The domain's name.</param>
 /// <param name="RatingScaleId">The domain's rating scale.</param>
-public sealed record ReportIndicator(Guid IndicatorId, string Name, string DomainName, Guid RatingScaleId);
+public sealed record ReportIndicator(Guid IndicatorId, string Name, Guid DomainId, string DomainName, Guid RatingScaleId);
 
 /// <summary>A rating-scale point.</summary>
 /// <param name="PointId">The point.</param>
@@ -130,7 +131,7 @@ public interface IReportReader
     /// <summary>The grading bands, in display order.</summary>
     Task<IReadOnlyList<ReportGradeBand>> ListGradeBandsAsync(CancellationToken cancellationToken);
 
-    /// <summary>The development indicators of the domains for this section, in domain then indicator order.</summary>
+    /// <summary>The ACTIVE indicators of the section's ACTIVE domains (what the sheet shows), in domain then indicator order.</summary>
     Task<IReadOnlyList<ReportIndicator>> ListIndicatorsAsync(Guid sectionId, CancellationToken cancellationToken);
 
     /// <summary>The points of these rating scales.</summary>
@@ -142,7 +143,10 @@ public interface IReportReader
     /// <summary>Every amount-type fee line of these levels' sections, with each level's amount for the term (null when unset).</summary>
     Task<IReadOnlyList<ReportFeeLine>> ListFeeLinesAsync(Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
 
-    /// <summary>The typed outstanding figures in these result sets, by set: pupils carrying one and their total.</summary>
+    /// <summary>The pupils (non-pending) enrolled in the arm at any point in the term: the class roster a count is out of.</summary>
+    Task<IReadOnlyList<Guid>> ListRosterAsync(Guid armId, Guid termId, CancellationToken cancellationToken);
+
+    /// <summary>The typed outstanding figures in these result sets (0 included: it prints), by set: pupils carrying one and their total.</summary>
     Task<IReadOnlyDictionary<Guid, (int Pupils, long Total)>> SumOutstandingAsync(IReadOnlyCollection<Guid> resultSetIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>

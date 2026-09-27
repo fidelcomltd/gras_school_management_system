@@ -106,6 +106,36 @@ internal abstract class ReportBuilder<TFilters> : IReportBuilder
         return new(Key, title, filters, orientation, twoUp, columns, rows, notes ?? [], rows.Count(row => row.Kind == ReportRowKind.Data), context.Now);
     }
 
+    /// <summary>
+    /// The subjects a report lists: those mapped to <paramref name="levelIds"/> for the term in sheet order, then any subject
+    /// with lines in <paramref name="subjectIdsWithLines"/> that is no longer mapped, by name.
+    /// </summary>
+    protected static async Task<List<(Guid Id, string Name)>> OrderedSubjectsAsync(
+        IReportReader reader, Guid termId, IReadOnlyCollection<Guid> levelIds, IEnumerable<Guid> subjectIdsWithLines, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        var mapped = await reader.ListMappedSubjectsAsync(termId, levelIds, cancellationToken).ConfigureAwait(false);
+        var unmapped = subjectIdsWithLines.Distinct().Where(id => mapped.All(subject => subject.SubjectId != id)).ToList();
+        var names = unmapped.Count == 0 ? new Dictionary<Guid, string>() : await reader.FindSubjectNamesAsync(unmapped, cancellationToken).ConfigureAwait(false);
+        return
+        [
+            .. mapped.GroupBy(subject => subject.SubjectId).Select(group => (group.Key, group.First().Name)),
+            .. unmapped.Select(id => (Id: id, Name: names.GetValueOrDefault(id, "Unknown subject"))).OrderBy(subject => subject.Name, StringComparer.OrdinalIgnoreCase),
+        ];
+    }
+
+    /// <summary>
+    /// The note every results report carries when it reads figures that are not yet published (the framework reads every
+    /// state, because the head teacher approves from them), naming the classes; null when all are published.
+    /// </summary>
+    protected static string? UnpublishedNote(IEnumerable<(ReportResultSet Set, string ArmName)> sets) =>
+        sets.Where(entry => entry.Set.Computed && entry.Set.State != SchoolManagement.Domain.Results.ResultSetState.Published)
+            .Select(entry => entry.ArmName)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList() is { Count: > 0 } names
+            ? $"Not yet published: {string.Join(", ", names)}. These figures change if marks are corrected and computed again."
+            : null;
+
     protected static Error OutOfScope() => Error.Forbidden("report.forbidden", "You do not have access to that class's records.");
 
     protected static Error NotFound(string message) => Error.NotFound("report.not_found", message);

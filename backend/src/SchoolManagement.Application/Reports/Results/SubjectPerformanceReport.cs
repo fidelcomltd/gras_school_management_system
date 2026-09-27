@@ -38,16 +38,13 @@ internal sealed class SubjectPerformanceReport(IReportReader reader) : ReportBui
             return Result.Failure<ReportDto>(NotFound("No class you can see is in that level in that term's session."));
         }
 
-        var sets = (await reader.ListResultSetsAsync(termId, cancellationToken).ConfigureAwait(false))
-            .Where(set => arms.Any(arm => arm.ArmId == set.ArmId))
-            .ToDictionary(set => set.ResultSetId, set => set.ArmId);
-        var lines = await reader.ListSubjectLinesAsync(sets.Keys, cancellationToken).ConfigureAwait(false);
-        var mapped = await reader.ListMappedSubjectsAsync(termId, [levelId], cancellationToken).ConfigureAwait(false);
-        var unmapped = lines.Select(line => line.SubjectId).Distinct().Where(id => mapped.All(subject => subject.SubjectId != id)).ToList();
-        var names = unmapped.Count == 0 ? new Dictionary<Guid, string>() : await reader.FindSubjectNamesAsync(unmapped, cancellationToken).ConfigureAwait(false);
-        var subjects = mapped.Select(subject => (Id: subject.SubjectId, subject.Name))
-            .Concat(unmapped.Select(id => (Id: id, Name: names.GetValueOrDefault(id, "Unknown subject"))).OrderBy(subject => subject.Name, StringComparer.OrdinalIgnoreCase))
+        var names = arms.ToDictionary(arm => arm.ArmId, arm => arm.Name);
+        var setRows = (await reader.ListResultSetsAsync(termId, cancellationToken).ConfigureAwait(false))
+            .Where(set => names.ContainsKey(set.ArmId))
             .ToList();
+        var sets = setRows.ToDictionary(set => set.ResultSetId, set => set.ArmId);
+        var lines = await reader.ListSubjectLinesAsync(sets.Keys, cancellationToken).ConfigureAwait(false);
+        var subjects = await OrderedSubjectsAsync(reader, termId, [levelId], lines.Select(line => line.SubjectId), cancellationToken).ConfigureAwait(false);
 
         var rows = new List<ReportRowDto>();
         foreach (var (id, name) in subjects)
@@ -72,6 +69,10 @@ internal sealed class SubjectPerformanceReport(IReportReader reader) : ReportBui
         }
 
         var notes = new List<string> { "Absent counts pupils marked absent from the examination; they are still counted." };
+        if (UnpublishedNote(setRows.Select(set => (set, names[set.ArmId]))) is { } unpublished)
+        {
+            notes.Add(unpublished);
+        }
         if (context.Scope.Arms is not null)
         {
             notes.Add("Only the classes you have access to are shown.");

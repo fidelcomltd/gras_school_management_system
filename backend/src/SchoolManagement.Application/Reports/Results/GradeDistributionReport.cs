@@ -53,19 +53,15 @@ internal sealed class GradeDistributionReport(IReportReader reader) : ReportBuil
         }
 
         var armIds = arms.Select(arm => arm.ArmId).ToHashSet();
-        var setIds = (await reader.ListResultSetsAsync(termId, cancellationToken).ConfigureAwait(false))
+        var sets = (await reader.ListResultSetsAsync(termId, cancellationToken).ConfigureAwait(false))
             .Where(set => armIds.Contains(set.ArmId))
-            .Select(set => set.ResultSetId)
             .ToList();
+        var setIds = sets.Select(set => set.ResultSetId).ToList();
         var lines = await reader.ListSubjectLinesAsync(setIds, cancellationToken).ConfigureAwait(false);
         var results = await reader.ListTermResultsAsync(setIds, cancellationToken).ConfigureAwait(false);
         var bands = await reader.ListGradeBandsAsync(cancellationToken).ConfigureAwait(false);
-        var mapped = await reader.ListMappedSubjectsAsync(termId, [.. arms.Select(arm => arm.LevelId).Distinct()], cancellationToken).ConfigureAwait(false);
-        var unmapped = lines.Select(line => line.SubjectId).Distinct().Where(id => mapped.All(subject => subject.SubjectId != id)).ToList();
-        var names = unmapped.Count == 0 ? new Dictionary<Guid, string>() : await reader.FindSubjectNamesAsync(unmapped, cancellationToken).ConfigureAwait(false);
-
-        var subjects = mapped.GroupBy(subject => subject.SubjectId).Select(group => (Id: group.Key, group.First().Name))
-            .Concat(unmapped.Select(id => (Id: id, Name: names.GetValueOrDefault(id, "Unknown subject"))).OrderBy(subject => subject.Name, StringComparer.OrdinalIgnoreCase))
+        var subjects = (await OrderedSubjectsAsync(reader, termId, [.. arms.Select(arm => arm.LevelId).Distinct()], lines.Select(line => line.SubjectId), cancellationToken)
+                .ConfigureAwait(false))
             .Where(subject => lines.Any(line => line.SubjectId == subject.Id))
             .ToList();
 
@@ -82,6 +78,10 @@ internal sealed class GradeDistributionReport(IReportReader reader) : ReportBuil
 
         var scopeLine = levelId is not null ? $"Level: {arms[0].LevelName}" : $"Class: {arms[0].Name}";
         var notes = new List<string> { $"Each # is {100 / BarWidth}% of the pupils graded in that section." };
+        if (UnpublishedNote(sets.Select(set => (set, arms.First(arm => arm.ArmId == set.ArmId).Name))) is { } unpublished)
+        {
+            notes.Add(unpublished);
+        }
         if (levelId is not null && context.Scope.Arms is not null)
         {
             notes.Add("Only the classes you have access to are counted.");

@@ -34,6 +34,11 @@ internal sealed class FeeNoticeAuditReport(IReportReader reader) : ReportBuilder
             .Where(arm => (levelId is null || arm.LevelId == levelId) && context.Scope.Allows(arm.ArmId))
             .ToList();
         var levels = arms.GroupBy(arm => arm.LevelId).Select(group => (Id: group.Key, group.First().LevelName, Arms: group.Select(arm => arm.ArmId).ToHashSet())).ToList();
+        if (levelId is not null && levels.Count == 0)
+        {
+            return Result.Failure<ReportDto>(NotFound("No class you can see is in that level in that term's session."));
+        }
+
         var lines = await reader.ListFeeLinesAsync(termId, [.. levels.Select(level => level.Id)], cancellationToken).ConfigureAwait(false);
         var sets = (await reader.ListResultSetsAsync(termId, cancellationToken).ConfigureAwait(false))
             .Where(set => arms.Any(arm => arm.ArmId == set.ArmId))
@@ -54,8 +59,8 @@ internal sealed class FeeNoticeAuditReport(IReportReader reader) : ReportBuilder
             var owing = sets.Where(set => level.Arms.Contains(set.ArmId))
                 .Select(set => outstanding.GetValueOrDefault(set.ResultSetId))
                 .Aggregate((Pupils: 0, Total: 0L), (sum, next) => (sum.Pupils + next.Pupils, sum.Total + next.Total));
-            rows.Add(new(ReportRowKind.Data, ["Pupils with an outstanding figure", ReportText.Number(owing.Pupils)]));
-            rows.Add(new(ReportRowKind.Data, ["Outstanding total", Naira(owing.Total)]));
+            rows.Add(new(ReportRowKind.Subtotal, ["Pupils with an outstanding figure", ReportText.Number(owing.Pupils)]));
+            rows.Add(new(ReportRowKind.Subtotal, ["Outstanding total (naira)", Naira(owing.Total)]));
         }
 
         var filterLines = new List<string> { $"{term.Name}, {term.SessionName}" };
@@ -66,14 +71,14 @@ internal sealed class FeeNoticeAuditReport(IReportReader reader) : ReportBuilder
 
         var notes = new List<string>
         {
-            "Amounts are the fee notice as configured now. A published sheet printed the amounts frozen when it was published.",
+            "Amounts are in naira, as the fee notice is configured now. A published sheet printed the amounts frozen when it was published.",
         };
         if (context.Scope.Arms is not null)
         {
             notes.Add("Outstanding figures count only the classes you have access to.");
         }
 
-        return Result.Success(Report(context, "Fee notice audit", filterLines, [new("Item", ReportAlign.Left), new("Naira", ReportAlign.Right)], rows, notes));
+        return Result.Success(Report(context, "Fee notice audit", filterLines, [new("Item", ReportAlign.Left), new("Figure", ReportAlign.Right)], rows, notes));
     }
 
     private static string Naira(long amount) => amount.ToString("N0", CultureInfo.InvariantCulture);
