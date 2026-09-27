@@ -1,5 +1,5 @@
-using SchoolManagement.Application.Abstractions.Auth;
 using System.Globalization;
+using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Common.Pagination;
