@@ -146,8 +146,13 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
         // (CreateSessionHandler is the only caller of AcademicSession.Create). A new one, for example a
         // hypothetical "POST /sessions/{id}/terms" that could produce a two-or-fewer-term session, fails here
         // until it is reviewed and added.
-        postSessionRoutes.Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
-            .ShouldBe(["/api/v{version:apiVersion}/sessions/", "/api/v{version:apiVersion}/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
+        // Compared after the version segment and without a trailing slash, so a routing change that
+        // creates no session (a v2 group, MapPost("/") for MapPost(string.Empty)) does not trip it. The
+        // structural rule itself is SourceConventionTests.OnlyCreateSessionHandlerCreatesASession.
+        postSessionRoutes
+            .Select(endpoint => System.Text.RegularExpressions.Regex.Replace(endpoint.RoutePattern.RawText ?? string.Empty, @"^/api/v[^/]+", string.Empty).TrimEnd('/'))
+            .Distinct()
+            .ShouldBe(["/sessions", "/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
     }
 
     // Review criterion 1, session half: the partial unique index is what stops two active sessions,
