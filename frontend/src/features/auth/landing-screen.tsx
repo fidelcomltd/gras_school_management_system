@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/http';
 import { useMe } from './api';
 import { LoadingState } from '@/components/feedback/query-states';
+import { Dashboard } from '@/features/dashboard/dashboard';
 
 /**
  * `/` — the minimum protected landing (TASK-0021 ruling 5), now mounted
@@ -49,6 +50,9 @@ export function LandingScreen() {
       <h1 className="font-display text-2xl font-semibold text-foreground">
         Welcome, {session.staffName}
       </h1>
+      <div className="w-full">
+        <Dashboard session={session} />
+      </div>
     </div>
   );
 }
