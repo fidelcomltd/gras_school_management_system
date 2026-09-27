@@ -22,6 +22,9 @@ export interface ReportParams {
   sex?: string;
   documentType?: string;
   minDays?: number;
+  from?: string;
+  to?: string;
+  group?: string;
 }
 
 /** Only the filters that are set: an absent one is omitted, never sent blank. */
@@ -32,7 +35,7 @@ function set<T extends object>(values: T): { [K in keyof T]?: Exclude<T[K], unde
 }
 
 function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal): Promise<ReportDto> {
-  const { termId = '', sessionId = '', pupilId = '', armId, levelId, top, state, outcome, status, sex, documentType, minDays } = params;
+  const { termId = '', sessionId = '', pupilId = '', armId, levelId, top, state, outcome, status, sex, documentType, minDays, from, to, group } = params;
   switch (key) {
     case 'broadsheet':
       return apiGet('/api/v1/reports/broadsheet', { termId, ...set({ armId }) }, { signal });
@@ -64,6 +67,12 @@ function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal):
       return apiGet('/api/v1/reports/outstanding-documents', { sessionId, ...set({ armId, levelId, documentType }) }, { signal });
     case 'admissions-pipeline':
       return apiGet('/api/v1/reports/admissions-pipeline', set({ levelId, minDays }), { signal });
+    case 'pin-usage':
+      return apiGet('/api/v1/reports/pin-usage', { sessionId, ...set({ armId, state }) }, { signal });
+    case 'audit':
+      return apiGet('/api/v1/reports/audit', set({ from, to, outcome }), { signal });
+    case 'settings-history':
+      return apiGet('/api/v1/reports/settings-history', set({ from, to, group }), { signal });
   }
 }
 

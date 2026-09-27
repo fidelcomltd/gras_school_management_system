@@ -266,6 +266,42 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
+    public async Task PinsAuditAndSettings_ReadTheirSources_AndCheckTheirFilters()
+    {
+        RequireDatabase();
+        var (jar, adminId) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        Guid sessionId;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            sessionId = await context.Terms.Where(term => term.Id == seeded.TermId).Select(term => term.SessionId).SingleAsync(TestContext.Current.CancellationToken);
+        }
+
+        var pins = await GetReportAsync(jar, $"/api/v1/reports/pin-usage?sessionId={sessionId}");
+        pins.Rows.ShouldContain(row => row.Cells[0] == seeded.ArmName && row.Cells[2] == "0");
+
+        // An export writes an audit event the audit report then reads back.
+        using (var export = await GetAsync(jar, $"/api/v1/reports/pin-usage/export?sessionId={sessionId}&format=csv"))
+        {
+            export.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(1)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var audit = await GetReportAsync(jar, $"/api/v1/reports/audit?from={today}&to={today}&action=report.export&actorAdminId={adminId}");
+        audit.Rows.ShouldContain(row => row.Cells[2] == "report.export" && row.Cells[3] == "report pin-usage");
+
+        (await GetReportAsync(jar, "/api/v1/reports/settings-history")).Key.ShouldBe("settings-history");
+
+        using var badDay = await GetAsync(jar, "/api/v1/reports/audit?from=27/09/2026");
+        badDay.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var badGroup = await GetAsync(jar, "/api/v1/reports/settings-history?group=Colours");
+        badGroup.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var badState = await GetAsync(jar, $"/api/v1/reports/pin-usage?sessionId={sessionId}&state=Lost");
+        badState.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task Broadsheet_WithoutAnArm_IsAValidationError()
     {
         RequireDatabase();

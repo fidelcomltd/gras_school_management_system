@@ -259,6 +259,40 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
             .Where(level => levelIds.Contains(level.Id))
             .ToDictionaryAsync(level => level.Id, level => (level.Name, level.ProgressionOrder), cancellationToken).ConfigureAwait(false);
 
+    public async Task<(IReadOnlyList<ReportPinBatch> Batches, IReadOnlyList<ReportPin> Pins, IReadOnlyList<ReportPinUse> Uses)> ListPinUsageAsync(
+        Guid sessionId, CancellationToken cancellationToken)
+    {
+        var batches = await context.PinBatches.AsNoTracking()
+            .Where(batch => batch.SessionId == sessionId)
+            .OrderBy(batch => batch.GeneratedAtUtc)
+            .Select(batch => new ReportPinBatch(batch.Id, batch.Name))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var batchIds = batches.Select(batch => batch.BatchId).ToList();
+        var pins = await context.Pins.AsNoTracking()
+            .Where(pin => batchIds.Contains(pin.BatchId))
+            .Select(pin => new ReportPin(pin.Id, pin.BatchId, pin.State, pin.UseCount))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var uses = await (
+                from use in context.PinUses.AsNoTracking()
+                join pin in context.Pins.AsNoTracking() on use.PinId equals pin.Id
+                where batchIds.Contains(pin.BatchId)
+                select new ReportPinUse(use.PinId, use.PupilId, use.OpenedAtUtc))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return (batches, pins, uses);
+    }
+
+    public async Task<IReadOnlyList<ReportConfigVersion>> ListConfigVersionsAsync(CancellationToken cancellationToken) =>
+        await context.ConfigVersions.AsNoTracking()
+            .OrderBy(version => version.VersionNumber)
+            .Select(version => new ReportConfigVersion(
+                version.VersionNumber, version.ChangedGroup, version.SnapshotJson, version.ActorAdminId, version.Reason, version.CreatedAtUtc))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyDictionary<Guid, string>> FindAdminNamesAsync(IReadOnlyCollection<Guid> adminIds, CancellationToken cancellationToken) =>
+        await context.AdminAccounts.AsNoTracking()
+            .Where(admin => adminIds.Contains(admin.Id))
+            .ToDictionaryAsync(admin => admin.Id, admin => admin.StaffName, cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken) =>
         await context.Subjects.AsNoTracking()
             .Where(subject => subjectIds.Contains(subject.Id))
