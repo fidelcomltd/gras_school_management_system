@@ -183,6 +183,42 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
+    public async Task AnnualPromotionAndPupilRecord_ReadTheAnnualRows()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        Guid sessionId;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            sessionId = await context.Terms.Where(term => term.Id == seeded.TermId).Select(term => term.SessionId).SingleAsync(TestContext.Current.CancellationToken);
+            foreach (var (pupilId, average, position) in new[] { (seeded.PupilIds[0], 61m, 2), (seeded.PupilIds[1], 84m, 1) })
+            {
+                context.Add(AnnualResult.Create(
+                    sessionId, seeded.ArmId, pupilId, 1, [average, null, null], [(int)average, null, null], (int)average, average, "B", "Good",
+                    position, false, 2, "[]", position == 1 ? PromotionOutcome.Promoted : PromotionOutcome.Repeat, DateTimeOffset.UtcNow));
+            }
+
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var annual = await GetReportAsync(jar, $"/api/v1/reports/annual-cumulative?sessionId={sessionId}&armId={seeded.ArmId}");
+        annual.Rows.Select(row => row.Cells[1]).ShouldBe(["EZE Chidera", "OKAFOR Chidera"]);
+        annual.Rows[0].Cells[^1].ShouldBe("Promoted (proposed)");
+
+        var promotion = await GetReportAsync(jar, $"/api/v1/reports/promotion-list?sessionId={sessionId}&outcome=Repeat");
+        promotion.Rows.Select(row => row.Cells[0]).ShouldBe(["OKAFOR Chidera"]);
+
+        var record = await GetReportAsync(jar, $"/api/v1/reports/pupil-record?pupilId={seeded.PupilIds[1]}");
+        record.Rows.ShouldContain(row => row.Kind == ReportRowKind.Data && row.Cells[0] == "First Term" && row.Cells[2] == "84.00");
+        record.Rows.ShouldContain(row => row.Kind == ReportRowKind.Subtotal && row.Cells[0] == "Annual" && row.Cells[6] == "Promoted (proposed)");
+
+        using var badOutcome = await GetAsync(jar, $"/api/v1/reports/promotion-list?sessionId={sessionId}&outcome=Expelled");
+        badOutcome.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task Broadsheet_WithoutAnArm_IsAValidationError()
     {
         RequireDatabase();

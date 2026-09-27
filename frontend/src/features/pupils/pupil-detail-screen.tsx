@@ -59,6 +59,7 @@ export function PupilDetailScreen() {
   const record = pupil.data;
   const canEdit = !!me.data && hasPrivilege(me.data, 'pupil.update');
   const canCorrect = !!me.data && hasPrivilege(me.data, 'pupil.regnumber.correct') && record.registrationNumber !== null;
+  const canReport = !!me.data && hasPrivilege(me.data, 'report.view') && record.status !== 'Pending';
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
   const tabs: { id: Tab; label: string; shown: boolean }[] = [
     { id: 'details', label: 'Details', shown: true },
@@ -91,6 +92,11 @@ export function PupilDetailScreen() {
             </Button>
           ) : null}
           {record.registrationNumber ? <PrintAdmissionSlip pupilId={record.id} /> : null}
+          {canReport ? (
+            <Button variant="outline" render={<Link to={`${paths.report('pupil-record')}?pupilId=${record.id}`} />}>
+              Cumulative record
+            </Button>
+          ) : null}
         </div>
       </header>
 

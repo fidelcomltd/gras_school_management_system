@@ -75,6 +75,30 @@ internal sealed record FeeNoticeAuditParameters(
     public FeeNoticeAuditFilters ToFilters() => new(TermId, LevelId);
 }
 
+/// <summary><c>sessionId</c>, <c>armId</c> or <c>levelId</c>.</summary>
+internal sealed record AnnualCumulativeParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "armId")] string? ArmId,
+    [FromQuery(Name = "levelId")] string? LevelId) : IReportParameters<AnnualCumulativeFilters>
+{
+    public AnnualCumulativeFilters ToFilters() => new(SessionId, ArmId, LevelId);
+}
+
+/// <summary><c>sessionId</c>, <c>levelId</c>, <c>outcome</c>.</summary>
+internal sealed record PromotionListParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "levelId")] string? LevelId,
+    [FromQuery(Name = "outcome")] string? Outcome) : IReportParameters<PromotionListFilters>
+{
+    public PromotionListFilters ToFilters() => new(SessionId, LevelId, Outcome);
+}
+
+/// <summary><c>pupilId</c>.</summary>
+internal sealed record PupilRecordParameters([FromQuery(Name = "pupilId")] string? PupilId) : IReportParameters<PupilRecordFilters>
+{
+    public PupilRecordFilters ToFilters() => new(PupilId);
+}
+
 /// <summary>
 /// Spec 15 section 10's reports. Each report is two routes: <c>GET /reports/{name}</c> (the table as JSON) and
 /// <c>GET /reports/{name}/export?format=csv|pdf</c> (a file, <c>report.export</c>, audited as <c>report.export</c> with the
@@ -127,6 +151,22 @@ public sealed class ReportEndpoints : IEndpointModule
             "Spec 15 section 10.2: per level, the configured fee lines and amounts for the term, their total, and how many " +
             "pupils carry a typed outstanding figure and its total. Amounts are the notice as configured now (a published " +
             "sheet printed its frozen copy). `levelId` optional. `report.view`.");
+        Map<AnnualCumulativeParameters, AnnualCumulativeFilters>(
+            group, "annual-cumulative", "AnnualCumulative", "Annual cumulative report",
+            "Per pupil for one arm (`armId`) or a level (`levelId`) of the session: the three term averages, cumulative " +
+            "average and grade, annual position, and promotion status (the committed decision, or the proposal marked as such " +
+            "until promotion runs). Empty with a note until annual computation has run. `report.view`. PDF landscape.");
+        Map<PromotionListParameters, PromotionListFilters>(
+            group, "promotion-list", "PromotionList", "Promotion list",
+            "Per pupil of the session (`levelId` optional): class, annual average, core subject results against the pass " +
+            "mark, proposed and final outcome, target class, and the override reason. `outcome` filters on the final outcome, " +
+            "or the proposal before promotion runs. Core subjects and pass mark are the result rules as configured now. " +
+            "`report.view`. PDF landscape.");
+        Map<PupilRecordParameters, PupilRecordFilters>(
+            group, "pupil-record", "PupilRecord", "Pupil cumulative record",
+            "One pupil across every session: term by term class, average, grade, class and level position and publication " +
+            "status, each session closed by its annual result and promotion outcome. An arm-restricted holder sees only the " +
+            "terms spent in their arms (403 when none). `report.view`.");
     }
 
     private static void Map<TParameters, TFilters>(RouteGroupBuilder group, string path, string name, string summary, string description)

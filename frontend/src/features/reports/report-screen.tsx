@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { NotFoundScreen } from '@/components/feedback/not-found-screen';
@@ -17,6 +17,14 @@ import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useExportReport, useReport, type ReportParams } from './api';
 import { tableReport, type TableReport } from './definitions';
 import { ReportTable } from './report-table';
+
+const OUTCOMES = [
+  { value: 'any', label: 'Any outcome' },
+  { value: 'Promoted', label: 'Promoted' },
+  { value: 'Repeat', label: 'Repeat' },
+  { value: 'PromotedOnTrial', label: 'Promoted on trial' },
+  { value: 'Graduated', label: 'Graduated' },
+];
 
 const STATES = [
   { value: '', label: 'Any state' },
@@ -45,6 +53,10 @@ function ReportView({ definition }: { definition: TableReport }) {
   const [top, setTop] = useState('');
   const [levelId, setLevelId] = useState('');
   const [state, setState] = useState('');
+  const [outcome, setOutcome] = useState('');
+  const [searchParams] = useSearchParams();
+  const pupilId = searchParams.get('pupilId') ?? '';
+  const bySession = definition.filters.startsWith('session');
 
   const levels = [...new Map(klass.arms.map((arm) => [arm.classLevelId, arm.classLevel])).entries()].map(([value, label]) => ({
     value,
@@ -61,14 +73,15 @@ function ReportView({ definition }: { definition: TableReport }) {
   const requiredLevel = levels.some((level) => level.value === levelId) ? levelId : (levels[0]?.value ?? '');
   const topNumber = Number(top);
 
-  const params: ReportParams = { termId: term.termId };
-  let ready = term.termId !== '';
+  const params: ReportParams = bySession ? { sessionId: term.sessionId } : definition.filters === 'pupil' ? { pupilId } : { termId: term.termId };
+  let ready = bySession ? term.sessionId !== '' : definition.filters === 'pupil' ? pupilId !== '' : term.termId !== '';
   switch (definition.filters) {
     case 'term-arm':
       params.armId = klass.armId;
       ready &&= klass.armId !== '';
       break;
     case 'term-scope':
+    case 'session-scope':
     case 'term-scope-top':
       if (scopeKind === 'level' && scopeId) params.levelId = scopeId;
       else if (scopeId) params.armId = scopeId;
@@ -84,6 +97,12 @@ function ReportView({ definition }: { definition: TableReport }) {
       if (levelId) params.levelId = levelId;
       if (state && definition.filters === 'term-level-state') params.state = state;
       break;
+    case 'session-level-outcome':
+      if (levelId) params.levelId = levelId;
+      if (outcome) params.outcome = outcome;
+      break;
+    case 'pupil':
+      break;
   }
 
   const report = useReport(definition.key, params, ready);
@@ -91,8 +110,11 @@ function ReportView({ definition }: { definition: TableReport }) {
   const canExport = !!me.data && hasPrivilege(me.data, 'report.export');
 
   const body = () => {
-    if (term.isPending || klass.isPending) return <LoadingState label="Loading classes…" />;
-    if (!term.termId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
+    if (definition.filters === 'pupil' && !pupilId) {
+      return <p className="text-sm text-muted-foreground">Open a pupil’s record and choose Cumulative record to see this report.</p>;
+    }
+    if (definition.filters !== 'pupil' && (term.isPending || klass.isPending)) return <LoadingState label="Loading classes…" />;
+    if (definition.filters !== 'pupil' && !term.sessionId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
     if (klass.isError) return <QueryErrorState error={new Error('The classes could not be loaded.')} onRetry={klass.retry} />;
     if (!ready) return <p className="text-sm text-muted-foreground">There are no classes you can report on in this session.</p>;
     if (report.isPending) return <LoadingState label="Building the report…" />;
@@ -119,7 +141,18 @@ function ReportView({ definition }: { definition: TableReport }) {
         <p className="text-sm text-muted-foreground">{definition.description}</p>
       </header>
       <div className="flex flex-wrap items-end gap-3">
-        <TermPicker choice={term} />
+        {definition.filters === 'pupil' ? null : bySession ? (
+          <LabelledSelect
+            label="Session"
+            placeholder="Session"
+            value={term.sessionId}
+            options={term.sessions.map((session) => ({ value: session.id, label: session.name }))}
+            onChange={term.setSessionId}
+            className="w-40"
+          />
+        ) : (
+          <TermPicker choice={term} />
+        )}
         {definition.filters === 'term-arm' ? (
           <LabelledSelect
             label="Class"
@@ -130,7 +163,7 @@ function ReportView({ definition }: { definition: TableReport }) {
             className="w-44"
           />
         ) : null}
-        {definition.filters === 'term-scope' || definition.filters === 'term-scope-top' ? (
+        {definition.filters === 'term-scope' || definition.filters === 'term-scope-top' || definition.filters === 'session-scope' ? (
           <>
             <LabelledSelect
               label="Class or level"
@@ -161,7 +194,7 @@ function ReportView({ definition }: { definition: TableReport }) {
         {definition.filters === 'term-level' ? (
           <LabelledSelect label="Level" placeholder="Level" value={requiredLevel} options={levels} onChange={setLevelId} className="w-44" />
         ) : null}
-        {definition.filters === 'term-level-state' || definition.filters === 'term-level-any' ? (
+        {definition.filters === 'term-level-state' || definition.filters === 'term-level-any' || definition.filters === 'session-level-outcome' ? (
           <>
             <LabelledSelect
               label="Level"
@@ -171,6 +204,16 @@ function ReportView({ definition }: { definition: TableReport }) {
               onChange={(next) => setLevelId(next === 'all' ? '' : next)}
               className="w-44"
             />
+            {definition.filters === 'session-level-outcome' ? (
+              <LabelledSelect
+                label="Outcome"
+                placeholder="Any outcome"
+                value={outcome || 'any'}
+                options={OUTCOMES}
+                onChange={(next) => setOutcome(next === 'any' ? '' : next)}
+                className="w-48"
+              />
+            ) : null}
             {definition.filters === 'term-level-state' ? (
               <LabelledSelect
                 label="State"

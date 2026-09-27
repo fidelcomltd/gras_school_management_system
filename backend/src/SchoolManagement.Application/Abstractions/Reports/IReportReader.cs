@@ -1,3 +1,4 @@
+using SchoolManagement.Domain.Promotion;
 using SchoolManagement.Domain.Results;
 
 namespace SchoolManagement.Application.Abstractions.Reports;
@@ -104,6 +105,57 @@ public sealed record ReportDevelopmentRating(Guid PupilId, Guid IndicatorId, Gui
 /// <param name="Amount">Naira, or null when no amount is set for this level.</param>
 public sealed record ReportFeeLine(Guid LevelId, string Label, int DisplayOrder, int? Amount);
 
+/// <summary>A session, for choosing and naming.</summary>
+/// <param name="SessionId">The session.</param>
+/// <param name="Name">"2026/2027".</param>
+/// <param name="StartDate">For ordering.</param>
+public sealed record ReportSession(Guid SessionId, string Name, DateOnly StartDate);
+
+/// <summary>A pupil's annual cumulative row (spec 6.7.10).</summary>
+/// <param name="ArmId">The arm the annual run placed them in.</param>
+/// <param name="PupilId">The pupil.</param>
+/// <param name="TermAverages">First, second and third term averages, null where not taken.</param>
+/// <param name="CumulativeAverage">The cumulative average.</param>
+/// <param name="Grade">Its grade.</param>
+/// <param name="Position">Annual position, if ranked.</param>
+/// <param name="Tied">Tied at that position.</param>
+/// <param name="ProposedOutcome">The computed proposal.</param>
+/// <param name="SubjectsJson">Per-subject annual means (<c>AnnualSubjectResult</c>s).</param>
+public sealed record ReportAnnualResult(
+    Guid ArmId,
+    Guid PupilId,
+    IReadOnlyList<decimal?> TermAverages,
+    decimal CumulativeAverage,
+    string Grade,
+    int? Position,
+    bool Tied,
+    PromotionOutcome ProposedOutcome,
+    string SubjectsJson);
+
+/// <summary>A committed (not reversed) promotion decision for a pupil (spec 6.3.7).</summary>
+/// <param name="PupilId">The pupil.</param>
+/// <param name="Outcome">The final outcome.</param>
+/// <param name="TargetArmId">The arm in the next session, if any.</param>
+/// <param name="TargetSessionId">The next session.</param>
+/// <param name="Reason">Recorded when the outcome overrides the proposal.</param>
+public sealed record ReportPromotionDecision(Guid PupilId, PromotionDecisionOutcome Outcome, Guid? TargetArmId, Guid TargetSessionId, string? Reason);
+
+/// <summary>One computed term result in a pupil's history.</summary>
+/// <param name="SessionId">The session.</param>
+/// <param name="TermOrdinal">1 to 3.</param>
+/// <param name="TermName">"First Term".</param>
+/// <param name="ArmId">The arm the result belongs to.</param>
+/// <param name="Average">Term average.</param>
+/// <param name="Grade">Overall grade.</param>
+/// <param name="ArmPosition">Position in the arm.</param>
+/// <param name="ArmTied">Tied there.</param>
+/// <param name="LevelPosition">Position in the level.</param>
+/// <param name="LevelTied">Tied there.</param>
+/// <param name="State">The result set's state.</param>
+public sealed record ReportPupilTerm(
+    Guid SessionId, int TermOrdinal, string TermName, Guid ArmId, decimal Average, string Grade,
+    int? ArmPosition, bool ArmTied, int? LevelPosition, bool LevelTied, ResultSetState State);
+
 /// <summary>Read-only projections the reports assemble from (spec 15 section 10). Every list is small: one session's worth.</summary>
 public interface IReportReader
 {
@@ -148,6 +200,30 @@ public interface IReportReader
 
     /// <summary>The typed outstanding figures in these result sets (0 included: it prints), by set: pupils carrying one and their total.</summary>
     Task<IReadOnlyDictionary<Guid, (int Pupils, long Total)>> SumOutstandingAsync(IReadOnlyCollection<Guid> resultSetIds, CancellationToken cancellationToken);
+
+    /// <summary>A session by id, or null.</summary>
+    Task<ReportSession?> FindSessionAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>These sessions, by id.</summary>
+    Task<IReadOnlyDictionary<Guid, ReportSession>> FindSessionsAsync(IReadOnlyCollection<Guid> sessionIds, CancellationToken cancellationToken);
+
+    /// <summary>The session's annual cumulative rows.</summary>
+    Task<IReadOnlyList<ReportAnnualResult>> ListAnnualResultsAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>Every annual row of one pupil, any session.</summary>
+    Task<IReadOnlyList<(Guid SessionId, ReportAnnualResult Annual)>> ListPupilAnnualAsync(Guid pupilId, CancellationToken cancellationToken);
+
+    /// <summary>The decisions of the session's committed, not reversed, promotion batch (empty when none).</summary>
+    Task<IReadOnlyList<ReportPromotionDecision>> ListPromotionDecisionsAsync(Guid sourceSessionId, CancellationToken cancellationToken);
+
+    /// <summary>Promotion's rule inputs as configured now: the core subjects and the pass mark.</summary>
+    Task<(IReadOnlyList<Guid> CoreSubjectIds, int PassMark)> GetCoreRulesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Every computed term result of one pupil, any session.</summary>
+    Task<IReadOnlyList<ReportPupilTerm>> ListPupilTermsAsync(Guid pupilId, CancellationToken cancellationToken);
+
+    /// <summary>These arms with their levels, whatever their session.</summary>
+    Task<IReadOnlyDictionary<Guid, ReportArm>> FindArmsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>
     Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);

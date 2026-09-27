@@ -13,7 +13,10 @@ export type ReportKey =
   | 'grade-distribution'
   | 'subject-performance'
   | 'development-summary'
-  | 'fee-notice-audit';
+  | 'fee-notice-audit'
+  | 'annual-cumulative'
+  | 'promotion-list'
+  | 'pupil-record';
 
 /**
  * Which filter set a report's screen shows: a class; a class or a whole level (with a top N for the merit list); a required
@@ -25,7 +28,10 @@ export type ReportFilterKind =
   | 'term-scope-top'
   | 'term-level'
   | 'term-level-state'
-  | 'term-level-any';
+  | 'term-level-any'
+  | 'session-scope'
+  | 'session-level-outcome'
+  | 'pupil';
 
 export interface TableReport {
   kind: 'table';
@@ -104,6 +110,33 @@ export const REPORTS: ReportDefinition[] = [
     group: 'Results',
     privilege: 'report.view',
     filters: 'term-arm',
+  },
+  {
+    kind: 'table',
+    key: 'annual-cumulative',
+    title: 'Annual cumulative report',
+    description: 'Each pupil’s three term averages, cumulative average, annual position and promotion status.',
+    group: 'Results',
+    privilege: 'report.view',
+    filters: 'session-scope',
+  },
+  {
+    kind: 'table',
+    key: 'promotion-list',
+    title: 'Promotion list',
+    description: 'Proposed and final promotion outcomes with core subject results and target classes. The document the school files.',
+    group: 'Results',
+    privilege: 'report.view',
+    filters: 'session-level-outcome',
+  },
+  {
+    kind: 'table',
+    key: 'pupil-record',
+    title: 'Pupil cumulative record',
+    description: 'One pupil across every session, term by term. Open it from the pupil’s own page.',
+    group: 'Pupils',
+    privilege: 'report.view',
+    filters: 'pupil',
   },
   {
     kind: 'table',
