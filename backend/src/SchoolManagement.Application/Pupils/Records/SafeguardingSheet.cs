@@ -152,14 +152,18 @@ internal sealed class SafeguardingSheetBuilder(
         Guid armId, string format, CancellationToken cancellationToken)
     {
         var grants = await effectivePrivilegeProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.SafeguardingView);
+        var arm = await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false);
+
+        // Only grants in the class's session count (TASK-0060).
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.SafeguardingView, arm?.SessionId);
         if (scope == PupilAccessScope.Forbidden
-            || (scope == PupilAccessScope.ArmRestricted && !PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.SafeguardingView).Contains(armId)))
+            || (scope == PupilAccessScope.ArmRestricted
+                && !PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.SafeguardingView, arm?.SessionId).Contains(armId)))
         {
             return Failure(Error.Forbidden("report.forbidden", $"You do not hold {Privileges.Pupil.SafeguardingView} for this class."));
         }
 
-        if (await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false) is not { } arm)
+        if (arm is null)
         {
             return Failure(Error.NotFound("arm.not_found", "No class was found with that id."));
         }

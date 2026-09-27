@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Reports;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Common;
@@ -191,6 +192,7 @@ internal sealed class ReportServices(
     ISchoolProfileRepository schoolProfiles,
     IReportPdfRenderer renderer,
     ISystemAuditSink auditSink,
+    ITermRepository terms,
     TimeProvider timeProvider)
 {
     /// <summary>The audit action every export writes.</summary>
@@ -203,7 +205,8 @@ internal sealed class ReportServices(
     {
         ArgumentNullException.ThrowIfNull(filters);
         var builder = _builders[filters.GetType()];
-        var scope = await ResolveScopeAsync(builder.ViewPrivilege, export, builder.ExtraExportPrivilege, cancellationToken).ConfigureAwait(false);
+        var sessionId = await TargetSessionAsync(filters, cancellationToken).ConfigureAwait(false);
+        var scope = await ResolveScopeAsync(builder.ViewPrivilege, export, builder.ExtraExportPrivilege, sessionId, cancellationToken).ConfigureAwait(false);
         if (scope is null)
         {
             var needed = !export ? builder.ViewPrivilege
@@ -251,33 +254,54 @@ internal sealed class ReportServices(
         return new ReportFile($"{report.Key}_{stamp}.{(pdf ? "pdf" : "csv")}", pdf ? "application/pdf" : "text/csv", content);
     }
 
-    // The view privilege's scope, narrowed to the caller's report.export arms when exporting; null when either is missing.
-    private async Task<ReportScope?> ResolveScopeAsync(string viewPrivilege, bool export, string? extraExportPrivilege, CancellationToken cancellationToken)
+    /// <summary>
+    /// The session a report belongs to (TASK-0060, spec 4.2.1): its <c>SessionId</c> filter, else its <c>TermId</c>
+    /// filter's session, else none (a pupil's whole record, the admissions pipeline, the audit log). Read by property
+    /// name, as the export's audit metadata reads the filters, so a new report with either filter is covered unasked.
+    /// An unparsable or unknown id yields none; the builder then refuses it with a 422 or a 404.
+    /// </summary>
+    private async Task<Guid?> TargetSessionAsync(IReportFilters filters, CancellationToken cancellationToken)
+    {
+        var type = filters.GetType();
+        if (Guid.TryParse(type.GetProperty("SessionId")?.GetValue(filters) as string, out var sessionId))
+        {
+            return sessionId;
+        }
+
+        return Guid.TryParse(type.GetProperty("TermId")?.GetValue(filters) as string, out var termId)
+            ? (await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false))?.SessionId
+            : null;
+    }
+
+    // The view privilege's scope in the report's session, narrowed to the caller's report.export arms when exporting;
+    // null when either is missing.
+    private async Task<ReportScope?> ResolveScopeAsync(
+        string viewPrivilege, bool export, string? extraExportPrivilege, Guid? sessionId, CancellationToken cancellationToken)
     {
         var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var view = Scope(grants, viewPrivilege);
+        var view = Scope(grants, viewPrivilege, sessionId);
         if (view is null || !export)
         {
             return view;
         }
 
-        if (extraExportPrivilege is not null && Scope(grants, extraExportPrivilege) is null)
+        if (extraExportPrivilege is not null && Scope(grants, extraExportPrivilege, sessionId) is null)
         {
             return null;
         }
 
-        var exporting = Scope(grants, Privileges.Report.Export);
+        var exporting = Scope(grants, Privileges.Report.Export, sessionId);
         return exporting is null ? null
             : view.Arms is null ? exporting
             : exporting.Arms is null ? view
             : new ReportScope(view.Arms.Where(exporting.Arms.Contains).ToHashSet());
     }
 
-    private static ReportScope? Scope(IReadOnlyCollection<PrivilegeGrant> grants, string privilege) =>
-        PupilAccessGuard.Resolve(grants, privilege) switch
+    private static ReportScope? Scope(IReadOnlyCollection<PrivilegeGrant> grants, string privilege, Guid? sessionId) =>
+        PupilAccessGuard.Resolve(grants, privilege, sessionId) switch
         {
             PupilAccessScope.SchoolWide => ReportScope.SchoolWide,
-            PupilAccessScope.ArmRestricted => new ReportScope(PupilAccessGuard.ResolveArmIds(grants, privilege)),
+            PupilAccessScope.ArmRestricted => new ReportScope(PupilAccessGuard.ResolveArmIds(grants, privilege, sessionId)),
             _ => null,
         };
 }

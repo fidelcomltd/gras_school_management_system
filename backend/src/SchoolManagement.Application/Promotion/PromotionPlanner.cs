@@ -68,7 +68,7 @@ internal sealed class PromotionPlanner(
         }
 
         var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var canDecide = PupilAccessGuard.Resolve(grants, Privileges.Promotion.Decide) == PupilAccessScope.SchoolWide;
+        var canDecide = PupilAccessGuard.Resolve(grants, Privileges.Promotion.Decide, source.Id) == PupilAccessScope.SchoolWide;
         var blockers = new List<PromotionBlockerDto>();
 
         var committed = await promotions.FindCommittedForSessionAsync(source.Id, cancellationToken).ConfigureAwait(false);

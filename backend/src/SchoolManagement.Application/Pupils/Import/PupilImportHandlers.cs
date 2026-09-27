@@ -147,7 +147,7 @@ internal sealed class CommitPupilImportHandler(
         }
 
         var overCapacity = await processor.CapacityWarningsAsync(toCreate, run.Arms, cancellationToken).ConfigureAwait(false);
-        var capacityCheck = await CheckCapacityAsync(overCapacity, request.OverrideCapacity, cancellationToken).ConfigureAwait(false);
+        var capacityCheck = await CheckCapacityAsync(overCapacity, request.OverrideCapacity, run.Session.Id, cancellationToken).ConfigureAwait(false);
         if (capacityCheck.IsFailure)
         {
             return Result.Failure<PupilImportResultDto>(capacityCheck.Error);
@@ -288,7 +288,7 @@ internal sealed class CommitPupilImportHandler(
     }
 
     private async Task<Result> CheckCapacityAsync(
-        IReadOnlyList<PupilImportCapacityWarningDto> overCapacity, bool confirmed, CancellationToken cancellationToken)
+        IReadOnlyList<PupilImportCapacityWarningDto> overCapacity, bool confirmed, Guid sessionId, CancellationToken cancellationToken)
     {
         if (overCapacity.Count == 0)
         {
@@ -306,10 +306,10 @@ internal sealed class CommitPupilImportHandler(
                     $"{first.Capacity}. Confirm the capacity override to import anyway.")));
         }
 
-        // Spec 6.4.6, as approval: school-wide, or arm-restricted to every arm going over.
+        // Spec 6.4.6, as approval: school-wide, or arm-restricted to every arm going over; in the import's session (TASK-0060).
         var grants = await effectivePrivilegeProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride);
-        var allowedArms = scope == PupilAccessScope.ArmRestricted ? PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride) : null;
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride, sessionId);
+        var allowedArms = scope == PupilAccessScope.ArmRestricted ? PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride, sessionId) : null;
         var refused = overCapacity.FirstOrDefault(warning => scope switch
         {
             PupilAccessScope.SchoolWide => false,

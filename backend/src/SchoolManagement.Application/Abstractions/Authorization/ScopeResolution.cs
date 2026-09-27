@@ -11,7 +11,11 @@ public abstract record ScopeResolution
 
     /// <summary>The scope parameter resolved to a single arm.</summary>
     /// <param name="ArmId">The resolved arm.</param>
-    public sealed record ResolvedArm(Guid ArmId) : ScopeResolution;
+    /// <param name="SessionId">
+    /// The arm's session, which only grants in that session satisfy (spec 4.2.1, TASK-0060); <see langword="null"/>
+    /// when the arm does not exist, which the handler then answers with a 404.
+    /// </param>
+    public sealed record ResolvedArm(Guid ArmId, Guid? SessionId) : ScopeResolution;
 
     /// <summary>
     /// The target has no single arm (a level named with no arm) — spec 4.2.1: "requires the

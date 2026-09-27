@@ -43,7 +43,9 @@ internal sealed class ListPupilsQueryHandler(
         }
 
         var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.View);
+        // The register spans every session, so no one session's grants are singled out (TASK-0060); an arm-list grant
+        // still reaches only its own arms, and those belong to its session.
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.View, targetSessionId: null);
 
         if (scope == PupilAccessScope.Forbidden)
         {
@@ -59,7 +61,7 @@ internal sealed class ListPupilsQueryHandler(
 
         if (scope == PupilAccessScope.ArmRestricted)
         {
-            var armIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View);
+            var armIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View, targetSessionId: null);
 
             if (armIds.Count == 0)
             {
