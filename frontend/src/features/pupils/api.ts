@@ -49,6 +49,18 @@ export function usePupilSearch(term: string, enabled: boolean) {
   });
 }
 
+/**
+ * The states and LGAs a pupil record accepts (spec 6.5.4), the same list the server validates against. It changes only
+ * with a deploy, so an hour's staleness is safe (the server caches it for an hour too).
+ */
+export function useNigerianGeography() {
+  return useQuery({
+    queryKey: [PupilsKeys.Geography],
+    queryFn: ({ signal }) => apiGet('/api/v1/geography/states', undefined, { signal }),
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
 /** Gated `pupil.view`. */
 export function usePupil(id: string) {
   return useQuery({

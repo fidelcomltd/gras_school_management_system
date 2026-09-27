@@ -659,6 +659,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/geography/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The states and LGAs a pupil record accepts
+         * @description Spec 6.5.4: the 36 states and the FCT, each with its LGAs, in the canonical spellings the server stores. A pupil's state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=3600`.
+         */
+        get: operations["GetNigerianGeography"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an admission still lacks
+         * @description Spec 6.5.12: `blocking` items stop approval (contacts, the barred-persons answer, the three health answers, the declaration, a required assessment's outcome); `chased` items are tracked after approval. Each is keyed to its admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.
+         */
+        get: operations["GetAdmissionCompleteness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/incomplete-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active pupils with records still to chase
+         * @description Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with the `required` items still missing (possible after a bulk import or a health override) and the `chased` items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty when no session is active. Bounded by the active roll, so not paginated.
+         */
+        get: operations["GetIncompleteRecordsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{termId}/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a term's derived weeks
+         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
+         */
+        get: operations["GetTermWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil's weekly reports for a term
+         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the handler so a pupil who has left (no open enrolment) is still readable school-wide.
+         */
+        get: operations["GetPupilWeekly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms/{armId}/head-teacher-remarks": {
         parameters: {
             query?: never;
@@ -1302,86 +1402,6 @@ export interface paths {
          * @description The tick stays: the paper still exists. Audited as `pupil.document.file_removed`. `404 document.file_not_found` when there is none. Needs `pupil.document.manage` over the pupil.
          */
         delete: operations["RemovePupilDocumentFile"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admissions/{id}/completeness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * What an admission still lacks
-         * @description Spec 6.5.12: `blocking` items stop approval (contacts, the barred-persons answer, the three health answers, the declaration, a required assessment's outcome); `chased` items are tracked after approval. Each is keyed to its admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.
-         */
-        get: operations["GetAdmissionCompleteness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/reports/incomplete-records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Active pupils with records still to chase
-         * @description Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with the `required` items still missing (possible after a bulk import or a health override) and the `chased` items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty when no session is active. Bounded by the active roll, so not paginated.
-         */
-        get: operations["GetIncompleteRecordsReport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/terms/{termId}/weeks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List a term's derived weeks
-         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
-         */
-        get: operations["GetTermWeeks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pupils/{pupilId}/weekly": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read one pupil's weekly reports for a term
-         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the handler so a pupil who has left (no open enrolment) is still readable school-wide.
-         */
-        get: operations["GetPupilWeekly"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6301,6 +6321,82 @@ export interface components {
              * @example C
              */
             label: string;
+        };
+        /**
+         * @description The 36 states and the FCT, each with its LGAs.
+         * @example {
+         *       "states": [
+         *         {
+         *           "name": "Abia",
+         *           "lgas": [
+         *             "Aba North",
+         *             "Aba South",
+         *             "Arochukwu"
+         *           ]
+         *         },
+         *         {
+         *           "name": "Anambra",
+         *           "lgas": [
+         *             "Aguata",
+         *             "Anambra East",
+         *             "Awka South"
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        NigerianGeographyDto: {
+            /**
+             * @description In the National Assembly's order, as the server lists them.
+             * @example [
+             *       {
+             *         "name": "Abia",
+             *         "lgas": [
+             *           "Aba North",
+             *           "Aba South",
+             *           "Arochukwu"
+             *         ]
+             *       },
+             *       {
+             *         "name": "Anambra",
+             *         "lgas": [
+             *           "Aguata",
+             *           "Anambra East",
+             *           "Awka South"
+             *         ]
+             *       }
+             *     ]
+             */
+            states: components["schemas"]["NigerianStateDto"][];
+        };
+        /**
+         * @description One state and its local government areas.
+         * @example {
+         *       "name": "Anambra",
+         *       "lgas": [
+         *         "Aguata",
+         *         "Anambra East",
+         *         "Awka North",
+         *         "Awka South"
+         *       ]
+         *     }
+         */
+        NigerianStateDto: {
+            /**
+             * @description The canonical spelling the server stores.
+             * @example Anambra
+             */
+            name: string;
+            /**
+             * @description Its LGAs, canonical spellings, in list order.
+             * @example [
+             *       "Aguata",
+             *       "Anambra East",
+             *       "Awka North",
+             *       "Awka South"
+             *     ]
+             */
+            lgas: string[];
         };
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
@@ -18089,6 +18185,296 @@ export interface operations {
             };
         };
     };
+    GetNigerianGeography: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NigerianGeographyDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionCompleteness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCompletenessDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIncompleteRecordsReport: {
+        parameters: {
+            query?: {
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncompleteRecordsReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTermWeeks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermWeekListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilWeekly: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetHeadTeacherRemarks: {
         parameters: {
             query: {
@@ -21197,258 +21583,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PupilDocumentListDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetAdmissionCompleteness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdmissionCompletenessDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetIncompleteRecordsReport: {
-        parameters: {
-            query?: {
-                armId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncompleteRecordsReportDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetTermWeeks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                termId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TermWeekListResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetPupilWeekly: {
-        parameters: {
-            query: {
-                termId: string;
-            };
-            header?: never;
-            path: {
-                pupilId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
                 };
             };
             /** @description Unauthorized */

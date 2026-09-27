@@ -2,6 +2,7 @@ import { useFormContext } from 'react-hook-form';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import type { BiographicalFormValues } from '../pupil-schema';
+import { GeographyFields } from './geography-fields';
 
 /**
  * Section B of the admission form (spec 6.5.3), shared by the create and edit dialogs. Reads the form through
@@ -50,8 +51,7 @@ export function BiographicalFields() {
       <div className="grid gap-3 sm:grid-cols-2">
         {text('dateOfBirth', 'Date of birth', 'date')}
         {text('nationality', 'Nationality (defaults to Nigerian)')}
-        {text('stateOfOrigin', 'State of origin')}
-        {text('lga', 'LGA')}
+        <GeographyFields />
       </div>
       {text('homeAddress', 'Home address')}
       <div className="grid gap-3 sm:grid-cols-2">
