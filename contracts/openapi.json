@@ -7176,6 +7176,87 @@
         }
       }
     },
+    "/api/v1/sessions/{sessionId}/promotion/preview": {
+      "get": {
+        "tags": [
+          "Promotion"
+        ],
+        "summary": "Preview a session's promotion",
+        "description": "Spec 6.3.7's review screen: one row per active pupil with the annual average, core subject results, the proposed outcome (Promoted, Repeat, or Graduated at the terminal level; blank with no annual result) and a default target arm dealt round-robin by descending average; the target session's arms with capacity and current counts; pupils no longer active, listed apart; and every unmet precondition in `blockers`. `targetSessionId` defaults to the next session by start date. When promotion has already run, `rows` is empty and `committedBatch` describes the batch.",
+        "operationId": "GetPromotionPreview",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "targetSessionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromotionPreviewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{sessionId}/promotion": {
       "post": {
         "tags": [
@@ -7371,94 +7452,13 @@
         }
       }
     },
-    "/api/v1/sessions/{sessionId}/promotion/preview": {
-      "get": {
-        "tags": [
-          "Promotion"
-        ],
-        "summary": "Preview a session's promotion",
-        "description": "Spec 6.3.7's review screen: one row per active pupil with the annual average, core subject results, the proposed outcome (Promoted, Repeat, or Graduated at the terminal level; blank with no annual result) and a default target arm dealt round-robin by descending average; the target session's arms with capacity and current counts; pupils no longer active, listed apart; and every unmet precondition in `blockers`. `targetSessionId` defaults to the next session by start date. When promotion has already run, `rows` is empty and `committedBatch` describes the batch.",
-        "operationId": "GetPromotionPreview",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "targetSessionId",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PromotionPreviewDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/promotion-batches/{batchId}/reverse": {
       "post": {
         "tags": [
           "Promotion"
         ],
         "summary": "Reverse a promotion",
-        "description": "Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters. `Idempotency-Key` is accepted, not required.",
+        "description": "Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters, and the caller must be a Super Admin (403 otherwise, whatever the role grants). `Idempotency-Key` is accepted, not required.",
         "operationId": "ReversePromotion",
         "parameters": [
           {
@@ -26536,10 +26536,11 @@
           "Promoted",
           "Repeat",
           "PromotedOnTrial",
-          "Graduated"
+          "Graduated",
+          null
         ],
-        "description": "What happened to one pupil in a promotion batch.",
-        "example": "PromotedOnTrial"
+        "description": "A promotion outcome (spec 6.3.7): Promoted, Repeat, PromotedOnTrial (never proposed, chosen with a reason) or Graduated (terminal level only).",
+        "example": "Promoted"
       },
       "PromotionExcludedPupilDto": {
         "required": [
@@ -30823,7 +30824,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "`POST /api/v1/promotion-batches/{batchId}/reverse` (spec 6.3.7): undoes a committed promotion, while no mark has been\n        entered and no pin used in the new session. Needs `promotion.reverse` and a reason. The batch row is kept, marked.",
+        "description": "`POST /api/v1/promotion-batches/{batchId}/reverse` (spec 6.3.7): undoes a committed promotion, while no mark has been\n        entered and no pin used in the new session. Needs `promotion.reverse`, a Super Admin, and a reason. The batch row is\n        kept, marked.",
         "example": {
           "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
           "reason": "Committed into the wrong session; the new session's dates were being corrected."

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/api/client';
-import { PromotionKeys, SessionsKeys, type CommitPromotionCommand } from './types';
+import { PromotionKeys, type CommitPromotionCommand } from './types';
 
 const PREVIEW_PATH = '/api/v1/sessions/{sessionId}/promotion/preview';
 const COMMIT_PATH = '/api/v1/sessions/{sessionId}/promotion';
@@ -37,10 +37,8 @@ export function useReversePromotion() {
   });
 }
 
-// Promotion moves every pupil: whatever lists enrolments, arms or pupils is stale afterwards.
+// Promotion moves every pupil between arms: rosters, score sheets, readiness, reports and the pupil list are all stale
+// afterwards, so everything cached is refetched rather than guessing which keys a roster reaches.
 function invalidateAfterPromotion(queryClient: ReturnType<typeof useQueryClient>) {
-  void queryClient.invalidateQueries({ queryKey: [PromotionKeys.Preview] });
-  void queryClient.invalidateQueries({ queryKey: [SessionsKeys.Detail] });
-  void queryClient.invalidateQueries({ queryKey: [SessionsKeys.List] });
-  void queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith('pupils.') || String(query.queryKey[0]).startsWith('arms.') });
+  void queryClient.invalidateQueries();
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Promotion;
+using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Promotion;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
@@ -54,6 +55,50 @@ internal sealed class PromotionRepository(ApplicationDbContext context) : IPromo
     /// <inheritdoc />
     public Task RemoveEnrolmentAsync(Guid enrolmentId, CancellationToken cancellationToken) =>
         context.Enrolments.Where(row => row.Id == enrolmentId).ExecuteDeleteAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task LockSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        context.Database.SqlQuery<Guid>($"SELECT id FROM academic_sessions WHERE id = {sessionId} FOR UPDATE").ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Enrolment>> ListOpenEnrolmentsTrackedAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+        return await context.Enrolments.Where(row => row.EffectiveTo == null && ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Enrolment>> ListEnrolmentsTrackedAsync(IReadOnlyCollection<Guid> enrolmentIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(enrolmentIds);
+        var ids = enrolmentIds.ToArray();
+        return await context.Enrolments.Where(row => ids.Contains(row.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Pupil>> ListPupilsTrackedAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+        return await context.Pupils.Where(pupil => ids.Contains(pupil.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, int>> CountOpenByArmAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(armIds);
+        var ids = armIds.ToArray();
+
+        // Joined through context.Pupils so its pending-exclusion query filter applies, as CountOpenExcludingPendingByArmAsync.
+        return await (from enrolment in context.Enrolments.AsNoTracking()
+                      join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                      where enrolment.EffectiveTo == null && ids.Contains(enrolment.ArmId)
+                      group enrolment by enrolment.ArmId into arm
+                      select new { ArmId = arm.Key, Count = arm.Count() })
+            .ToDictionaryAsync(row => row.ArmId, row => row.Count, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public Task<AcademicSession?> FindNextSessionAsync(DateOnly startDate, CancellationToken cancellationToken) =>

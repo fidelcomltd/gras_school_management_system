@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
-using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Promotion;
 using SchoolManagement.Application.Abstractions.Pupils;
@@ -41,7 +40,6 @@ internal sealed class PromotionPlanner(
     IArmRepository arms,
     IClassLevelRepository classLevels,
     IPupilRepository pupils,
-    IEnrolmentRepository enrolments,
     IPromotionRepository promotions,
     IResultRulesRepository resultRules,
     ISubjectRepository subjects,
@@ -79,9 +77,11 @@ internal sealed class PromotionPlanner(
             var into = committed.TargetSessionId == target?.Id
                 ? target
                 : await sessions.FindReadOnlyByIdAsync(committed.TargetSessionId, cancellationToken).ConfigureAwait(false);
+
+            // Spec 6.3.9's wording, as written.
             blockers.Add(new PromotionBlockerDto(
                 "promotion.already_run",
-                $"Promotion from {source.Name} has already been run into {into?.Name}. Reverse it before running promotion again."));
+                $"Promotion has already been run for {source.Name}. Reverse the existing batch if you need to run it again."));
             return Result.Success(new PromotionPlan(source, into ?? target, blockers, [], [], [], [], committed, canDecide));
         }
 
@@ -147,12 +147,10 @@ internal sealed class PromotionPlanner(
         var targetArms = target is null
             ? []
             : allArms.Where(arm => arm.SessionId == target.Id && arm.Status == ArmStatus.Active).OrderBy(arm => arm.LabelKey, StringComparer.Ordinal).ToList();
-        var targetArmDtos = new List<PromotionTargetArmDto>(targetArms.Count);
-        foreach (var arm in targetArms)
-        {
-            var enrolled = await enrolments.CountOpenExcludingPendingByArmAsync(arm.Id, cancellationToken).ConfigureAwait(false);
-            targetArmDtos.Add(new PromotionTargetArmDto(arm.Id, ArmName(arm), arm.ClassLevelId, arm.Capacity, enrolled));
-        }
+        var enrolledByArm = await promotions.CountOpenByArmAsync([.. targetArms.Select(arm => arm.Id)], cancellationToken).ConfigureAwait(false);
+        var targetArmDtos = targetArms
+            .Select(arm => new PromotionTargetArmDto(arm.Id, ArmName(arm), arm.ClassLevelId, arm.Capacity, enrolledByArm.GetValueOrDefault(arm.Id)))
+            .ToList();
 
         var drafts = active
             .Select(entry => Draft(entry.Pupil, armsById[entry.ArmId], levels, annual.GetValueOrDefault(entry.Pupil.Id), rules.CoreSubjectIds, rules.PassMark))
@@ -197,8 +195,7 @@ internal sealed class PromotionPlanner(
     }
 
     /// <summary>Surname first, as every register in the product.</summary>
-    public static string DisplayName(Pupil pupil) =>
-        string.IsNullOrWhiteSpace(pupil.MiddleName) ? $"{pupil.Surname} {pupil.FirstName}" : $"{pupil.Surname} {pupil.FirstName} {pupil.MiddleName}";
+    public static string DisplayName(Pupil pupil) => Weekly.WeeklyProjection.DisplayName(pupil.Surname, pupil.FirstName, pupil.MiddleName);
 
     /// <summary>The level a decision's pupil goes to: their own on a repeat, the next on promotion, none on graduation.</summary>
     public static Guid? DestinationLevel(PromotionDecisionOutcome outcome, Guid levelId, Guid? nextLevelId) => outcome switch

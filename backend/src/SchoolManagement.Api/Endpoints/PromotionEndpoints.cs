@@ -20,12 +20,10 @@ public sealed class PromotionEndpoints : IEndpointModule
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        // The batch-returning endpoints first: PromotionBatchDto must reach the schema generator as a type (with its example)
-        // before it is met as the preview's nullable committedBatch property, whose example is null.
         var sessions = endpoints.MapGroup("/sessions").WithTags(Tag);
+        MapPreview(sessions);
         MapCommit(sessions);
         MapReverse(endpoints.MapGroup("/promotion-batches").WithTags(Tag));
-        MapPreview(sessions);
     }
 
     private static void MapPreview(RouteGroupBuilder group) =>
@@ -105,7 +103,8 @@ public sealed class PromotionEndpoints : IEndpointModule
             .WithDescription(
                 "Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to " +
                 "active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a " +
-                "pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters. " +
+                "pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters, and " +
+                "the caller must be a Super Admin (403 otherwise, whatever the role grants). " +
                 "`Idempotency-Key` is accepted, not required.")
             .Produces<PromotionBatchDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)

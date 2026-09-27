@@ -1007,26 +1007,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/sessions/{sessionId}/promotion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Commit a session's promotion
-         * @description Spec 6.3.7: one decision per active pupil, exactly once, applied in ONE transaction: each current enrolment closes on the old session's end date and a new one opens in the target arm on the new session's start date; a graduate changes status and gets no enrolment. Changing a proposed outcome, or choosing `PromotedOnTrial` (which also needs a reason of 10 to 500 characters), needs `promotion.decide`. Over capacity is allowed (spec 6.4.9 warns, never blocks). 409 while any preview blocker remains or when the pupils changed since the preview. `Idempotency-Key` is REQUIRED.
-         */
-        post: operations["CommitPromotion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/sessions/{sessionId}/promotion/preview": {
         parameters: {
             query?: never;
@@ -1047,6 +1027,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{sessionId}/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit a session's promotion
+         * @description Spec 6.3.7: one decision per active pupil, exactly once, applied in ONE transaction: each current enrolment closes on the old session's end date and a new one opens in the target arm on the new session's start date; a graduate changes status and gets no enrolment. Changing a proposed outcome, or choosing `PromotedOnTrial` (which also needs a reason of 10 to 500 characters), needs `promotion.decide`. Over capacity is allowed (spec 6.4.9 warns, never blocks). 409 while any preview blocker remains or when the pupils changed since the preview. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CommitPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/promotion-batches/{batchId}/reverse": {
         parameters: {
             query?: never;
@@ -1058,7 +1058,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse a promotion
-         * @description Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters. `Idempotency-Key` is accepted, not required.
+         * @description Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters, and the caller must be a Super Admin (403 otherwise, whatever the role grants). `Idempotency-Key` is accepted, not required.
          */
         post: operations["ReversePromotion"];
         delete?: never;
@@ -7339,11 +7339,11 @@ export interface components {
             reason: null | string;
         };
         /**
-         * @description What happened to one pupil in a promotion batch.
-         * @example PromotedOnTrial
+         * @description A promotion outcome (spec 6.3.7): Promoted, Repeat, PromotedOnTrial (never proposed, chosen with a reason) or Graduated (terminal level only).
+         * @example Promoted
          * @enum {unknown}
          */
-        PromotionDecisionOutcome: "Promoted" | "Repeat" | "PromotedOnTrial" | "Graduated";
+        PromotionDecisionOutcome: "Promoted" | "Repeat" | "PromotedOnTrial" | "Graduated" | null;
         /**
          * @description A pupil enrolled in the session who is no longer active.
          * @example {
@@ -10468,7 +10468,8 @@ export interface components {
         };
         /**
          * @description `POST /api/v1/promotion-batches/{batchId}/reverse` (spec 6.3.7): undoes a committed promotion, while no mark has been
-         *             entered and no pin used in the new session. Needs `promotion.reverse` and a reason. The batch row is kept, marked.
+         *             entered and no pin used in the new session. Needs `promotion.reverse`, a Super Admin, and a reason. The batch row is
+         *             kept, marked.
          * @example {
          *       "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
          *       "reason": "Committed into the wrong session; the new session's dates were being corrected."
@@ -20424,6 +20425,66 @@ export interface operations {
             };
         };
     };
+    GetPromotionPreview: {
+        parameters: {
+            query?: {
+                targetSessionId?: string;
+            };
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionPreviewDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     CommitPromotion: {
         parameters: {
             query?: never;
@@ -20526,66 +20587,6 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetPromotionPreview: {
-        parameters: {
-            query?: {
-                targetSessionId?: string;
-            };
-            header?: never;
-            path: {
-                sessionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PromotionPreviewDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
                     [name: string]: unknown;
                 };
                 content: {

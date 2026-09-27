@@ -75,7 +75,7 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
     {
         RequireDatabase();
         var seeded = await SeedAsync(thirdTermClosed: true, coreSubjectsChosen: true, primary3Arms: 2);
-        var decider = await SignInWithGrantsAsync(Privileges.Promotion.Run, Privileges.Promotion.Decide, Privileges.Promotion.Reverse);
+        var decider = await SignInWithGrantsAsync(superAdmin: true, Privileges.Promotion.Run, Privileges.Promotion.Decide, Privileges.Promotion.Reverse);
 
         var preview = await ReadAsync<PromotionPreviewDto>(await GetAsync($"/api/v1/sessions/{seeded.SourceId}/promotion/preview", decider));
         preview.Blockers.ShouldBeEmpty();
@@ -95,7 +95,7 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
         preview.TargetArms.Count.ShouldBe(3);
 
         // Changing a proposal needs promotion.decide.
-        var runner = await SignInWithGrantsAsync(Privileges.Promotion.Run);
+        var runner = await SignInWithGrantsAsync(superAdmin: false, Privileges.Promotion.Run);
         var overridden = Decisions(seeded, weak: new(seeded.Weak, PromotionDecisionOutcome.Promoted, seeded.Primary3B, null));
         (await PostAsync($"/api/v1/sessions/{seeded.SourceId}/promotion", runner, overridden, Guid.NewGuid().ToString())).StatusCode
             .ShouldBe(HttpStatusCode.Forbidden);
@@ -103,6 +103,10 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
         // On trial needs a reason.
         var noReason = Decisions(seeded, weak: new(seeded.Weak, PromotionDecisionOutcome.PromotedOnTrial, seeded.Primary3B, null));
         (await PostAsync($"/api/v1/sessions/{seeded.SourceId}/promotion", decider, noReason, Guid.NewGuid().ToString())).StatusCode
+            .ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        // No decisions at all is a validation failure, never a 500.
+        (await PostAsync($"/api/v1/sessions/{seeded.SourceId}/promotion", decider, new { targetSessionId = seeded.TargetId }, Guid.NewGuid().ToString())).StatusCode
             .ShouldBe(HttpStatusCode.UnprocessableEntity);
 
         // A pupil left out is refused whole: nothing applied.
@@ -126,6 +130,8 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
             (await context.Set<Pupil>().AsNoTracking().SingleAsync(pupil => pupil.Id == seeded.Leaver, TestContext.Current.CancellationToken)).Status
                 .ShouldBe(PupilStatus.Graduated);
             (await context.Set<Enrolment>().AnyAsync(row => row.PupilId == seeded.Leaver && row.EffectiveTo == null, TestContext.Current.CancellationToken)).ShouldBeFalse();
+            var graduation = await context.Set<PupilStatusChange>().AsNoTracking().SingleAsync(row => row.PupilId == seeded.Leaver, TestContext.Current.CancellationToken);
+            (graduation.FromStatus, graduation.ToStatus).ShouldBe((PupilStatus.Active, PupilStatus.Graduated));
             (await context.Set<PromotionDecision>().AsNoTracking().SingleAsync(row => row.PupilId == seeded.Weak, TestContext.Current.CancellationToken)).Reason
                 .ShouldBe("Strong Third Term after illness.");
             (await context.AuditEvents.AnyAsync(audit => audit.Action == Privileges.Promotion.Run, TestContext.Current.CancellationToken)).ShouldBeTrue();
@@ -137,6 +143,11 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
         after.Blockers.Single().Code.ShouldBe("promotion.already_run");
         (await PostAsync($"/api/v1/sessions/{seeded.SourceId}/promotion", decider, command, Guid.NewGuid().ToString())).StatusCode
             .ShouldBe(HttpStatusCode.Conflict);
+
+        // promotion.reverse alone is not enough: spec 6.3.7 reserves reversal to a Super Admin.
+        var notSuper = await SignInWithGrantsAsync(superAdmin: false, Privileges.Promotion.Run, Privileges.Promotion.Reverse);
+        (await PostAsync($"/api/v1/promotion-batches/{batch.Id}/reverse", notSuper, new { reason = "Committed into the wrong session." })).StatusCode
+            .ShouldBe(HttpStatusCode.Forbidden);
 
         var reversed = await PostAsync($"/api/v1/promotion-batches/{batch.Id}/reverse", decider, new { reason = "Committed into the wrong session." });
         reversed.StatusCode.ShouldBe(HttpStatusCode.OK, await reversed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -163,7 +174,7 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
     {
         RequireDatabase();
         var seeded = await SeedAsync(thirdTermClosed: false, coreSubjectsChosen: false, primary3Arms: 0);
-        var jar = await SignInWithGrantsAsync(Privileges.Promotion.Run);
+        var jar = await SignInWithGrantsAsync(superAdmin: false, Privileges.Promotion.Run);
 
         var preview = await ReadAsync<PromotionPreviewDto>(await GetAsync($"/api/v1/sessions/{seeded.SourceId}/promotion/preview", jar));
 
@@ -180,7 +191,7 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
     {
         RequireDatabase();
         var seeded = await SeedAsync(thirdTermClosed: true, coreSubjectsChosen: true, primary3Arms: 1);
-        var jar = await SignInWithGrantsAsync(Privileges.Promotion.Run, Privileges.Promotion.Decide, Privileges.Promotion.Reverse);
+        var jar = await SignInWithGrantsAsync(superAdmin: true, Privileges.Promotion.Run, Privileges.Promotion.Decide, Privileges.Promotion.Reverse);
         var committed = await PostAsync($"/api/v1/sessions/{seeded.SourceId}/promotion", jar, Decisions(seeded), Guid.NewGuid().ToString());
         committed.StatusCode.ShouldBe(HttpStatusCode.OK, await committed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var batch = await ReadAsync<PromotionBatchDto>(committed);
@@ -312,9 +323,12 @@ public sealed class PromotionEndpointsTests : IAsyncLifetime
             strong.Id, weak.Id, noResult.Id, leaver.Id, withdrawn.Id);
     }
 
-    private async Task<CookieJar> SignInWithGrantsAsync(params string[] privileges)
+    private async Task<CookieJar> SignInWithGrantsAsync(bool superAdmin, params string[] privileges)
     {
-        var (accountId, email, _) = await AdminAccountSeeder.SeedRegularAsync(_fixture, email: $"promo-{Guid.NewGuid():N}@example.com");
+        var email = $"promo-{Guid.NewGuid():N}@example.com";
+        var accountId = superAdmin
+            ? (await AdminAccountSeeder.SeedAsync(_fixture, email: email)).AccountId
+            : (await AdminAccountSeeder.SeedRegularAsync(_fixture, email: email)).AccountId;
         _grants.SetGrants(
             accountId.ToString("D", CultureInfo.InvariantCulture),
             privileges.Select(privilege => new PrivilegeGrant(privilege, ScopeType.SchoolWide, new HashSet<Guid>(), SessionId: null)).ToArray());

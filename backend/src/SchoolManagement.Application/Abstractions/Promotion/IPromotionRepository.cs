@@ -1,3 +1,4 @@
+using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Promotion;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
@@ -31,6 +32,24 @@ public interface IPromotionRepository
     /// the reopened enrolment never meets it under the one-open-enrolment index.
     /// </summary>
     Task RemoveEnrolmentAsync(Guid enrolmentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Locks the source session's row for the rest of the transaction, so two concurrent commits (or a commit and a reversal)
+    /// run one after the other and the second sees the first's batch instead of failing on a unique index.
+    /// </summary>
+    Task LockSessionAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>The open enrolment of each of these pupils, tracked, in one query.</summary>
+    Task<IReadOnlyList<Enrolment>> ListOpenEnrolmentsTrackedAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
+
+    /// <summary>These enrolments, tracked, in one query.</summary>
+    Task<IReadOnlyList<Enrolment>> ListEnrolmentsTrackedAsync(IReadOnlyCollection<Guid> enrolmentIds, CancellationToken cancellationToken);
+
+    /// <summary>These pupils, tracked, in one query.</summary>
+    Task<IReadOnlyList<Pupil>> ListPupilsTrackedAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken);
+
+    /// <summary>Open, non-pending enrolments per arm, for these arms, in one query; an arm with none is absent.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountOpenByArmAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken);
 
     /// <summary>The earliest session starting after <paramref name="startDate"/>: the default promotion target.</summary>
     Task<AcademicSession?> FindNextSessionAsync(DateOnly startDate, CancellationToken cancellationToken);

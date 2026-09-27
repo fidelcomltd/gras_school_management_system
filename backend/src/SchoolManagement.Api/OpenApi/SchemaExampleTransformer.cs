@@ -53,6 +53,14 @@ internal sealed class SchemaExampleTransformer : IOpenApiSchemaTransformer
                 // still owned by the parsed parent example.
                 schema.Example = propertyExample.DeepClone();
             }
+
+            // A nullable object property whose parent example shows it null would otherwise leave the referenced type's
+            // component schema with no example at all, when this call is the first to reach it; its own example applies.
+            if (schema.Example is null &&
+                OpenApiExamples.TryGetExample(property.PropertyType) is JsonObject ownExample)
+            {
+                schema.Example = ownExample;
+            }
         }
         else if (OpenApiExamples.TryGetExample(context.JsonTypeInfo.Type) is { } typeExample)
         {
