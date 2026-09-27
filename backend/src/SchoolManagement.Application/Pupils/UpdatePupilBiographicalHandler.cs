@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 
@@ -18,6 +19,7 @@ internal sealed class UpdatePupilBiographicalHandler(
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
     IArmRepository arms,
+    IAcademicSessionRepository sessions,
     TimeProvider timeProvider)
     : IRequestHandler<UpdatePupilBiographicalCommand, Result<PupilDto>>
 {
@@ -62,7 +64,7 @@ internal sealed class UpdatePupilBiographicalHandler(
         }
 
         // TASK-0059/0060: same arm-of-record and session resolution as GetPupilQueryHandler — see its remarks.
-        var (armId, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupil.Id, armOfRecordLookup, arms, cancellationToken).ConfigureAwait(false);
+        var (armId, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupil.Id, armOfRecordLookup, arms, sessions, cancellationToken).ConfigureAwait(false);
         var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.Update, sessionId);
 
         if (scope == PupilAccessScope.Forbidden

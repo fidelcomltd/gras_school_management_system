@@ -3,6 +3,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 
@@ -15,6 +16,7 @@ internal sealed class GetPupilQueryHandler(
     IPupilArmOfRecordLookup armOfRecordLookup,
     ICurrentUser currentUser,
     IArmRepository arms,
+    IAcademicSessionRepository sessions,
     TimeProvider timeProvider)
     : IRequestHandler<GetPupilQuery, Result<PupilDto>>
 {
@@ -46,7 +48,7 @@ internal sealed class GetPupilQueryHandler(
         // Pending, or between enrolments) is unresolvable and an arm-restricted caller is refused it, the same
         // fail-closed direction PrivilegeDecision.IsAuthorized takes for ScopeResolution.Unresolvable generally.
         // TASK-0060: only grants in that arm's session count.
-        var (armId, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupil.Id, armOfRecordLookup, arms, cancellationToken).ConfigureAwait(false);
+        var (armId, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupil.Id, armOfRecordLookup, arms, sessions, cancellationToken).ConfigureAwait(false);
         var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.View, sessionId);
 
         if (scope == PupilAccessScope.ArmRestricted)

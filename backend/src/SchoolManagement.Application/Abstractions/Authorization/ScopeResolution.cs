@@ -21,7 +21,11 @@ public abstract record ScopeResolution
     /// The target has no single arm (a level named with no arm) — spec 4.2.1: "requires the
     /// privilege school-wide." Only a school-wide grant can satisfy this outcome.
     /// </summary>
-    public sealed record RequiresSchoolWide : ScopeResolution;
+    /// <param name="SessionId">
+    /// The session only grants in which count (TASK-0060): the active session for a pupil with no open enrolment,
+    /// who belongs to it by spec 4.2.1's "arm of record for the active term"; <see langword="null"/> for a level.
+    /// </param>
+    public sealed record RequiresSchoolWide(Guid? SessionId) : ScopeResolution;
 
     /// <summary>
     /// The scope parameter was missing, or the named pupil/result set could not be resolved to an

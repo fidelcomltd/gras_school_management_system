@@ -2,6 +2,7 @@ using NSubstitute;
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Authorization;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Pupils;
@@ -20,7 +21,9 @@ public sealed class ScopeResolverTests
 
     private readonly IArmRepository _arms = Substitute.For<IArmRepository>();
 
-    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup, _pupils, _arms);
+    private readonly IAcademicSessionRepository _sessions = Substitute.For<IAcademicSessionRepository>();
+
+    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup, _pupils, _arms, _sessions);
 
     [Fact]
     public async Task ArmKind_CarriesTheArmsSession()

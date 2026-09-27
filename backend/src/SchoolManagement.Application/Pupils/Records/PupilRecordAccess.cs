@@ -2,6 +2,7 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 
@@ -15,7 +16,7 @@ namespace SchoolManagement.Application.Pupils.Records;
 /// </summary>
 internal sealed class PupilRecordAccess(
     IPupilRepository pupils, IEffectivePrivilegeProvider grantsProvider, IPupilArmOfRecordLookup armOfRecordLookup, ICurrentUser currentUser,
-    IArmRepository arms)
+    IArmRepository arms, IAcademicSessionRepository sessions)
 {
     /// <summary>The pupil, when it exists and <see cref="ICurrentUser"/> holds <paramref name="privilege"/> over it.</summary>
     public async Task<Result<Pupil>> CheckAsync(Guid pupilId, string privilege, CancellationToken cancellationToken)
@@ -37,7 +38,7 @@ internal sealed class PupilRecordAccess(
         }
 
         // TASK-0060: only grants in the session of the pupil's arm of record count.
-        var (armOfRecord, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupilId, armOfRecordLookup, arms, cancellationToken).ConfigureAwait(false);
+        var (armOfRecord, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupilId, armOfRecordLookup, arms, sessions, cancellationToken).ConfigureAwait(false);
         var scope = PupilAccessGuard.Resolve(grants, privilege, sessionId);
         if (scope == PupilAccessScope.Forbidden
             || (scope == PupilAccessScope.ArmRestricted

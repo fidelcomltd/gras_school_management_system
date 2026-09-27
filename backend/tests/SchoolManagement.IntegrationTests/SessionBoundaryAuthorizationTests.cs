@@ -15,9 +15,9 @@ namespace SchoolManagement.IntegrationTests;
 /// <summary>
 /// TASK-0060, spec 4.2.1 and 4.2.2: a grant authorises only "in the session the target belongs to". Each test signs in
 /// two regular accounts holding the same SCHOOL-WIDE role, one assigned in last session and one in the target's own
-/// session, and proves only the second gets through. Arm-list grants cannot cross sessions (an assignment's arms must
+/// session, and proves only the second gets through (with a 200, so a broken lookup cannot pass as "not refused"). Arm-list grants cannot cross sessions (an assignment's arms must
 /// belong to its session), so the school-wide grant is the case that leaked. One target per enforcement path: a
-/// declarative arm-scoped route, a handler-guarded pupil read, and a report.
+/// declarative arm-scoped route, a handler-guarded pupil read, the register list, and a report.
 /// </summary>
 public sealed class SessionBoundaryAuthorizationTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
 {
@@ -43,6 +43,16 @@ public sealed class SessionBoundaryAuthorizationTests(ApiTestFixture fixture) : 
     }
 
     [Fact]
+    public async Task PupilList_SchoolWideGrantInAnotherSession_Returns403()
+    {
+        // The register's pupils belong to the active session (spec 4.2.1: "arm of record for the active term").
+        RequireDatabase();
+        var seeded = await SeedAsync();
+
+        await AssertOnlyTargetSessionPassesAsync(seeded, Privileges.Pupil.View, "/api/v1/pupils");
+    }
+
+    [Fact]
     public async Task Report_SchoolWideGrantInAnotherSession_Returns403()
     {
         RequireDatabase();
@@ -64,7 +74,7 @@ public sealed class SessionBoundaryAuthorizationTests(ApiTestFixture fixture) : 
 
         var thisSession = await SignInWithSchoolWideGrantAsync(roleId, seeded.TargetSessionId);
         using var allowed = await GetAsync(url, thisSession);
-        allowed.StatusCode.ShouldNotBe(HttpStatusCode.Forbidden, "a grant in the target's own session must reach it");
+        allowed.StatusCode.ShouldBe(HttpStatusCode.OK, "a grant in the target's own session must reach it");
     }
 
     private sealed record Seeded(Guid LastSessionId, Guid TargetSessionId, Guid TermId, Guid ArmId, Guid PupilId);

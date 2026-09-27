@@ -1,5 +1,6 @@
 using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Application.Pupils;
@@ -104,18 +105,23 @@ internal static class PupilAccessGuard
     }
 
     /// <summary>
-    /// A pupil as a scope target: the arm of their open enrolment and that arm's session, both <see langword="null"/>
-    /// for a pupil with none (a pending admission, a leaver), who then belongs to no session.
+    /// A pupil as a scope target: the arm of their open enrolment and that arm's session. A pupil with none (a pending
+    /// admission, a leaver) has no arm and belongs to the active session, spec 4.2.1's "arm of record for the active term".
     /// </summary>
     public static async Task<(Guid? ArmId, Guid? SessionId)> ResolvePupilTargetAsync(
-        Guid pupilId, IPupilArmOfRecordLookup armOfRecordLookup, IArmRepository arms, CancellationToken cancellationToken)
+        Guid pupilId,
+        IPupilArmOfRecordLookup armOfRecordLookup,
+        IArmRepository arms,
+        IAcademicSessionRepository sessions,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(armOfRecordLookup);
         ArgumentNullException.ThrowIfNull(arms);
+        ArgumentNullException.ThrowIfNull(sessions);
 
         if (await armOfRecordLookup.GetArmIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not { } armId)
         {
-            return (null, null);
+            return (null, (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id);
         }
 
         var arm = await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false);

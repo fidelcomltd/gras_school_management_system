@@ -193,6 +193,7 @@ internal sealed class ReportServices(
     IReportPdfRenderer renderer,
     ISystemAuditSink auditSink,
     ITermRepository terms,
+    IAcademicSessionRepository sessions,
     TimeProvider timeProvider)
 {
     /// <summary>The audit action every export writes.</summary>
@@ -256,9 +257,9 @@ internal sealed class ReportServices(
 
     /// <summary>
     /// The session a report belongs to (TASK-0060, spec 4.2.1): its <c>SessionId</c> filter, else its <c>TermId</c>
-    /// filter's session, else none (a pupil's whole record, the admissions pipeline, the audit log). Read by property
-    /// name, as the export's audit metadata reads the filters, so a new report with either filter is covered unasked.
-    /// An unparsable or unknown id yields none; the builder then refuses it with a 422 or a 404.
+    /// filter's session, else the active session (a pupil's record, the admissions pipeline, the audit log: today's
+    /// school). Read by property name, as the export's audit metadata reads the filters, so a new report with either
+    /// filter is covered unasked. An unknown term yields none; the builder then refuses it with a 404.
     /// </summary>
     private async Task<Guid?> TargetSessionAsync(IReportFilters filters, CancellationToken cancellationToken)
     {
@@ -268,9 +269,12 @@ internal sealed class ReportServices(
             return sessionId;
         }
 
-        return Guid.TryParse(type.GetProperty("TermId")?.GetValue(filters) as string, out var termId)
-            ? (await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false))?.SessionId
-            : null;
+        if (Guid.TryParse(type.GetProperty("TermId")?.GetValue(filters) as string, out var termId))
+        {
+            return (await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false))?.SessionId;
+        }
+
+        return (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
     }
 
     // The view privilege's scope in the report's session, narrowed to the caller's report.export arms when exporting;

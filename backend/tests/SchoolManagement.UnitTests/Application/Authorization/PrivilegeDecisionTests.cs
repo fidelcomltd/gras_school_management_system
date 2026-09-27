@@ -29,6 +29,18 @@ public sealed class PrivilegeDecisionTests
     }
 
     [Fact]
+    public void RequiresSchoolWideInASession_CountsOnlyGrantsInThatSession()
+    {
+        // A pupil with no open enrolment belongs to the active session (TASK-0060).
+        var grants = new[] { SchoolWideGrant(Privileges.Pupil.View) with { SessionId = LastSession } };
+
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Pupil.View, new ScopeResolution.RequiresSchoolWide(ThisSession))
+            .ShouldBeFalse();
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Pupil.View, new ScopeResolution.RequiresSchoolWide(LastSession))
+            .ShouldBeTrue();
+    }
+
+    [Fact]
     public void SessionlessGrant_AuthorizesAResolvedArmInAnySession()
     {
         // Spec 4.2.2: the Super Admin assignment is sessionless and permanent.
@@ -84,7 +96,7 @@ public sealed class PrivilegeDecisionTests
     {
         var grants = new[] { SchoolWideGrant(Privileges.Settings.GradingUpdate) };
 
-        PrivilegeDecision.IsAuthorized(grants, Privileges.Settings.GradingUpdate, new ScopeResolution.RequiresSchoolWide())
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Settings.GradingUpdate, new ScopeResolution.RequiresSchoolWide(SessionId: null))
             .ShouldBeTrue();
         PrivilegeDecision.IsAuthorized(grants, Privileges.Settings.GradingUpdate, new ScopeResolution.NotApplicable())
             .ShouldBeTrue();
@@ -109,7 +121,7 @@ public sealed class PrivilegeDecisionTests
         // level-wide operations even over a level containing only their own arm."
         var grants = new[] { ArmScopedGrant(Privileges.Promotion.Run, ArmA) };
 
-        PrivilegeDecision.IsAuthorized(grants, Privileges.Promotion.Run, new ScopeResolution.RequiresSchoolWide())
+        PrivilegeDecision.IsAuthorized(grants, Privileges.Promotion.Run, new ScopeResolution.RequiresSchoolWide(SessionId: null))
             .ShouldBeFalse();
     }
 

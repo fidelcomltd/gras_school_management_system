@@ -16,8 +16,9 @@ namespace SchoolManagement.Application.Authorization;
 /// SESSION BOUNDARY (TASK-0060): a resolved arm carries its session, and only a grant in that session (or the
 /// sessionless Super Admin grant) covers it, per <see cref="PrivilegeGrant.AppliesToSession"/>. Arm-list grants could
 /// not leak anyway, because an assignment's arms must belong to its session; the school-wide grant is what this stops.
-/// Outcomes with no arm (<see cref="ScopeResolution.NotApplicable"/>, <see cref="ScopeResolution.RequiresSchoolWide"/>,
-/// <see cref="ScopeResolution.AnyGrant"/>) name no session and are not filtered. Handler-level checks
+/// A pupil with no open enrolment resolves to <see cref="ScopeResolution.RequiresSchoolWide"/> in the active session.
+/// A level, <see cref="ScopeResolution.NotApplicable"/> and <see cref="ScopeResolution.AnyGrant"/> name no session and
+/// are not filtered: whether non-scopable operations follow the active session is a spec 4.2.2 question left open. Handler-level checks
 /// (<c>PupilAccessGuard</c>) apply the same filter with the session of the pupil, arm or report they target.
 /// </para>
 /// </remarks>
@@ -46,7 +47,8 @@ public static class PrivilegeDecision
             // ever satisfy it. An arm-scoped grant — however wide its arm list — does not count,
             // by design (spec 4.2.1).
             ScopeResolution.NotApplicable => matching.Any(grant => grant.Scope == ScopeType.SchoolWide),
-            ScopeResolution.RequiresSchoolWide => matching.Any(grant => grant.Scope == ScopeType.SchoolWide),
+            ScopeResolution.RequiresSchoolWide requiresSchoolWide => matching.Any(grant =>
+                grant.Scope == ScopeType.SchoolWide && grant.AppliesToSession(requiresSchoolWide.SessionId)),
 
             // A resolved arm: a grant in the arm's session covers it when school-wide, or when the arm is in
             // that specific grant's list.

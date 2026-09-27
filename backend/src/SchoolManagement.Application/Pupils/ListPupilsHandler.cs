@@ -2,6 +2,7 @@ using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -20,6 +21,7 @@ internal sealed class ListPupilsQueryHandler(
     IPupilRecordRepository records,
     IEffectivePrivilegeProvider grantsProvider,
     ICurrentUser currentUser,
+    IAcademicSessionRepository sessions,
     TimeProvider timeProvider)
     : IRequestHandler<ListPupilsQuery, Result<CursorPage<PupilDto>>>
 {
@@ -43,9 +45,10 @@ internal sealed class ListPupilsQueryHandler(
         }
 
         var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
-        // The register spans every session, so no one session's grants are singled out (TASK-0060); an arm-list grant
-        // still reaches only its own arms, and those belong to its session.
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.View, targetSessionId: null);
+        // The register's pupils belong to the active session (spec 4.2.1, "arm of record for the active term"), so only
+        // grants in it count (TASK-0060); an arm-list grant still reaches only its own arms.
+        var activeSessionId = (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.View, activeSessionId);
 
         if (scope == PupilAccessScope.Forbidden)
         {
@@ -61,7 +64,7 @@ internal sealed class ListPupilsQueryHandler(
 
         if (scope == PupilAccessScope.ArmRestricted)
         {
-            var armIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View, targetSessionId: null);
+            var armIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.View, activeSessionId);
 
             if (armIds.Count == 0)
             {
