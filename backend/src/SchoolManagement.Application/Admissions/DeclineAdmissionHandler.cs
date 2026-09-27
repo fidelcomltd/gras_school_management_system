@@ -63,7 +63,7 @@ internal sealed class DeclineAdmissionCommandHandler(
             // neither Pupil nor AdmissionRecord has a column to hold it.
             reason: request.Reason).ConfigureAwait(false);
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         return Result.Success(PupilMapper.ToDto(pupil, today));
     }

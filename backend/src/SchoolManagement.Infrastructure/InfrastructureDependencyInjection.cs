@@ -171,6 +171,7 @@ public static class InfrastructureDependencyInjection
         services.AddOptions<Pins.PortalOptions>().Bind(configuration.GetSection(Pins.PortalOptions.SectionName));
         services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
         services.AddSingleton<Application.Abstractions.Pupils.ISafeguardingSheetRenderer, Pupils.QuestPdfSafeguardingSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Pupils.IAdmissionSlipRenderer, Pupils.QuestPdfAdmissionSlipRenderer>();
         services.AddSingleton<Application.Abstractions.Pupils.IPupilImportWorkbook, Pupils.ClosedXmlPupilImportWorkbook>();
         services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
         services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();

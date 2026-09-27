@@ -33,7 +33,7 @@ internal sealed class CreatePupilHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         // Section A's own references (spec 6.5.9) are resolved BEFORE the pupil is created, so a bad
         // session or class level fails the whole request without leaving a pupil row behind — the

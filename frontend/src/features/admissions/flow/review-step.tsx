@@ -2,6 +2,8 @@ import { LoadingState, QueryErrorState } from '@/components/feedback/query-state
 import { useMe } from '@/features/auth/api';
 import { useCompleteness } from '@/features/pupils/records/api';
 import { CompletenessCard } from '@/features/pupils/records/documents-panel';
+import { PhoneDuplicateWarning } from '@/features/pupils/records/phone-duplicates';
+import { usePhoneDuplicates } from '@/features/pupils/records/use-phone-duplicates';
 import { pupilName, type PupilDto } from '@/features/pupils/types';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { formatDate } from '@/shared/format/date';
@@ -20,6 +22,7 @@ export function ReviewStep({ pupil, onGo }: { pupil: PupilDto; onGo: (step: numb
   const me = useMe();
   const completeness = useCompleteness(pupil.id, true);
   const record = useAdmissionRecord(pupil.id);
+  const duplicates = usePhoneDuplicates(pupil.id);
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
   if (completeness.isPending || record.isPending) return <LoadingState label="Checking the admission…" />;
@@ -37,10 +40,13 @@ export function ReviewStep({ pupil, onGo }: { pupil: PupilDto; onGo: (step: numb
     <div className="flex flex-col gap-5">
       <CompletenessCard pupilId={pupil.id} onGo={onGo} />
       <Summary pupil={pupil} record={record.data} />
+      <PhoneDuplicateWarning pupilId={pupil.id} />
       {!can('pupil.admission.approve') ? (
         <p className="text-sm text-muted-foreground">Approval needs the admission approval privilege.</p>
       ) : stillBlocking.length > 0 ? (
         <p className="text-sm text-muted-foreground">Approval opens here once the steps marked above are complete.</p>
+      ) : duplicates.needsAcknowledgement ? (
+        <p className="text-sm text-muted-foreground">Approval opens once you tick that you have checked the possible duplicate above.</p>
       ) : (
         <section aria-labelledby="approve-heading" className="flex max-w-xl flex-col gap-3 rounded-lg border border-border p-4">
           <h3 id="approve-heading" className="text-base font-semibold text-foreground">

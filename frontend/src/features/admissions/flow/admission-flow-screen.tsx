@@ -8,6 +8,7 @@ import { PupilInfoForm } from '@/features/pupils/components/edit-pupil-dialog';
 import { useCompleteness } from '@/features/pupils/records/api';
 import { CollectionPanel } from '@/features/pupils/records/collection-panel';
 import { ContactsPanel } from '@/features/pupils/records/contacts-panel';
+import { usePhoneDuplicates } from '@/features/pupils/records/use-phone-duplicates';
 import { DocumentsPanel } from '@/features/pupils/records/documents-panel';
 import { HealthPanel } from '@/features/pupils/records/health-panel';
 import { PupilPhoto } from '@/features/pupils/records/pupil-photo';
@@ -40,6 +41,7 @@ export function AdmissionFlowScreen() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const pupil = usePupil(id);
+  const duplicates = usePhoneDuplicates(id);
   const pending = pupil.data?.status === 'Pending';
   const completeness = useCompleteness(id, pending);
   const me = useMe();
@@ -128,7 +130,13 @@ export function AdmissionFlowScreen() {
               Back
             </Button>
             {step < 9 ? (
-              <Button variant="outline" onClick={() => go(step + 1)}>
+              <Button
+                variant="outline"
+                // Spec 6.5.11: a possible duplicate must be checked and ticked before continuing.
+                disabled={step === 3 && duplicates.needsAcknowledgement}
+                title={step === 3 && duplicates.needsAcknowledgement ? 'Tick that you have checked the possible duplicate first' : undefined}
+                onClick={() => go(step + 1)}
+              >
                 Next: {STEPS[step]}
               </Button>
             ) : null}

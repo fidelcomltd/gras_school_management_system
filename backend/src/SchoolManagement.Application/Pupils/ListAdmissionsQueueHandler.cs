@@ -23,7 +23,7 @@ internal sealed class ListAdmissionsQueueQueryHandler(IPupilRepository pupils, T
         }
 
         var pageSize = Math.Clamp(request.PageSize ?? CursorPageRequest.DefaultPageSize, 1, CursorPageRequest.MaxPageSize);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         var page = await pupils.ListAdmissionsQueueAsync(request.Cursor, pageSize, today, cancellationToken).ConfigureAwait(false);
 

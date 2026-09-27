@@ -206,11 +206,12 @@ public sealed class PupilEndpoints : IEndpointModule
                 [FromQuery] string surname,
                 [FromQuery] string firstName,
                 [FromQuery] DateOnly dateOfBirth,
+                [FromQuery] string? contactPhone,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.SendAsync(
-                    new FindPupilDuplicatesQuery(surname, firstName, dateOfBirth), cancellationToken);
+                    new FindPupilDuplicatesQuery(surname, firstName, dateOfBirth, contactPhone), cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
             .RequirePrivilege(Privileges.Pupil.Create)
@@ -219,8 +220,8 @@ public sealed class PupilEndpoints : IEndpointModule
             .WithDescription(
                 "Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING " +
                 "pending records — the point is catching a second, in-progress admission for the same " +
-                "child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT " +
-                "card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide " +
+                "child. Optional `contactPhone` (either Nigerian form) also matches surname AND any contact's " +
+                "phone or WhatsApp number, the other half of 6.5.11's detection. Not arm-scoped: `pupil.create` is school-wide " +
                 "only. Capped at 20 candidates — a panel, not a paged list.")
             .Produces<IReadOnlyList<PupilDto>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)

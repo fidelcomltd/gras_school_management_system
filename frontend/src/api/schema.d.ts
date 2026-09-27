@@ -1040,7 +1040,7 @@ export interface paths {
         };
         /**
          * Find pupil records that may be duplicates
-         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
+         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Optional `contactPhone` (either Nigerian form) also matches surname AND any contact's phone or WhatsApp number, the other half of 6.5.11's detection. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
          */
         get: operations["FindPupilDuplicates"];
         put?: never;
@@ -1364,6 +1364,26 @@ export interface paths {
          * @description Spec 6.5.8: the received date defaults to today; the Other row needs a label when ticked. A ticked row needs no file: the school keeps paper. While a scan is attached the row cannot be unticked (`422 document.file_attached`) and the Other row keeps its label. Needs `pupil.document.manage` over the pupil.
          */
         put: operations["SavePupilDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/admission-slip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print a pupil's admission slip
+         * @description Spec 6.5.11: the slip with the issued registration number, a PDF of half an A4 with the lower half blank (the school files them), stamped with when and by whom it was printed. `409 pupil.not_admitted` before approval. Needs `pupil.view` over the pupil.
+         */
+        get: operations["GetAdmissionSlip"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -7597,6 +7617,12 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             photoUpdatedAtUtc?: null | string;
+            /**
+             * Format: int32
+             * @description The record's completeness across spec 6.5.12's chased set, 0 to 100. Populated ONLY by the pupil list (the list column
+             *     of spec 6.5.15); null everywhere else, where the record's own completeness report is the source.
+             */
+            chasedPercent?: null | number | string;
         };
         /**
          * @description One enrolment in the pupil's history (spec 02 §5.2).
@@ -19884,6 +19910,7 @@ export interface operations {
                 surname: string;
                 firstName: string;
                 dateOfBirth: string;
+                contactPhone?: string;
             };
             header?: never;
             path?: never;
@@ -21443,6 +21470,73 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionSlip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Too Many Requests */

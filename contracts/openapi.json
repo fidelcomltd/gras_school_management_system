@@ -7409,7 +7409,7 @@
           "Pupils"
         ],
         "summary": "Find pupil records that may be duplicates",
-        "description": "Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.",
+        "description": "Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Optional `contactPhone` (either Nigerian form) also matches surname AND any contact's phone or WhatsApp number, the other half of 6.5.11's detection. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.",
         "operationId": "FindPupilDuplicates",
         "parameters": [
           {
@@ -7435,6 +7435,13 @@
             "schema": {
               "type": "string",
               "format": "date"
+            }
+          },
+          {
+            "name": "contactPhone",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -9794,6 +9801,89 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PupilDocumentListDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pupils/{pupilId}/admission-slip": {
+      "get": {
+        "tags": [
+          "Pupil records"
+        ],
+        "summary": "Print a pupil's admission slip",
+        "description": "Spec 6.5.11: the slip with the issued registration number, a PDF of half an A4 with the lower half blank (the school files them), stamped with when and by whom it was printed. `409 pupil.not_admitted` before approval. Needs `pupil.view` over the pupil.",
+        "operationId": "GetAdmissionSlip",
+        "parameters": [
+          {
+            "name": "pupilId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -26427,6 +26517,16 @@
             "description": "When the current photograph was uploaded, or `null` when there is none (spec 6.5.4). A client's cache\nkey: the bytes come from `GET /pupils/{id}/photo` and `/photo/thumbnail`.",
             "format": "date-time",
             "example": "2026-08-03T09:30:00+00:00"
+          },
+          "chasedPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "The record's completeness across spec 6.5.12's chased set, 0 to 100. Populated ONLY by the pupil list (the list column\nof spec 6.5.15); null everywhere else, where the record's own completeness report is the source.",
+            "format": "int32"
           }
         },
         "additionalProperties": false,

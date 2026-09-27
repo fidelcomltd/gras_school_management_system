@@ -10,6 +10,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { usePupils } from './api';
 import { CreatePupilDialog } from './components/create-pupil-dialog';
+import { CompletenessBadge, PupilThumbnail } from './components/register-columns';
 import { PUPIL_STATUSES, pupilName, type PupilsFilters } from './types';
 import { LoadMoreButton } from '@/components/ui/load-more-button';
 import { EmptyState } from '@/components/feedback/empty-state';
@@ -107,9 +108,13 @@ export function PupilsListScreen() {
                       to={paths.pupilDetail(pupil.id)}
                       className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3 text-sm hover:bg-muted"
                     >
-                      <span className="font-medium text-foreground">{pupilName(pupil)}</span>
-                      <span className="text-muted-foreground">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <PupilThumbnail pupilId={pupil.id} photoUpdatedAtUtc={pupil.photoUpdatedAtUtc} />
+                        <span className="truncate font-medium text-foreground">{pupilName(pupil)}</span>
+                      </span>
+                      <span className="flex items-center gap-3 text-muted-foreground">
                         {pupil.registrationNumber ?? 'No number yet'} · {pupil.status}
+                        {pupil.chasedPercent == null ? null : <CompletenessBadge percent={Number(pupil.chasedPercent)} />}
                       </span>
                     </Link>
                   </li>

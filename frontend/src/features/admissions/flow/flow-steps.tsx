@@ -145,7 +145,7 @@ export function AdmittedNotice({ pupil }: { pupil: PupilDto }) {
     <div className="flex flex-col items-start gap-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(pupil)}</h1>
       {pupil.status === 'Active' && number ? (
-        <RegistrationNumber number={number} label="Admitted. Registration number:" />
+        <RegistrationNumber number={number} label="Admitted. Registration number:" pupilId={pupil.id} />
       ) : (
         <p className="text-sm text-muted-foreground">This admission is no longer pending (status: {pupil.status}).</p>
       )}

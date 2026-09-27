@@ -127,7 +127,7 @@ internal sealed class ApproveAdmissionCommandHandler(
         var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var resolvedHeadOfSchoolName = request.HeadOfSchoolName ?? profile.HeadTeacherName;
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         // Section J's assessment outcome and head-of-school fields — reuses Update's own
         // null-means-unchanged convention rather than a second setter (every other field left null).

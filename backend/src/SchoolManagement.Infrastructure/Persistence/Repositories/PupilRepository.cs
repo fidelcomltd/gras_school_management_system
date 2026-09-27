@@ -386,6 +386,7 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         string surname,
         string firstName,
         DateOnly dateOfBirth,
+        string? contactPhone,
         int maxResults,
         DateOnly asOfDate,
         CancellationToken cancellationToken)
@@ -393,13 +394,21 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         ArgumentException.ThrowIfNullOrWhiteSpace(surname);
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
 
+        // Spec 6.5.11 step 1: surname + first name + date of birth, or separately surname + a contact phone (stored canonical,
+        // so the caller passes the +234 form). The phone half catches a sibling or a re-admission under another first name.
+        var contacts = context.Set<PupilContact>().AsNoTracking();
+        var surnamePattern = EscapeLike(surname);
+        var firstNamePattern = EscapeLike(firstName);
         var rows = await context.Pupils
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(pupil =>
-                EF.Functions.ILike(pupil.Surname, surname) &&
-                EF.Functions.ILike(pupil.FirstName, firstName) &&
-                pupil.DateOfBirth == dateOfBirth)
+                (EF.Functions.ILike(pupil.Surname, surnamePattern, LikeEscape) &&
+                    EF.Functions.ILike(pupil.FirstName, firstNamePattern, LikeEscape) &&
+                    pupil.DateOfBirth == dateOfBirth) ||
+                (contactPhone != null &&
+                    EF.Functions.ILike(pupil.Surname, surnamePattern, LikeEscape) &&
+                    contacts.Any(contact => contact.PupilId == pupil.Id && (contact.Phone == contactPhone || contact.WhatsappNumber == contactPhone))))
             .OrderBy(pupil => pupil.CreatedAtUtc)
             .Take(maxResults)
             .ToListAsync(cancellationToken)
@@ -423,6 +432,13 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
 
         return rows.ConvertAll(row => (row.Pupil, row.ArmId));
     }
+
+    /// <summary>The escape character for the duplicate check's case-insensitive exact matches.</summary>
+    private const string LikeEscape = "\\";
+
+    /// <summary>A name as a literal ILIKE pattern: "%" and "_" match themselves, never anything.</summary>
+    private static string EscapeLike(string value) =>
+        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken) =>

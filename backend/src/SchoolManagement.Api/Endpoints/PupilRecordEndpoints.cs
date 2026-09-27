@@ -169,9 +169,19 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
-    /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6).</summary>
+    /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6), and the admission slip.</summary>
     private static void MapFiles(RouteGroupBuilder pupils)
     {
+        Read(pupils.MapGet("/admission-slip", async (Guid pupilId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetAdmissionSlipQuery(pupilId), cancellationToken))
+                .Match(content => FileResponses.Serve(httpContext, content, "attachment"))),
+            "GetAdmissionSlip", "Print a pupil's admission slip",
+            "Spec 6.5.11: the slip with the issued registration number, a PDF of half an A4 with the lower half blank (the " +
+            "school files them), stamped with when and by whom it was printed. `409 pupil.not_admitted` before approval. Needs " +
+            "`pupil.view` over the pupil.")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         Upload(pupils.MapPost("/photo", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
                 {
                     var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);

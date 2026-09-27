@@ -10,6 +10,7 @@ import { formatDate } from '@/shared/format/date';
 import { usePupil } from './api';
 import { CorrectNumberDialog } from './components/correct-number-dialog';
 import { EditPupilDialog } from './components/edit-pupil-dialog';
+import { PrintAdmissionSlip } from './components/print-admission-slip';
 import { ClassStatusPanel } from './movement/class-status-panel';
 import { CollectionPanel } from './records/collection-panel';
 import { ContactsPanel } from './records/contacts-panel';
@@ -89,6 +90,7 @@ export function PupilDetailScreen() {
               Correct registration number
             </Button>
           ) : null}
+          {record.registrationNumber ? <PrintAdmissionSlip pupilId={record.id} /> : null}
         </div>
       </header>
 

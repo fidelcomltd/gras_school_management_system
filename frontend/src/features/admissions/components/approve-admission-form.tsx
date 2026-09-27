@@ -84,7 +84,7 @@ export function ApproveAdmissionForm({
   if (approveAdmission.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <RegistrationNumber number={approveAdmission.data.registrationNumber ?? '—'} label="Approved. Registration number:" />
+        <RegistrationNumber number={approveAdmission.data.registrationNumber ?? '—'} label="Approved. Registration number:" pupilId={pupil.id} />
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             Done
