@@ -237,6 +237,13 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
             father.Apply("Emeka Eze", "Father", "08059876543", null, null, null, isPrimary: false).IsSuccess.ShouldBeTrue();
             context.AddRange(mother, father);
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            // Okafor has since graduated: on that session's register she still counts, because she was on its roll at its end.
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE enrolments SET effective_to = (SELECT end_date FROM academic_sessions WHERE id = {sessionId}) WHERE pupil_id = {seeded.PupilIds[0]}",
+                TestContext.Current.CancellationToken);
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE pupils SET status = {nameof(PupilStatus.Graduated)} WHERE id = {seeded.PupilIds[0]}", TestContext.Current.CancellationToken);
         }
 
         var roll = await GetReportAsync(jar, $"/api/v1/reports/nominal-roll?sessionId={sessionId}&armId={seeded.ArmId}");

@@ -131,6 +131,9 @@ public interface IPupilRepository
     /// </summary>
     Task<IReadOnlyList<(Pupil Pupil, Guid ArmId)>> ListActiveEnrolledInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
 
+    /// <summary>Every pupil still pending admission, read-only, in one query (the admissions pipeline report).</summary>
+    Task<IReadOnlyList<Pupil>> ListPendingReadOnlyAsync(CancellationToken cancellationToken);
+
     /// <summary>The active pupils with an open enrolment in one arm: a class's roll, without loading the whole session.</summary>
     Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken);
 

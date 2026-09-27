@@ -68,7 +68,6 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
       { value: 'PassportPhotograph', label: 'Passport photograph' },
       { value: 'PreviousSchoolResult', label: 'Previous school result' },
       { value: 'TransferLetter', label: 'Transfer letter' },
-      { value: 'Other', label: 'Other' },
     ],
   },
 };

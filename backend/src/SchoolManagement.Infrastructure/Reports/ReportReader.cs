@@ -226,6 +226,7 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
                 from enrolment in context.Enrolments.AsNoTracking()
                 join arm in context.Arms.AsNoTracking() on enrolment.ArmId equals arm.Id
                 join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                join session in context.AcademicSessions.AsNoTracking() on arm.SessionId equals session.Id
                 where arm.SessionId == sessionId
                 select new
                 {
@@ -239,26 +240,24 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
                     pupil.Status,
                     enrolment.ArmId,
                     enrolment.EffectiveFrom,
+                    enrolment.EffectiveTo,
+                    SessionEnd = session.EndDate,
                 })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return rows.GroupBy(row => row.Id)
             .Select(group => group.OrderByDescending(row => row.EffectiveFrom).First())
             .Select(row => new ReportRegisterPupil(
                 row.Id, row.Surname, string.Join(' ', new[] { row.FirstName, row.MiddleName }.Where(name => !string.IsNullOrWhiteSpace(name))),
-                row.RegistrationNumber, row.Sex, row.DateOfBirth, row.Status, row.ArmId))
+                row.RegistrationNumber, row.Sex, row.DateOfBirth,
+                row.EffectiveTo is null || row.EffectiveTo >= row.SessionEnd ? PupilStatus.Active : row.Status,
+                row.ArmId))
             .ToList();
     }
 
-    public async Task<IReadOnlyList<Guid>> ListPendingPupilIdsAsync(CancellationToken cancellationToken) =>
-        await context.Pupils.IgnoreQueryFilters().AsNoTracking()
-            .Where(pupil => pupil.Status == PupilStatus.Pending)
-            .Select(pupil => pupil.Id)
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-
-    public async Task<IReadOnlyDictionary<Guid, string>> FindLevelNamesAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyDictionary<Guid, (string Name, int Order)>> FindLevelsAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken) =>
         await context.ClassLevels.AsNoTracking()
             .Where(level => levelIds.Contains(level.Id))
-            .ToDictionaryAsync(level => level.Id, level => level.Name, cancellationToken).ConfigureAwait(false);
+            .ToDictionaryAsync(level => level.Id, level => (level.Name, level.ProgressionOrder), cancellationToken).ConfigureAwait(false);
 
     public async Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken) =>
         await context.Subjects.AsNoTracking()

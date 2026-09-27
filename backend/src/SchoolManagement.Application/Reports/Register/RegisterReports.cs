@@ -57,9 +57,6 @@ internal static class RegisterText
         return (adults.ElementAtOrDefault(0), adults.ElementAtOrDefault(1));
     }
 
-    /// <summary>Whole years on <paramref name="today"/>.</summary>
-    public static int Age(DateOnly dateOfBirth, DateOnly today) =>
-        today.Year - dateOfBirth.Year - (today < dateOfBirth.AddYears(today.Year - dateOfBirth.Year) ? 1 : 0);
 
     public static string Date(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
@@ -140,11 +137,12 @@ internal sealed class NominalRollReport(IReportReader reader, IPupilRecordReposi
             .ToList();
         var set = await records.LoadForPupilsAsync([.. pupils.Select(pupil => pupil.PupilId)], cancellationToken).ConfigureAwait(false);
         var today = WeeklyProjection.LagosToday(context.Now);
+        var byArm = pupils.ToLookup(pupil => pupil.ArmId);
 
         var rows = new List<ReportRowDto>();
         foreach (var arm in arms)
         {
-            var inArm = pupils.Where(pupil => pupil.ArmId == arm.ArmId).ToList();
+            var inArm = byArm[arm.ArmId].ToList();
             if (inArm.Count == 0)
             {
                 continue;
@@ -160,7 +158,7 @@ internal sealed class NominalRollReport(IReportReader reader, IPupilRecordReposi
                     pupil.DisplayName,
                     pupil.Sex.ToString(),
                     RegisterText.Date(pupil.DateOfBirth),
-                    ReportText.Number(RegisterText.Age(pupil.DateOfBirth, today)),
+                    ReportText.Number(Pupil.CalculateAgeYears(pupil.DateOfBirth, today)),
                     set.Admissions.GetValueOrDefault(pupil.PupilId) is { } admission ? RegisterText.Date(admission.DateAdmitted) : null,
                     pupil.Status.ToString(),
                     guardian?.FullName,
@@ -202,7 +200,7 @@ internal sealed class NominalRollReport(IReportReader reader, IPupilRecordReposi
                 new("Phone", ReportAlign.Left),
             ],
             rows,
-            [$"Ages are as at {RegisterText.Date(today)}."],
+            [$"Ages are as at {RegisterText.Date(today)}. Status is the pupil's status in that session: on the roll at its end counts as Active."],
             ReportOrientation.Landscape));
     }
 }
@@ -229,7 +227,9 @@ internal sealed class EnrolmentSummaryReport(IReportReader reader) : ReportBuild
         }
 
         var arms = (await reader.ListArmsAsync(sessionId, cancellationToken).ConfigureAwait(false)).Where(arm => context.Scope.Allows(arm.ArmId)).ToList();
-        var pupils = (await reader.ListRegisterAsync(sessionId, cancellationToken).ConfigureAwait(false)).Where(pupil => pupil.Status == status).ToList();
+        var pupils = (await reader.ListRegisterAsync(sessionId, cancellationToken).ConfigureAwait(false))
+            .Where(pupil => pupil.Status == status)
+            .ToLookup(pupil => pupil.ArmId);
 
         var rows = new List<ReportRowDto>();
         var total = (Boys: 0, Girls: 0, Capacity: 0);
@@ -238,8 +238,8 @@ internal sealed class EnrolmentSummaryReport(IReportReader reader) : ReportBuild
             var sum = (Boys: 0, Girls: 0, Capacity: 0);
             foreach (var arm in level)
             {
-                var inArm = pupils.Where(pupil => pupil.ArmId == arm.ArmId).ToList();
-                var counts = (Boys: inArm.Count(pupil => pupil.Sex == PupilSex.Male), Girls: inArm.Count(pupil => pupil.Sex == PupilSex.Female), Capacity: arm.Capacity ?? 0);
+                var inArm = pupils[arm.ArmId].ToList();
+                var counts = (Boys: inArm.Count(pupil => pupil.Sex == PupilSex.Male), Girls: inArm.Count(pupil => pupil.Sex == PupilSex.Female), arm.Capacity);
                 rows.Add(Row(ReportRowKind.Data, arm.Name, counts));
                 sum = (sum.Boys + counts.Boys, sum.Girls + counts.Girls, sum.Capacity + counts.Capacity);
             }
@@ -266,7 +266,7 @@ internal sealed class EnrolmentSummaryReport(IReportReader reader) : ReportBuild
                 new("Space left", ReportAlign.Right),
             ],
             rows,
-            ["Space left is capacity less the pupils counted here; negative means over capacity."]));
+            ["Space left is capacity less the pupils counted here; negative means over capacity (capacity is a soft limit). Status is the pupil's status in that session."]));
     }
 
     private static ReportRowDto Row(ReportRowKind kind, string label, (int Boys, int Girls, int Capacity) counts) => new(kind,
@@ -355,10 +355,12 @@ internal sealed class OutstandingDocumentsReport(IReportReader reader, IPupilRep
             return Result.Failure<ReportDto>(error);
         }
 
-        var documentType = Enum.GetNames<PupilDocumentType>().FirstOrDefault(name => string.Equals(name, filters.DocumentType, StringComparison.OrdinalIgnoreCase));
+        // "Other" is never chased (it has no fixed meaning), so it is not a filter either.
+        var chased = Enum.GetNames<PupilDocumentType>().Where(name => name != nameof(PupilDocumentType.Other)).ToList();
+        var documentType = chased.FirstOrDefault(name => string.Equals(name, filters.DocumentType, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrEmpty(filters.DocumentType) && documentType is null)
         {
-            return Result.Failure<ReportDto>(Error.Validation("report.filter", $"documentType must be one of {string.Join(", ", Enum.GetNames<PupilDocumentType>())}."));
+            return Result.Failure<ReportDto>(Error.Validation("report.filter", $"documentType must be one of {string.Join(", ", chased)}."));
         }
 
         if (armId is { } wanted && !context.Scope.Allows(wanted))
@@ -375,6 +377,11 @@ internal sealed class OutstandingDocumentsReport(IReportReader reader, IPupilRep
         var arms = (await reader.ListArmsAsync(sessionId, cancellationToken).ConfigureAwait(false))
             .Where(arm => (armId is null || arm.ArmId == armId) && (levelId is null || arm.LevelId == levelId) && context.Scope.Allows(arm.ArmId))
             .ToDictionary(arm => arm.ArmId);
+        if ((armId is not null || levelId is not null) && arms.Count == 0)
+        {
+            return Result.Failure<ReportDto>(NotFound("No class you can see matches those filters in that session."));
+        }
+
         var enrolled = (await pupils.ListActiveEnrolledInSessionAsync(sessionId, cancellationToken).ConfigureAwait(false))
             .Where(row => arms.ContainsKey(row.ArmId))
             .ToList();
@@ -394,7 +401,7 @@ internal sealed class OutstandingDocumentsReport(IReportReader reader, IPupilRep
             .Select(entry => new ReportRowDto(ReportRowKind.Data,
             [
                 RegisterText.Date(DateOnly.FromDateTime(entry.Pupil.CreatedAtUtc.ToOffset(WeeklyProjection.LagosOffset).DateTime)),
-                $"{entry.Pupil.Surname.ToUpperInvariant()} {entry.Pupil.FirstName}",
+                ReportRegisterPupil.Name(entry.Pupil.Surname, entry.Pupil.FirstName, entry.Pupil.MiddleName),
                 entry.Pupil.RegistrationNumber,
                 arms[entry.ArmId].Name,
                 entry.Item.Message.TrimEnd('.'),
@@ -419,7 +426,7 @@ internal sealed class OutstandingDocumentsReport(IReportReader reader, IPupilRep
                 new("Document", ReportAlign.Left),
             ],
             rows,
-            ["Active pupils only; a pending admission's documents are on the admissions pipeline."]));
+            ["Active pupils currently enrolled; a pending admission's documents are on the admissions pipeline."]));
     }
 }
 
@@ -446,16 +453,10 @@ internal sealed class AdmissionsPipelineReport(IReportReader reader, IPupilRepos
         }
 
         var notes = new List<string>();
-        var pending = new List<Pupil>();
+        IReadOnlyList<Pupil> pending = [];
         if (context.Scope.Arms is null)
         {
-            foreach (var id in await reader.ListPendingPupilIdsAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (await pupils.FindReadOnlyByIdAsync(id, cancellationToken).ConfigureAwait(false) is { } pupil)
-                {
-                    pending.Add(pupil);
-                }
-            }
+            pending = await pupils.ListPendingReadOnlyAsync(cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -463,7 +464,7 @@ internal sealed class AdmissionsPipelineReport(IReportReader reader, IPupilRepos
         }
 
         var set = await records.LoadForPupilsAsync([.. pending.Select(pupil => pupil.Id)], cancellationToken).ConfigureAwait(false);
-        var levelNames = await reader.FindLevelNamesAsync([.. set.Admissions.Values.Select(admission => admission.ClassAdmittedInto).Distinct()], cancellationToken)
+        var levels = await reader.FindLevelsAsync([.. set.Admissions.Values.Select(admission => admission.ClassAdmittedInto).Distinct()], cancellationToken)
             .ConfigureAwait(false);
         var today = WeeklyProjection.LagosToday(context.Now);
 
@@ -476,12 +477,12 @@ internal sealed class AdmissionsPipelineReport(IReportReader reader, IPupilRepos
                 return (Pupil: pupil, LevelId: admission?.ClassAdmittedInto, Created: created, Days: today.DayNumber - created.DayNumber, completeness.Blocking);
             })
             .Where(entry => (levelId is null || entry.LevelId == levelId) && (filters.MinDays is null || entry.Days >= filters.MinDays))
-            .OrderBy(entry => entry.LevelId is { } id ? levelNames.GetValueOrDefault(id) : null, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(entry => entry.LevelId is { } id && levels.TryGetValue(id, out var level) ? level.Order : int.MaxValue)
             .ThenByDescending(entry => entry.Days)
             .Select(entry => new ReportRowDto(ReportRowKind.Data,
             [
-                entry.LevelId is { } id ? levelNames.GetValueOrDefault(id, "Unknown level") : "Not chosen yet",
-                $"{entry.Pupil.Surname.ToUpperInvariant()} {entry.Pupil.FirstName}",
+                entry.LevelId is { } id ? (levels.TryGetValue(id, out var level) ? level.Name : "Unknown level") : "Not chosen yet",
+                ReportRegisterPupil.Name(entry.Pupil.Surname, entry.Pupil.FirstName, entry.Pupil.MiddleName),
                 RegisterText.Date(entry.Created),
                 ReportText.Number(entry.Days),
                 entry.Blocking.Count == 0 ? "Ready to approve" : $"Step {entry.Blocking.Min(item => item.Step).ToString(CultureInfo.InvariantCulture)}",
@@ -492,7 +493,7 @@ internal sealed class AdmissionsPipelineReport(IReportReader reader, IPupilRepos
         var filterLines = new List<string>();
         if (levelId is { } chosen)
         {
-            filterLines.Add($"Level: {levelNames.GetValueOrDefault(chosen, "that level")}");
+            filterLines.Add($"Level: {(levels.TryGetValue(chosen, out var level) ? level.Name : "that level")}");
         }
 
         if (filters.MinDays is { } days)

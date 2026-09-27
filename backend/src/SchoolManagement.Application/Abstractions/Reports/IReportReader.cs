@@ -11,9 +11,9 @@ namespace SchoolManagement.Application.Abstractions.Reports;
 /// <param name="LevelName">The level's name.</param>
 /// <param name="LevelOrder">The level's progression order.</param>
 /// <param name="SectionId">The level's section.</param>
-/// <param name="Capacity">The arm's capacity, if set.</param>
+/// <param name="Capacity">The arm's capacity (always set: 1 to 100, a soft limit).</param>
 /// <param name="NextLevelId">The level promotion moves to; null at the terminal level (its pupils graduate).</param>
-public sealed record ReportArm(Guid ArmId, string Name, Guid LevelId, string LevelName, int LevelOrder, Guid SectionId, int? Capacity, Guid? NextLevelId);
+public sealed record ReportArm(Guid ArmId, string Name, Guid LevelId, string LevelName, int LevelOrder, Guid SectionId, int Capacity, Guid? NextLevelId);
 
 /// <summary>A term with its session.</summary>
 /// <param name="TermId">The term.</param>
@@ -168,13 +168,20 @@ public sealed record ReportPupilTerm(
 /// <param name="RegistrationNumber">Their number, if issued.</param>
 /// <param name="Sex">Sex.</param>
 /// <param name="DateOfBirth">Date of birth.</param>
-/// <param name="Status">Current status.</param>
+/// <param name="Status">
+/// Status in that session: Active when still on the roll at the session's end (an open enrolment, or one closed on or after
+/// its last day, as promotion closes them); otherwise the status they left with.
+/// </param>
 /// <param name="ArmId">The arm.</param>
 public sealed record ReportRegisterPupil(
     Guid PupilId, string Surname, string GivenNames, string? RegistrationNumber, PupilSex Sex, DateOnly DateOfBirth, PupilStatus Status, Guid ArmId)
 {
     /// <summary>"OKAFOR Chidera Ada".</summary>
     public string DisplayName => $"{Surname.ToUpperInvariant()} {GivenNames}".Trim();
+
+    /// <summary>The one way a report names a pupil: "OKAFOR Chidera Ada".</summary>
+    public static string Name(string surname, string firstName, string? middleName) =>
+        $"{surname.ToUpperInvariant()} {string.Join(' ', new[] { firstName, middleName }.Where(name => !string.IsNullOrWhiteSpace(name)))}".Trim();
 }
 
 /// <summary>Read-only projections the reports assemble from (spec 15 section 10). Every list is small: one session's worth.</summary>
@@ -255,11 +262,8 @@ public interface IReportReader
     /// </summary>
     Task<IReadOnlyList<ReportRegisterPupil>> ListRegisterAsync(Guid sessionId, CancellationToken cancellationToken);
 
-    /// <summary>Every pupil still pending admission (spec 6.5.14), the one list that opts out of the pending filter.</summary>
-    Task<IReadOnlyList<Guid>> ListPendingPupilIdsAsync(CancellationToken cancellationToken);
-
-    /// <summary>These class levels' names, by id.</summary>
-    Task<IReadOnlyDictionary<Guid, string>> FindLevelNamesAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+    /// <summary>These class levels' names and progression order, by id.</summary>
+    Task<IReadOnlyDictionary<Guid, (string Name, int Order)>> FindLevelsAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>
     Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);

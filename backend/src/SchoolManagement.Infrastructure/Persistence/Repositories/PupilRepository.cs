@@ -441,6 +441,12 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Pupil>> ListPendingReadOnlyAsync(CancellationToken cancellationToken) =>
+        await context.Pupils.IgnoreQueryFilters().AsNoTracking()
+            .Where(pupil => pupil.Status == PupilStatus.Pending)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken) =>
         await (
                 from enrolment in context.Enrolments.AsNoTracking()
