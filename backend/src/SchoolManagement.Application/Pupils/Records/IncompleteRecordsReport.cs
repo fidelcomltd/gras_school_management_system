@@ -86,9 +86,11 @@ internal sealed class GetIncompleteRecordsHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // The report covers the active session, so only grants in it count (TASK-0060).
+        var session = await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false);
         var grants = await effectivePrivilegeProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Report.View);
-        var allowedArms = scope == PupilAccessScope.ArmRestricted ? PupilAccessGuard.ResolveArmIds(grants, Privileges.Report.View) : null;
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Report.View, session?.Id);
+        var allowedArms = scope == PupilAccessScope.ArmRestricted ? PupilAccessGuard.ResolveArmIds(grants, Privileges.Report.View, session?.Id) : null;
         var armFilter = request.ArmId is null ? (Guid?)null : Guid.Parse(request.ArmId);
         if (scope == PupilAccessScope.Forbidden || (armFilter is { } wanted && allowedArms is not null && !allowedArms.Contains(wanted)))
         {
@@ -96,7 +98,6 @@ internal sealed class GetIncompleteRecordsHandler(
                 "report.forbidden", "You do not have access to that arm's records."));
         }
 
-        var session = await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false);
         if (session is null)
         {
             return Result.Success(new IncompleteRecordsReportDto(null, 0, [], []));

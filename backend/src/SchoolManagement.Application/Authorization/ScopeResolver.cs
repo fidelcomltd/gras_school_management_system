@@ -1,5 +1,7 @@
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 
 namespace SchoolManagement.Application.Authorization;
 
@@ -9,7 +11,9 @@ namespace SchoolManagement.Application.Authorization;
 internal sealed class ScopeResolver(
     IPupilArmOfRecordLookup pupilArmLookup,
     IResultSetArmLookup resultSetArmLookup,
-    IPupilRepository pupils)
+    IPupilRepository pupils,
+    IArmRepository arms,
+    IAcademicSessionRepository sessions)
     : IScopeResolver
 {
     /// <inheritdoc />
@@ -27,7 +31,7 @@ internal sealed class ScopeResolver(
             case ScopeParameterKind.Arm:
                 // "A request naming an arm resolves to that arm." The parameter IS the arm id.
                 return parameterValue is { } armId
-                    ? new ScopeResolution.ResolvedArm(armId)
+                    ? await ResolveArmAsync(armId, cancellationToken).ConfigureAwait(false)
                     : new ScopeResolution.Unresolvable();
 
             case ScopeParameterKind.Pupil:
@@ -44,14 +48,15 @@ internal sealed class ScopeResolver(
 
                 if (pupilArm is { } resolvedPupilArm)
                 {
-                    return new ScopeResolution.ResolvedArm(resolvedPupilArm);
+                    return await ResolveArmAsync(resolvedPupilArm, cancellationToken).ConfigureAwait(false);
                 }
 
                 // A pupil with no open enrolment (a pending admission, a leaver) has no arm for an
                 // arm-scoped grant to match, but is still a real target: only a school-wide grant
-                // covers them (human ruling 2026-09-23). An id naming no pupil stays unresolvable.
+                // covers them (human ruling 2026-09-23), and only one in the active session (TASK-0060). An id naming no
+                // pupil stays unresolvable.
                 return await pupils.ExistsAsync(pupilId, cancellationToken).ConfigureAwait(false)
-                    ? new ScopeResolution.RequiresSchoolWide()
+                    ? new ScopeResolution.RequiresSchoolWide((await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id)
                     : new ScopeResolution.Unresolvable();
 
             case ScopeParameterKind.ResultSet:
@@ -65,7 +70,7 @@ internal sealed class ScopeResolver(
                     .ConfigureAwait(false);
 
                 return resultSetArm is { } resolvedResultSetArm
-                    ? new ScopeResolution.ResolvedArm(resolvedResultSetArm)
+                    ? await ResolveArmAsync(resolvedResultSetArm, cancellationToken).ConfigureAwait(false)
                     : new ScopeResolution.Unresolvable();
 
             case ScopeParameterKind.Level:
@@ -73,10 +78,17 @@ internal sealed class ScopeResolver(
                 // arm-scoped holder cannot perform level-wide operations even over a level
                 // containing only their own arm." The level's identity plays no further part in
                 // the check, so it is deliberately not consulted here.
-                return new ScopeResolution.RequiresSchoolWide();
+                return new ScopeResolution.RequiresSchoolWide(SessionId: null);
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown scope parameter kind.");
         }
+    }
+
+    // TASK-0060: the arm carries its session into the decision, so a grant from another session does not cover it.
+    private async Task<ScopeResolution> ResolveArmAsync(Guid armId, CancellationToken cancellationToken)
+    {
+        var arm = await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false);
+        return new ScopeResolution.ResolvedArm(armId, arm?.SessionId);
     }
 }

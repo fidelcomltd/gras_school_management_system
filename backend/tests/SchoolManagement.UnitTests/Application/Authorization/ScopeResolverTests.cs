@@ -1,7 +1,10 @@
 using NSubstitute;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Authorization;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Pupils;
 
 namespace SchoolManagement.UnitTests.Application.Authorization;
@@ -16,7 +19,26 @@ public sealed class ScopeResolverTests
 
     private readonly IPupilRepository _pupils = Substitute.For<IPupilRepository>();
 
-    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup, _pupils);
+    private readonly IArmRepository _arms = Substitute.For<IArmRepository>();
+
+    private readonly IAcademicSessionRepository _sessions = Substitute.For<IAcademicSessionRepository>();
+
+    private ScopeResolver CreateResolver() => new(_pupilArmLookup, _resultSetArmLookup, _pupils, _arms, _sessions);
+
+    [Fact]
+    public async Task ArmKind_CarriesTheArmsSession()
+    {
+        // TASK-0060: the decision needs the target's session; an unknown arm carries none.
+        var sessionId = Guid.CreateVersion7();
+        var arm = Arm.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), sessionId, "A", null, null).Value;
+        _arms.FindReadOnlyByIdAsync(arm.Id, Arg.Any<CancellationToken>()).Returns(arm);
+
+        var known = await CreateResolver().ResolveAsync(ScopeParameterKind.Arm, arm.Id, TestContext.Current.CancellationToken);
+        var unknown = await CreateResolver().ResolveAsync(ScopeParameterKind.Arm, Guid.CreateVersion7(), TestContext.Current.CancellationToken);
+
+        known.ShouldBeOfType<ScopeResolution.ResolvedArm>().SessionId.ShouldBe(sessionId);
+        unknown.ShouldBeOfType<ScopeResolution.ResolvedArm>().SessionId.ShouldBeNull();
+    }
 
     [Fact]
     public async Task ArmKind_ResolvesDirectlyToTheSuppliedId()
