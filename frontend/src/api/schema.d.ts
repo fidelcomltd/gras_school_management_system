@@ -1294,7 +1294,7 @@ export interface paths {
         put?: never;
         /**
          * Attach or replace a checklist document's scan
-         * @description Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is REQUIRED.
+         * @description Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as received today by the uploader. The file's own name is kept for display only (never the download name, never audited). The Other row needs its label first (`422 document.other_label_required`). Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is REQUIRED.
          */
         post: operations["UploadPupilDocumentFile"];
         /**
@@ -7089,7 +7089,8 @@ export interface components {
          *       "file": {
          *         "contentType": "application/pdf",
          *         "sizeBytes": 412736,
-         *         "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *         "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *         "fileName": "birth-cert-scan.pdf"
          *       }
          *     }
          */
@@ -7121,7 +7122,8 @@ export interface components {
          * @example {
          *       "contentType": "application/pdf",
          *       "sizeBytes": 412736,
-         *       "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *       "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *       "fileName": "birth-cert-scan.pdf"
          *     }
          */
         PupilDocumentFileDto: {
@@ -7142,6 +7144,11 @@ export interface components {
              * @example 2026-09-14T10:05:00+00:00
              */
             uploadedAtUtc: string;
+            /**
+             * @description The name it had on the uploader's device, for display; null for a scan attached before it was kept.
+             * @example IMG_2231.jpg
+             */
+            fileName: null | string;
         };
         /**
          * @description The body of the document route: one row's state.
@@ -7186,7 +7193,8 @@ export interface components {
          *           "file": {
          *             "contentType": "application/pdf",
          *             "sizeBytes": 412736,
-         *             "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *             "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *             "fileName": "birth-cert-scan.pdf"
          *           }
          *         },
          *         {
@@ -7242,7 +7250,8 @@ export interface components {
              *         "file": {
              *           "contentType": "application/pdf",
              *           "sizeBytes": 412736,
-             *           "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+             *           "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+             *           "fileName": "birth-cert-scan.pdf"
              *         }
              *       },
              *       {

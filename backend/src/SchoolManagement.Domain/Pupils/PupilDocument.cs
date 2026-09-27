@@ -1,3 +1,4 @@
+using System.Globalization;
 using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Domain.Pupils;
@@ -32,6 +33,9 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
 
     /// <summary>Spec 6.5.8: String 200.</summary>
     public const int RemarksMaxLength = 200;
+
+    /// <summary>The longest attached-file name kept for display; a longer one is shortened, keeping its extension.</summary>
+    public const int FileNameMaxLength = 120;
 
     private PupilDocument(Guid id, Guid pupilId, PupilDocumentType documentType)
         : base(id)
@@ -69,6 +73,12 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
 
     /// <summary>The attached scan's store id, or <see langword="null"/>. A convenience, never a requirement.</summary>
     public string? FileAssetId { get; private set; }
+
+    /// <summary>
+    /// The name the file had on the uploader's device, for display beside the row only (human ruling 2026-09-26). It may
+    /// name the child, so it never enters the audit log, and it is never the download name: that is derived from the type.
+    /// </summary>
+    public string? FileName { get; private set; }
 
     /// <summary><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>, decided by magic bytes.</summary>
     public string? FileContentType { get; private set; }
@@ -152,7 +162,8 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
     /// 2026-09-26: a scan proves the school saw the document), so the Other row needs its label first. A replaced scan stays
     /// in the store, which never deletes.
     /// </summary>
-    public Result AttachFile(string assetId, string contentType, int sizeBytes, DateTimeOffset uploadedAtUtc, DateOnly today, string? actor)
+    public Result AttachFile(
+        string assetId, string contentType, int sizeBytes, string? fileName, DateTimeOffset uploadedAtUtc, DateOnly today, string? actor)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
@@ -171,6 +182,7 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
 
         FileAssetId = assetId;
         FileContentType = contentType;
+        FileName = CleanFileName(fileName);
         FileSizeBytes = sizeBytes;
         FileUploadedAtUtc = uploadedAtUtc;
         FileUploadedBy = actor;
@@ -193,9 +205,46 @@ public sealed class PupilDocument : Entity<Guid>, IAuditableEntity
 
         FileAssetId = null;
         FileContentType = null;
+        FileName = null;
         FileSizeBytes = null;
         FileUploadedAtUtc = null;
         FileUploadedBy = null;
         return Result.Success();
     }
+
+    /// <summary>
+    /// The base name only (a browser may send a path), with control and invisible format characters removed (a
+    /// right-to-left override, U+202E, between "cert" and "gpj.pdf" displays the name as "certfdp.jpg") and at most
+    /// <see cref="FileNameMaxLength"/> characters, shortening the stem so the extension survives and never splitting a
+    /// surrogate pair (a lone surrogate cannot be stored as UTF-8). Blank becomes null.
+    /// </summary>
+    private static string? CleanFileName(string? raw)
+    {
+        if (raw is null)
+        {
+            return null;
+        }
+
+        var baseName = raw[(raw.LastIndexOfAny(['/', '\\']) + 1)..];
+        var clean = new string([.. baseName.Where(character =>
+            char.GetUnicodeCategory(character) is not (UnicodeCategory.Control or UnicodeCategory.Format))]).Trim();
+        if (clean.Length == 0)
+        {
+            return null;
+        }
+
+        if (clean.Length <= FileNameMaxLength)
+        {
+            return clean;
+        }
+
+        var extension = System.IO.Path.GetExtension(clean);
+        return extension.Length is > 0 and <= 10
+            ? Prefix(clean, FileNameMaxLength - extension.Length) + extension
+            : Prefix(clean, FileNameMaxLength);
+    }
+
+    /// <summary>The first <paramref name="length"/> UTF-16 units, one fewer when the cut would split a surrogate pair.</summary>
+    private static string Prefix(string value, int length) =>
+        char.IsHighSurrogate(value[length - 1]) ? value[..(length - 1)] : value[..length];
 }

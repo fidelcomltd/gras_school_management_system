@@ -1,3 +1,4 @@
+import { ScrollText } from 'lucide-react';
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,8 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAuditEvents, useExportAudit, type AuditFilters } from './api';
 import { AuditRow } from './audit-row';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const EMPTY: AuditFilters = { from: '', to: '', action: '', entityType: '', outcome: '' };
 const control = 'h-10 rounded-md border border-input bg-background px-2 text-sm';
@@ -71,7 +74,7 @@ export function AuditScreen() {
       ) : events.isError ? (
         <QueryErrorState error={events.error} onRetry={() => void events.refetch()} />
       ) : events.data.pages[0]?.items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No events match these filters.</p>
+        <EmptyState icon={ScrollText} title="No events match these filters." />
       ) : (
         <>
           <ul className="flex flex-col gap-2">
@@ -81,9 +84,7 @@ export function AuditScreen() {
           </ul>
           {events.hasNextPage ? (
             <div>
-              <Button variant="outline" size="sm" disabled={events.isFetchingNextPage} onClick={() => void events.fetchNextPage()}>
-                {events.isFetchingNextPage ? 'Loading…' : 'Load more'}
-              </Button>
+              <LoadMoreButton loading={events.isFetchingNextPage} onClick={() => void events.fetchNextPage()} />
             </div>
           ) : null}
         </>

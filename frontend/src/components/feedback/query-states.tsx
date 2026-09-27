@@ -1,14 +1,20 @@
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { ApiError } from '@/lib/http';
+import { cn } from '@/lib/utils/cn';
 
 /**
- * The loading and error halves of CONVENTIONS.md §11's four required states, shared by every
- * data screen from the pupils feature on. (The older screens inline the same markup; they move
- * here when next touched rather than in a sweep.) Empty is screen-specific copy, so it stays in
- * the screen. Unauthorized renders nothing: `ProtectedLayout` is already navigating to sign-in.
+ * The loading and error halves of CONVENTIONS.md §11's four required states, shared by every data screen (the
+ * 2026-09-26 UI pass moved the older screens' inline copies here). The empty half is `EmptyState`, with
+ * screen-specific copy. Unauthorized renders nothing: `ProtectedLayout` is already navigating to sign-in.
  */
-export function LoadingState({ label }: { label: string }) {
-  return <output className="text-sm text-muted-foreground">{label}</output>;
+export function LoadingState({ label, className }: { label: string; className?: string }) {
+  return (
+    <output className={cn('flex items-center justify-center gap-3 py-10 text-sm text-muted-foreground', className)}>
+      <Spinner />
+      {label}
+    </output>
+  );
 }
 
 export function QueryErrorState({ error, onRetry }: { error: Error; onRetry: () => void }) {

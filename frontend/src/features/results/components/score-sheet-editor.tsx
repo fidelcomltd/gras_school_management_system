@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useSaveScoreSheet } from '../api';
 import { isEditable, STATE_LABEL, type ScoreSheetDto } from '../types';
 import { cellError, draftFrom, hasErrors, rowTotal, toCommand, type RowDraft } from './score-draft';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const inputClass = 'h-9 w-16 rounded-md border border-input bg-background px-2 text-center text-sm';
 
@@ -30,7 +32,7 @@ export function ScoreSheetEditor({ sheet, canEdit }: { sheet: ScoreSheetDto; can
     });
 
   if (sheet.rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+    return <EmptyState icon={Users} title="No active pupils in this class." />;
   }
 
   return (

@@ -1,8 +1,10 @@
-import { useId, useState } from 'react';
+import { FileSpreadsheet } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
+import { FileButton } from '@/components/ui/file-button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError, saveFile } from '@/lib/http';
@@ -25,7 +27,6 @@ function errorMessage(error: unknown): string | null {
  * order.
  */
 export function ImportPupilsScreen() {
-  const fileInputId = useId();
   const me = useMe();
   const canOverride = !!me.data && hasPrivilege(me.data, 'arm.capacity.override');
   const template = useDownloadImportTemplate();
@@ -79,22 +80,17 @@ export function ImportPupilsScreen() {
       <FormError message={errorMessage(template.error)} />
 
       <section className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
-        <label htmlFor={fileInputId} className="text-sm font-medium text-foreground">
-          Filled-in template (.xlsx)
-        </label>
+        <p className="text-sm font-medium text-foreground">Filled-in template (.xlsx)</p>
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            id={fileInputId}
-            type="file"
+          <FileButton
+            inputLabel="Filled-in template (.xlsx)"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="text-sm"
-            onChange={(event) => {
-              reset(event.target.files?.[0] ?? null);
-              // Cleared so choosing the same file again, after fixing it, still fires a change.
-              event.target.value = '';
-            }}
-          />
-          {file ? <span className="text-sm text-foreground">{file.name}</span> : null}
+            onFile={(chosen) => reset(chosen)}
+          >
+            <FileSpreadsheet aria-hidden="true" />
+            {file ? 'Choose another file' : 'Choose file'}
+          </FileButton>
+          {file ? <span className="text-sm text-foreground">{file.name}</span> : <span className="text-sm text-muted-foreground">No file chosen yet.</span>}
           <Button onClick={() => file && validate.mutate(file)} disabled={!file || validate.isPending}>
             {validate.isPending ? 'Checking…' : 'Check file'}
           </Button>

@@ -256,6 +256,6 @@ internal static class DocumentMapper
 
     private static PupilDocumentFileDto? FileOf(PupilDocument document) =>
         document is { FileContentType: { } contentType, FileSizeBytes: { } size, FileUploadedAtUtc: { } uploadedAt }
-            ? new PupilDocumentFileDto(contentType, size, uploadedAt)
+            ? new PupilDocumentFileDto(contentType, size, uploadedAt, document.FileName)
             : null;
 }

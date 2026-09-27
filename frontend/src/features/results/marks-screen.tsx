@@ -1,3 +1,4 @@
+import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { ScoreSheetEditor } from './components/score-sheet-editor';
 import { VoidSheetDialog } from './components/void-sheet-dialog';
 import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { isEditable } from './types';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/results/marks` — mark entry per class, subject and term (spec 6.7.4). */
 export function MarksScreen() {
@@ -32,10 +34,10 @@ export function MarksScreen() {
   const body = () => {
     if (term.isPending || klass.isPending) return <LoadingState label="Loading classes…" />;
     if (!term.termId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
-    if (klass.arms.length === 0) return <p className="text-sm text-muted-foreground">There are no classes you can enter marks for in this session.</p>;
+    if (klass.arms.length === 0) return <EmptyState icon={BookOpen} title="There are no classes you can enter marks for in this session." />;
     if (subjects.isPending) return <LoadingState label="Loading subjects…" />;
     if (subjects.isError) return <QueryErrorState error={subjects.error} onRetry={() => void subjects.refetch()} />;
-    if (subjectList.length === 0) return <p className="text-sm text-muted-foreground">No subjects are mapped to this class for this term.</p>;
+    if (subjectList.length === 0) return <EmptyState icon={BookOpen} title="No subjects are mapped to this class for this term." />;
     if (sheet.isPending) return <LoadingState label="Loading marks…" />;
     if (sheet.isError) return <QueryErrorState error={sheet.error} onRetry={() => void sheet.refetch()} />;
     return (

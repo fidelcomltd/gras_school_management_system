@@ -1,3 +1,4 @@
+import { CalendarX, CircleCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -9,6 +10,7 @@ import { saveFile } from '@/lib/http';
 import { csvDocument, csvLine } from '@/shared/format/csv';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { useIncompleteRecords, type IncompleteRecord, type IncompleteRecordsReport } from './api';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const ALL_ARMS = 'all';
 
@@ -83,7 +85,7 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
   const canExport = !!me.data && report.pupils.some((pupil) => hasPrivilegeInArm(me.data, 'report.export', pupil.armId));
 
   if (report.sessionName === null) {
-    return <p className="text-sm text-muted-foreground">No session is active, so there is no roll to check.</p>;
+    return <EmptyState icon={CalendarX} title="No session is active, so there is no roll to check." description="Activate a session under Sessions to see its roll here." />;
   }
 
   return (
@@ -136,7 +138,7 @@ function Report({ report }: { report: IncompleteRecordsReport }) {
       ) : null}
 
       {shown.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing to chase here.</p>
+        <EmptyState icon={CircleCheck} title="Nothing to chase here." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

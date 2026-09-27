@@ -1,3 +1,4 @@
+import { Layers } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
@@ -7,6 +8,9 @@ import { useDeleteLevel, useLevels, useReorderLevels } from '../api';
 import type { LevelDto } from '../types';
 import { CreateLevelDialog } from './create-level-dialog';
 import { EditLevelDialog } from './edit-level-dialog';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * Levels, in `progressionOrder` (spec 6.4.9) — never alphabetically (AC).
@@ -31,7 +35,7 @@ export function LevelList() {
   const canDeactivate = !!me.data && hasPrivilege(me.data, 'level.deactivate');
 
   if (levels.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading levels…</output>;
+    return <LoadingState label="Loading levels…" />;
   }
 
   if (levels.isError) {
@@ -80,7 +84,7 @@ export function LevelList() {
       ) : null}
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No levels yet.</p>
+        <EmptyState icon={Layers} title="No levels yet." />
       ) : (
         <ul aria-label="Levels" className="flex flex-col gap-2">
           {items.map((level, index) => (
@@ -143,14 +147,7 @@ export function LevelList() {
       )}
 
       {levels.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void levels.fetchNextPage()}
-          disabled={levels.isFetchingNextPage}
-        >
-          {levels.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={levels.isFetchingNextPage} onClick={() => void levels.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateLevelDialog levels={items} onClose={() => setShowCreate(false)} /> : null}

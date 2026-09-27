@@ -100,7 +100,8 @@ public sealed record PupilDocumentDto(
 /// <param name="ContentType"><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>.</param>
 /// <param name="SizeBytes">The stored file's size.</param>
 /// <param name="UploadedAtUtc">When it was attached.</param>
-public sealed record PupilDocumentFileDto(string ContentType, int SizeBytes, DateTimeOffset UploadedAtUtc);
+/// <param name="FileName">The name it had on the uploader's device, for display; null for a scan attached before it was kept.</param>
+public sealed record PupilDocumentFileDto(string ContentType, int SizeBytes, DateTimeOffset UploadedAtUtc, string? FileName);
 
 /// <summary>A pupil's current photograph (spec 6.5.4): where to read each size, through the privilege-checked endpoints.</summary>
 /// <param name="PupilId">The pupil.</param>

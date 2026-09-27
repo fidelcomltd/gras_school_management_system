@@ -1,3 +1,4 @@
+import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -9,6 +10,7 @@ import { ApiError } from '@/lib/http';
 import { useDeleteSubject, useSubjects } from './api';
 import { SubjectDialog } from './components/subject-dialog';
 import type { SubjectDto } from './types';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/subjects` — the subject catalogue (spec 6.6.3); which levels take which subject is on the mapping screen. */
 export function SubjectsScreen() {
@@ -38,7 +40,7 @@ export function SubjectsScreen() {
       <FormError message={remove.error instanceof ApiError ? remove.error.message : null} />
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No subjects yet.</p>
+        <EmptyState icon={BookOpen} title="No subjects yet." />
       ) : (
         <table className="w-full text-left text-sm">
           <thead className="text-muted-foreground">

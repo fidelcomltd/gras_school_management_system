@@ -1,9 +1,11 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import type { WeeklyDraft } from '../hooks/use-weekly-draft';
 import { PHRASE_KEY, WEEKLY_FIELDS, formatDate, type WeeklyGridDto } from '../types';
 import { EditedByOther, IllnessMarker } from './weekly-markers';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * The per-pupil tab (spec 6.10.7): one pupil's whole week as the paper form lays it out, five day panels of eight lines.
@@ -23,7 +25,7 @@ export function PupilWeek({
   const [choice, setChoice] = useState<string | null>(null);
   const row = grid.rows.find((candidate) => candidate.pupilId === choice) ?? grid.rows[0];
 
-  if (!row) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (!row) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   return (
     <div className="flex flex-col gap-4">

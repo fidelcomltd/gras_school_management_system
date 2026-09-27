@@ -1,3 +1,4 @@
+import { ShieldUser } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -8,6 +9,9 @@ import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const STATUS_OPTIONS: { value: AdminAccountStatus | ''; label: string }[] = [
   { value: '', label: 'Active & suspended' },
@@ -29,7 +33,7 @@ export function AdminsListScreen() {
   const canCreate = !!me.data && hasPrivilege(me.data, 'admin.create');
 
   if (admins.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading admin accounts…</output>;
+    return <LoadingState label="Loading admin accounts…" />;
   }
 
   if (admins.isError) {
@@ -72,7 +76,7 @@ export function AdminsListScreen() {
       </label>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No admin accounts found.</p>
+        <EmptyState icon={ShieldUser} title="No admin accounts found." />
       ) : (
         <ul aria-label="Admin accounts" className="flex flex-col gap-2">
           {items.map((admin) => (
@@ -93,14 +97,7 @@ export function AdminsListScreen() {
       )}
 
       {admins.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void admins.fetchNextPage()}
-          disabled={admins.isFetchingNextPage}
-        >
-          {admins.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={admins.isFetchingNextPage} onClick={() => void admins.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateAdminDialog onClose={() => setShowCreate(false)} /> : null}

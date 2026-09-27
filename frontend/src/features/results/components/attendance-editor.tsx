@@ -1,9 +1,11 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '@/api/schema';
 import { cn } from '@/lib/utils/cn';
 import { useSaveAttendance } from '../api-records';
 import { isEditable } from '../types';
 import { LockNotice, SaveBar } from './save-bar';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 type AttendanceSheetDto = components['schemas']['AttendanceSheetDto'];
 
@@ -21,7 +23,7 @@ export function AttendanceEditor({ sheet, canEdit }: { sheet: AttendanceSheetDto
     value.trim() !== '' && (!/^\d+$/.test(value.trim()) || (opened !== null && Number(value) > opened));
   const anyInvalid = Object.values(draft).some(invalid);
 
-  if (sheet.rows.length === 0) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (sheet.rows.length === 0) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   return (
     <div className="flex flex-col gap-3">

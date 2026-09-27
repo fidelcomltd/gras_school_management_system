@@ -108,6 +108,7 @@ public sealed class PupilFileEndpointsTests(ApiTestFixture fixture) : Integratio
         row.ReceivedDate.ShouldBe(Application.Weekly.WeeklyProjection.LagosToday(DateTimeOffset.UtcNow));
         row.File.ShouldNotBeNull().ContentType.ShouldBe("application/pdf");
         row.File.SizeBytes.ShouldBe(pdf.Length);
+        row.File.FileName.ShouldBe("upload.bin"); // the name it had on the device, for display only
 
         var download = await GetAsync(fileUrl, jar);
         download.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -125,6 +126,7 @@ public sealed class PupilFileEndpointsTests(ApiTestFixture fixture) : Integratio
         var actions = await AuditActionsAsync(pupilId);
         actions.ShouldContain("pupil.document.file_attached");
         actions.ShouldContain("pupil.document.file_removed");
+        (await AuditJsonAsync(pupilId)).ShouldNotContain("upload.bin"); // a file name may name the child: never audited
     }
 
     [Fact]
@@ -174,6 +176,17 @@ public sealed class PupilFileEndpointsTests(ApiTestFixture fixture) : Integratio
         var id = pupilId.ToString("D", CultureInfo.InvariantCulture);
         return await context.AuditEvents.AsNoTracking().Where(audit => audit.EntityId == id).Select(audit => audit.Action)
             .ToListAsync(TestContext.Current.CancellationToken);
+    }
+
+    private async Task<string> AuditJsonAsync(Guid pupilId)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var id = pupilId.ToString("D", CultureInfo.InvariantCulture);
+        // Both columns are jsonb: read them as they are and join here, never concatenate them in SQL.
+        var rows = await context.AuditEvents.AsNoTracking().Where(audit => audit.EntityId == id)
+            .Select(audit => new { audit.BeforeJson, audit.AfterJson }).ToListAsync(TestContext.Current.CancellationToken);
+        return string.Concat(rows.Select(row => row.BeforeJson + row.AfterJson));
     }
 
     /// <summary>A pending pupil with its admission record: no enrolment, no arm, exactly as step 1 leaves it.</summary>

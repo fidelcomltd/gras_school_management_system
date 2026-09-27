@@ -3108,12 +3108,12 @@ internal static class OpenApiExamples
         [typeof(PupilDocumentDto)] = """
             {
               "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
-              "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+              "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "birth-cert-scan.pdf" }
             }
             """,
 
         [typeof(PupilDocumentFileDto)] = """
-            { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+            { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "IMG_2231.jpg" }
             """,
 
         [typeof(PupilPhotoDto)] = $$"""
@@ -3131,7 +3131,7 @@ internal static class OpenApiExamples
               "items": [
                 {
                   "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
-                  "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+                  "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "birth-cert-scan.pdf" }
                 },
                 { "documentType": "PassportPhotograph", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
                 { "documentType": "PreviousSchoolResult", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },

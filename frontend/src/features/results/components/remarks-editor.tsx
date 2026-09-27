@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import type { components } from '@/api/schema';
 import { Input } from '@/components/ui/input';
@@ -5,6 +6,7 @@ import { useRemarkTemplates, useSaveClassRemarks, useSaveHeadRemarks } from '../
 import type { ResultSetState } from '../types';
 import { RemarkPhrases } from './remark-phrases';
 import { LockNotice, SaveBar } from './save-bar';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 type RemarkSheetDto = components['schemas']['RemarkSheetDto'];
 const MAX = 300;
@@ -40,7 +42,7 @@ export function RemarksEditor({ kind, sheet, canEdit }: { kind: 'ClassTeacher' |
     else saveHead.mutate({ ...base, fillEmpty: fillEmpty.trim() || null });
   };
 
-  if (sheet.rows.length === 0) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (sheet.rows.length === 0) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   return (
     <div className="flex flex-col gap-4">

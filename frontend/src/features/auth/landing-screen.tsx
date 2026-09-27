@@ -3,6 +3,7 @@ import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/http';
 import { useMe } from './api';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /**
  * `/` — the minimum protected landing (TASK-0021 ruling 5), now mounted
@@ -23,7 +24,7 @@ export function LandingScreen() {
 
   if (me.isPending) {
     return (
-      <output className="text-sm text-muted-foreground">Loading your account…</output>
+      <LoadingState label="Loading your account…" />
     );
   }
 

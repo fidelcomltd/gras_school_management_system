@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
@@ -9,6 +10,7 @@ import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
 import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { STATE_LABEL } from './types';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/results` — a class's results for a term: how complete they are, and the next step (spec 6.7.5, 6.7.8–6.7.11). */
 export function ProgressScreen() {
@@ -21,7 +23,7 @@ export function ProgressScreen() {
   const body = () => {
     if (term.isPending || klass.isPending) return <LoadingState label="Loading classes…" />;
     if (!term.termId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
-    if (!klass.armId) return <p className="text-sm text-muted-foreground">There are no classes you can see in this session.</p>;
+    if (!klass.armId) return <EmptyState icon={Users} title="There are no classes you can see in this session." />;
     if (readiness.isPending) return <LoadingState label="Loading results…" />;
     if (readiness.isError) return <QueryErrorState error={readiness.error} onRetry={() => void readiness.refetch()} />;
 
@@ -58,7 +60,7 @@ export function ProgressScreen() {
           )}
         </section>
         {data.pupils.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active pupils in this class.</p>
+          <EmptyState icon={Users} title="No active pupils in this class." />
         ) : (
           <ReadinessGrid readiness={data} />
         )}
