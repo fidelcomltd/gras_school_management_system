@@ -17,6 +17,7 @@ using SchoolManagement.Application.Pupils.Movement;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Reports;
 using SchoolManagement.Application.Results;
 using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Application.Security.Assignments;
@@ -3144,6 +3145,42 @@ internal static class OpenApiExamples
               "pupils": [
                 { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "thumbnail": null, "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
               ]
+            }
+            """,
+
+        [typeof(ReportColumnDto)] = """
+            { "label": "CA", "align": "Right", "group": "Mathematics" }
+            """,
+
+        [typeof(ReportRowDto)] = """
+            { "kind": "Data", "cells": ["1", "OKAFOR Chidera Ngozi", "GRA/2026/0014", "38", "52", "90", "90", "90.00", "A", "2="] }
+            """,
+
+        [typeof(ReportDto)] = """
+            {
+              "key": "broadsheet",
+              "title": "Arm broadsheet",
+              "filters": ["Class: Primary 2 Gold", "First Term, 2026/2027"],
+              "orientation": "Landscape",
+              "twoUp": false,
+              "columns": [
+                { "label": "Pos.", "align": "Right", "group": null },
+                { "label": "Name", "align": "Left", "group": null },
+                { "label": "Reg. no.", "align": "Left", "group": null },
+                { "label": "CA", "align": "Right", "group": "Mathematics" },
+                { "label": "Exam", "align": "Right", "group": "Mathematics" },
+                { "label": "Total", "align": "Right", "group": "Mathematics" },
+                { "label": "Total", "align": "Right", "group": null },
+                { "label": "Average", "align": "Right", "group": null },
+                { "label": "Grade", "align": "Center", "group": null },
+                { "label": "Level pos.", "align": "Right", "group": null }
+              ],
+              "rows": [
+                { "kind": "Data", "cells": ["1", "OKAFOR Chidera Ngozi", "GRA/2026/0014", "38", "52", "90", "90", "90.00", "A", "2="] }
+              ],
+              "notes": ["Not yet published (Awaiting approval): figures change if marks are corrected and computed again."],
+              "rowCount": 1,
+              "generatedAtUtc": "2026-12-11T09:30:00+00:00"
             }
             """,
 

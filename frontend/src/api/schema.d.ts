@@ -1703,6 +1703,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/broadsheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Arm broadsheet
+         * @description One row per pupil, a CA / Exam / Total group per subject, then total, average, grade and level position, by arm position. Reads computed results in any state (the head teacher approves from it), with a note until published. `report.view`. PDF prints landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetBroadsheetReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/broadsheet/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Arm broadsheet, as CSV or PDF
+         * @description The same report as `GET /reports/broadsheet`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportBroadsheetReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/merit-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Merit list
+         * @description Position order for one arm (`armId`) or a whole level (`levelId`, ranked by level position): position, name, registration number, class for a level, average and grade. `top` keeps positions up to N, ties included. Unranked pupils are left out. `report.view`. PDF prints portrait in two columns. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetMeritListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/merit-list/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Merit list, as CSV or PDF
+         * @description The same report as `GET /reports/merit-list`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportMeritListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/result-entry-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Result entry progress
+         * @description One row per arm for the term: pupils, subjects mapped, mark cells, ratings, attendance, teacher's and head's remarks complete of total, and the result set's state. Filters: `levelId`, `state` (`NotStarted` or a result-set state). The same figures as each class's readiness grid. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetResultEntryProgressReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/result-entry-progress/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Result entry progress, as CSV or PDF
+         * @description The same report as `GET /reports/result-entry-progress`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportResultEntryProgressReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/result-sets/{resultSetId}/compute": {
         parameters: {
             query?: never;
@@ -10457,6 +10577,296 @@ export interface components {
              */
             orderedLevelIds: string[];
         };
+        /**
+         * @description How a column's cells sit.
+         * @example Right
+         * @enum {unknown}
+         */
+        ReportAlign: "Left" | "Center" | "Right";
+        /**
+         * @description One column.
+         * @example {
+         *       "label": "CA",
+         *       "align": "Right",
+         *       "group": "Mathematics"
+         *     }
+         */
+        ReportColumnDto: {
+            /**
+             * @description The heading.
+             * @example CA
+             */
+            label: string;
+            /** @description How its cells sit. */
+            align: components["schemas"]["ReportAlign"];
+            /**
+             * @description A heading over consecutive columns sharing it (the broadsheet's subject over CA, Exam and Total), or null.
+             * @example Mathematics
+             */
+            group?: null | string;
+        };
+        /**
+         * @description Every report in spec 15 section 10 as one tabular shape (spec 15: read-only views, CSV and PDF under `report.export`),
+         *     so a single screen, CSV writer and PDF renderer serve all of them. Cells are formatted on the server, the same text in
+         *     all three outputs.
+         * @example {
+         *       "key": "broadsheet",
+         *       "title": "Arm broadsheet",
+         *       "filters": [
+         *         "Class: Primary 2 Gold",
+         *         "First Term, 2026/2027"
+         *       ],
+         *       "orientation": "Landscape",
+         *       "twoUp": false,
+         *       "columns": [
+         *         {
+         *           "label": "Pos.",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Name",
+         *           "align": "Left",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Reg. no.",
+         *           "align": "Left",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "CA",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Exam",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Total",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Total",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Average",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Grade",
+         *           "align": "Center",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Level pos.",
+         *           "align": "Right",
+         *           "group": null
+         *         }
+         *       ],
+         *       "rows": [
+         *         {
+         *           "kind": "Data",
+         *           "cells": [
+         *             "1",
+         *             "OKAFOR Chidera Ngozi",
+         *             "GRA/2026/0014",
+         *             "38",
+         *             "52",
+         *             "90",
+         *             "90",
+         *             "90.00",
+         *             "A",
+         *             "2="
+         *           ]
+         *         }
+         *       ],
+         *       "notes": [
+         *         "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+         *       ],
+         *       "rowCount": 1,
+         *       "generatedAtUtc": "2026-12-11T09:30:00+00:00"
+         *     }
+         */
+        ReportDto: {
+            /**
+             * @description The report's route name, e.g. `broadsheet`.
+             * @example broadsheet
+             */
+            key: string;
+            /**
+             * @description The heading.
+             * @example Arm broadsheet
+             */
+            title: string;
+            /**
+             * @description The filters applied, as readable lines ("Class: Primary 3A").
+             * @example [
+             *       "Class: Primary 2 Gold",
+             *       "First Term, 2026/2027"
+             *     ]
+             */
+            filters: string[];
+            /** @description The PDF's orientation. */
+            orientation: components["schemas"]["ReportOrientation"];
+            /**
+             * @description The PDF prints the table in two columns side by side (the merit list).
+             * @example false
+             */
+            twoUp: boolean;
+            /**
+             * @description The columns.
+             * @example [
+             *       {
+             *         "label": "Pos.",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Name",
+             *         "align": "Left",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Reg. no.",
+             *         "align": "Left",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "CA",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Exam",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Total",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Total",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Average",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Grade",
+             *         "align": "Center",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Level pos.",
+             *         "align": "Right",
+             *         "group": null
+             *       }
+             *     ]
+             */
+            columns: components["schemas"]["ReportColumnDto"][];
+            /**
+             * @description The rows.
+             * @example [
+             *       {
+             *         "kind": "Data",
+             *         "cells": [
+             *           "1",
+             *           "OKAFOR Chidera Ngozi",
+             *           "GRA/2026/0014",
+             *           "38",
+             *           "52",
+             *           "90",
+             *           "90",
+             *           "90.00",
+             *           "A",
+             *           "2="
+             *         ]
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["ReportRowDto"][];
+            /**
+             * @description Lines printed under the table.
+             * @example [
+             *       "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+             *     ]
+             */
+            notes: string[];
+            /**
+             * Format: int32
+             * @description Data rows, the figure every export audits.
+             * @example 1
+             */
+            rowCount: number | string;
+            /**
+             * Format: date-time
+             * @description When this copy was produced.
+             * @example 2026-12-11T09:30:00+00:00
+             */
+            generatedAtUtc: string;
+        };
+        /**
+         * @description The PDF's page orientation.
+         * @example Landscape
+         * @enum {unknown}
+         */
+        ReportOrientation: "Portrait" | "Landscape";
+        /**
+         * @description One row: one cell per column, already formatted, null for blank.
+         * @example {
+         *       "kind": "Data",
+         *       "cells": [
+         *         "1",
+         *         "OKAFOR Chidera Ngozi",
+         *         "GRA/2026/0014",
+         *         "38",
+         *         "52",
+         *         "90",
+         *         "90",
+         *         "90.00",
+         *         "A",
+         *         "2="
+         *       ]
+         *     }
+         */
+        ReportRowDto: {
+            /** @description What the row is. */
+            kind: components["schemas"]["ReportRowKind"];
+            /**
+             * @description The cells, in column order.
+             * @example [
+             *       "1",
+             *       "OKAFOR Chidera Ngozi",
+             *       "GRA/2026/0014",
+             *       "38",
+             *       "52",
+             *       "90",
+             *       "90",
+             *       "90.00",
+             *       "A",
+             *       "2="
+             *     ]
+             */
+            cells: string[];
+        };
+        /**
+         * @description What a row is, so screen, CSV and PDF can each style it.
+         * @example Data
+         * @enum {unknown}
+         */
+        ReportRowKind: "Data" | "Heading" | "Subtotal" | "Total";
         /**
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
@@ -24418,6 +24828,426 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBroadsheetReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportBroadsheetReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMeritListReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+                top?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportMeritListReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+                top?: number | string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetResultEntryProgressReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportResultEntryProgressReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                state?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

@@ -12309,6 +12309,622 @@
         }
       }
     },
+    "/api/v1/reports/broadsheet": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Arm broadsheet",
+        "description": "One row per pupil, a CA / Exam / Total group per subject, then total, average, grade and level position, by arm position. Reads computed results in any state (the head teacher approves from it), with a note until published. `report.view`. PDF prints landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "GetBroadsheetReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "armId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/broadsheet/export": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Arm broadsheet, as CSV or PDF",
+        "description": "The same report as `GET /reports/broadsheet`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "ExportBroadsheetReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "armId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/merit-list": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Merit list",
+        "description": "Position order for one arm (`armId`) or a whole level (`levelId`, ranked by level position): position, name, registration number, class for a level, average and grade. `top` keeps positions up to N, ties included. Unranked pupils are left out. `report.view`. PDF prints portrait in two columns. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "GetMeritListReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "armId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/merit-list/export": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Merit list, as CSV or PDF",
+        "description": "The same report as `GET /reports/merit-list`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "ExportMeritListReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "armId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/result-entry-progress": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Result entry progress",
+        "description": "One row per arm for the term: pupils, subjects mapped, mark cells, ratings, attendance, teacher's and head's remarks complete of total, and the result set's state. Filters: `levelId`, `state` (`NotStarted` or a result-set state). The same figures as each class's readiness grid. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "GetResultEntryProgressReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/result-entry-progress/export": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Result entry progress, as CSV or PDF",
+        "description": "The same report as `GET /reports/result-entry-progress`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.",
+        "operationId": "ExportResultEntryProgressReport",
+        "parameters": [
+          {
+            "name": "termId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/result-sets/{resultSetId}/compute": {
       "post": {
         "tags": [
@@ -31319,6 +31935,357 @@
           ]
         }
       },
+      "ReportAlign": {
+        "enum": [
+          "Left",
+          "Center",
+          "Right"
+        ],
+        "description": "How a column's cells sit.",
+        "example": "Right"
+      },
+      "ReportColumnDto": {
+        "required": [
+          "label",
+          "align"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The heading.",
+            "example": "CA"
+          },
+          "align": {
+            "description": "How its cells sit.",
+            "$ref": "#/components/schemas/ReportAlign"
+          },
+          "group": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A heading over consecutive columns sharing it (the broadsheet's subject over CA, Exam and Total), or null.",
+            "example": "Mathematics"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One column.",
+        "example": {
+          "label": "CA",
+          "align": "Right",
+          "group": "Mathematics"
+        }
+      },
+      "ReportDto": {
+        "required": [
+          "key",
+          "title",
+          "filters",
+          "orientation",
+          "twoUp",
+          "columns",
+          "rows",
+          "notes",
+          "rowCount",
+          "generatedAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The report's route name, e.g. `broadsheet`.",
+            "example": "broadsheet"
+          },
+          "title": {
+            "type": "string",
+            "description": "The heading.",
+            "example": "Arm broadsheet"
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The filters applied, as readable lines (\"Class: Primary 3A\").",
+            "example": [
+              "Class: Primary 2 Gold",
+              "First Term, 2026/2027"
+            ]
+          },
+          "orientation": {
+            "description": "The PDF's orientation.",
+            "$ref": "#/components/schemas/ReportOrientation"
+          },
+          "twoUp": {
+            "type": "boolean",
+            "description": "The PDF prints the table in two columns side by side (the merit list).",
+            "example": false
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportColumnDto"
+            },
+            "description": "The columns.",
+            "example": [
+              {
+                "label": "Pos.",
+                "align": "Right",
+                "group": null
+              },
+              {
+                "label": "Name",
+                "align": "Left",
+                "group": null
+              },
+              {
+                "label": "Reg. no.",
+                "align": "Left",
+                "group": null
+              },
+              {
+                "label": "CA",
+                "align": "Right",
+                "group": "Mathematics"
+              },
+              {
+                "label": "Exam",
+                "align": "Right",
+                "group": "Mathematics"
+              },
+              {
+                "label": "Total",
+                "align": "Right",
+                "group": "Mathematics"
+              },
+              {
+                "label": "Total",
+                "align": "Right",
+                "group": null
+              },
+              {
+                "label": "Average",
+                "align": "Right",
+                "group": null
+              },
+              {
+                "label": "Grade",
+                "align": "Center",
+                "group": null
+              },
+              {
+                "label": "Level pos.",
+                "align": "Right",
+                "group": null
+              }
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRowDto"
+            },
+            "description": "The rows.",
+            "example": [
+              {
+                "kind": "Data",
+                "cells": [
+                  "1",
+                  "OKAFOR Chidera Ngozi",
+                  "GRA/2026/0014",
+                  "38",
+                  "52",
+                  "90",
+                  "90",
+                  "90.00",
+                  "A",
+                  "2="
+                ]
+              }
+            ]
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lines printed under the table.",
+            "example": [
+              "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+            ]
+          },
+          "rowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Data rows, the figure every export audits.",
+            "format": "int32",
+            "example": 1
+          },
+          "generatedAtUtc": {
+            "type": "string",
+            "description": "When this copy was produced.",
+            "format": "date-time",
+            "example": "2026-12-11T09:30:00+00:00"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Every report in spec 15 section 10 as one tabular shape (spec 15: read-only views, CSV and PDF under `report.export`),\nso a single screen, CSV writer and PDF renderer serve all of them. Cells are formatted on the server, the same text in\nall three outputs.",
+        "example": {
+          "key": "broadsheet",
+          "title": "Arm broadsheet",
+          "filters": [
+            "Class: Primary 2 Gold",
+            "First Term, 2026/2027"
+          ],
+          "orientation": "Landscape",
+          "twoUp": false,
+          "columns": [
+            {
+              "label": "Pos.",
+              "align": "Right",
+              "group": null
+            },
+            {
+              "label": "Name",
+              "align": "Left",
+              "group": null
+            },
+            {
+              "label": "Reg. no.",
+              "align": "Left",
+              "group": null
+            },
+            {
+              "label": "CA",
+              "align": "Right",
+              "group": "Mathematics"
+            },
+            {
+              "label": "Exam",
+              "align": "Right",
+              "group": "Mathematics"
+            },
+            {
+              "label": "Total",
+              "align": "Right",
+              "group": "Mathematics"
+            },
+            {
+              "label": "Total",
+              "align": "Right",
+              "group": null
+            },
+            {
+              "label": "Average",
+              "align": "Right",
+              "group": null
+            },
+            {
+              "label": "Grade",
+              "align": "Center",
+              "group": null
+            },
+            {
+              "label": "Level pos.",
+              "align": "Right",
+              "group": null
+            }
+          ],
+          "rows": [
+            {
+              "kind": "Data",
+              "cells": [
+                "1",
+                "OKAFOR Chidera Ngozi",
+                "GRA/2026/0014",
+                "38",
+                "52",
+                "90",
+                "90",
+                "90.00",
+                "A",
+                "2="
+              ]
+            }
+          ],
+          "notes": [
+            "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+          ],
+          "rowCount": 1,
+          "generatedAtUtc": "2026-12-11T09:30:00+00:00"
+        }
+      },
+      "ReportOrientation": {
+        "enum": [
+          "Portrait",
+          "Landscape"
+        ],
+        "description": "The PDF's page orientation.",
+        "example": "Landscape"
+      },
+      "ReportRowDto": {
+        "required": [
+          "kind",
+          "cells"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "What the row is.",
+            "$ref": "#/components/schemas/ReportRowKind"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The cells, in column order.",
+            "example": [
+              "1",
+              "OKAFOR Chidera Ngozi",
+              "GRA/2026/0014",
+              "38",
+              "52",
+              "90",
+              "90",
+              "90.00",
+              "A",
+              "2="
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row: one cell per column, already formatted, null for blank.",
+        "example": {
+          "kind": "Data",
+          "cells": [
+            "1",
+            "OKAFOR Chidera Ngozi",
+            "GRA/2026/0014",
+            "38",
+            "52",
+            "90",
+            "90",
+            "90.00",
+            "A",
+            "2="
+          ]
+        }
+      },
+      "ReportRowKind": {
+        "enum": [
+          "Data",
+          "Heading",
+          "Subtotal",
+          "Total"
+        ],
+        "description": "What a row is, so screen, CSV and PDF can each style it.",
+        "example": "Data"
+      },
       "ResetAdminAccountPasswordResponse": {
         "required": [
           "id",
@@ -39349,6 +40316,9 @@
     },
     {
       "name": "Remark templates"
+    },
+    {
+      "name": "Reports"
     },
     {
       "name": "Result sets"

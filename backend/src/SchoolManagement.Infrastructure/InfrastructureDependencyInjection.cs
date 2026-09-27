@@ -178,6 +178,8 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<Application.Abstractions.Results.IResultVerificationReader, Results.ResultVerificationReader>();
         services.AddScoped<Application.Abstractions.Results.IAnnualSheetReader, Results.AnnualSheetReader>();
         services.AddSingleton<Application.Abstractions.Results.IResultSheetPdfRenderer, Results.QuestPdfResultSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Reports.IReportPdfRenderer, Reports.QuestPdfReportRenderer>();
+        services.AddScoped<Application.Abstractions.Reports.IReportReader, Reports.ReportReader>();
         services.AddSingleton<Application.Abstractions.Results.IResultPdfCache, Results.DiskResultPdfCache>();
         services.AddSingleton<Pins.PinMaintenanceService>();
         services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());

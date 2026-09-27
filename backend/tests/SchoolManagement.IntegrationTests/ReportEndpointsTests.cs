@@ -1,0 +1,158 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using SchoolManagement.Application.Reports;
+using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Enrolments;
+using SchoolManagement.Domain.Pupils;
+using SchoolManagement.Domain.Results;
+using SchoolManagement.Domain.Sessions;
+using SchoolManagement.Infrastructure.Persistence;
+using SchoolManagement.IntegrationTests.Infrastructure;
+
+namespace SchoolManagement.IntegrationTests;
+
+/// <summary>Spec 15 section 10's results reports over one computed arm, and the audited export.</summary>
+public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTestBase(fixture)
+{
+    private static int _nextYear = 9700;
+
+    [Fact]
+    public async Task ResultsReports_ReadTheComputedArm_AndAnExportIsAudited()
+    {
+        RequireDatabase();
+        var (jar, adminId) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        var query = $"termId={seeded.TermId}";
+
+        var broadsheet = await GetReportAsync(jar, $"/api/v1/reports/broadsheet?{query}&armId={seeded.ArmId}");
+        broadsheet.Rows.Count.ShouldBe(2);
+        broadsheet.Rows[0].Cells[1].ShouldBe("EZE Chidera"); // arm position 1 first
+        broadsheet.Columns.Count(column => column.Group == seeded.SubjectName).ShouldBe(3);
+        broadsheet.Notes.ShouldContain(note => note.StartsWith("Not yet published", StringComparison.Ordinal));
+
+        var merit = await GetReportAsync(jar, $"/api/v1/reports/merit-list?{query}&levelId={seeded.LevelId}&top=1");
+        merit.Rows.Select(row => row.Cells[1]).ShouldBe(["EZE Chidera"]);
+
+        var progress = await GetReportAsync(jar, $"/api/v1/reports/result-entry-progress?{query}&state=Approved");
+        progress.Rows.ShouldContain(row => row.Cells[0] == seeded.ArmName && row.Cells[8] == "Approved");
+
+        using (var bad = await GetAsync(jar, $"/api/v1/reports/broadsheet/export?{query}&armId={seeded.ArmId}&format=xls"))
+        {
+            bad.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        }
+
+        using (var csv = await GetAsync(jar, $"/api/v1/reports/broadsheet/export?{query}&armId={seeded.ArmId}&format=csv"))
+        {
+            csv.StatusCode.ShouldBe(HttpStatusCode.OK);
+            csv.Content.Headers.ContentType!.MediaType.ShouldBe("text/csv");
+            (await csv.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("EZE Chidera");
+        }
+
+        using (var pdf = await GetAsync(jar, $"/api/v1/reports/merit-list/export?{query}&armId={seeded.ArmId}&format=pdf"))
+        {
+            pdf.StatusCode.ShouldBe(HttpStatusCode.OK);
+            pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        }
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var exports = await context.AuditEvents.AsNoTracking()
+            .Where(audit => audit.Action == "report.export" && audit.ActorAdminId == adminId)
+            .Select(audit => audit.EntityId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        exports.ShouldBe(["broadsheet", "merit-list"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task Broadsheet_WithoutAnArm_IsAValidationError()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+
+        using var response = await GetAsync(jar, $"/api/v1/reports/broadsheet?termId={Guid.NewGuid()}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    private sealed record Seeded(Guid TermId, Guid ArmId, string ArmName, Guid LevelId, string SubjectName);
+
+    /// <summary>An Approved, computed arm: Eze first, Okafor second, one subject.</summary>
+    private async Task<Seeded> SeedAsync()
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var level = await context.ClassLevels.AsNoTracking()
+            .FirstAsync(candidate => candidate.SectionId == SeededClassLevels.PrimarySectionId, TestContext.Current.CancellationToken);
+
+        var year = Interlocked.Increment(ref _nextYear);
+        var session = AcademicSession.Create(Guid.CreateVersion7(), $"{year}/{year + 1}", new DateOnly(year, 9, 1), new DateOnly(year + 1, 7, 31)).Value;
+        context.Add(session);
+        var term = Term.Create(Guid.CreateVersion7(), session.Id, 1, "First Term", new DateOnly(year, 9, 1), new DateOnly(year, 12, 15)).Value;
+        context.Add(term);
+        var arm = Arm.Create(Guid.CreateVersion7(), level.Id, session.Id, "A", null, null).Value;
+        context.Add(arm);
+        var resultSet = ResultSet.Create(Guid.CreateVersion7(), arm.Id, term.Id).Value;
+        typeof(ResultSet).GetProperty(nameof(ResultSet.State))!.SetValue(resultSet, ResultSetState.Approved);
+        resultSet.MarkComputed(null, DateTimeOffset.UtcNow, 2);
+        context.Add(resultSet);
+
+        var subjectName = $"Maths {Guid.NewGuid():N}"[..20];
+        var subject = SchoolManagement.Domain.Subjects.Subject.Create(Guid.CreateVersion7(), subjectName, null, null).Value;
+        context.Add(subject);
+        context.Add(SchoolManagement.Domain.Subjects.SubjectMapping.Create(Guid.CreateVersion7(), subject.Id, level.Id, session.Id, term.Id, 1).Value);
+
+        foreach (var (surname, position, total) in new[] { ("Okafor", 2, 61), ("Eze", 1, 84) })
+        {
+            var pupil = Pupil.Create(
+                Guid.CreateVersion7(), surname, "Chidera", middleName: null, PupilSex.Female, new DateOnly(2018, 1, 1), asOfDate: new DateOnly(2026, 9, 9),
+                nationality: null, "Anambra", "Awka South", "14 Zik Avenue, Awka", previousSchool: null, previousClass: null, otherInformation: null).Value;
+            context.Add(pupil);
+            context.Add(Enrolment.Open(Guid.CreateVersion7(), pupil.Id, arm.Id, new DateOnly(year, 9, 1)).Value);
+            context.Add(SubjectResultLine.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, subject.Id, total / 2, total - (total / 2), total, "B", "Good", position, false, true));
+            context.Add(PupilTermResult.Create(Guid.CreateVersion7(), resultSet.Id, pupil.Id, 1, 100, total, total, "B", position, false, 2, position, false, 2));
+        }
+
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        // Pending pupils are hidden by the model's query filter; a pupil with results is active.
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE pupils SET status = {nameof(PupilStatus.Active)} WHERE id IN (SELECT pupil_id FROM enrolments WHERE arm_id = {arm.Id})",
+            TestContext.Current.CancellationToken);
+        return new Seeded(term.Id, arm.Id, ArmDisplayName.Compose(level.Name, "A"), level.Id, subjectName);
+    }
+
+    private async Task<ReportDto> GetReportAsync(CookieJar jar, string url)
+    {
+        using var response = await GetAsync(jar, url);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        return (await response.Content.ReadFromJsonAsync<ReportDto>(JsonOptions, TestContext.Current.CancellationToken))!;
+    }
+
+    private async Task<(CookieJar Jar, Guid AccountId)> SignInAdminAsync()
+    {
+        var (accountId, email) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false, email: $"admin-{Guid.NewGuid():N}@example.com");
+        var jar = new CookieJar();
+        using (var csrf = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/csrf"))
+        {
+            jar.Capture(await Client.SendAsync(csrf, TestContext.Current.CancellationToken));
+        }
+
+        using var signIn = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/sign-in")
+        {
+            Content = JsonContent.Create(new SchoolManagement.Application.Auth.SignIn.SignInCommand(email, AdminAccountSeeder.Password)),
+        };
+        jar.ApplyWithCsrf(signIn);
+        var response = await Client.SendAsync(signIn, TestContext.Current.CancellationToken);
+        jar.Capture(response);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return (jar, accountId);
+    }
+
+    private async Task<HttpResponseMessage> GetAsync(CookieJar jar, string url)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        jar.Apply(request);
+        return await Client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+}
