@@ -10,7 +10,7 @@ import { EditArmDialog } from './components/edit-arm-dialog';
 import { FormTeacherLabel } from './components/form-teacher-label';
 import { useFormTeacherNames } from './hooks/use-form-teacher-names';
 import { LoadingState } from '@/components/feedback/query-states';
-import { PageTrail } from '@/components/layout/page-trail';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 /**
  * `/arms/:id` (spec 6.4.5, 6.4.7). Four required states (CONVENTIONS.md §11)
@@ -39,19 +39,11 @@ export function ArmDetailScreen() {
   );
 
   if (arm.isPending) {
-    return <LoadingState label="Loading arm…" />;
+    return <WithTrail trail={[{ to: paths.arms }, { label: 'Arm' }]}><LoadingState label="Loading arm…" /></WithTrail>;
   }
 
   if (arm.isError) {
-    if (arm.error instanceof ApiError && arm.error.kind === 'unauthorized') return null;
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{arm.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void arm.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <TrailedError trail={[{ to: paths.arms }, { label: 'Arm' }]} error={arm.error} onRetry={() => void arm.refetch()} />;
   }
 
   const detail = arm.data;
@@ -62,7 +54,7 @@ export function ArmDetailScreen() {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <PageTrail trail={[{ label: 'Arms', to: paths.arms }, { label: detail.displayName }]} />
+      <PageTrail trail={[{ to: paths.arms }, { label: detail.displayName }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.displayName}</h1>

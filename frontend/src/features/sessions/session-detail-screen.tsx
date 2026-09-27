@@ -3,12 +3,11 @@ import { useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
 import { useSession } from './api';
 import { EditSessionDialog } from './components/edit-session-dialog';
 import { TermCard } from './components/term-card';
 import { LoadingState } from '@/components/feedback/query-states';
-import { PageTrail } from '@/components/layout/page-trail';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 import { paths } from '@/app/router/paths';
 
 /**
@@ -27,21 +26,11 @@ export function SessionDetailScreen() {
   const [showEdit, setShowEdit] = useState(false);
 
   if (session.isPending) {
-    return <LoadingState label="Loading session…" />;
+    return <WithTrail trail={[{ to: paths.sessions }, { label: 'Session' }]}><LoadingState label="Loading session…" /></WithTrail>;
   }
 
   if (session.isError) {
-    if (session.error instanceof ApiError && session.error.kind === 'unauthorized') {
-      return null;
-    }
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{session.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void session.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <TrailedError trail={[{ to: paths.sessions }, { label: 'Session' }]} error={session.error} onRetry={() => void session.refetch()} />;
   }
 
   const detail = session.data;
@@ -52,7 +41,7 @@ export function SessionDetailScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Sessions', to: paths.sessions }, { label: detail.name }]} />
+      <PageTrail trail={[{ to: paths.sessions }, { label: detail.name }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.name}</h1>

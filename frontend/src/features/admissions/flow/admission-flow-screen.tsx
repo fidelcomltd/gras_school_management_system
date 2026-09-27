@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from 'react-router';
 import { paths } from '@/app/router/paths';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { LoadingState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { usePupil } from '@/features/pupils/api';
@@ -16,7 +16,7 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
 import { AdmittedNotice, DeclarationStep, OtherInformationStep } from './flow-steps';
 import { ReviewStep } from './review-step';
-import { PageTrail } from '@/components/layout/page-trail';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 /** Spec 6.5.11's nine steps. Step 1 is the create dialog; this screen resumes from step 2. */
 const STEPS = [
@@ -45,8 +45,8 @@ export function AdmissionFlowScreen() {
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
-  if (pupil.isPending) return <LoadingState label="Loading the admission…" />;
-  if (pupil.isError) return <QueryErrorState error={pupil.error} onRetry={() => void pupil.refetch()} />;
+  if (pupil.isPending) return <WithTrail trail={[{ to: paths.admissions }, { label: 'Admission' }]}><LoadingState label="Loading the admission…" /></WithTrail>;
+  if (pupil.isError) return <TrailedError trail={[{ to: paths.admissions }, { label: 'Admission' }]} error={pupil.error} onRetry={() => void pupil.refetch()} />;
   const record = pupil.data;
   if (!pending) return <AdmittedNotice pupil={record} />;
 
@@ -60,7 +60,7 @@ export function AdmissionFlowScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Admissions', to: paths.admissions }, { label: pupilName(record) }]} />
+      <PageTrail trail={[{ to: paths.admissions }, { label: pupilName(record) }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Admission: {pupilName(record)}</h1>
         <p className="text-sm text-muted-foreground">Pending. Each section saves on its own button; you can leave and come back.</p>

@@ -74,7 +74,7 @@ export function MappingScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Subjects', to: paths.subjects }, { label: 'Subjects by class' }]} />
+      <PageTrail trail={[{ to: paths.subjects }, { label: 'Subjects by class' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Subjects by class</h1>
         <p className="text-sm text-muted-foreground">Tick the subjects each class takes this term. Changes are previewed before they are saved.</p>

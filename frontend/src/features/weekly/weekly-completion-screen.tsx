@@ -71,7 +71,7 @@ export function WeeklyCompletionScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Weekly reports', to: paths.weekly }, { label: 'Completion' }]} />
+      <PageTrail trail={[{ to: paths.weekly }, { label: 'Weekly report completion' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Weekly report completion</h1>
         <p className="text-sm text-muted-foreground">Which classes have written their weekly notes, week by week.</p>

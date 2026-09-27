@@ -67,7 +67,7 @@ export function ImportPupilsScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Pupils', to: paths.pupils }, { label: 'Import pupils' }]} />
+      <PageTrail trail={[{ to: paths.pupils }, { label: 'Import pupils' }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">Import pupils</h1>

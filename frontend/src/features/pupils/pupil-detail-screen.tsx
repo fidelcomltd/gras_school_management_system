@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { LoadingState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
@@ -17,7 +17,7 @@ import { CompletenessCard, DocumentsPanel } from './records/documents-panel';
 import { HealthPanel } from './records/health-panel';
 import { PupilPhoto } from './records/pupil-photo';
 import { pupilName, type PupilDto } from './types';
-import { PageTrail } from '@/components/layout/page-trail';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 type Tab = 'details' | 'class' | 'contacts' | 'collection' | 'health' | 'documents';
 
@@ -48,11 +48,11 @@ export function PupilDetailScreen() {
   const navigate = useNavigate();
 
   if (pupil.isPending) {
-    return <LoadingState label="Loading pupil…" />;
+    return <WithTrail trail={[{ to: paths.pupils }, { label: 'Pupil' }]}><LoadingState label="Loading pupil…" /></WithTrail>;
   }
 
   if (pupil.isError) {
-    return <QueryErrorState error={pupil.error} onRetry={() => void pupil.refetch()} />;
+    return <TrailedError trail={[{ to: paths.pupils }, { label: 'Pupil' }]} error={pupil.error} onRetry={() => void pupil.refetch()} />;
   }
 
   const record = pupil.data;
@@ -72,7 +72,7 @@ export function PupilDetailScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ label: 'Pupils', to: paths.pupils }, { label: pupilName(record) }]} />
+      <PageTrail trail={[{ to: paths.pupils }, { label: pupilName(record) }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-3">
           <h1 className="font-display text-2xl font-semibold text-foreground">{pupilName(record)}</h1>
