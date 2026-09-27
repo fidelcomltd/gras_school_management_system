@@ -272,7 +272,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | Task | Title | Owner | Status |
 |---|---|---|---|
 | TASK-0060 | Enforce the session boundary in scope decisions | orchestrator | **DONE 2026-09-27** (`fix/session-boundary`, on local staging); see `## Decisions` |
-| TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | backend-dev | **dispatchable 2026-09-19**: ruled fail-open (403 + error log). Still behind product work |
+| TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | orchestrator | **DONE 2026-09-27** (`fix/audit-fail-open`, on local staging); see `## Decisions` |
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | orchestrator | **DONE 2026-09-27** (`feat/promotion`, on staging) — row corrected 2026-09-27; see `## Decisions` |
@@ -285,6 +285,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-27 **Rejection audit fails open (TASK-0058)**, `fix/audit-fail-open`, ruling 2026-09-19: both rejection sinks write through `RejectedAuditWrite`; a failed separate-connection write logs EventId 3100 with every column and the 403 stands (red first: 500 on a route-level and a handler-level refusal). Building the event still throws; the write ignores request cancellation. All 26 call sites covered. **Recorded, not changed:** an outage still delays each 403 by the writer's retry policy. → `decisions/2026-Q3.md`
 - 2026-09-27 **Register page seam fixed (TASK-0068)**, `fix/pupil-page-seam`, ruling (b): `GET /pupils` pages with ONE SQL keyset, `(level, armKey, lower(surname), id) > cursor` via Npgsql row-value comparison (which composes with subqueries where `string.Compare` did not), so ORDER BY and cursor share one collation and the leavers block is LIMITed. Red first under a glibc-like collation: O'Brien on no page. Review also removed the same mismatch for arm labels. Contract unchanged. → `decisions/2026-Q3.md`
 - 2026-09-27 **Session boundary enforced (TASK-0060)**, `fix/session-boundary`: a grant counts only in its target's session (`PrivilegeGrant.AppliesToSession`; sessionless Super Admin everywhere). Arm-list grants could not leak; school-wide ones did (red first: 200 on an arm route, a pupil read and a report). **Decided: `PupilAccessGuard` stays and takes the session** (lists and reports have no declarative target); pupils with no arm, the register and filterless reports use the active session; promotion accepts either session. Contract unchanged. **Decided unasked, needs review:** non-scopable checks (settings, accounts, roles, rule 3, form teacher) still accept any session's grant, proposed with copy-to-session in TASK-0046. → `decisions/2026-Q3.md`
 - 2026-09-27 **Head teacher dashboard**, `feat/dashboard`, frontend only: the home page shows school-wide `report.view` holders tiles read from existing reports, each linking to it: results this term by state and classes still entering marks, pupils on roll (boys, girls, places left or over capacity), admissions waiting and the oldest, records to chase, and (with `pupil.safeguarding.view`) pupils with illness noted on several days: the spec 20 marker the 2026-09-23 weekly line listed as not built. The term is the active one, or between terms the latest that has begun. `useTermChoice` gained `isError`. Review fixes: no endless spinners with no session or term or a failed session list, admissions link to its report, school-wide holders only, over-capacity wording, "and N more" on illness, tiles mounted only when shown. **Decided unasked, needs review:** a class-scoped `report.view` holder gets no dashboard (its figures are school-wide); the setup checklist of spec 6.2.2 is still not on the home page.
@@ -930,7 +931,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   the SUMMARY block, so this is accepted, not a defect. *Trigger: any card making the console output
   load-bearing (e.g. TASK-0056's machine-readable gate summary). Owner: `backend-dev`.*
 
-- 2026-09-09 **An unaudited 403 becomes a 500.** `RejectedAuditEventWriter.WriteAsync` is awaited
+- 2026-09-09 **STRUCK 2026-09-27 by TASK-0058** (fail-open write, error log). **An unaudited 403 becomes a 500.** `RejectedAuditEventWriter.WriteAsync` is awaited
   with no `try` / `catch` in either `SystemAuditSink.RecordRejectionAsync` or its caller.
   *Trigger: TASK-0058 (re-pointed 2026-09-14 — the old trigger "the next audit card" FIRED on
   TASK-0053 and was deliberately not folded into an encoding-only card). Owner: `backend-dev`.*
