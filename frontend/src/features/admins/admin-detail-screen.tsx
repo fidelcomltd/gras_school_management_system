@@ -5,6 +5,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmin, useRevokeAdminSessions } from './api';
+import { AssignmentsSection } from './assignments/assignments-section';
 import { ChangeStatusDialog } from './components/change-status-dialog';
 import { EditAdminDialog } from './components/edit-admin-dialog';
 import { ResetPasswordDialog } from './components/reset-password-dialog';
@@ -50,6 +51,8 @@ export function AdminDetailScreen() {
   const canGrantSuperAdmin = !!me.data?.isSuperAdmin;
   const canResetPassword = !!me.data && hasPrivilege(me.data, 'admin.password.reset');
   const canRevokeSessions = !!me.data && hasPrivilege(me.data, 'admin.session.revoke');
+  const canAssign = !!me.data && hasPrivilege(me.data, 'role.assign');
+  const canScopeAssign = !!me.data && hasPrivilege(me.data, 'role.scope.assign');
 
   const statusTargets =
     isSelf || !me.data
@@ -133,6 +136,14 @@ export function AdminDetailScreen() {
           </Button>
         ) : null}
       </div>
+
+      <AssignmentsSection
+        adminId={detail.id}
+        staffName={detail.staffName}
+        isSelf={isSelf}
+        canAssign={canAssign}
+        canScopeAssign={canScopeAssign}
+      />
 
       {showEdit ? (
         <EditAdminDialog admin={detail} canGrantSuperAdmin={canGrantSuperAdmin} onClose={() => setShowEdit(false)} />

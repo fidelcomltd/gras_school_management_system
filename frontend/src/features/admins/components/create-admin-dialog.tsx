@@ -15,8 +15,8 @@ const FIELDS = ['staffName', 'email', 'phone'] as const;
 
 /**
  * `POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14). Role assignment (step
- * two) is TASK-0028's own scope, not this dialog's — an account with zero
- * assignments can exist and sign in.
+ * two) happens on the new account's page, in its Roles section — an account
+ * with zero assignments can exist and sign in, but do nothing.
  *
  * The generated temporary password is credential material (TASK-0043):
  * captured into this component's own `reveal` state only, and the mutation's
