@@ -289,15 +289,10 @@ public sealed class ResultsPersistenceTests(ApiTestFixture fixture)
         (await gate2.CountPublishedInSessionAsync(sessionId, TestContext.Current.CancellationToken)).ShouldBe(1);
     }
 
-    // TASK-0060, cited by this card's own notes: PrivilegeDecision ignores PrivilegeGrant.SessionId
-    // entirely, and result_set is the first SESSION-BEARING ResultSet-scope target with a REAL
-    // lookup (previously it threw, so no resolution — real or wrong — could ever come out of it). Not
-    // a fix — this documents today's behaviour: a grant scoped to a DIFFERENT session than the result
-    // set's own still authorises, because neither ScopeResolver nor PrivilegeDecision ever compares
-    // them. No route declares ScopeParameterKind.ResultSet yet (this card's own contract delta scopes
-    // score-sheet routes by arm id directly), so this remains unreached by any real caller today.
+    // TASK-0060: this test once DOCUMENTED the gap (a grant in another session still authorised a result set); it now
+    // proves the fix. The result set resolves to its arm AND that arm's session, and only a grant in that session counts.
     [Fact]
-    public async Task ScopeResolution_ForAResultSet_IgnoresTheGrantsSessionId_DocumentingTask0060()
+    public async Task ScopeResolution_ForAResultSet_CountsOnlyGrantsInTheResultSetsSession()
     {
         RequireDatabase();
         await fixture.ResetDatabaseAsync(TestContext.Current.CancellationToken);
@@ -311,14 +306,16 @@ public sealed class ResultsPersistenceTests(ApiTestFixture fixture)
         var resolution = await resolver.ResolveAsync(
             ScopeParameterKind.ResultSet, resultSetId, TestContext.Current.CancellationToken);
 
-        resolution.ShouldBeOfType<ScopeResolution.ResolvedArm>().ArmId.ShouldBe(armId);
+        var resolvedArm = resolution.ShouldBeOfType<ScopeResolution.ResolvedArm>();
+        resolvedArm.ArmId.ShouldBe(armId);
+        resolvedArm.SessionId.ShouldBe(sessionId);
 
-        // Scoped to a session that is NOT this result set's own session.
         var otherSessionId = Guid.CreateVersion7();
-        otherSessionId.ShouldNotBe(sessionId);
-        var grant = new PrivilegeGrant(Privileges.Results.View, ScopeType.ArmList, new HashSet<Guid> { armId }, otherSessionId);
+        var otherSession = new PrivilegeGrant(Privileges.Results.View, ScopeType.SchoolWide, new HashSet<Guid>(), otherSessionId);
+        var ownSession = otherSession with { SessionId = sessionId };
 
-        PrivilegeDecision.IsAuthorized([grant], Privileges.Results.View, resolution).ShouldBeTrue();
+        PrivilegeDecision.IsAuthorized([otherSession], Privileges.Results.View, resolution).ShouldBeFalse();
+        PrivilegeDecision.IsAuthorized([ownSession], Privileges.Results.View, resolution).ShouldBeTrue();
     }
 
     // The old NotYetImplementedResultSetArmLookup THREW; this would FAIL against it outright.
