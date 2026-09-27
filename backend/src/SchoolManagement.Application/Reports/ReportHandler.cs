@@ -71,6 +71,9 @@ internal interface IReportBuilder
     /// <summary>The filters this report takes.</summary>
     Type FiltersType { get; }
 
+    /// <summary>A privilege exporting also needs besides <c>report.export</c>, or null (the audit log's <c>audit.export</c>).</summary>
+    string? ExtraExportPrivilege { get; }
+
     /// <summary>The report, or why not: a validation error for bad filters, 403 for an arm outside the scope.</summary>
     Task<Result<ReportDto>> BuildAsync(IReportFilters filters, ReportContext context, CancellationToken cancellationToken);
 }
@@ -85,6 +88,8 @@ internal abstract class ReportBuilder<TFilters> : IReportBuilder
     public virtual string ViewPrivilege => Privileges.Report.View;
 
     public Type FiltersType => typeof(TFilters);
+
+    public virtual string? ExtraExportPrivilege => null;
 
     public Task<Result<ReportDto>> BuildAsync(IReportFilters filters, ReportContext context, CancellationToken cancellationToken) =>
         BuildAsync((TFilters)filters, context, cancellationToken);
@@ -198,10 +203,12 @@ internal sealed class ReportServices(
     {
         ArgumentNullException.ThrowIfNull(filters);
         var builder = _builders[filters.GetType()];
-        var scope = await ResolveScopeAsync(builder.ViewPrivilege, export, cancellationToken).ConfigureAwait(false);
+        var scope = await ResolveScopeAsync(builder.ViewPrivilege, export, builder.ExtraExportPrivilege, cancellationToken).ConfigureAwait(false);
         if (scope is null)
         {
-            var needed = export ? $"{builder.ViewPrivilege} and {Privileges.Report.Export}" : builder.ViewPrivilege;
+            var needed = !export ? builder.ViewPrivilege
+                : builder.ExtraExportPrivilege is { } extra ? $"{builder.ViewPrivilege}, {Privileges.Report.Export} and {extra}"
+                : $"{builder.ViewPrivilege} and {Privileges.Report.Export}";
             return Result.Failure<(IReportBuilder, ReportDto)>(Error.Forbidden("report.forbidden", $"You do not hold {needed} for this report."));
         }
 
@@ -245,13 +252,18 @@ internal sealed class ReportServices(
     }
 
     // The view privilege's scope, narrowed to the caller's report.export arms when exporting; null when either is missing.
-    private async Task<ReportScope?> ResolveScopeAsync(string viewPrivilege, bool export, CancellationToken cancellationToken)
+    private async Task<ReportScope?> ResolveScopeAsync(string viewPrivilege, bool export, string? extraExportPrivilege, CancellationToken cancellationToken)
     {
         var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var view = Scope(grants, viewPrivilege);
         if (view is null || !export)
         {
             return view;
+        }
+
+        if (extraExportPrivilege is not null && Scope(grants, extraExportPrivilege) is null)
+        {
+            return null;
         }
 
         var exporting = Scope(grants, Privileges.Report.Export);

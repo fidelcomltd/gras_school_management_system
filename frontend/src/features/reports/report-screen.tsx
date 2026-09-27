@@ -18,10 +18,13 @@ import { useExportReport, useReport, type ReportParams } from './api';
 import { tableReport, type ReportControl, type TableReport } from './definitions';
 import { ReportTable } from './report-table';
 
-/** The optional select filters: the first option means "no filter". */
-const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: string; label: string }[] }>> = {
+type ChoiceParam = 'state' | 'outcome' | 'status' | 'sex' | 'documentType' | 'group';
+
+/** The optional select filters, each sent as `param`: the first option means "no filter". */
+const CHOICES: Partial<Record<ReportControl, { label: string; param: ChoiceParam; options: { value: string; label: string }[] }>> = {
   state: {
     label: 'State',
+    param: 'state',
     options: [
       { value: '', label: 'Any state' },
       { value: 'NotStarted', label: 'Not started' },
@@ -35,6 +38,7 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
   },
   outcome: {
     label: 'Outcome',
+    param: 'outcome',
     options: [
       { value: '', label: 'Any outcome' },
       { value: 'Promoted', label: 'Promoted' },
@@ -45,6 +49,7 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
   },
   status: {
     label: 'Status',
+    param: 'status',
     options: [
       { value: '', label: 'Active' },
       { value: 'Transferred', label: 'Transferred' },
@@ -54,6 +59,7 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
   },
   sex: {
     label: 'Sex',
+    param: 'sex',
     options: [
       { value: '', label: 'Both' },
       { value: 'Male', label: 'Male' },
@@ -62,6 +68,7 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
   },
   documentType: {
     label: 'Document',
+    param: 'documentType',
     options: [
       { value: '', label: 'Any document' },
       { value: 'BirthCertificate', label: 'Birth certificate' },
@@ -70,7 +77,46 @@ const CHOICES: Partial<Record<ReportControl, { label: string; options: { value: 
       { value: 'TransferLetter', label: 'Transfer letter' },
     ],
   },
+  pinState: {
+    label: 'Pins',
+    param: 'state',
+    options: [
+      { value: '', label: 'All pins' },
+      { value: 'Unused', label: 'Unused' },
+      { value: 'Active', label: 'Active' },
+      { value: 'Exhausted', label: 'Exhausted' },
+      { value: 'Suspended', label: 'Suspended' },
+      { value: 'Revoked', label: 'Revoked' },
+    ],
+  },
+  auditOutcome: {
+    label: 'Outcome',
+    param: 'outcome',
+    options: [
+      { value: '', label: 'Any outcome' },
+      { value: 'Success', label: 'Success' },
+      { value: 'Rejected', label: 'Rejected' },
+    ],
+  },
+  group: {
+    label: 'Settings group',
+    param: 'group',
+    options: [
+      { value: '', label: 'Every group' },
+      { value: 'Identity', label: 'Identity' },
+      { value: 'Abbreviation', label: 'Abbreviation' },
+      { value: 'RegistrationNumber', label: 'Registration numbers' },
+      { value: 'Grading', label: 'Grading' },
+      { value: 'Assessment', label: 'Assessment' },
+      { value: 'ResultRules', label: 'Result rules' },
+      { value: 'RatingScales', label: 'Rating scales' },
+      { value: 'DevelopmentDomains', label: 'Development domains' },
+      { value: 'Traits', label: 'Traits' },
+    ],
+  },
 };
+
+const CHOICE_CONTROLS = ['state', 'outcome', 'status', 'sex', 'documentType', 'pinState', 'auditOutcome', 'group'] as const;
 
 const NONE = '__none';
 
@@ -92,6 +138,8 @@ function ReportView({ definition }: { definition: TableReport }) {
   const [levelId, setLevelId] = useState('');
   const [top, setTop] = useState('');
   const [minDays, setMinDays] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [choices, setChoices] = useState<Partial<Record<ReportControl, string>>>({});
 
   const levels = [...new Map(klass.arms.map((arm) => [arm.classLevelId, arm.classLevel])).entries()].map(([value, label]) => ({ value, label }));
@@ -136,9 +184,14 @@ function ReportView({ definition }: { definition: TableReport }) {
   if (topValue !== undefined) params.top = topValue;
   const minDaysValue = has('minDays') ? whole(minDays, 3650) : undefined;
   if (minDaysValue !== undefined) params.minDays = minDaysValue;
-  for (const control of ['state', 'outcome', 'status', 'sex', 'documentType'] as const) {
+  for (const control of CHOICE_CONTROLS) {
     const value = choices[control];
-    if (has(control) && value) params[control] = value;
+    const choice = CHOICES[control];
+    if (has(control) && value && choice) params[choice.param] = value;
+  }
+  if (has('dateRange')) {
+    if (from) params.from = from;
+    if (to) params.to = to;
   }
   if (has('pupil')) {
     params.pupilId = pupilId;
@@ -231,7 +284,7 @@ function ReportView({ definition }: { definition: TableReport }) {
             className="w-44"
           />
         ) : null}
-        {(['state', 'outcome', 'status', 'sex', 'documentType'] as const).map((control) => {
+        {CHOICE_CONTROLS.map((control) => {
           const choice = CHOICES[control];
           return has(control) && choice ? (
             <LabelledSelect
@@ -245,6 +298,18 @@ function ReportView({ definition }: { definition: TableReport }) {
             />
           ) : null;
         })}
+        {has('dateRange') ? (
+          <>
+            <label htmlFor="report-from" className="flex items-center gap-2 text-sm text-foreground">
+              From
+              <Input id="report-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="w-40" />
+            </label>
+            <label htmlFor="report-to" className="flex items-center gap-2 text-sm text-foreground">
+              To
+              <Input id="report-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} className="w-40" />
+            </label>
+          </>
+        ) : null}
         {has('top') ? (
           <label htmlFor="report-top" className="flex items-center gap-2 text-sm text-foreground">
             Top

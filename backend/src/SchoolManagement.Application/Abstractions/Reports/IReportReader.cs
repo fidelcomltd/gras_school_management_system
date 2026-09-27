@@ -1,6 +1,8 @@
+using SchoolManagement.Domain.Pins;
 using SchoolManagement.Domain.Promotion;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Application.Abstractions.Reports;
 
@@ -184,6 +186,33 @@ public sealed record ReportRegisterPupil(
         $"{surname.ToUpperInvariant()} {string.Join(' ', new[] { firstName, middleName }.Where(name => !string.IsNullOrWhiteSpace(name)))}".Trim();
 }
 
+/// <summary>A pin batch of a session.</summary>
+/// <param name="BatchId">The batch.</param>
+/// <param name="Name">Its name.</param>
+public sealed record ReportPinBatch(Guid BatchId, string Name);
+
+/// <summary>A pin's state and use count (never its value).</summary>
+/// <param name="PinId">The pin.</param>
+/// <param name="BatchId">Its batch.</param>
+/// <param name="State">Its state.</param>
+/// <param name="UseCount">Uses spent.</param>
+public sealed record ReportPin(Guid PinId, Guid BatchId, PinState State, int UseCount);
+
+/// <summary>One portal lookup: a pin opening a pupil's results.</summary>
+/// <param name="PinId">The pin.</param>
+/// <param name="PupilId">The pupil looked up.</param>
+/// <param name="OpenedAtUtc">When.</param>
+public sealed record ReportPinUse(Guid PinId, Guid PupilId, DateTimeOffset OpenedAtUtc);
+
+/// <summary>One saved configuration version (spec 6.2.10).</summary>
+/// <param name="VersionNumber">Monotonic across every group.</param>
+/// <param name="Group">The settings group the save changed.</param>
+/// <param name="SnapshotJson">The whole configuration as of this save.</param>
+/// <param name="ActorAdminId">Who saved it, or null for the system.</param>
+/// <param name="Reason">The reason, when the group requires one.</param>
+/// <param name="CreatedAtUtc">When.</param>
+public sealed record ReportConfigVersion(long VersionNumber, ConfigVersionGroup Group, string SnapshotJson, string? ActorAdminId, string? Reason, DateTimeOffset CreatedAtUtc);
+
 /// <summary>Read-only projections the reports assemble from (spec 15 section 10). Every list is small: one session's worth.</summary>
 public interface IReportReader
 {
@@ -264,6 +293,16 @@ public interface IReportReader
 
     /// <summary>These class levels' names and progression order, by id.</summary>
     Task<IReadOnlyDictionary<Guid, (string Name, int Order)>> FindLevelsAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
+
+    /// <summary>The session's pin batches, their pins and every portal lookup made with them.</summary>
+    Task<(IReadOnlyList<ReportPinBatch> Batches, IReadOnlyList<ReportPin> Pins, IReadOnlyList<ReportPinUse> Uses)> ListPinUsageAsync(
+        Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>Every configuration version, oldest first (a school writes a few hundred at most).</summary>
+    Task<IReadOnlyList<ReportConfigVersion>> ListConfigVersionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>These admin accounts' staff names, by id.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> FindAdminNamesAsync(IReadOnlyCollection<Guid> adminIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>
     Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);

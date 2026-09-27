@@ -161,6 +161,25 @@ describe('ReportScreen', () => {
     await waitFor(() => expect(asked.at(-1)?.get('sex')).toBe('Female'));
   });
 
+  it('runs the audit report without filters, then for the chosen days', async () => {
+    mockMe('report.view', 'audit.view');
+    mockClasses();
+    const asked: URLSearchParams[] = [];
+    server.use(
+      http.get(apiUrl('/api/v1/reports/audit'), ({ request }) => {
+        asked.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ ...broadsheet, key: 'audit', title: 'Audit report' });
+      }),
+    );
+
+    const { user } = renderReport('audit');
+
+    expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
+    expect(asked[0]?.has('from')).toBe(false);
+    await user.type(screen.getByLabelText('From'), '2026-09-01');
+    await waitFor(() => expect(asked.at(-1)?.get('from')).toBe('2026-09-01'));
+  });
+
   it('lists only the reports the caller may open', () => {
     mockMe('report.view');
 

@@ -3,6 +3,7 @@ using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Reports;
+using SchoolManagement.Application.Reports.Admin;
 using SchoolManagement.Application.Reports.Register;
 using SchoolManagement.Application.Reports.Results;
 
@@ -145,6 +146,37 @@ internal sealed record AdmissionsPipelineParameters(
     public AdmissionsPipelineFilters ToFilters() => new(LevelId, MinDays);
 }
 
+/// <summary><c>sessionId</c>, <c>armId</c>, <c>batchId</c>, <c>state</c>.</summary>
+internal sealed record PinUsageParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "armId")] string? ArmId,
+    [FromQuery(Name = "batchId")] string? BatchId,
+    [FromQuery(Name = "state")] string? State) : IReportParameters<PinUsageFilters>
+{
+    public PinUsageFilters ToFilters() => new(SessionId, ArmId, BatchId, State);
+}
+
+/// <summary><c>from</c>, <c>to</c>, <c>actorAdminId</c>, <c>action</c>, <c>entityType</c>, <c>outcome</c>.</summary>
+internal sealed record AuditReportParameters(
+    [FromQuery(Name = "from")] string? From,
+    [FromQuery(Name = "to")] string? To,
+    [FromQuery(Name = "actorAdminId")] string? ActorAdminId,
+    [FromQuery(Name = "action")] string? Action,
+    [FromQuery(Name = "entityType")] string? EntityType,
+    [FromQuery(Name = "outcome")] string? Outcome) : IReportParameters<AuditReportFilters>
+{
+    public AuditReportFilters ToFilters() => new(From, To, ActorAdminId, Action, EntityType, Outcome);
+}
+
+/// <summary><c>from</c>, <c>to</c>, <c>group</c>.</summary>
+internal sealed record SettingsHistoryParameters(
+    [FromQuery(Name = "from")] string? From,
+    [FromQuery(Name = "to")] string? To,
+    [FromQuery(Name = "group")] string? Group) : IReportParameters<SettingsHistoryFilters>
+{
+    public SettingsHistoryFilters ToFilters() => new(From, To, Group);
+}
+
 /// <summary>
 /// Spec 15 section 10's reports. Each report is two routes: <c>GET /reports/{name}</c> (the table as JSON) and
 /// <c>GET /reports/{name}/export?format=csv|pdf</c> (a file, <c>report.export</c>, audited as <c>report.export</c> with the
@@ -234,6 +266,22 @@ public sealed class ReportEndpoints : IEndpointModule
             group, "admissions-pipeline", "AdmissionsPipeline", "Admissions pipeline",
             "Every pending admission by level applied for: created, days since, the step it is held at and what blocks " +
             "approval. Filters: `levelId`, `minDays`. `report.view` school-wide (a pending record has no class). PDF landscape.");
+        Map<PinUsageParameters, PinUsageFilters>(
+            group, "pin-usage", "PinUsage", "Pin distribution and usage",
+            "Per arm of the session: active pupils, pupils whose results were opened, the pins that opened them and how many " +
+            "are exhausted or revoked, and the last use; each batch's totals (pins, used at least once, exhausted, revoked) in " +
+            "the notes. Pins open any number, so a class's pins are those used for its pupils. Filters: `armId`, `batchId`, " +
+            "`state`. `pin.usage.view`.");
+        Map<AuditReportParameters, AuditReportFilters>(
+            group, "audit", "Audit", "Audit report",
+            "The filtered audit log, newest first: time (WAT), actor, action, entity, outcome, reason, and before/after values " +
+            "for score changes. Filters: `from`/`to` (yyyy-MM-dd, Lagos days, inclusive), `actorAdminId`, `action`, " +
+            "`entityType`, `outcome` (Success or Rejected). At most 2000 events. `audit.view`; exporting also needs `audit.export` " +
+            "(spec 6.1.12), as the audit log's own export does. PDF landscape.");
+        Map<SettingsHistoryParameters, SettingsHistoryFilters>(
+            group, "settings-history", "SettingsHistory", "Settings change history",
+            "Every configuration version, newest first, with who saved it, when, the reason, and a plain-language summary of " +
+            "what changed against the version before it. Filters: `from`/`to` (yyyy-MM-dd), `group`. `audit.view`. PDF landscape.");
     }
 
     private static void Map<TParameters, TFilters>(RouteGroupBuilder group, string path, string name, string summary, string description)

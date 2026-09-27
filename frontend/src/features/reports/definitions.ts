@@ -21,7 +21,10 @@ export type ReportKey =
   | 'enrolment-summary'
   | 'guardian-contacts'
   | 'outstanding-documents'
-  | 'admissions-pipeline';
+  | 'admissions-pipeline'
+  | 'pin-usage'
+  | 'audit'
+  | 'settings-history';
 
 /**
  * One filter control on a report's screen. The period is a term or a session; a class is required (`arm`); a class or a
@@ -43,6 +46,10 @@ export type ReportControl =
   | 'sex'
   | 'documentType'
   | 'minDays'
+  | 'pinState'
+  | 'auditOutcome'
+  | 'group'
+  | 'dateRange'
   | 'pupil';
 
 export interface TableReport {
@@ -173,6 +180,30 @@ export const REPORTS: ReportDefinition[] = [
     description: 'One pupil across every session, term by term. Open it from the pupil’s own page.',
     group: 'Pupils',
     controls: ['pupil'],
+  }),
+  table({
+    key: 'pin-usage',
+    title: 'Pin distribution and usage',
+    description: 'How many pupils’ results were opened, class by class, and each batch’s pins used, exhausted and revoked.',
+    group: 'Pins and records',
+    privilege: 'pin.usage.view',
+    controls: ['session', 'pinState'],
+  }),
+  table({
+    key: 'audit',
+    title: 'Audit report',
+    description: 'The audit log for reading and printing, with before and after values for score changes.',
+    group: 'Pins and records',
+    privilege: 'audit.view',
+    controls: ['dateRange', 'auditOutcome'],
+  }),
+  table({
+    key: 'settings-history',
+    title: 'Settings change history',
+    description: 'Every settings change, who made it and why, and what it changed, in plain words.',
+    group: 'Pins and records',
+    privilege: 'audit.view',
+    controls: ['dateRange', 'group'],
   }),
   table({
     key: 'fee-notice-audit',
