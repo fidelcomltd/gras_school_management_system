@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent, waitFor } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -25,6 +25,16 @@ function mockMe(...privileges: string[]) {
     ),
   );
 }
+
+// The Roles section's reads, empty unless a test says otherwise.
+beforeEach(() => {
+  server.use(
+    http.get(apiUrl('/api/v1/admins/:id/assignments'), () => HttpResponse.json([])),
+    http.get(apiUrl('/api/v1/roles'), () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get(apiUrl('/api/v1/sessions'), () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get(apiUrl('/api/v1/arms'), () => HttpResponse.json({ items: [], nextCursor: null })),
+  );
+});
 
 function account(overrides: Record<string, unknown> = {}) {
   return {

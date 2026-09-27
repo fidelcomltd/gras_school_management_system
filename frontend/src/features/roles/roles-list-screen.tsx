@@ -13,10 +13,9 @@ import { LoadMoreButton } from '@/components/ui/load-more-button';
 import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
- * `/roles` (TASK-0028 §2). Role *assignments* and scopes are out of scope
- * (TASK-0030, blocked on arms — the backend does not exist yet); this screen
- * only manages the role definitions themselves: name, description,
- * privileges, active/archived.
+ * `/roles` (TASK-0028 §2). Manages the role definitions themselves: name,
+ * description, privileges, active/archived. Who holds a role, and over which
+ * classes, is assigned on each admin's page (Roles section).
  */
 export function RolesListScreen() {
   const roles = useRoles();
