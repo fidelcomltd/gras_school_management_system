@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Reports;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Fees;
+using SchoolManagement.Domain.Promotion;
+using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
@@ -11,17 +13,20 @@ namespace SchoolManagement.Infrastructure.Reports;
 /// <summary>The reports' projections: no tracking, no entities leave this class.</summary>
 internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
 {
-    public async Task<IReadOnlyList<ReportArm>> ListArmsAsync(Guid sessionId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ReportArm>> ListArmsAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        await ArmsAsync(arm => arm.SessionId == sessionId, cancellationToken).ConfigureAwait(false);
+
+    // The one arm-with-level projection, by level progression then label.
+    private async Task<List<ReportArm>> ArmsAsync(System.Linq.Expressions.Expression<Func<Arm, bool>> which, CancellationToken cancellationToken)
     {
         var rows = await (
-                from arm in context.Arms.AsNoTracking()
+                from arm in context.Arms.AsNoTracking().Where(which)
                 join level in context.ClassLevels.AsNoTracking() on arm.ClassLevelId equals level.Id
-                where arm.SessionId == sessionId
                 orderby level.ProgressionOrder, arm.Label
-                select new { arm.Id, arm.Label, LevelId = level.Id, LevelName = level.Name, level.ProgressionOrder, level.SectionId, arm.Capacity })
+                select new { arm.Id, arm.Label, LevelId = level.Id, LevelName = level.Name, level.ProgressionOrder, level.SectionId, arm.Capacity, level.NextLevelId })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return rows.ConvertAll(row => new ReportArm(
-            row.Id, ArmDisplayName.Compose(row.LevelName, row.Label), row.LevelId, row.LevelName, row.ProgressionOrder, row.SectionId, row.Capacity));
+            row.Id, ArmDisplayName.Compose(row.LevelName, row.Label), row.LevelId, row.LevelName, row.ProgressionOrder, row.SectionId, row.Capacity, row.NextLevelId));
     }
 
     public Task<ReportTerm?> FindTermAsync(Guid termId, CancellationToken cancellationToken) =>
@@ -140,6 +145,79 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return rows.ToDictionary(row => row.Key, row => (row.Pupils, row.Total));
     }
+
+    public Task<ReportSession?> FindSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        context.AcademicSessions.AsNoTracking()
+            .Where(session => session.Id == sessionId)
+            .Select(session => new ReportSession(session.Id, session.Name, session.StartDate))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, ReportSession>> FindSessionsAsync(IReadOnlyCollection<Guid> sessionIds, CancellationToken cancellationToken) =>
+        await context.AcademicSessions.AsNoTracking()
+            .Where(session => sessionIds.Contains(session.Id))
+            .ToDictionaryAsync(session => session.Id, session => new ReportSession(session.Id, session.Name, session.StartDate), cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportAnnualResult>> ListAnnualResultsAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        (await context.AnnualResults.AsNoTracking().Where(result => result.SessionId == sessionId).ToListAsync(cancellationToken).ConfigureAwait(false))
+            .ConvertAll(Annual);
+
+    public async Task<IReadOnlyList<(Guid SessionId, ReportAnnualResult Annual)>> ListPupilAnnualAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        (await context.AnnualResults.AsNoTracking().Where(result => result.PupilId == pupilId).ToListAsync(cancellationToken).ConfigureAwait(false))
+            .ConvertAll(result => (result.SessionId, Annual(result)));
+
+    public async Task<IReadOnlyList<ReportPromotionDecision>> ListPromotionDecisionsAsync(Guid sourceSessionId, CancellationToken cancellationToken) =>
+        await (
+                from batch in context.PromotionBatches.AsNoTracking()
+                join decision in context.Set<PromotionDecision>().AsNoTracking() on batch.Id equals decision.BatchId
+                where batch.SourceSessionId == sourceSessionId && batch.State == PromotionBatchState.Committed
+                select new ReportPromotionDecision(
+                    decision.PupilId, decision.FromArmId, decision.ProposedOutcome, decision.Outcome, decision.TargetArmId, batch.TargetSessionId, decision.Reason))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyDictionary<Guid, ReportPromotionDecision>> ListPupilDecisionsAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        await (
+                from batch in context.PromotionBatches.AsNoTracking()
+                join decision in context.Set<PromotionDecision>().AsNoTracking() on batch.Id equals decision.BatchId
+                where decision.PupilId == pupilId && batch.State == PromotionBatchState.Committed
+                select new
+                {
+                    batch.SourceSessionId,
+                    Decision = new ReportPromotionDecision(
+                        decision.PupilId, decision.FromArmId, decision.ProposedOutcome, decision.Outcome, decision.TargetArmId, batch.TargetSessionId, decision.Reason),
+                })
+            .ToDictionaryAsync(row => row.SourceSessionId, row => row.Decision, cancellationToken).ConfigureAwait(false);
+
+    public async Task<(IReadOnlyList<Guid> CoreSubjectIds, int PassMark)> GetCoreRulesAsync(CancellationToken cancellationToken)
+    {
+        var rules = await context.ResultRules.AsNoTracking().FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        return rules is null ? ([], ResultRules.DefaultPassMark) : (rules.CoreSubjectIds, rules.PassMark);
+    }
+
+    public async Task<IReadOnlyList<ReportPupilTerm>> ListPupilTermsAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        await (
+                from result in context.PupilTermResults.AsNoTracking()
+                join set in context.ResultSets.AsNoTracking() on result.ResultSetId equals set.Id
+                join term in context.Terms.AsNoTracking() on set.TermId equals term.Id
+                where result.PupilId == pupilId
+                select new ReportPupilTerm(
+                    term.SessionId, term.Ordinal, term.Name, set.ArmId, result.Average, result.OverallGrade,
+                    result.ArmPosition, result.ArmPositionTied, result.LevelPosition, result.LevelPositionTied, set.State))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyDictionary<Guid, ReportArm>> FindArmsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken) =>
+        (await ArmsAsync(arm => armIds.Contains(arm.Id), cancellationToken).ConfigureAwait(false)).ToDictionary(arm => arm.ArmId);
+
+    private static ReportAnnualResult Annual(AnnualResult result) => new(
+        result.ArmId,
+        result.PupilId,
+        [result.FirstTermAverage, result.SecondTermAverage, result.ThirdTermAverage],
+        result.CumulativeAverage,
+        result.CumulativeGrade,
+        result.AnnualPosition,
+        result.AnnualPositionTied,
+        result.ProposedOutcome,
+        result.SubjectsJson);
 
     public async Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken) =>
         await context.Subjects.AsNoTracking()

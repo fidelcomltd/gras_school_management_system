@@ -43,9 +43,9 @@ const broadsheet = {
   generatedAtUtc: '2026-12-11T09:30:00Z',
 };
 
-function renderReport(key: string) {
+function renderReport(key: string, search = '') {
   return renderWithProviders(
-    <MemoryRouter initialEntries={[`/reports/${key}`]}>
+    <MemoryRouter initialEntries={[`/reports/${key}${search}`]}>
       <Routes>
         <Route path="/reports/:key" element={<ReportScreen />} />
       </Routes>
@@ -111,6 +111,32 @@ describe('ReportScreen', () => {
     expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
     expect(asked.get('levelId')).toBe('p4');
     expect(asked.get('armId')).toBeNull();
+  });
+
+  it('shows a pupil record for the pupil named in the address, and asks for one otherwise', async () => {
+    mockMe('report.view');
+    mockClasses();
+    let asked = '';
+    server.use(
+      http.get(apiUrl('/api/v1/reports/pupil-record'), ({ request }) => {
+        asked = new URL(request.url).searchParams.get('pupilId') ?? '';
+        return HttpResponse.json({ ...broadsheet, key: 'pupil-record', title: 'Pupil cumulative record' });
+      }),
+    );
+
+    renderReport('pupil-record', '?pupilId=p-9');
+
+    expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
+    expect(asked).toBe('p-9');
+  });
+
+  it('asks for a pupil when the address names none', () => {
+    mockMe('report.view');
+    mockClasses();
+
+    renderReport('pupil-record');
+
+    return waitFor(() => expect(screen.getByText(/Open a pupil’s record/)).toBeInTheDocument());
   });
 
   it('lists only the reports the caller may open', () => {

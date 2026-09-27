@@ -10,7 +10,10 @@ export const ReportsKeys = {
 
 /** Every filter any report takes; each report sends only its own. */
 export interface ReportParams {
-  termId: string;
+  termId?: string;
+  sessionId?: string;
+  pupilId?: string;
+  outcome?: string;
   armId?: string;
   levelId?: string;
   top?: number;
@@ -18,7 +21,7 @@ export interface ReportParams {
 }
 
 function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal): Promise<ReportDto> {
-  const { termId, armId, levelId, top, state } = params;
+  const { termId = '', sessionId = '', pupilId = '', armId, levelId, top, state, outcome } = params;
   switch (key) {
     case 'broadsheet':
       return apiGet('/api/v1/reports/broadsheet', { termId, ...(armId ? { armId } : {}) }, { signal });
@@ -46,6 +49,20 @@ function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal):
       return apiGet('/api/v1/reports/development-summary', { termId, ...(armId ? { armId } : {}) }, { signal });
     case 'fee-notice-audit':
       return apiGet('/api/v1/reports/fee-notice-audit', { termId, ...(levelId ? { levelId } : {}) }, { signal });
+    case 'annual-cumulative':
+      return apiGet(
+        '/api/v1/reports/annual-cumulative',
+        { sessionId, ...(armId ? { armId } : {}), ...(levelId ? { levelId } : {}) },
+        { signal },
+      );
+    case 'promotion-list':
+      return apiGet(
+        '/api/v1/reports/promotion-list',
+        { sessionId, ...(levelId ? { levelId } : {}), ...(outcome ? { outcome } : {}) },
+        { signal },
+      );
+    case 'pupil-record':
+      return apiGet('/api/v1/reports/pupil-record', { pupilId }, { signal });
   }
 }
 
