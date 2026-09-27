@@ -122,9 +122,10 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         // "Translation of method 'string.Compare' failed" regardless of nesting depth or which specific
         // extra condition it was. It ONLY succeeds in the exact minimal shape
         // `ListAdmissionsQueueAsync` already uses below (a plain status equality, then a lone
-        // string.Compare-or-ILike `.Where()`, nothing else). So the ordinal comparison here runs
-        // client-side in .NET, never in SQL — see `ListRegisterAsync` below — while every OTHER piece
-        // of the cursor logic (bucket membership, ORDER BY, LIMIT) stays server-side.
+        // string.Compare-or-ILike `.Where()`, nothing else). TASK-0068 therefore compares the surname
+        // with a ROW-VALUE comparison instead (`EF.Functions.GreaterThan` on (lower(surname), id)), a
+        // different translation that composes with the subqueries, so the whole cursor — comparison,
+        // ORDER BY and LIMIT — runs in SQL under ONE collation. See `ListRegisterAsync` below.
         return await ListRegisterAsync(
                 query, hasCursor, cursorLevelOrdinal, cursorArmKey, cursorSurnameKey, cursorId, pageSize, term, asOfDate, cancellationToken)
             .ConfigureAwait(false);
@@ -154,9 +155,6 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
                 (arm, level) => new { arm.Id, arm.LabelKey, level.ProgressionOrder })
             .ToDictionaryAsync(row => row.Id, row => (row.ProgressionOrder, row.LabelKey), cancellationToken)
             .ConfigureAwait(false);
-
-        static (Pupil Pupil, int LevelOrdinal, string ArmKey) ToRow(Pupil pupil, int levelOrdinal, string armKey) =>
-            (pupil, levelOrdinal, armKey);
 
         if (!hasCursor)
         {
@@ -204,28 +202,22 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
         var afterBucketRows = await SelectOrderedByClassKeyAsync(afterBucketQuery, pageSize, cancellationToken)
             .ConfigureAwait(false);
 
-        // Group 2: rows in the SAME bucket as the cursor — bounded by one arm's roster (spec 9.5: "an
-        // arm is at most a hundred pupils"), or the trailing sentinel block when the cursor itself was
-        // already in it. Fetched whole (no string.Compare in THIS query either), then the surname/id
-        // tie-break and ordering run in plain .NET — see the trap note above for why.
+        // Group 2: rows in the SAME bucket as the cursor, after it by (surname, id). TASK-0068: compared
+        // in SQL as a row value, so it uses the SAME collation as the ORDER BY that placed the cursor
+        // (an ordinal .NET comparison disagreed on punctuation and lost O'Brien after Oakes), and
+        // ordered and LIMITed there too, so paging into the leavers block no longer loads every leaver.
         var sameBucketQuery = query.Where(pupil =>
-            context.Enrolments.Any(enrolment =>
+            (context.Enrolments.Any(enrolment =>
                 enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null &&
                 armIdsAtCursorBucket.Contains(enrolment.ArmId)) ||
             (cursorIsAtSentinel &&
-                !context.Enrolments.Any(enrolment => enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null)));
+                !context.Enrolments.Any(enrolment => enrolment.PupilId == pupil.Id && enrolment.EffectiveTo == null))) &&
+            EF.Functions.GreaterThan(
+                ValueTuple.Create(pupil.Surname.ToLower(), pupil.Id),
+                ValueTuple.Create(cursorSurnameKey, cursorId)));
 
-        var sameBucketCandidates = await sameBucketQuery.ToListAsync(cancellationToken).ConfigureAwait(false);
-
-        var sameBucketRows = sameBucketCandidates
-            .Where(pupil =>
-                string.CompareOrdinal(pupil.Surname.ToLowerInvariant(), cursorSurnameKey) > 0 ||
-                (pupil.Surname.Equals(cursorSurnameKey, StringComparison.OrdinalIgnoreCase) &&
-                    pupil.Id.CompareTo(cursorId) > 0))
-            .OrderBy(pupil => pupil.Surname, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(pupil => pupil.Id)
-            .Select(pupil => ToRow(pupil, cursorLevelOrdinal, cursorArmKey))
-            .ToList();
+        var sameBucketRows = await SelectOrderedByClassKeyAsync(sameBucketQuery, pageSize, cancellationToken)
+            .ConfigureAwait(false);
 
         // Same-bucket rows sort BEFORE the strictly-after-bucket rows (they share the cursor's own
         // bucket, which is earlier than any "after" bucket) — concatenate in that order, then take one
