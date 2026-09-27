@@ -276,7 +276,8 @@ public sealed class ReportEndpoints : IEndpointModule
             group, "audit", "Audit", "Audit report",
             "The filtered audit log, newest first: time (WAT), actor, action, entity, outcome, reason, and before/after values " +
             "for score changes. Filters: `from`/`to` (yyyy-MM-dd, Lagos days, inclusive), `actorAdminId`, `action`, " +
-            "`entityType`, `outcome`. At most 2000 events. `audit.view`. PDF landscape.");
+            "`entityType`, `outcome` (Success or Rejected). At most 2000 events. `audit.view`; exporting also needs `audit.export` " +
+            "(spec 6.1.12), as the audit log's own export does. PDF landscape.");
         Map<SettingsHistoryParameters, SettingsHistoryFilters>(
             group, "settings-history", "SettingsHistory", "Settings change history",
             "Every configuration version, newest first, with who saved it, when, the reason, and a plain-language summary of " +

@@ -95,8 +95,7 @@ const CHOICES: Partial<Record<ReportControl, { label: string; param: ChoiceParam
     options: [
       { value: '', label: 'Any outcome' },
       { value: 'Success', label: 'Success' },
-      { value: 'Denied', label: 'Denied' },
-      { value: 'Failed', label: 'Failed' },
+      { value: 'Rejected', label: 'Rejected' },
     ],
   },
   group: {
@@ -111,6 +110,8 @@ const CHOICES: Partial<Record<ReportControl, { label: string; param: ChoiceParam
       { value: 'Assessment', label: 'Assessment' },
       { value: 'ResultRules', label: 'Result rules' },
       { value: 'RatingScales', label: 'Rating scales' },
+      { value: 'DevelopmentDomains', label: 'Development domains' },
+      { value: 'Traits', label: 'Traits' },
     ],
   },
 };

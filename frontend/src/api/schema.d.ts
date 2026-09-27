@@ -2352,7 +2352,7 @@ export interface paths {
         };
         /**
          * Audit report
-         * @description The filtered audit log, newest first: time (WAT), actor, action, entity, outcome, reason, and before/after values for score changes. Filters: `from`/`to` (yyyy-MM-dd, Lagos days, inclusive), `actorAdminId`, `action`, `entityType`, `outcome`. At most 2000 events. `audit.view`. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         * @description The filtered audit log, newest first: time (WAT), actor, action, entity, outcome, reason, and before/after values for score changes. Filters: `from`/`to` (yyyy-MM-dd, Lagos days, inclusive), `actorAdminId`, `action`, `entityType`, `outcome` (Success or Rejected). At most 2000 events. `audit.view`; exporting also needs `audit.export` (spec 6.1.12), as the audit log's own export does. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
          */
         get: operations["GetAuditReport"];
         put?: never;

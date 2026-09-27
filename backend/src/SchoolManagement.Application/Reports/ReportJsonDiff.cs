@@ -41,7 +41,8 @@ public static class ReportJsonDiff
             var names = before.EnumerateObject().Select(property => property.Name)
                 .Concat(after.EnumerateObject().Select(property => property.Name))
                 .Distinct(StringComparer.Ordinal);
-            foreach (var name in names)
+            // The per-group version counters move on every save; they are not a change anyone made.
+            foreach (var name in names.Where(name => !name.EndsWith("VersionNumber", StringComparison.OrdinalIgnoreCase)))
             {
                 var had = before.TryGetProperty(name, out var old);
                 var has = after.TryGetProperty(name, out var now);
@@ -63,7 +64,7 @@ public static class ReportJsonDiff
 
         if (before.ValueKind == JsonValueKind.Array && after.ValueKind == JsonValueKind.Array)
         {
-            var key = IdentityKey(before) ?? IdentityKey(after);
+            var key = IdentityKey(before, after);
             if (key is null)
             {
                 var length = Math.Max(before.GetArrayLength(), after.GetArrayLength());
@@ -113,12 +114,25 @@ public static class ReportJsonDiff
         }
     }
 
-    // A key present and scalar on every item: the items' identity.
-    private static string? IdentityKey(JsonElement array) =>
-        array.GetArrayLength() == 0 || array.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.Object)
-            ? null
-            : IdentityKeys.FirstOrDefault(key => array.EnumerateArray().All(item =>
-                item.TryGetProperty(key, out var value) && value.ValueKind is JsonValueKind.String or JsonValueKind.Number));
+    // A key present, scalar and unique on every item of BOTH lists: the items' identity. Two traits may share a name in
+    // different domains, so a key that repeats is no identity, and the lists are compared by position instead.
+    private static string? IdentityKey(JsonElement before, JsonElement after) =>
+        IdentityKeys.FirstOrDefault(key => Identifies(before, key) && Identifies(after, key) && (before.GetArrayLength() + after.GetArrayLength()) > 0);
+
+    private static bool Identifies(JsonElement array, string key)
+    {
+        var values = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(key, out var value)
+                || value.ValueKind is not (JsonValueKind.String or JsonValueKind.Number) || !values.Add(Text(value)))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static string Text(JsonElement value) => value.ValueKind switch
     {

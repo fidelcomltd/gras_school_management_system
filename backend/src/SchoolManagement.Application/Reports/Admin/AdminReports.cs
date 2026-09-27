@@ -24,7 +24,7 @@ public sealed record PinUsageFilters(string? SessionId, string? ArmId, string? B
 /// <param name="ActorAdminId">One actor.</param>
 /// <param name="Action">One action code, e.g. <c>result.score.enter</c>.</param>
 /// <param name="EntityType">One entity type, e.g. <c>subject_score</c>.</param>
-/// <param name="Outcome">Success, Denied or Failed.</param>
+/// <param name="Outcome">Success or Rejected.</param>
 public sealed record AuditReportFilters(string? From, string? To, string? ActorAdminId, string? Action, string? EntityType, string? Outcome) : IReportFilters;
 
 /// <summary>Settings change history filters.</summary>
@@ -45,6 +45,12 @@ internal static class ReportDays
         if (!TryDay(from, out var first) || !TryDay(to, out var last))
         {
             error = Error.Validation("report.filter", "from and to must be dates written yyyy-MM-dd.");
+            return false;
+        }
+
+        if (first is { Year: < 2000 or > 2999 } || last is { Year: < 2000 or > 2999 })
+        {
+            error = Error.Validation("report.filter", "from and to must be dates between 2000 and 2999.");
             return false;
         }
 
@@ -151,7 +157,7 @@ internal sealed class PinUsageReport(IReportReader reader) : ReportBuilder<PinUs
             ]);
         });
 
-        var inScope = batches.Where(batch => batchId is null || batch.BatchId == batchId).ToList();
+        var inScope = context.Scope.Arms is null ? batches.Where(batch => batchId is null || batch.BatchId == batchId).ToList() : [];
         var notes = inScope.Select(batch =>
         {
             var batchPins = pins.Values.Where(pin => pin.BatchId == batch.BatchId).ToList();
@@ -159,6 +165,10 @@ internal sealed class PinUsageReport(IReportReader reader) : ReportBuilder<PinUs
                 $"{batchPins.Count(pin => pin.State == PinState.Exhausted)} exhausted, {batchPins.Count(pin => pin.State == PinState.Revoked)} revoked.";
         }).ToList();
         notes.Add("Pins open any registration number, so a class's pins are those used to open its pupils' results. Per-pin detail is on each batch's page.");
+        if (context.Scope.Arms is not null)
+        {
+            notes.Add("Batch totals cover every class, so they show only to a school-wide holder.");
+        }
 
         var filterLines = new List<string> { $"Session: {session.Name}" };
         if (state is not null)
@@ -188,13 +198,16 @@ internal sealed class PinUsageReport(IReportReader reader) : ReportBuilder<PinUs
 /// Spec 15 section 10, audit report (<c>audit.view</c>): the filtered audit log for reading and export, newest first, with the
 /// before and after values for score changes. At most <see cref="MaxRows"/> rows; narrow the filters for more.
 /// </summary>
-internal sealed class AuditReport(IAuditEventQueryRepository events) : ReportBuilder<AuditReportFilters>
+internal sealed class AuditReport(IAuditEventQueryRepository events, IReportReader reader) : ReportBuilder<AuditReportFilters>
 {
     public const int MaxRows = 2_000;
 
     public override string Key => "audit";
 
     public override string ViewPrivilege => Privileges.Audit.View;
+
+    /// <summary>Spec 6.1.12: exporting the audit log needs <c>audit.export</c>, whichever route it leaves by.</summary>
+    public override string? ExtraExportPrivilege => Privileges.Audit.Export;
 
     protected override async Task<Result<ReportDto>> BuildAsync(AuditReportFilters filters, ReportContext context, CancellationToken cancellationToken)
     {
@@ -215,41 +228,39 @@ internal sealed class AuditReport(IAuditEventQueryRepository events) : ReportBui
         var entityType = string.IsNullOrWhiteSpace(filters.EntityType) ? null : filters.EntityType.Trim();
 
         var rows = new List<ReportRowDto>();
-        string? cursor = null;
         var truncated = false;
-        do
+        await foreach (var item in events.StreamAsync(fromUtc, toUtc, actorId, action, entityType, null, outcome, cancellationToken).ConfigureAwait(false))
         {
-            var page = await events.ListAsync(fromUtc, toUtc, actorId, action, entityType, null, outcome, cursor, 100, cancellationToken).ConfigureAwait(false);
-            foreach (var item in page.Items)
+            if (rows.Count == MaxRows)
             {
-                if (rows.Count == MaxRows)
-                {
-                    truncated = true;
-                    break;
-                }
-
-                var score = string.Equals(item.EntityType, "subject_score", StringComparison.Ordinal);
-                rows.Add(new(ReportRowKind.Data,
-                [
-                    ReportDays.When(item.OccurredAtUtc),
-                    item.ActorLabel,
-                    item.Action,
-                    item.EntityId is null ? item.EntityType : $"{item.EntityType} {item.EntityId}",
-                    item.Outcome.ToString(),
-                    item.Reason,
-                    score ? item.BeforeJson : null,
-                    score ? item.AfterJson : null,
-                ]));
+                truncated = true;
+                break;
             }
 
-            cursor = page.NextCursor;
+            var score = string.Equals(item.EntityType, "subject_score", StringComparison.Ordinal);
+            rows.Add(new(ReportRowKind.Data,
+            [
+                ReportDays.When(item.OccurredAtUtc),
+                item.ActorLabel,
+                item.Action,
+                item.EntityId is null ? item.EntityType : $"{item.EntityType} {item.EntityId}",
+                item.Outcome.ToString(),
+                item.Reason,
+                score ? item.BeforeJson : null,
+                score ? item.AfterJson : null,
+            ]));
         }
-        while (cursor is not null && !truncated);
 
         var filterLines = new List<string>();
         if (filters.From is not null || filters.To is not null)
         {
             filterLines.Add($"From {filters.From ?? "the start"} to {filters.To ?? "today"}");
+        }
+
+        if (actorId is { } actor)
+        {
+            var names = await reader.FindAdminNamesAsync([actor], cancellationToken).ConfigureAwait(false);
+            filterLines.Add($"Actor: {names.GetValueOrDefault(actor, "an admin account")}");
         }
 
         filterLines.AddRange(new[] { ("Action", action), ("Entity", entityType), ("Outcome", outcomeName) }
@@ -360,6 +371,7 @@ internal sealed class SettingsHistoryReport(IReportReader reader) : ReportBuilde
         ConfigVersionGroup.RegistrationNumber => "Registration numbers",
         ConfigVersionGroup.ResultRules => "Result rules",
         ConfigVersionGroup.RatingScales => "Rating scales",
+        ConfigVersionGroup.DevelopmentDomains => "Development domains",
         _ => group.ToString(),
     };
 }
