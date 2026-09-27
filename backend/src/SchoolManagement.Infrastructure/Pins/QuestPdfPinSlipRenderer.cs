@@ -102,7 +102,7 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
                 table.ColumnsDefinition(columns =>
                 {
                     columns.ConstantColumn(30);
-                    columns.ConstantColumn(50);
+                    columns.ConstantColumn(80);
                     columns.RelativeColumn(3);
                     columns.RelativeColumn(1.4f);
                     columns.RelativeColumn(3);
@@ -142,19 +142,25 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
     private void Slip(IContainer cell, PinSlipSheet sheet, PinSlip slip, byte[]? logo) =>
         cell.Row(row =>
         {
-            // Left: whose pin this is.
-            row.ConstantItem(170).Column(school =>
+            // Left: whose pin this is. Every line is clamped: the card's height is fixed, and a school name can run to 160
+            // characters, a batch name to 80, so unclamped text would overflow it and QuestPDF would refuse the whole print run.
+            row.ConstantItem(180).Column(school =>
             {
-                school.Spacing(4);
+                school.Spacing(3);
                 if (logo is not null)
                 {
-                    school.Item().Height(40).Width(40).Image(logo).FitArea();
+                    school.Item().Height(32).Width(32).Image(logo).FitArea();
                 }
 
-                school.Item().Text(sheet.SchoolShortName).Bold().FontSize(12);
-                school.Item().Text("Result checking pin").FontColor(Colors.Grey.Darken2);
-                school.Item().Text($"Valid for the {sheet.SessionName} session").FontSize(9).FontColor(Colors.Grey.Darken2);
-                school.Item().ExtendVertical().AlignBottom().Text(sheet.BatchName).FontSize(7).FontColor(Colors.Grey.Medium);
+                school.Item().Text(sheet.SchoolShortName).Bold().FontSize(11).ClampLines(2);
+                school.Item().Text("Result checking pin").FontSize(9).FontColor(Colors.Grey.Darken2);
+                if (!string.IsNullOrWhiteSpace(sheet.SessionName))
+                {
+                    school.Item().Text($"Valid for the {sheet.SessionName} session").FontSize(8).FontColor(Colors.Grey.Darken2).ClampLines(1);
+                }
+
+                // The batch name ties a loose slip back to its batch, so it has its own line, never squeezed out.
+                school.Item().PaddingTop(2).Text(sheet.BatchName).FontSize(7).FontColor(Colors.Grey.Medium).ClampLines(1);
             });
 
             row.ConstantItem(14);
@@ -171,7 +177,7 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
                     $"This pin can be used {slip.MaxUses.ToString(CultureInfo.InvariantCulture)} {(slip.MaxUses == 1 ? "time" : "times")}. " +
                     "Looking at all three terms for one pupil in one sitting counts as one use.").FontSize(9);
                 pin.Item().Text("You will need the pupil's registration number.").FontSize(9);
-                pin.Item().Text(_portalLine).Bold().FontSize(9);
+                pin.Item().Text(_portalLine).Bold().FontSize(9).ClampLines(2);
             });
         });
 }
