@@ -278,7 +278,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | orchestrator | **DONE 2026-09-27** (`feat/promotion`, on staging) — row corrected 2026-09-27; see `## Decisions` |
-| TASK-0046 | Assignments read surface, rule 2, copy-to-session, 6.1.13 cascades, role archive | backend-dev | **NOT YET CARDED** — split from TASK-0030 on 2026-09-08 but no card file exists. Write it before dispatch (noticed 2026-09-14) |
+| TASK-0046 | Assignments: read surface (A), copy-to-session (B), lifecycle (C) | orchestrator | **A DONE 2026-09-28** (on local staging); B building, ruled (a); C queued. Card written 2026-09-27 |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | orchestrator | **DONE 2026-09-27** (`fix/pupil-page-seam`, on local staging); see `## Decisions` |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads (Cloudinary) | orchestrator | **A–C done 2026-09-22**; stage D (Cloudinary adapter) left, needs the human's keys for the smoke test |
@@ -287,6 +287,8 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-28 **Deployment done (lead, 2026-09-28):** staging and production have run on the VPS since 2026-09-26, both confirmed working; a push to `origin/staging` now reaches a live environment. The deployment items below are for the lead to close against what was deployed.
+- 2026-09-28 **Assignments read surface (TASK-0046 A)**, `feat/assignments-read-surface`: TASK-0046 carded (A read surface, B copy-to-session, C lifecycle). Assignments carry role, session and class names; `GET /admins` rows carry `rolesHeld` and `scopeSummary` (6.1.8; Closed sessions skipped, classes in class order); create returns a real `createdAtUtc`; the Roles section needs no other lists. Contract additive `2c1bb74e`. **Ruled (a) 2026-09-28:** non-scopable operations follow the active session, with B. → `decisions/2026-Q3.md`
 - 2026-09-27 **Rejection audit fails open (TASK-0058)**, `fix/audit-fail-open`, ruling 2026-09-19: both rejection sinks write through `RejectedAuditWrite`; a failed separate-connection write logs EventId 3100 with every column and the 403 stands (red first: 500 on a route-level and a handler-level refusal). Building the event still throws; the write ignores request cancellation. All 26 call sites covered. **Recorded, not changed:** an outage still delays each 403 by the writer's retry policy. → `decisions/2026-Q3.md`
 - 2026-09-27 **Register page seam fixed (TASK-0068)**, `fix/pupil-page-seam`, ruling (b): `GET /pupils` pages with ONE SQL keyset, `(level, armKey, lower(surname), id) > cursor` via Npgsql row-value comparison (which composes with subqueries where `string.Compare` did not), so ORDER BY and cursor share one collation and the leavers block is LIMITed. Red first under a glibc-like collation: O'Brien on no page. Review also removed the same mismatch for arm labels. Contract unchanged. → `decisions/2026-Q3.md`
 - 2026-09-27 **Session boundary enforced (TASK-0060)**, `fix/session-boundary`: a grant counts only in its target's session (`PrivilegeGrant.AppliesToSession`; sessionless Super Admin everywhere). Arm-list grants could not leak; school-wide ones did (red first: 200 on an arm route, a pupil read and a report). **Decided: `PupilAccessGuard` stays and takes the session** (lists and reports have no declarative target); pupils with no arm, the register and filterless reports use the active session; promotion accepts either session. Contract unchanged. **Decided unasked, needs review:** non-scopable checks (settings, accounts, roles, rule 3, form teacher) still accept any session's grant, proposed with copy-to-session in TASK-0046. → `decisions/2026-Q3.md`
@@ -833,7 +835,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   exist. Owner: `backend-dev`.*
 - 2026-09-07 ~~**`POST /terms/{id}/close` does not enforce spec 6.3.6's result-set precondition.**~~ **STRUCK
   2026-09-17 by TASK-0076 A**, with marks entered, plus Returned for Correction by ruling. → `drift/2026-Q3.md`
-- 2026-09-06 **`DELETE /roles/{id}` hard-deletes unconditionally, and section 9.4 says it must not
+- 2026-09-06 **STRUCK 2026-09-27 (found carding TASK-0046): `DeleteRoleHandler` already archives a role that was ever assigned.** **`DELETE /roles/{id}` hard-deletes unconditionally, and section 9.4 says it must not
   once assignments exist.** *Trigger: TASK-0046 (role archive). Owner: `backend-dev`.*
 - 2026-09-06 **6.1.7 rule 2 cannot be proven end-to-end by a real caller yet** — it needs an actor
   holding `role.update` and not `settings.grading.update`. *Trigger: TASK-0046.
@@ -885,7 +887,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   *Trigger: if it recurs, raise its timeout or find the slow await. Owner: `frontend-dev`.*
 - 2026-09-21 **`ApiError.problem` is one generic union, so `SubmitResultSet`'s typed 422 (`readiness`) is unreachable without a cast.** *Trigger: the
   readiness-screen card. Owner: `frontend-dev`.*
-- 2026-09-19 **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
+- 2026-09-19 **STRUCK 2026-09-28 by TASK-0046 A** (create returns the clock's reading). **`CreateRoleAssignmentHandler` may return a default `createdAtUtc`** — `AuditingInterceptor` stamps it at SaveChanges, after the
   handler built the DTO (found by reading, UNVERIFIED; TASK-0086 used `TimeProvider` instead). *Trigger: next card touching assignments (TASK-0046). Owner: `backend-dev`.*
 - 2026-09-19 **`RequireAuthenticatedCaller()`'s doc says "never an RBAC-gated business operation"; pupil and remark-template routes use it exactly so**
   (handler-level guards). *Trigger: next card adding a handler-level guard. Owner: orchestrator — amend the doc or add a named helper.*

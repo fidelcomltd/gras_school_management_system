@@ -4,7 +4,7 @@ description: "Prod is PostgreSQL + app on one Namecheap Pulsar VPS, files on Clo
 metadata:
   node_type: memory
   type: project
-  modified: 2026-09-26T01:12:49.116Z
+  modified: 2026-09-27T23:03:30.786Z
   originSessionId: a5da418c-37e0-461c-82bf-6245630197d9
 ---
 
@@ -16,9 +16,12 @@ The school's domain is **goldenroyalark.com** (project lead, 2026-09-22). The fo
 cookie is `__Host-` + `SameSite=Lax`, so a `*.netlify.app` or `*.onrender.com` frontend origin breaks every sign-in.
 Changing **results.** after a pin batch is printed invalidates the slips and QR codes already handed to parents.
 
-Live as of 2026-09-26 (project lead): **api.** on the VPS (first deploy by hand 2026-09-25) and **app.** on Netlify. Staging
-(Render API + a second Netlify site) is not up yet; its tooling is `render.yaml` + `deploy/open-staging-db.sh`. The API deploys only via the manual `deploy-production` workflow
-(0 runs as of 2026-09-26), so check whether Netlify auto-builds `main`: if it does, app. can ship UI the live API lacks.
+**Both staging and production are deployed and confirmed working (project lead, 2026-09-28: deployed 2026-09-26).** Treat
+deployment as DONE, not outstanding, even where STATE.md or a handoff still lists "deployment to the VPS" as future work
+(they lagged: the 2026-09-27 handoff did). A push to `origin/staging` therefore feeds a live staging environment. Earlier
+notes: **api.** on the VPS (first deploy by hand 2026-09-25), **app.** on Netlify; staging tooling is `render.yaml` +
+`deploy/open-staging-db.sh`. The API deploys via the manual `deploy-production` workflow, so check whether Netlify
+auto-builds `main`: if it does, app. can ship UI the live API lacks.
 
 Secrets never go in chat (project lead asked 2026-09-22 whether to paste Cloudinary keys; told no): they go in
 `/etc/gras/api.env` on the VPS, Render's dashboard, or `dotnet user-secrets` locally.
