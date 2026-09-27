@@ -363,7 +363,7 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
             seeded.Add(pupilId);
         }
 
-        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync(seeded));
+        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync([seeded[0], seeded[2], seeded[1], seeded[3]]));
     }
 
     [Fact]
@@ -379,7 +379,7 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
             seeded.Add(pupilId);
         }
 
-        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync(seeded));
+        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync([seeded[0], seeded[2], seeded[1], seeded[3]]));
     }
 
     // ICU "shifted" ignores punctuation at the first level, as glibc's en_US.UTF-8 does. Restored afterwards, because the
@@ -387,28 +387,29 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
     private async Task WithProductionLikeSurnameCollationAsync(Func<Task> body)
     {
         await SetSurnameCollationAsync(
-            """
-            CREATE COLLATION IF NOT EXISTS seam_shifted (provider = icu, locale = 'en-u-ka-shifted');
-            ALTER TABLE pupils ALTER COLUMN surname TYPE character varying(60) COLLATE seam_shifted;
-            """);
+            "CREATE COLLATION IF NOT EXISTS seam_shifted (provider = icu, locale = 'en-u-ka-shifted');", "seam_shifted");
         try
         {
             await body();
         }
         finally
         {
-            await SetSurnameCollationAsync("""ALTER TABLE pupils ALTER COLUMN surname TYPE character varying(60) COLLATE "default";""");
+            await SetSurnameCollationAsync(string.Empty, "\"default\"");
         }
     }
 
-    private async Task SetSurnameCollationAsync(string sql)
+    private async Task SetSurnameCollationAsync(string setup, string collation)
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var sql = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{setup} ALTER TABLE pupils ALTER COLUMN surname TYPE character varying({Pupil.NameMaxLength}) COLLATE {collation};");
         await context.Database.ExecuteSqlRawAsync(sql, TestContext.Current.CancellationToken);
     }
 
-    private async Task AssertEachPupilOnExactlyOnePageAsync(List<Guid> seeded)
+    // expectedOrder: the register order with punctuation ignored (Oakes, Obi, O'Brien, Okafor-Eze).
+    private async Task AssertEachPupilOnExactlyOnePageAsync(List<Guid> expectedOrder)
     {
         var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
         var collected = new List<string>();
@@ -422,10 +423,9 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
             collected.AddRange(page.Items.Select(item => item.Id));
             cursor = page.NextCursor;
         }
-        while (cursor is not null && collected.Count <= seeded.Count);
+        while (cursor is not null && collected.Count <= expectedOrder.Count);
 
-        collected.ShouldBeUnique();
-        collected.ShouldBe(seeded.Select(id => id.ToString("D", CultureInfo.InvariantCulture)), ignoreOrder: true);
+        collected.ShouldBe(expectedOrder.Select(id => id.ToString("D", CultureInfo.InvariantCulture)).ToArray());
     }
 
     [Fact]
