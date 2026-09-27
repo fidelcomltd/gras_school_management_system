@@ -42,16 +42,7 @@ internal sealed class BroadsheetReport(IReportReader reader) : ReportBuilder<Bro
         var lines = (await reader.ListSubjectLinesAsync(setIds, cancellationToken).ConfigureAwait(false))
             .ToDictionary(line => (line.PupilId, line.SubjectId));
         var pupils = await reader.FindPupilsAsync([.. results.Select(result => result.PupilId)], cancellationToken).ConfigureAwait(false);
-        var mapped = await reader.ListMappedSubjectsAsync(termId, [arm.LevelId], cancellationToken).ConfigureAwait(false);
-        var unmapped = lines.Keys.Select(key => key.SubjectId).Distinct().Where(id => mapped.All(subject => subject.SubjectId != id)).ToList();
-        var names = unmapped.Count == 0 ? new Dictionary<Guid, string>() : await reader.FindSubjectNamesAsync(unmapped, cancellationToken).ConfigureAwait(false);
-
-        // Mapped subjects in sheet order, then any subject with lines that is no longer mapped, by name.
-        var subjects = mapped.Select(subject => (subject.SubjectId, subject.Name))
-            .Concat(unmapped
-                .Select(id => (SubjectId: id, Name: names.GetValueOrDefault(id, "Unknown subject")))
-                .OrderBy(subject => subject.Name, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        var subjects = await OrderedSubjectsAsync(reader, termId, [arm.LevelId], lines.Keys.Select(key => key.SubjectId), cancellationToken).ConfigureAwait(false);
 
         var columns = new List<ReportColumnDto>
         {

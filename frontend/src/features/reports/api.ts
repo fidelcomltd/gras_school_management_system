@@ -34,6 +34,18 @@ function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal):
         { termId, ...(levelId ? { levelId } : {}), ...(state ? { state } : {}) },
         { signal },
       );
+    case 'grade-distribution':
+      return apiGet(
+        '/api/v1/reports/grade-distribution',
+        { termId, ...(armId ? { armId } : {}), ...(levelId ? { levelId } : {}) },
+        { signal },
+      );
+    case 'subject-performance':
+      return apiGet('/api/v1/reports/subject-performance', { termId, ...(levelId ? { levelId } : {}) }, { signal });
+    case 'development-summary':
+      return apiGet('/api/v1/reports/development-summary', { termId, ...(armId ? { armId } : {}) }, { signal });
+    case 'fee-notice-audit':
+      return apiGet('/api/v1/reports/fee-notice-audit', { termId, ...(levelId ? { levelId } : {}) }, { signal });
   }
 }
 

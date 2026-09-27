@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SchoolManagement.Application.Abstractions.Reports;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Fees;
+using SchoolManagement.Domain.Settings;
 using SchoolManagement.Domain.Subjects;
 using SchoolManagement.Infrastructure.Persistence;
 
@@ -69,6 +71,75 @@ internal sealed class ReportReader(ApplicationDbContext context) : IReportReader
                 orderby mapping.DisplayOrder, subject.Name
                 select new ReportSubject(mapping.ClassLevelId, subject.Id, subject.Name, mapping.DisplayOrder))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportGradeBand>> ListGradeBandsAsync(CancellationToken cancellationToken) =>
+        await context.GradingBands.AsNoTracking()
+            .OrderBy(band => band.DisplayOrder)
+            .Select(band => new ReportGradeBand(band.GradeLetter, band.LowerBound, band.UpperBound, band.Remark))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportIndicator>> ListIndicatorsAsync(Guid sectionId, CancellationToken cancellationToken) =>
+        await (
+                from indicator in context.DevelopmentIndicators.AsNoTracking()
+                join domain in context.DevelopmentDomains.AsNoTracking() on indicator.DomainId equals domain.Id
+                where domain.SectionId == sectionId
+                    && domain.Status == DevelopmentDomainStatus.Active && indicator.Status == DevelopmentIndicatorStatus.Active
+                orderby domain.DisplayOrder, indicator.DisplayOrder
+                select new ReportIndicator(indicator.Id, indicator.Name, domain.Id, domain.Name, domain.RatingScaleId))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportRatingPoint>> ListRatingPointsAsync(IReadOnlyCollection<Guid> ratingScaleIds, CancellationToken cancellationToken) =>
+        await context.RatingScalePoints.AsNoTracking()
+            .Where(point => ratingScaleIds.Contains(point.RatingScaleId))
+            .OrderBy(point => point.PointOrder)
+            .Select(point => new ReportRatingPoint(point.Id, point.RatingScaleId, point.PointLabel, point.PointOrder))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportDevelopmentRating>> ListDevelopmentRatingsAsync(Guid resultSetId, CancellationToken cancellationToken) =>
+        await context.DevelopmentRatings.AsNoTracking()
+            .Where(rating => rating.ResultSetId == resultSetId)
+            .Select(rating => new ReportDevelopmentRating(rating.PupilId, rating.IndicatorId, rating.RatingScalePointId))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ReportFeeLine>> ListFeeLinesAsync(Guid termId, IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken)
+    {
+        var lines = await (
+                from level in context.ClassLevels.AsNoTracking()
+                join label in context.FeeLabels.AsNoTracking() on level.SectionId equals label.SectionId
+                where levelIds.Contains(level.Id) && label.Kind == FeeLabelKind.Amount
+                select new { LevelId = level.Id, label.Id, label.Label, label.DisplayOrder })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var amounts = await context.FeeAmounts.AsNoTracking()
+            .Where(amount => amount.TermId == termId && levelIds.Contains(amount.ClassLevelId))
+            .ToDictionaryAsync(amount => (amount.FeeLabelId, amount.ClassLevelId), amount => amount.Amount, cancellationToken)
+            .ConfigureAwait(false);
+        return lines
+            .OrderBy(line => line.DisplayOrder)
+            .Select(line => new ReportFeeLine(line.LevelId, line.Label, line.DisplayOrder, amounts.TryGetValue((line.Id, line.LevelId), out var amount) ? amount : null))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListRosterAsync(Guid armId, Guid termId, CancellationToken cancellationToken) =>
+        await (
+                from enrolment in context.Enrolments.AsNoTracking()
+                join pupil in context.Pupils.AsNoTracking() on enrolment.PupilId equals pupil.Id
+                join term in context.Terms.AsNoTracking() on termId equals term.Id
+                where enrolment.ArmId == armId
+                    && enrolment.EffectiveFrom <= term.EndDate && (enrolment.EffectiveTo == null || enrolment.EffectiveTo >= term.StartDate)
+                select pupil.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyDictionary<Guid, (int Pupils, long Total)>> SumOutstandingAsync(
+        IReadOnlyCollection<Guid> resultSetIds, CancellationToken cancellationToken)
+    {
+        var rows = await context.OutstandingFees.AsNoTracking()
+            .Where(fee => resultSetIds.Contains(fee.ResultSetId))
+            .GroupBy(fee => fee.ResultSetId)
+            .Select(group => new { group.Key, Pupils = group.Count(), Total = group.Sum(fee => (long)fee.Amount) })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return rows.ToDictionary(row => row.Key, row => (row.Pupils, row.Total));
+    }
 
     public async Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken) =>
         await context.Subjects.AsNoTracking()

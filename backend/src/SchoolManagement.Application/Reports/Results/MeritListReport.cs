@@ -102,13 +102,9 @@ internal sealed class MeritListReport(IReportReader reader) : ReportBuilder<Meri
         }
 
         var notes = new List<string>();
-        var unpublished = sets.Values.Where(set => set.Computed && set.State != SchoolManagement.Domain.Results.ResultSetState.Published)
-            .Select(set => arms[set.ArmId].Name)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (unpublished.Count > 0)
+        if (UnpublishedNote(sets.Values.Select(set => (set, arms[set.ArmId].Name))) is { } unpublished)
         {
-            notes.Add($"Not yet published: {string.Join(", ", unpublished)}. Positions and averages change if marks are corrected and computed again.");
+            notes.Add(unpublished);
         }
 
         if (byLevel && context.Scope.Arms is not null)
