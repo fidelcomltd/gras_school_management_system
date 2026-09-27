@@ -115,7 +115,10 @@ function ReportView({ definition }: { definition: TableReport }) {
     }
     if (definition.filters !== 'pupil' && (term.isPending || klass.isPending)) return <LoadingState label="Loading classes…" />;
     if (definition.filters !== 'pupil' && !term.sessionId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
-    if (klass.isError) return <QueryErrorState error={new Error('The classes could not be loaded.')} onRetry={klass.retry} />;
+    if (!bySession && definition.filters !== 'pupil' && !term.termId) {
+      return <p className="text-sm text-muted-foreground">This session has no terms yet.</p>;
+    }
+    if (definition.filters !== 'pupil' && klass.isError) return <QueryErrorState error={new Error('The classes could not be loaded.')} onRetry={klass.retry} />;
     if (!ready) return <p className="text-sm text-muted-foreground">There are no classes you can report on in this session.</p>;
     if (report.isPending) return <LoadingState label="Building the report…" />;
     if (report.isError) return <QueryErrorState error={report.error} onRetry={() => void report.refetch()} />;

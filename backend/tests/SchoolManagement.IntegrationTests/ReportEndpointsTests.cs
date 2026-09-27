@@ -216,6 +216,8 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
 
         using var badOutcome = await GetAsync(jar, $"/api/v1/reports/promotion-list?sessionId={sessionId}&outcome=Expelled");
         badOutcome.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var numeric = await GetAsync(jar, $"/api/v1/reports/promotion-list?sessionId={sessionId}&outcome=1");
+        numeric.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
     }
 
     [Fact]
@@ -236,8 +238,11 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     {
         await using var scope = Fixture.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        // A level with a next level, so its pupils are proposed Promoted or Repeat, not Graduated.
         var level = await context.ClassLevels.AsNoTracking()
-            .FirstAsync(candidate => candidate.SectionId == SeededClassLevels.PrimarySectionId, TestContext.Current.CancellationToken);
+            .Where(candidate => candidate.SectionId == SeededClassLevels.PrimarySectionId && candidate.NextLevelId != null)
+            .OrderBy(candidate => candidate.ProgressionOrder)
+            .FirstAsync(TestContext.Current.CancellationToken);
 
         var year = Interlocked.Increment(ref _nextYear);
         var session = AcademicSession.Create(Guid.CreateVersion7(), $"{year}/{year + 1}", new DateOnly(year, 9, 1), new DateOnly(year + 1, 7, 31)).Value;

@@ -42,6 +42,8 @@ internal sealed class PupilRecordReport(IReportReader reader) : ReportBuilder<Pu
         var arms = await reader.FindArmsAsync([.. terms.Select(term => term.ArmId).Concat(annual.Select(entry => entry.Annual.ArmId)).Distinct()], cancellationToken)
             .ConfigureAwait(false);
 
+        var decisions = await reader.ListPupilDecisionsAsync(pupilId, cancellationToken).ConfigureAwait(false);
+
         var rows = new List<ReportRowDto>();
         foreach (var sessionId in sessionIds.OrderBy(id => sessions.GetValueOrDefault(id)?.StartDate ?? DateOnly.MaxValue))
         {
@@ -62,8 +64,6 @@ internal sealed class PupilRecordReport(IReportReader reader) : ReportBuilder<Pu
 
             if (annual.FirstOrDefault(entry => entry.SessionId == sessionId) is { Annual: { } year })
             {
-                var decision = (await reader.ListPromotionDecisionsAsync(sessionId, cancellationToken).ConfigureAwait(false))
-                    .FirstOrDefault(candidate => candidate.PupilId == pupilId);
                 rows.Add(new(ReportRowKind.Subtotal,
                 [
                     "Annual",
@@ -72,7 +72,7 @@ internal sealed class PupilRecordReport(IReportReader reader) : ReportBuilder<Pu
                     year.Grade,
                     ReportText.Position(year.Position, year.Tied),
                     null,
-                    AnnualText.Status(year, decision),
+                    AnnualText.Status(year, arms.GetValueOrDefault(year.ArmId), decisions.GetValueOrDefault(sessionId)),
                 ]));
             }
         }

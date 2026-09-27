@@ -11,7 +11,8 @@ namespace SchoolManagement.Application.Abstractions.Reports;
 /// <param name="LevelOrder">The level's progression order.</param>
 /// <param name="SectionId">The level's section.</param>
 /// <param name="Capacity">The arm's capacity, if set.</param>
-public sealed record ReportArm(Guid ArmId, string Name, Guid LevelId, string LevelName, int LevelOrder, Guid SectionId, int? Capacity);
+/// <param name="NextLevelId">The level promotion moves to; null at the terminal level (its pupils graduate).</param>
+public sealed record ReportArm(Guid ArmId, string Name, Guid LevelId, string LevelName, int LevelOrder, Guid SectionId, int? Capacity, Guid? NextLevelId);
 
 /// <summary>A term with its session.</summary>
 /// <param name="TermId">The term.</param>
@@ -134,11 +135,14 @@ public sealed record ReportAnnualResult(
 
 /// <summary>A committed (not reversed) promotion decision for a pupil (spec 6.3.7).</summary>
 /// <param name="PupilId">The pupil.</param>
+/// <param name="FromArmId">The arm promoted from.</param>
+/// <param name="ProposedOutcome">What the planner proposed, or null when it had nothing to propose.</param>
 /// <param name="Outcome">The final outcome.</param>
 /// <param name="TargetArmId">The arm in the next session, if any.</param>
 /// <param name="TargetSessionId">The next session.</param>
 /// <param name="Reason">Recorded when the outcome overrides the proposal.</param>
-public sealed record ReportPromotionDecision(Guid PupilId, PromotionDecisionOutcome Outcome, Guid? TargetArmId, Guid TargetSessionId, string? Reason);
+public sealed record ReportPromotionDecision(
+    Guid PupilId, Guid FromArmId, PromotionDecisionOutcome? ProposedOutcome, PromotionDecisionOutcome Outcome, Guid? TargetArmId, Guid TargetSessionId, string? Reason);
 
 /// <summary>One computed term result in a pupil's history.</summary>
 /// <param name="SessionId">The session.</param>
@@ -215,6 +219,9 @@ public interface IReportReader
 
     /// <summary>The decisions of the session's committed, not reversed, promotion batch (empty when none).</summary>
     Task<IReadOnlyList<ReportPromotionDecision>> ListPromotionDecisionsAsync(Guid sourceSessionId, CancellationToken cancellationToken);
+
+    /// <summary>One pupil's committed decisions, by the session promoted from.</summary>
+    Task<IReadOnlyDictionary<Guid, ReportPromotionDecision>> ListPupilDecisionsAsync(Guid pupilId, CancellationToken cancellationToken);
 
     /// <summary>Promotion's rule inputs as configured now: the core subjects and the pass mark.</summary>
     Task<(IReadOnlyList<Guid> CoreSubjectIds, int PassMark)> GetCoreRulesAsync(CancellationToken cancellationToken);

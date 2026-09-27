@@ -18,24 +18,27 @@ public sealed record AnnualCumulativeFilters(string? SessionId, string? ArmId, s
 /// <param name="Outcome">One outcome only (<c>Promoted</c>, <c>Repeat</c>, <c>PromotedOnTrial</c>, <c>Graduated</c>).</param>
 public sealed record PromotionListFilters(string? SessionId, string? LevelId, string? Outcome) : IReportFilters;
 
-/// <summary>What the annual reports share: the outcome in words, and a pupil's promotion as decided or as proposed.</summary>
+/// <summary>What the annual reports share: the proposal exactly as the promotion planner makes it, and outcomes in words.</summary>
 internal static class AnnualText
 {
+    /// <summary>
+    /// Spec 6.3.9, as <c>PromotionPlanner</c>: a terminal-level pupil is proposed Graduated whatever the average; otherwise the
+    /// annual row's Repeat or Promoted. On trial is never proposed.
+    /// </summary>
+    public static PromotionDecisionOutcome Proposed(ReportAnnualResult result, ReportArm? arm) =>
+        arm is { NextLevelId: null } ? PromotionDecisionOutcome.Graduated
+        : result.ProposedOutcome == PromotionOutcome.Repeat ? PromotionDecisionOutcome.Repeat
+        : PromotionDecisionOutcome.Promoted;
+
     public static string Outcome(PromotionDecisionOutcome outcome) => outcome switch
     {
         PromotionDecisionOutcome.PromotedOnTrial => "Promoted on trial",
         _ => outcome.ToString(),
     };
 
-    public static string Outcome(PromotionOutcome outcome) => outcome switch
-    {
-        PromotionOutcome.PromotedOnTrial => "Promoted on trial",
-        _ => outcome.ToString(),
-    };
-
-    /// <summary>The committed decision when there is one, otherwise the computed proposal, marked as such.</summary>
-    public static string Status(ReportAnnualResult result, ReportPromotionDecision? decision) =>
-        decision is null ? $"{Outcome(result.ProposedOutcome)} (proposed)" : Outcome(decision.Outcome);
+    /// <summary>The committed decision when there is one, otherwise the proposal, marked as such.</summary>
+    public static string Status(ReportAnnualResult result, ReportArm? arm, ReportPromotionDecision? decision) =>
+        decision is null ? $"{Outcome(Proposed(result, arm))} (proposed)" : Outcome(decision.Outcome);
 
     public static string? Average(decimal? value) => value is { } average ? ReportText.Decimal(average) : null;
 }
@@ -121,7 +124,7 @@ internal sealed class AnnualCumulativeReport(IReportReader reader) : ReportBuild
                 cells.AddRange(result.TermAverages.Select(AnnualText.Average));
                 cells.Add(ReportText.Decimal(result.CumulativeAverage));
                 cells.Add(result.Grade);
-                cells.Add(AnnualText.Status(result, decisions.GetValueOrDefault(result.PupilId)));
+                cells.Add(AnnualText.Status(result, arms[result.ArmId], decisions.GetValueOrDefault(result.PupilId)));
                 return new ReportRowDto(ReportRowKind.Data, cells);
             })
             .ToList();
@@ -149,11 +152,13 @@ internal sealed class AnnualCumulativeReport(IReportReader reader) : ReportBuild
 
 /// <summary>
 /// Spec 15 section 10, promotion list: per pupil the arm, annual average, core subject results, the proposed and the final
-/// outcome, the target arm, and the reason where an override was recorded. The document the school files. Before promotion
-/// runs, the final outcome and target are blank.
+/// outcome, the target arm, and the reason where an override was recorded. The document the school files. Every committed
+/// decision appears, a pupil decided without an annual row included; before promotion runs, the final outcome is blank.
 /// </summary>
 internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<PromotionListFilters>
 {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
     public override string Key => "promotion-list";
 
     protected override async Task<Result<ReportDto>> BuildAsync(PromotionListFilters filters, ReportContext context, CancellationToken cancellationToken)
@@ -163,7 +168,8 @@ internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<
             return Result.Failure<ReportDto>(error);
         }
 
-        if (!string.IsNullOrEmpty(filters.Outcome) && !Enum.TryParse<PromotionDecisionOutcome>(filters.Outcome, ignoreCase: true, out _))
+        var wantedOutcome = Enum.GetNames<PromotionDecisionOutcome>().FirstOrDefault(name => string.Equals(name, filters.Outcome, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(filters.Outcome) && wantedOutcome is null)
         {
             return Result.Failure<ReportDto>(Error.Validation("report.filter", "outcome must be Promoted, Repeat, PromotedOnTrial or Graduated."));
         }
@@ -182,31 +188,41 @@ internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<
             return Result.Failure<ReportDto>(NotFound("No class you can see is in that level in that session."));
         }
 
-        var results = (await reader.ListAnnualResultsAsync(sessionId, cancellationToken).ConfigureAwait(false)).Where(result => arms.ContainsKey(result.ArmId)).ToList();
-        var decisions = (await reader.ListPromotionDecisionsAsync(sessionId, cancellationToken).ConfigureAwait(false)).ToDictionary(decision => decision.PupilId);
-        var targets = decisions.Count == 0
-            ? new Dictionary<Guid, ReportArm>()
-            : await reader.FindArmsAsync([.. decisions.Values.Where(decision => decision.TargetArmId is not null).Select(decision => decision.TargetArmId!.Value)], cancellationToken)
-                .ConfigureAwait(false);
-        var pupils = await reader.FindPupilsAsync([.. results.Select(result => result.PupilId)], cancellationToken).ConfigureAwait(false);
+        var results = (await reader.ListAnnualResultsAsync(sessionId, cancellationToken).ConfigureAwait(false))
+            .Where(result => arms.ContainsKey(result.ArmId))
+            .ToDictionary(result => result.PupilId);
+        var decisions = (await reader.ListPromotionDecisionsAsync(sessionId, cancellationToken).ConfigureAwait(false))
+            .Where(decision => arms.ContainsKey(decision.FromArmId))
+            .ToDictionary(decision => decision.PupilId);
+        var targets = await reader.FindArmsAsync([.. decisions.Values.Where(decision => decision.TargetArmId is not null).Select(decision => decision.TargetArmId!.Value)], cancellationToken)
+            .ConfigureAwait(false);
+        var pupilIds = results.Keys.Union(decisions.Keys).ToList();
+        var pupils = await reader.FindPupilsAsync(pupilIds, cancellationToken).ConfigureAwait(false);
         var (coreIds, passMark) = await reader.GetCoreRulesAsync(cancellationToken).ConfigureAwait(false);
         var coreNames = coreIds.Count == 0 ? new Dictionary<Guid, string>() : await reader.FindSubjectNamesAsync(coreIds, cancellationToken).ConfigureAwait(false);
 
-        var rows = results
-            .Select(result => (Row: result, Decision: decisions.GetValueOrDefault(result.PupilId), Pupil: pupils.GetValueOrDefault(result.PupilId)))
-            .Where(entry => string.IsNullOrEmpty(filters.Outcome)
-                || string.Equals(entry.Decision?.Outcome.ToString() ?? entry.Row.ProposedOutcome.ToString(), filters.Outcome, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(entry => arms[entry.Row.ArmId].LevelOrder)
-            .ThenBy(entry => arms[entry.Row.ArmId].Name, StringComparer.OrdinalIgnoreCase)
+        var rows = pupilIds
+            .Select(pupilId =>
+            {
+                var annual = results.GetValueOrDefault(pupilId);
+                var decision = decisions.GetValueOrDefault(pupilId);
+                var arm = arms[annual?.ArmId ?? decision!.FromArmId];
+                // After promotion the planner's own proposal is on the decision; before it, derived the planner's way.
+                var proposed = decision is not null ? decision.ProposedOutcome : annual is null ? null : AnnualText.Proposed(annual, arm);
+                return (Pupil: pupils.GetValueOrDefault(pupilId), Annual: annual, Decision: decision, Arm: arm, Proposed: proposed);
+            })
+            .Where(entry => wantedOutcome is null || string.Equals((entry.Decision?.Outcome ?? entry.Proposed)?.ToString(), wantedOutcome, StringComparison.Ordinal))
+            .OrderBy(entry => entry.Arm.LevelOrder)
+            .ThenBy(entry => entry.Arm.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(entry => entry.Pupil?.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(entry => new ReportRowDto(ReportRowKind.Data,
             [
                 entry.Pupil?.DisplayName ?? "Unknown pupil",
                 entry.Pupil?.RegistrationNumber,
-                arms[entry.Row.ArmId].Name,
-                ReportText.Decimal(entry.Row.CumulativeAverage),
-                Core(entry.Row.SubjectsJson, coreIds, coreNames, passMark),
-                AnnualText.Outcome(entry.Row.ProposedOutcome),
+                entry.Arm.Name,
+                entry.Annual is null ? null : ReportText.Decimal(entry.Annual.CumulativeAverage),
+                entry.Annual is null ? "No annual result" : Core(entry.Annual.SubjectsJson, coreIds, coreNames, passMark),
+                entry.Proposed is { } proposed ? AnnualText.Outcome(proposed) : "None",
                 entry.Decision is null ? null : AnnualText.Outcome(entry.Decision.Outcome),
                 entry.Decision?.TargetArmId is { } target ? targets.GetValueOrDefault(target)?.Name : null,
                 entry.Decision?.Reason,
@@ -219,9 +235,9 @@ internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<
             filterLines.Add($"Level: {arms.Values.First().LevelName}");
         }
 
-        if (!string.IsNullOrEmpty(filters.Outcome))
+        if (wantedOutcome is not null)
         {
-            filterLines.Add($"Outcome: {filters.Outcome}");
+            filterLines.Add($"Outcome: {AnnualText.Outcome(Enum.Parse<PromotionDecisionOutcome>(wantedOutcome))}");
         }
 
         var notes = new List<string> { $"Core subjects and the pass mark ({ReportText.Number(passMark)}) are the result rules as configured now." };
@@ -250,7 +266,7 @@ internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<
             ReportOrientation.Landscape));
     }
 
-    // "Mathematics 68 pass; English 45 fail", from the annual row's per-subject means; a core subject not taken says so.
+    // "Mathematics 68.00 pass; English 45.00 fail", from the annual row's per-subject means, read as PromotionPlanner reads them.
     private static string? Core(string subjectsJson, IReadOnlyList<Guid> coreIds, IReadOnlyDictionary<Guid, string> names, int passMark)
     {
         if (coreIds.Count == 0)
@@ -258,23 +274,12 @@ internal sealed class PromotionListReport(IReportReader reader) : ReportBuilder<
             return null;
         }
 
-        var means = new Dictionary<Guid, decimal>();
-        using (var document = JsonDocument.Parse(subjectsJson))
-        {
-            foreach (var subject in document.RootElement.EnumerateArray())
-            {
-                if (subject.TryGetProperty("subjectId", out var id) && id.TryGetGuid(out var subjectId) && subject.TryGetProperty("mean", out var mean))
-                {
-                    means[subjectId] = mean.GetDecimal();
-                }
-            }
-        }
-
+        var taken = JsonSerializer.Deserialize<List<AnnualSubjectResult>>(subjectsJson, Json) ?? [];
         return string.Join("; ", coreIds.Select(id =>
         {
             var name = names.GetValueOrDefault(id, "Unknown subject");
-            return means.TryGetValue(id, out var value)
-                ? $"{name} {ReportText.Decimal(value)} {(value >= passMark ? "pass" : "fail")}"
+            return taken.Find(subject => subject.SubjectId == id) is { } subject
+                ? $"{name} {ReportText.Decimal(subject.Mean)} {(subject.Mean >= passMark ? "pass" : "fail")}"
                 : $"{name} not taken";
         }));
     }
