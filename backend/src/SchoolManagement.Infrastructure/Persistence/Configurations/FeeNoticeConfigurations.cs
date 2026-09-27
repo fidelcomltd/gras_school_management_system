@@ -24,7 +24,8 @@ internal sealed class FeeLabelConfiguration : IEntityTypeConfiguration<FeeLabel>
         builder.Property(label => label.Kind).IsRequired().HasConversion<string>().HasMaxLength(16);
         builder.Property(label => label.CreatedBy).HasMaxLength(AuditActorMaxLength);
         builder.Property(label => label.ModifiedBy).HasMaxLength(AuditActorMaxLength);
-        builder.HasOne<Section>().WithMany().HasForeignKey(label => label.SectionId).OnDelete(DeleteBehavior.Restrict);
+        // Fee lines are configuration of the section: deleting the section (only allowed when nothing else uses it) takes them.
+        builder.HasOne<Section>().WithMany().HasForeignKey(label => label.SectionId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(label => label.SectionId).HasDatabaseName("ix_fee_label_section");
 
         // At most one outstanding line per section: it is the one per-pupil figure on the sheet.
@@ -53,7 +54,7 @@ internal sealed class FeeAmountConfiguration : IEntityTypeConfiguration<FeeAmoun
         // Removing a line takes its amounts with it; nothing else deletes them.
         builder.HasOne<FeeLabel>().WithMany().HasForeignKey(amount => amount.FeeLabelId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Term>().WithMany().HasForeignKey(amount => amount.TermId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ClassLevel>().WithMany().HasForeignKey(amount => amount.ClassLevelId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ClassLevel>().WithMany().HasForeignKey(amount => amount.ClassLevelId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(amount => new { amount.TermId, amount.ClassLevelId, amount.FeeLabelId })
             .IsUnique()
             .HasDatabaseName("ix_fee_amount_term_level_label_unique");

@@ -35,7 +35,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         column: x => x.section_id,
                         principalTable: "sections",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -92,7 +92,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         column: x => x.class_level_id,
                         principalTable: "class_levels",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_fee_amount_fee_labels_fee_label_id",
                         column: x => x.fee_label_id,

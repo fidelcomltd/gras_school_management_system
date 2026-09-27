@@ -38,7 +38,7 @@ const renderScreen = () =>
 function grid(overrides: Partial<FeeNoticeGridDto> = {}): FeeNoticeGridDto {
   return {
     sectionId: SECTION, sectionName: 'Primary', termId: 't-1', termName: 'First Term', sessionName: '2026/2027',
-    previousTermId: 't-0', previousTermLabel: 'Third Term 2025/2026', isDefault: true,
+    previousTermId: 't-0', previousTermLabel: 'Third Term 2025/2026', isDefault: true, version: null,
     levels: [{ classLevelId: 'p1', name: 'Primary 1' }, { classLevelId: 'p2', name: 'Primary 2' }],
     lines: [
       { id: null, label: 'Tuition Fee', kind: 'Amount', showOnPortal: false, amounts: [] },
@@ -69,13 +69,14 @@ describe('FeeNoticesScreen', () => {
     await user.click(await screen.findByRole('button', { name: 'Copy from Third Term 2025/2026' }));
     expect(await screen.findByDisplayValue('40000')).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'Tuition Fee, Primary 1' }), '45,000');
-    await user.click(screen.getByRole('checkbox', { name: 'Show it to parents on the portal' }));
+    await user.click(screen.getByRole('checkbox', { name: /Show it to parents on the portal/ }));
     await user.click(screen.getByRole('button', { name: 'Save fee lines' }));
 
     await waitFor(() => expect(saved).toBeDefined());
     expect(saved).toEqual({
       sectionId: SECTION,
       termId: 't-1',
+      version: null,
       lines: [
         { id: null, label: 'Tuition Fee', kind: 'Amount', showOnPortal: false, amounts: [{ classLevelId: 'p1', amount: 45000 }, { classLevelId: 'p2', amount: 40000 }] },
         { id: null, label: 'Outstanding Fee', kind: 'Outstanding', showOnPortal: true, amounts: [] },
@@ -121,11 +122,11 @@ describe('FeeNoticesScreen', () => {
     const { user } = renderScreen();
     await user.click(await screen.findByRole('button', { name: 'Outstanding figures' }));
     await user.type(await screen.findByRole('textbox', { name: 'Outstanding for Okafor Ada' }), '12500');
-    await user.clear(screen.getByRole('textbox', { name: 'Outstanding for Bello Tunde' }));
     await user.click(screen.getByRole('button', { name: 'Save figures' }));
 
+    // Bello's untouched 5,000 is not sent, so a figure saved elsewhere meanwhile is never cleared from here.
     await waitFor(() => expect(saved).toBeDefined());
-    expect(saved).toEqual({ armId: 'arm-1', termId: 't-1', rows: [{ pupilId: 'p-1', amount: 12500 }, { pupilId: 'p-2', amount: null }] });
+    expect(saved).toEqual({ armId: 'arm-1', termId: 't-1', rows: [{ pupilId: 'p-1', amount: 12500 }] });
 
     server.use(http.get(apiUrl('/api/v1/arms/:armId/outstanding-fees'), () => HttpResponse.json(sheet(true))));
     server.use(http.get(apiUrl('/api/v1/fee-notices'), () => HttpResponse.json(grid())));

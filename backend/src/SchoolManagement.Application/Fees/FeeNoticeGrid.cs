@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using FluentValidation;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Classes;
@@ -28,6 +30,7 @@ namespace SchoolManagement.Application.Fees;
 /// <param name="IsDefault">True when the section has saved no lines yet and <paramref name="Lines"/> are spec 6.2.13's seed, unsaved.</param>
 /// <param name="Levels">The section's active class levels, in progression order.</param>
 /// <param name="Lines">In print order.</param>
+/// <param name="Version">Opaque; sent back with a save so a stale screen cannot overwrite (or delete) newer lines. Null before any save.</param>
 public sealed record FeeNoticeGridDto(
     Guid SectionId,
     string SectionName,
@@ -38,7 +41,8 @@ public sealed record FeeNoticeGridDto(
     string? PreviousTermLabel,
     bool IsDefault,
     IReadOnlyList<FeeGridLevelDto> Levels,
-    IReadOnlyList<FeeGridLineDto> Lines);
+    IReadOnlyList<FeeGridLineDto> Lines,
+    string? Version);
 
 /// <summary>A column of the grid.</summary>
 /// <param name="ClassLevelId">The level.</param>
@@ -105,8 +109,10 @@ public sealed record FeeGridAmountInput(Guid ClassLevelId, int? Amount);
 /// </summary>
 /// <param name="SectionId">The section.</param>
 /// <param name="TermId">The term whose sheets print it.</param>
-/// <param name="Lines">Every line, in print order.</param>
-public sealed record SaveFeeNoticeGridCommand(Guid SectionId, Guid TermId, IReadOnlyList<FeeGridLineInput> Lines) : ICommand<Result<FeeNoticeGridDto>>;
+/// <param name="Lines">Every line, in print order. Empty removes the notice: the section's sheets then print no fees block.</param>
+/// <param name="Version">The <see cref="FeeNoticeGridDto.Version"/> the screen was loaded with; 409 when the grid has changed since.</param>
+public sealed record SaveFeeNoticeGridCommand(Guid SectionId, Guid TermId, IReadOnlyList<FeeGridLineInput> Lines, string? Version)
+    : ICommand<Result<FeeNoticeGridDto>>;
 
 /// <summary>Shape rules; the section's levels and saved lines are checked in the handler.</summary>
 internal sealed class SaveFeeNoticeGridCommandValidator : AbstractValidator<SaveFeeNoticeGridCommand>
@@ -118,13 +124,13 @@ internal sealed class SaveFeeNoticeGridCommandValidator : AbstractValidator<Save
         RuleFor(command => command.TermId).NotEmpty();
         RuleFor(command => command.Lines)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty()
+            .NotNull()
             .Must(lines => lines.All(line => line is not null && line.Amounts is not null)).WithMessage("Every line must be filled in.")
             .Must(lines => lines.Count <= FeeLabel.MaxLabelsPerSection).WithMessage($"A fee notice can have at most {FeeLabel.MaxLabelsPerSection} lines.")
             .Must(lines => lines.Count(line => line.Kind == FeeLabelKind.Outstanding) <= 1).WithMessage("Only one line can be the outstanding-fee line.")
             .Must(lines => lines.Where(line => line.Id is not null).Select(line => line.Id).Distinct().Count() == lines.Count(line => line.Id is not null))
             .WithMessage("A line appears twice.")
-            .Must(lines => lines.Select(line => line.Label?.Trim().ToUpperInvariant()).Distinct().Count() == lines.Count)
+            .Must(lines => NoDuplicateLabels(lines))
             .WithMessage("Two lines have the same label.");
         RuleForEach(command => command.Lines)
             .ChildRules(line =>
@@ -142,6 +148,13 @@ internal sealed class SaveFeeNoticeGridCommandValidator : AbstractValidator<Save
                         .WithMessage($"A fee amount must be between 0 and {FeeAmount.MaxAmount:N0} naira."));
             })
             .When(command => command.Lines is not null && command.Lines.All(line => line is not null && line.Amounts is not null));
+    }
+
+    // Blank labels are the per-line rule's to report, not a duplicate.
+    private static bool NoDuplicateLabels(IReadOnlyList<FeeGridLineInput> lines)
+    {
+        var labels = lines.Select(line => line.Label?.Trim().ToUpperInvariant()).Where(label => !string.IsNullOrEmpty(label)).ToList();
+        return labels.Distinct(StringComparer.Ordinal).Count() == labels.Count;
     }
 }
 
@@ -164,6 +177,14 @@ internal sealed class SaveFeeNoticeGridHandler(
         }
 
         var grid = loaded.Value;
+
+        // Removing a line takes its amounts in every term, so a save from a stale screen must never run.
+        if (!string.Equals(grid.Version(), request.Version, StringComparison.Ordinal))
+        {
+            return Result.Failure<FeeNoticeGridDto>(Error.Conflict(
+                "fee.stale_version", "These fee lines were changed since you opened them. Reload the page before saving again."));
+        }
+
         var levelIds = grid.Levels.Select(level => level.Id).ToHashSet();
         var saved = grid.Labels.ToDictionary(label => label.Id);
         foreach (var line in request.Lines)
@@ -313,7 +334,30 @@ internal sealed record FeeNoticeGridContext(
             PreviousTerm is null ? null : $"{PreviousTerm.Name} {PreviousSessionName}".Trim(),
             isDefault,
             [.. Levels.Select(level => new FeeGridLevelDto(level.Id, level.Name))],
-            lines);
+            lines,
+            Version());
+    }
+
+    /// <summary>A hash of the section's lines and this term's amounts; null before any line is saved.</summary>
+    public string? Version()
+    {
+        if (Labels.Count == 0)
+        {
+            return null;
+        }
+
+        var builder = new StringBuilder();
+        foreach (var label in Labels.OrderBy(label => label.Id))
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"L|{label.Id:D}|{label.Label}|{label.DisplayOrder}|{label.Kind}|{label.ShowOnPortal}\n");
+        }
+
+        foreach (var amount in Amounts.OrderBy(amount => amount.FeeLabelId).ThenBy(amount => amount.ClassLevelId))
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"A|{amount.FeeLabelId:D}|{amount.ClassLevelId:D}|{amount.Amount}\n");
+        }
+
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
     }
 }
 
@@ -350,9 +394,12 @@ internal sealed class FeeNoticeGridReader(
         var labels = tracked
             ? await fees.ListLabelsTrackedAsync(section.Id, cancellationToken).ConfigureAwait(false)
             : await fees.ListLabelsReadOnlyAsync(section.Id, cancellationToken).ConfigureAwait(false);
+        IReadOnlyCollection<Guid> labelIds = [.. labels.Select(label => label.Id)];
         var amounts = labels.Count == 0
             ? []
-            : await fees.ListAmountsTrackedAsync(term.Id, [.. labels.Select(label => label.Id)], cancellationToken).ConfigureAwait(false);
+            : tracked
+                ? await fees.ListAmountsTrackedAsync(term.Id, labelIds, cancellationToken).ConfigureAwait(false)
+                : await fees.ListAmountsReadOnlyAsync(term.Id, labelIds, cancellationToken).ConfigureAwait(false);
         return Result.Success(new FeeNoticeGridContext(section, term, session?.Name ?? string.Empty, previous, previousSession?.Name, levels, labels, amounts));
     }
 }

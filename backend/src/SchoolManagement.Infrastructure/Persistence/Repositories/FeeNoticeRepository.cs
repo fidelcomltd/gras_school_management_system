@@ -28,6 +28,15 @@ internal sealed class FeeNoticeRepository(ApplicationDbContext context) : IFeeNo
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<FeeAmount>> ListAmountsReadOnlyAsync(Guid termId, IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(labelIds);
+        var ids = labelIds.ToArray();
+        return await context.FeeAmounts.AsNoTracking().Where(amount => amount.TermId == termId && ids.Contains(amount.FeeLabelId))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<FeeAmount>> ListAmountsReadOnlyAsync(Guid termId, Guid classLevelId, CancellationToken cancellationToken) =>
         await context.FeeAmounts.AsNoTracking().Where(amount => amount.TermId == termId && amount.ClassLevelId == classLevelId)
             .ToListAsync(cancellationToken).ConfigureAwait(false);

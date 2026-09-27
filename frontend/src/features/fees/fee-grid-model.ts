@@ -39,7 +39,6 @@ export function parseAmount(text: string): number | null | 'invalid' {
 
 /** What stops the save: a blank or long label, a duplicate label, or a cell that is not a whole naira amount. */
 export function draftProblem(lines: DraftLine[]): string | null {
-  if (lines.length === 0) return 'Add at least one line.';
   if (lines.length > MAX_LINES) return `A fee notice can have at most ${MAX_LINES} lines.`;
   const labels = lines.map((line) => line.label.trim().toUpperCase());
   if (labels.some((label) => label.length === 0 || label.length > LABEL_MAX)) return `Every line needs a label of 1 to ${LABEL_MAX} characters.`;
@@ -53,6 +52,8 @@ export function toCommand(lines: DraftLine[], grid: FeeNoticeGridDto): SaveFeeNo
   return {
     sectionId: grid.sectionId,
     termId: grid.termId,
+    // The server refuses a save from a stale screen: removing a line takes its amounts in every term.
+    version: grid.version ?? null,
     lines: lines.map((line) => ({
       id: line.id,
       label: line.label.trim(),

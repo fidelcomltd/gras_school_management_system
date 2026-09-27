@@ -15,6 +15,9 @@ public interface IFeeNoticeRepository
     /// <summary>Every amount printed on <paramref name="termId"/>'s sheets for these lines, tracked.</summary>
     Task<IReadOnlyList<FeeAmount>> ListAmountsTrackedAsync(Guid termId, IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken);
 
+    /// <summary>Every amount printed on <paramref name="termId"/>'s sheets for these lines, read-only.</summary>
+    Task<IReadOnlyList<FeeAmount>> ListAmountsReadOnlyAsync(Guid termId, IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken);
+
     /// <summary>The amounts printed on <paramref name="termId"/>'s sheets for one class level, read-only.</summary>
     Task<IReadOnlyList<FeeAmount>> ListAmountsReadOnlyAsync(Guid termId, Guid classLevelId, CancellationToken cancellationToken);
 

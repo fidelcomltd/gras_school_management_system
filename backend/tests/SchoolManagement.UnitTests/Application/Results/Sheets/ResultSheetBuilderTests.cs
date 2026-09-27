@@ -76,6 +76,17 @@ public sealed class ResultSheetBuilderTests
     }
 
     [Fact]
+    public void ATermNobodyFilledIn_PrintsNoFeesBlock_RatherThanATableOfDashes()
+    {
+        var blank = NurserySnapshot.Replace(
+            "\"formTeacherName\": \"Mrs Adeyemi\"",
+            "\"formTeacherName\": \"Mrs Adeyemi\", \"feeNotice\": { \"lines\": [{ \"label\": \"Tuition Fee\", \"kind\": \"Amount\", \"amount\": null, \"showOnPortal\": false }] }",
+            StringComparison.Ordinal);
+
+        ResultSheetBuilder.Build(Data(blank, revision: 1))!.Fees.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void ASectionWithNoFeeLines_PrintsNoFeesBlock()
     {
         var sheet = ResultSheetBuilder.Build(Data(NurserySnapshot, revision: 1))!;

@@ -30,8 +30,15 @@ export function useSaveFeeNoticeGrid() {
   return useMutation({
     mutationKey: [FeesKeys.SaveGrid],
     mutationFn: (payload: SaveFeeNoticeGridCommand) => apiPut(GRID_PATH, payload),
-    // Labels are section-wide, so every term's grid for the section may have changed.
-    onSuccess: (_grid, payload) => void queryClient.invalidateQueries({ queryKey: [FeesKeys.Grid, payload.sectionId] }),
+    onSuccess: (grid) => {
+      // The saved grid (with its new ids and version) straight into the cache, so the next save is never made from stale ids;
+      // labels are section-wide, so the section's other terms are refetched too.
+      queryClient.setQueryData([FeesKeys.Grid, grid.sectionId, grid.termId], grid);
+      void queryClient.invalidateQueries({
+        queryKey: [FeesKeys.Grid, grid.sectionId],
+        predicate: (query) => query.queryKey[2] !== grid.termId,
+      });
+    },
   });
 }
 

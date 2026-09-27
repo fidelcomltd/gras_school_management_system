@@ -47,7 +47,7 @@ public sealed class FeeNoticeEndpointsTests(ApiTestFixture fixture) : Integratio
             .. fresh.Lines.Select(line => new FeeGridLineInput(
                 null, line.Label, line.Kind, false,
                 line.Kind == FeeLabelKind.Amount ? [new(Primary1Id, line.Label == "Tuition Fee" ? 45000 : 0), new(Primary2Id, null)] : [])),
-        ]);
+        ], fresh.Version);
         var saved = await ReadAsync<FeeNoticeGridDto>(await SendAsync(HttpMethod.Put, "/api/v1/fee-notices", jar, first));
         saved.IsDefault.ShouldBeFalse();
         saved.Lines.Single(line => line.Label == "Tuition Fee").Amounts.Single().ShouldBe(new FeeGridAmountDto(Primary1Id, 45000));
@@ -61,8 +61,13 @@ public sealed class FeeNoticeEndpointsTests(ApiTestFixture fixture) : Integratio
             new(lines["Books"].Id, "Books & Stationery", FeeLabelKind.Amount, false, [new(Primary1Id, 8000)]),
             new(lines["Exam & PTA"].Id, "Exam & PTA", FeeLabelKind.Amount, false, []),
             new(lines["Toiletries"].Id, "Toiletries", FeeLabelKind.Amount, false, []),
-        ]);
+        ], saved.Version);
         (await SendAsync(HttpMethod.Put, "/api/v1/fee-notices", jar, second)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // The first screen's version is stale now: its save would re-create the defaults and delete the saved lines. Refused.
+        var stale = await SendAsync(HttpMethod.Put, "/api/v1/fee-notices", jar, first);
+        stale.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await stale.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("fee.stale_version");
 
         var reread = await ReadAsync<FeeNoticeGridDto>(await SendAsync(HttpMethod.Get, url, jar, null));
         reread.Lines.Select(line => line.Label).ShouldBe(["Outstanding Fee", "Tuition Fee", "Books & Stationery", "Exam & PTA", "Toiletries"]);
@@ -83,11 +88,11 @@ public sealed class FeeNoticeEndpointsTests(ApiTestFixture fixture) : Integratio
         var jar = await SignInAsync(superAdmin: true);
 
         var amountOnOutstanding = new SaveFeeNoticeGridCommand(SeededClassLevels.PrimarySectionId, seeded.TermId,
-            [new(null, "Outstanding Fee", FeeLabelKind.Outstanding, false, [new(Primary1Id, 1000)])]);
+            [new(null, "Outstanding Fee", FeeLabelKind.Outstanding, false, [new(Primary1Id, 1000)])], null);
         (await SendAsync(HttpMethod.Put, "/api/v1/fee-notices", jar, amountOnOutstanding)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
 
         var twoOutstanding = new SaveFeeNoticeGridCommand(SeededClassLevels.PrimarySectionId, seeded.TermId,
-            [new(null, "Outstanding Fee", FeeLabelKind.Outstanding, false, []), new(null, "Arrears", FeeLabelKind.Outstanding, false, [])]);
+            [new(null, "Outstanding Fee", FeeLabelKind.Outstanding, false, []), new(null, "Arrears", FeeLabelKind.Outstanding, false, [])], null);
         (await SendAsync(HttpMethod.Put, "/api/v1/fee-notices", jar, twoOutstanding)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
     }
 

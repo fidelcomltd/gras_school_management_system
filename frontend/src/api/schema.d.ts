@@ -6219,7 +6219,8 @@ export interface components {
          *           "showOnPortal": false,
          *           "amounts": []
          *         }
-         *       ]
+         *       ],
+         *       "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
          *     }
          */
         FeeNoticeGridDto: {
@@ -6313,6 +6314,11 @@ export interface components {
              *     ]
              */
             lines: components["schemas"]["FeeGridLineDto"][];
+            /**
+             * @description Opaque; sent back with a save so a stale screen cannot overwrite (or delete) newer lines. Null before any save.
+             * @example 5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d
+             */
+            version: null | string;
         };
         /**
          * @description Generates a batch (spec 6.8.9). Pins are not tied to any pupil.
@@ -11579,7 +11585,8 @@ export interface components {
          *           "showOnPortal": false,
          *           "amounts": []
          *         }
-         *       ]
+         *       ],
+         *       "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
          *     }
          */
         SaveFeeNoticeGridCommand: {
@@ -11596,7 +11603,7 @@ export interface components {
              */
             termId: string;
             /**
-             * @description Every line, in print order.
+             * @description Every line, in print order. Empty removes the notice: the section's sheets then print no fees block.
              * @example [
              *       {
              *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
@@ -11632,6 +11639,11 @@ export interface components {
              *     ]
              */
             lines: components["schemas"]["FeeGridLineInput"][];
+            /**
+             * @description The string? FeeNoticeGridDto.Version the screen was loaded with; 409 when the grid has changed since.
+             * @example 5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d
+             */
+            version: null | string;
         };
         /**
          * @description `PUT /api/v1/arms/{armId}/head-teacher-remarks` (TASK-0086 stage A) — partial-save sheet

@@ -265,8 +265,15 @@ public static class ResultSheetBuilder
             feeTotal);
     }
 
-    // The lines frozen at publication (09 6.7.x: a reprint never reads live settings); the outstanding figure is the pupil's own.
-    private static List<SheetFeeLine> Fees(JsonElement root, int? outstanding, bool forParent) =>
+    // The lines frozen at publication (Appendix C.8 rule 2: a reprint never reads live settings); the outstanding figure is the
+    // pupil's own. A term nobody filled in (every line blank) prints no block rather than a table of dashes.
+    private static List<SheetFeeLine> Fees(JsonElement root, int? outstanding, bool forParent)
+    {
+        var lines = FeeLines(root, outstanding, forParent);
+        return lines.Any(line => line.Amount is not null) ? lines : [];
+    }
+
+    private static List<SheetFeeLine> FeeLines(JsonElement root, int? outstanding, bool forParent) =>
         Array(root, "feeNotice", "lines")
             .Where(line => Str(line, "kind") != "Outstanding" || !forParent || (TryGet(line, "showOnPortal")?.GetBoolean() ?? false))
             .Select(line => new SheetFeeLine(

@@ -12,7 +12,7 @@ using SchoolManagement.Infrastructure.Persistence;
 namespace SchoolManagement.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260927083320_AddFeeNotice")]
+    [Migration("20260927090651_AddFeeNotice")]
     partial class AddFeeNotice
     {
         /// <inheritdoc />
@@ -5692,7 +5692,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
                         .WithMany()
                         .HasForeignKey("ClassLevelId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fee_amount_class_levels_class_level_id");
 
@@ -5716,7 +5716,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.HasOne("SchoolManagement.Domain.Classes.Section", null)
                         .WithMany()
                         .HasForeignKey("SectionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fee_label_sections_section_id");
                 });

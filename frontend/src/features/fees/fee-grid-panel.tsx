@@ -125,7 +125,7 @@ function FeeGridEditor({ grid, save }: { grid: FeeNoticeGridDto; save: ReturnTyp
                         checked={line.showOnPortal}
                         onChange={(event) => update(line.key, { showOnPortal: event.target.checked })}
                       />
-                      Show it to parents on the portal
+                      Show it to parents on the portal (applies to results published after you save)
                     </label>
                   </td>
                 ) : (
@@ -181,6 +181,9 @@ function FeeGridEditor({ grid, save }: { grid: FeeNoticeGridDto; save: ReturnTyp
           </Button>
         </div>
       </div>
+      {lines.length === 0 ? (
+        <p className="text-sm text-muted-foreground">With no lines, {grid.sectionName} result sheets print no fees block.</p>
+      ) : null}
       <FormError message={save.error instanceof ApiError ? save.error.message : null} />
       {save.isSuccess ? <output className="text-sm text-success">Saved.</output> : null}
       <p className="text-xs text-muted-foreground">

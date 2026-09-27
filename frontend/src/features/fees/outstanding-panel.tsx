@@ -46,19 +46,17 @@ function OutstandingEditor({ sheet, save }: { sheet: OutstandingFeeSheetDto; sav
   );
   const invalid = Object.values(cells).some((cell) => parseAmount(cell) === 'invalid');
 
+  // Only the rows this screen changed are sent: a blank here must never clear a figure someone else saved meanwhile.
+  const changed = sheet.rows.flatMap((row) => {
+    const parsed = parseAmount(cells[row.pupilId] ?? '');
+    return parsed !== 'invalid' && parsed !== (row.amount ?? null) ? [{ pupilId: row.pupilId, amount: parsed }] : [];
+  });
+
   if (sheet.rows.length === 0) {
     return <EmptyState icon={Users} title={`No active pupils in ${sheet.armName}.`} />;
   }
 
-  const submit = () =>
-    save.mutate({
-      armId: sheet.armId,
-      termId: sheet.termId,
-      rows: sheet.rows.map((row) => {
-        const parsed = parseAmount(cells[row.pupilId] ?? '');
-        return { pupilId: row.pupilId, amount: parsed === 'invalid' ? null : parsed };
-      }),
-    });
+  const submit = () => save.mutate({ armId: sheet.armId, termId: sheet.termId, rows: changed });
 
   return (
     <section aria-label={`${sheet.armName} outstanding figures`} className="flex flex-col gap-4">
@@ -105,7 +103,7 @@ function OutstandingEditor({ sheet, save }: { sheet: OutstandingFeeSheetDto; sav
       {sheet.locked ? null : (
         <div className="flex items-center justify-end gap-3">
           {invalid ? <span className="text-sm text-destructive">Figures are whole naira, 0 or more.</span> : null}
-          <Button disabled={invalid || save.isPending} onClick={submit}>
+          <Button disabled={invalid || changed.length === 0 || save.isPending} onClick={submit}>
             {save.isPending ? 'Saving…' : 'Save figures'}
           </Button>
         </div>

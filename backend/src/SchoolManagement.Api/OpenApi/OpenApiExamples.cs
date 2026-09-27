@@ -3258,7 +3258,8 @@ internal static class OpenApiExamples
                 { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
                 { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03", "label": "Exam & PTA", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 5000 }] },
                 { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
-              ]
+              ],
+              "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
             }
             """,
 
@@ -3278,7 +3279,8 @@ internal static class OpenApiExamples
                 { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
                 { "id": null, "label": "Uniform", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 0 }] },
                 { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
-              ]
+              ],
+              "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
             }
             """,
 

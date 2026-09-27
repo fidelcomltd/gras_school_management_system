@@ -5689,7 +5689,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
                         .WithMany()
                         .HasForeignKey("ClassLevelId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fee_amount_class_levels_class_level_id");
 
@@ -5713,7 +5713,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.HasOne("SchoolManagement.Domain.Classes.Section", null)
                         .WithMany()
                         .HasForeignKey("SectionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fee_label_sections_section_id");
                 });
