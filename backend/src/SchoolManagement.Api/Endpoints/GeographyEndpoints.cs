@@ -15,8 +15,8 @@ public sealed class GeographyEndpoints : IEndpointModule
 
         endpoints.MapGet("/geography/states", async (ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
             {
-                // A compile-time list: a day in the browser's private cache saves every form a round trip.
-                httpContext.Response.Headers.CacheControl = "private, max-age=86400";
+                // Changes only with a deploy; an hour in the browser's private cache saves every form a round trip.
+                httpContext.Response.Headers.CacheControl = "private, max-age=3600";
                 return (await sender.SendAsync(new GetNigerianGeographyQuery(), cancellationToken)).Match(TypedResults.Ok);
             })
             .RequireAuthenticatedCaller()
@@ -25,7 +25,7 @@ public sealed class GeographyEndpoints : IEndpointModule
             .WithSummary("The states and LGAs a pupil record accepts")
             .WithDescription(
                 "Spec 6.5.4: the 36 states and the FCT, each with its LGAs, in the canonical spellings the server stores. A pupil's " +
-                "state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=86400`.")
+                "state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=3600`.")
             .Produces<NigerianGeographyDto>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils/cn';
 export function SearchableSelect({
   id,
   label,
+  describedBy,
   options,
   value,
   onChange,
@@ -20,6 +21,8 @@ export function SearchableSelect({
   id?: string;
   /** The accessible name of the input. */
   label: string;
+  /** The id of the element describing the input (its error message). */
+  describedBy?: string | undefined;
   options: readonly string[];
   value: string;
   onChange: (value: string) => void;
@@ -35,12 +38,15 @@ export function SearchableSelect({
       onValueChange={(next: string | null) => onChange(next ?? '')}
       disabled={disabled}
       openOnInputClick
+      // Enter (and Tab) choose the first match, so typing a full name and moving on keeps it.
+      autoHighlight
     >
       <div className="relative">
         <Combobox.Input
           id={id}
           aria-label={label}
           aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           placeholder={placeholder}
           className={cn(
             'h-10 w-full rounded-md border border-input bg-background pr-9 pl-3 text-sm text-foreground placeholder:text-muted-foreground',

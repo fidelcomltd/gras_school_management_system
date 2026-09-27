@@ -23,6 +23,9 @@ public static class EndpointModuleExtensions
             .Where(type =>
                 type is { IsAbstract: false, IsInterface: false, IsGenericTypeDefinition: false } &&
                 typeof(IEndpointModule).IsAssignableFrom(type))
+            // A fixed order: GetTypes() follows metadata order, which shifts when a module is added, and the route order
+            // becomes the OpenAPI document's path order. Unsorted, one new module rewrote thousands of contract lines.
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();
 
         foreach (var moduleType in moduleTypes)

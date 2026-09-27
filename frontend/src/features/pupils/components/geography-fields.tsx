@@ -1,15 +1,15 @@
-import { useId } from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
+import { useId, type ReactNode } from 'react';
+import { Controller, useFormContext, useWatch } from 'react-hook-form';
+import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Spinner } from '@/components/ui/spinner';
 import { useNigerianGeography } from '../api';
 import type { BiographicalFormValues } from '../pupil-schema';
 
 /**
  * State of origin and LGA (spec 6.5.4), chosen from the server's own list rather than typed: searchable, since there are
- * 37 states and up to 44 LGAs in one. Choosing a state narrows the LGAs to it, and a state change clears an LGA that
- * does not belong to the new state. A value already on file that the list lacks still shows, so an edit never silently
- * blanks it.
+ * 37 states and up to 44 LGAs in one. Choosing a state narrows the LGAs to it, and any change of state clears the LGA:
+ * several states share LGA names (Irepodun in Kwara and Osun, Surulere in Lagos and Oyo) that are different places. A
+ * value already on file that the list lacks still shows, so an edit never silently blanks it.
  */
 export function GeographyFields() {
   const stateId = useId();
@@ -17,81 +17,85 @@ export function GeographyFields() {
   const geography = useNigerianGeography();
   const {
     control,
-    watch,
     setValue,
     formState: { errors },
   } = useFormContext<BiographicalFormValues>();
-  const state = watch('stateOfOrigin');
+  const state = useWatch({ control, name: 'stateOfOrigin' });
 
-  const states = geography.data?.states ?? [];
-  const lgas = states.find((candidate) => candidate.name === state)?.lgas ?? [];
-
-  if (geography.isPending) {
+  if (geography.isPending) return <LoadingState label="Loading states and LGAs…" className="py-2 sm:col-span-2" />;
+  if (geography.isError) {
     return (
-      <output className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
-        <Spinner className="size-4" />
-        Loading states and LGAs…
-      </output>
+      <div className="sm:col-span-2">
+        <QueryErrorState error={geography.error} onRetry={() => void geography.refetch()} />
+      </div>
     );
   }
 
+  const states = geography.data.states;
+  const lgas = states.find((candidate) => candidate.name === state)?.lgas ?? [];
+
+  const field = (
+    id: string,
+    label: string,
+    message: string | undefined,
+    renderControl: (describedBy: string | undefined) => ReactNode,
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
+        {label}
+      </label>
+      {renderControl(message ? `${id}-error` : undefined)}
+      {message ? (
+        <p id={`${id}-error`} role="alert" className="text-xs font-medium text-destructive">
+          {message}
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={stateId} className="text-sm font-medium text-foreground">
-          State of origin
-        </label>
+      {field(stateId, 'State of origin', errors.stateOfOrigin?.message, (describedBy) => (
         <Controller
           control={control}
           name="stateOfOrigin"
-          render={({ field }) => (
+          render={({ field: stateField }) => (
             <SearchableSelect
               id={stateId}
               label="State of origin"
+              describedBy={describedBy}
               options={states.map((candidate) => candidate.name)}
-              value={field.value}
+              value={stateField.value}
               invalid={!!errors.stateOfOrigin}
               placeholder="Search states…"
               onChange={(next) => {
-                field.onChange(next);
-                const nextLgas = states.find((candidate) => candidate.name === next)?.lgas ?? [];
-                if (!nextLgas.includes(watch('lga'))) setValue('lga', '', { shouldDirty: true });
+                if (next === stateField.value) return;
+                stateField.onChange(next);
+                setValue('lga', '', { shouldDirty: true });
               }}
             />
           )}
         />
-        {errors.stateOfOrigin ? (
-          <p role="alert" className="text-xs font-medium text-destructive">
-            {errors.stateOfOrigin.message}
-          </p>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={lgaId} className="text-sm font-medium text-foreground">
-          LGA
-        </label>
+      ))}
+      {field(lgaId, 'LGA', errors.lga?.message, (describedBy) => (
         <Controller
           control={control}
           name="lga"
-          render={({ field }) => (
+          render={({ field: lgaField }) => (
             <SearchableSelect
               id={lgaId}
               label="LGA"
+              describedBy={describedBy}
               options={lgas}
-              value={field.value}
+              value={lgaField.value}
               invalid={!!errors.lga}
               disabled={!state}
               placeholder={state ? 'Search LGAs…' : 'Choose the state first'}
-              onChange={field.onChange}
+              onChange={lgaField.onChange}
             />
           )}
         />
-        {errors.lga ? (
-          <p role="alert" className="text-xs font-medium text-destructive">
-            {errors.lga.message}
-          </p>
-        ) : null}
-      </div>
+      ))}
     </>
   );
 }

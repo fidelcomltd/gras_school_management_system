@@ -5164,7 +5164,7 @@
           "Reference"
         ],
         "summary": "The states and LGAs a pupil record accepts",
-        "description": "Spec 6.5.4: the 36 states and the FCT, each with its LGAs, in the canonical spellings the server stores. A pupil's state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=86400`.",
+        "description": "Spec 6.5.4: the 36 states and the FCT, each with its LGAs, in the canonical spellings the server stores. A pupil's state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=3600`.",
         "operationId": "GetNigerianGeography",
         "responses": {
           "200": {
