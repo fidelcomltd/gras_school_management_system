@@ -25,7 +25,13 @@ internal sealed class PortalOptions
 /// </summary>
 internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
 {
-    private const int SlipsPerPage = 4;
+    private const int SlipsPerPage = 5;
+
+    // A4's 842pt height less the margins and gaps, shared by five cards: each slip is a wide card, cut along its border.
+    private const float SlipHeight = 146;
+
+    // How a prefix is shown wherever the rest of the pin is not (spec 6.8: the system never reveals the remainder).
+    private const string HiddenRest = " ••••••";
 
     private static readonly string[] DistributionColumns = ["No.", "Pin", "Pupil name", "Class", "Guardian name", "Signature"];
 
@@ -55,21 +61,16 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
                     page.Size(PageSizes.A4);
                     page.Margin(24);
                     page.DefaultTextStyle(style => style.FontSize(10));
-                    page.Content().Table(table =>
+                    page.Content().Column(column =>
                     {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.RelativeColumn();
-                            columns.RelativeColumn();
-                        });
-
+                        column.Spacing(8);
                         foreach (var slip in pageSlips)
                         {
-                            table.Cell()
-                                .Height(380)
+                            column.Item()
+                                .Height(SlipHeight)
                                 .Border(0.75f)
                                 .BorderColor(Colors.Grey.Lighten1)
-                                .Padding(16)
+                                .Padding(12)
                                 .Element(cell => Slip(cell, sheet, slip, logo));
                         }
                     });
@@ -91,6 +92,8 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
             {
                 column.Item().Text(sheet.SchoolShortName).Bold().FontSize(13);
                 column.Item().Text($"Pin distribution list: {sheet.BatchName} ({sheet.SessionName})");
+                column.Item().Text("Only each pin's first four characters are shown: the full pin exists only on its printed slip.")
+                    .FontSize(8).FontColor(Colors.Grey.Darken1);
                 column.Item().PaddingBottom(8).Text("Fill in as each slip is handed over. This sheet is the school's only record of who received which pin.")
                     .Italic().FontColor(Colors.Grey.Darken1);
             });
@@ -99,7 +102,7 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
                 table.ColumnsDefinition(columns =>
                 {
                     columns.ConstantColumn(30);
-                    columns.ConstantColumn(50);
+                    columns.ConstantColumn(80);
                     columns.RelativeColumn(3);
                     columns.RelativeColumn(1.4f);
                     columns.RelativeColumn(3);
@@ -117,7 +120,7 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
                 for (var index = 0; index < sheet.Prefixes.Count; index++)
                 {
                     table.Cell().Element(Row).Text((index + 1).ToString(CultureInfo.InvariantCulture));
-                    table.Cell().Element(Row).Text(sheet.Prefixes[index] + "…").Bold();
+                    table.Cell().Element(Row).Text(sheet.Prefixes[index] + HiddenRest).Bold();
                     table.Cell().Element(Row);
                     table.Cell().Element(Row);
                     table.Cell().Element(Row);
@@ -137,32 +140,44 @@ internal sealed class QuestPdfPinSlipRenderer : IPinSlipRenderer
     }
 
     private void Slip(IContainer cell, PinSlipSheet sheet, PinSlip slip, byte[]? logo) =>
-        cell.Column(column =>
+        cell.Row(row =>
         {
-            column.Spacing(8);
-            column.Item().Row(row =>
+            // Left: whose pin this is. Every line is clamped: the card's height is fixed, and a school name can run to 160
+            // characters, a batch name to 80, so unclamped text would overflow it and QuestPDF would refuse the whole print run.
+            row.ConstantItem(180).Column(school =>
             {
+                school.Spacing(3);
                 if (logo is not null)
                 {
-                    row.ConstantItem(44).Height(44).Image(logo).FitArea();
-                    row.ConstantItem(10);
+                    school.Item().Height(32).Width(32).Image(logo).FitArea();
                 }
 
-                row.RelativeItem().AlignMiddle().Column(title =>
+                school.Item().Text(sheet.SchoolShortName).Bold().FontSize(11).ClampLines(2);
+                school.Item().Text("Result checking pin").FontSize(9).FontColor(Colors.Grey.Darken2);
+                if (!string.IsNullOrWhiteSpace(sheet.SessionName))
                 {
-                    title.Item().Text(sheet.SchoolShortName).Bold().FontSize(13);
-                    title.Item().Text("Result checking pin").FontColor(Colors.Grey.Darken2);
-                });
+                    school.Item().Text($"Valid for the {sheet.SessionName} session").FontSize(8).FontColor(Colors.Grey.Darken2).ClampLines(1);
+                }
+
+                // The batch name ties a loose slip back to its batch, so it has its own line, never squeezed out.
+                school.Item().PaddingTop(2).Text(sheet.BatchName).FontSize(7).FontColor(Colors.Grey.Medium).ClampLines(1);
             });
 
-            column.Item().PaddingTop(10).AlignCenter().Text(slip.FormattedPin).Bold().FontSize(22).LetterSpacing(0.12f);
-            column.Item().AlignCenter().Text($"Valid for the {sheet.SessionName} session").FontColor(Colors.Grey.Darken2);
+            row.ConstantItem(14);
+            row.ConstantItem(0.75f).Background(Colors.Grey.Lighten2);
+            row.ConstantItem(14);
 
-            column.Item().PaddingTop(10).Text(
-                $"This pin can be used {slip.MaxUses.ToString(CultureInfo.InvariantCulture)} {(slip.MaxUses == 1 ? "time" : "times")}. " +
-                "Looking at all three terms for one pupil in one sitting counts as one use.");
-            column.Item().Text("You will need the pupil's registration number.");
-            column.Item().Text(_portalLine).Bold();
-            column.Item().ExtendVertical().AlignBottom().Text(sheet.BatchName).FontSize(7).FontColor(Colors.Grey.Medium);
+            // Right: the pin itself, large, then how to use it.
+            row.RelativeItem().Column(pin =>
+            {
+                pin.Spacing(4);
+                pin.Item().Text("PIN").FontSize(8).FontColor(Colors.Grey.Darken1).LetterSpacing(0.1f);
+                pin.Item().Text(slip.FormattedPin).Bold().FontSize(24).LetterSpacing(0.12f);
+                pin.Item().PaddingTop(4).Text(
+                    $"This pin can be used {slip.MaxUses.ToString(CultureInfo.InvariantCulture)} {(slip.MaxUses == 1 ? "time" : "times")}. " +
+                    "Looking at all three terms for one pupil in one sitting counts as one use.").FontSize(9);
+                pin.Item().Text("You will need the pupil's registration number.").FontSize(9);
+                pin.Item().Text(_portalLine).Bold().FontSize(9).ClampLines(2);
+            });
         });
 }

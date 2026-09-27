@@ -1,3 +1,4 @@
+import { pinLabel } from './masked-pin';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -97,7 +98,7 @@ export function PinBatchScreen() {
 
       {asking ? (
         <ReasonDialog
-          title={asking.kind === 'revoke-batch' ? 'Revoke the whole batch' : asking.kind === 'revoke-pin' ? `Revoke pin ${asking.pin.prefix}…` : `Reinstate pin ${asking.pin.prefix}…`}
+          title={asking.kind === 'revoke-batch' ? 'Revoke the whole batch' : asking.kind === 'revoke-pin' ? `Revoke ${pinLabel(asking.pin.prefix)}` : `Reinstate ${pinLabel(asking.pin.prefix)}`}
           description={
             asking.kind === 'revoke-batch'
               ? 'Every pin in it stops working at once, including any parent viewing results with one now.'
