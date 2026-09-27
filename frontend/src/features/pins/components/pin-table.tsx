@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import type { PinSummaryDto } from '../types';
 
-/** Each pin by its first four characters (the value itself is never shown after printing), with its state and uses. */
+/** Each pin by its first four characters (spec 6.8: the rest is never shown after printing), with its state and uses. */
 export function PinTable({
   pins,
   canRevoke,
@@ -14,6 +14,11 @@ export function PinTable({
   onReinstate: (pin: PinSummaryDto) => void;
 }) {
   return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">
+        Only each pin&apos;s first four characters are kept on screen, to match a pin a parent reads out. The full pin exists only
+        on its printed slip.
+      </p>
     <div className="overflow-x-auto rounded-md border border-border">
       <table className="w-full text-sm">
         <thead className="bg-muted text-muted-foreground">
@@ -30,7 +35,10 @@ export function PinTable({
         <tbody>
           {pins.map((pin) => (
             <tr key={pin.id} className="border-t border-border">
-              <th scope="row" className="px-3 py-1.5 text-left font-mono font-normal text-foreground">{pin.prefix}…</th>
+              <th scope="row" className="px-3 py-1.5 text-left font-mono font-normal text-foreground">{pin.prefix}
+                <span aria-hidden="true" className="text-muted-foreground"> ••••••</span>
+                <span className="sr-only"> (rest hidden)</span>
+              </th>
               <td className="px-3 py-1.5 text-foreground">
                 {pin.state}
                 {pin.stateReason ? <span className="block text-xs text-muted-foreground">{pin.stateReason}</span> : null}
@@ -55,6 +63,7 @@ export function PinTable({
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }
