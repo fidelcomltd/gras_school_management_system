@@ -19,6 +19,8 @@ export function WorkflowActions({
   resultSet,
   canSubmitNow,
   can,
+  onPrint,
+  printing,
 }: {
   armId: string;
   termId: string;
@@ -26,6 +28,9 @@ export function WorkflowActions({
   resultSet: ResultSetSummaryDto;
   canSubmitNow: boolean;
   can: (privilege: string) => boolean;
+  /** Prints the whole class; the screen owns the request so the grid's per-pupil prints share its state. */
+  onPrint: () => void;
+  printing: boolean;
 }) {
   const transition = useTransition(armId, termId);
   const annual = useComputeAnnual(armId);
@@ -66,6 +71,11 @@ export function WorkflowActions({
         {state === 'Published' && can('result.unpublish') ? (
           <Button variant="outline" disabled={busy} onClick={() => setAsking('withdraw')}>
             Withdraw from parents
+          </Button>
+        ) : null}
+        {state === 'Published' && can('result.print') ? (
+          <Button variant="outline" disabled={printing} onClick={onPrint}>
+            {printing ? 'Preparing…' : 'Print result sheets'}
           </Button>
         ) : null}
         {state === 'Withdrawn' ? button('Reopen for correction', 'reopen', 'result.unpublish') : null}

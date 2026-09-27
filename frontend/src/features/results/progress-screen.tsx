@@ -1,10 +1,11 @@
 import { Users } from 'lucide-react';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { ApiError } from '@/lib/http';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
-import { useReadiness } from './api-workflow';
+import { usePrintResultSheets, useReadiness } from './api-workflow';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
@@ -17,6 +18,14 @@ export function ProgressScreen() {
   const term = useTermChoice();
   const klass = useClassChoice(term.sessionId, 'result.view');
   const readiness = useReadiness(klass.armId, term.termId);
+  const print = usePrintResultSheets();
+  // One request for the class button and the grid; its error belongs to the class and term it was for, not the next one.
+  const printError =
+    print.error instanceof ApiError && print.variables?.armId === klass.armId && print.variables.termId === term.termId
+      ? print.error.message
+      : null;
+  const printFor = (pupilId?: string) =>
+    print.mutate(pupilId ? { armId: klass.armId, termId: term.termId, pupilId } : { armId: klass.armId, termId: term.termId });
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilegeInArm(me.data, privilege, klass.armId);
 
@@ -54,15 +63,22 @@ export function ProgressScreen() {
               resultSet={set}
               canSubmitNow={data.canSubmit}
               can={can}
+              onPrint={() => printFor()}
+              printing={print.isPending}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Results start when the first mark, rating or remark is saved.</p>
           )}
+          <FormError message={printError} />
         </section>
         {data.pupils.length === 0 ? (
           <EmptyState icon={Users} title="No active pupils in this class." />
         ) : (
-          <ReadinessGrid readiness={data} />
+          <ReadinessGrid
+            readiness={data}
+            onPrint={set?.state === 'Published' && can('result.print') ? printFor : undefined}
+            printing={print.isPending}
+          />
         )}
       </div>
     );

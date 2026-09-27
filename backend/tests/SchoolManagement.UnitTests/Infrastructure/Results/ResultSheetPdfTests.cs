@@ -39,6 +39,20 @@ public sealed class ResultSheetPdfTests
     }
 
     [Fact]
+    public void SeveralSheets_OneFlowingOntoASecondPage_RenderAsOnePdf()
+    {
+        var renderer = new QuestPdfResultSheetRenderer(Options.Create(new PortalOptions { PublicUrl = "results.example.sch.ng" }));
+        var extras = new ResultSheetPdfExtras(ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty, Token, renderer.VerificationUrl(Token), DateTimeOffset.UtcNow);
+
+        var one = renderer.Render(Sheet(subjects: 14), extras);
+        var many = renderer.RenderMany([(Sheet(subjects: 30), extras), (Sheet(subjects: 14), extras), (Sheet(subjects: 14), extras)]);
+
+        System.Text.Encoding.ASCII.GetString(many, 0, 5).ShouldBe("%PDF-");
+        many.Length.ShouldBeGreaterThan(one.Length);
+        Should.Throw<ArgumentOutOfRangeException>(() => renderer.RenderMany([]));
+    }
+
+    [Fact]
     public void AnnualSheet_ReadsTheRowAndSnapshot_OrdersSubjects_AndRendersUnder200Kb()
     {
         var english = Guid.Parse("22222222-0000-7000-8000-000000000001");
