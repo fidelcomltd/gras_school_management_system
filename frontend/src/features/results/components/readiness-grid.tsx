@@ -1,4 +1,5 @@
 import type { components } from '@/api/schema';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 
 type ResultSetReadinessDto = components['schemas']['ResultSetReadinessDto'];
@@ -15,7 +16,16 @@ const tick = (done: boolean) => (
 );
 
 /** The completeness gate (spec 6.7.5): subjects across, pupils down, then ratings, attendance and the two remarks. */
-export function ReadinessGrid({ readiness }: { readiness: ResultSetReadinessDto }) {
+export function ReadinessGrid({
+  readiness,
+  onPrint,
+  printing = false,
+}: {
+  readiness: ResultSetReadinessDto;
+  /** Present when the set is published and the viewer may print: adds a per-pupil Print column. */
+  onPrint?: ((pupilId: string) => void) | undefined;
+  printing?: boolean;
+}) {
   const counters = readiness.counters;
   const summary = [
     ['Marks', counters.marks],
@@ -50,6 +60,7 @@ export function ReadinessGrid({ readiness }: { readiness: ResultSetReadinessDto 
               <th scope="col" className="px-2 py-2 font-medium">Attendance</th>
               <th scope="col" className="px-2 py-2 font-medium">Teacher</th>
               <th scope="col" className="px-2 py-2 font-medium">Head</th>
+              {onPrint ? <th scope="col" className="px-2 py-2 font-medium">Sheet</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -69,6 +80,19 @@ export function ReadinessGrid({ readiness }: { readiness: ResultSetReadinessDto 
                 <td className="px-2 py-1.5 text-center">{tick(pupil.attendanceComplete)}</td>
                 <td className="px-2 py-1.5 text-center">{tick(pupil.classTeacherRemarkPresent)}</td>
                 <td className="px-2 py-1.5 text-center">{tick(pupil.headTeacherRemarkPresent)}</td>
+                {onPrint ? (
+                  <td className="px-2 py-1 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={printing}
+                      aria-label={`Print ${pupil.displayName}'s result sheet`}
+                      onClick={() => onPrint(pupil.pupilId)}
+                    >
+                      Print
+                    </Button>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

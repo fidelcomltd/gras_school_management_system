@@ -41,23 +41,44 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
     public byte[] Render(ResultSheet sheet, ResultSheetPdfExtras extras)
     {
         ArgumentNullException.ThrowIfNull(sheet);
+        return RenderMany([(sheet, extras)]);
+    }
+
+    public byte[] RenderMany(IReadOnlyList<(ResultSheet Sheet, ResultSheetPdfExtras Extras)> sheets)
+    {
+        ArgumentNullException.ThrowIfNull(sheets);
+        ArgumentOutOfRangeException.ThrowIfZero(sheets.Count);
+        var first = sheets[0].Sheet;
+        return Document.Create(document =>
+            {
+                for (var index = 0; index < sheets.Count; index++)
+                {
+                    ComposeSheet(document, sheets[index].Sheet, sheets[index].Extras, $"sheet-{index}");
+                }
+            })
+            .WithMetadata(new DocumentMetadata { Title = $"{first.TermName} result, {first.AcademicYear}", Author = first.SchoolName, Creator = first.SchoolName })
+            .WithSettings(new DocumentSettings { ImageRasterDpi = 200, ImageCompressionQuality = ImageCompressionQuality.High })
+            .GeneratePdf();
+    }
+
+    /// <summary>One sheet as its own page set. The section keeps "Page n of N" counting this sheet, not the document.</summary>
+    private static void ComposeSheet(IDocumentContainer document, ResultSheet sheet, ResultSheetPdfExtras extras, string section)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
         ArgumentNullException.ThrowIfNull(extras);
         var logo = extras.Logo.IsEmpty ? null : extras.Logo.ToArray();
         var signature = extras.Signature.IsEmpty ? null : extras.Signature.ToArray();
         var qr = extras.VerificationUrl is { } url ? QrPng(url.AbsoluteUri) : null;
 
-        return Document.Create(document => document.Page(page =>
-            {
-                page.Size(PageSizes.A4);
-                page.Margin(Margin);
-                page.DefaultTextStyle(style => style.FontSize(8));
-                page.Header().Element(header => Header(header, sheet, logo));
-                page.Content().PaddingVertical(6).Element(content => Content(content, sheet, signature));
-                page.Footer().Element(footer => Footer(footer, extras, qr));
-            }))
-            .WithMetadata(new DocumentMetadata { Title = $"{sheet.TermName} result, {sheet.AcademicYear}", Author = sheet.SchoolName, Creator = sheet.SchoolName })
-            .WithSettings(new DocumentSettings { ImageRasterDpi = 200, ImageCompressionQuality = ImageCompressionQuality.High })
-            .GeneratePdf();
+        document.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(Margin);
+            page.DefaultTextStyle(style => style.FontSize(8));
+            page.Header().Element(header => Header(header, sheet, logo));
+            page.Content().Section(section).PaddingVertical(6).Element(content => Content(content, sheet, signature));
+            page.Footer().Element(footer => Footer(footer, extras, qr, section));
+        });
     }
 
     public byte[] RenderAnnual(AnnualSheet sheet, ResultSheetPdfExtras extras)
@@ -535,7 +556,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             column.Item().Text(string.Join("    ", gradeKey.Select(band => $"{band.Grade}: {band.Range} {band.Word}"))).FontSize(7);
         });
 
-    private static void Footer(IContainer container, ResultSheetPdfExtras extras, byte[]? qr) =>
+    private static void Footer(IContainer container, ResultSheetPdfExtras extras, byte[]? qr, string? section = null) =>
         container.BorderTop(0.5f).PaddingTop(4).Row(row =>
         {
             if (qr is not null && extras.VerificationToken is { } token)
@@ -564,9 +585,18 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
                 {
                     text.DefaultTextStyle(style => style.FontSize(6.5f));
                     text.Span("Page ");
-                    text.CurrentPageNumber();
-                    text.Span(" of ");
-                    text.TotalPages();
+                    if (section is null)
+                    {
+                        text.CurrentPageNumber();
+                        text.Span(" of ");
+                        text.TotalPages();
+                    }
+                    else
+                    {
+                        text.PageNumberWithinSection(section);
+                        text.Span(" of ");
+                        text.TotalPagesWithinSection(section);
+                    }
                 });
             });
         });

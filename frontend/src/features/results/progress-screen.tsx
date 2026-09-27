@@ -1,10 +1,11 @@
 import { Users } from 'lucide-react';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { ApiError } from '@/lib/http';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
-import { useReadiness } from './api-workflow';
+import { usePrintResultSheets, useReadiness } from './api-workflow';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
@@ -17,6 +18,7 @@ export function ProgressScreen() {
   const term = useTermChoice();
   const klass = useClassChoice(term.sessionId, 'result.view');
   const readiness = useReadiness(klass.armId, term.termId);
+  const print = usePrintResultSheets(klass.armId, term.termId);
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilegeInArm(me.data, privilege, klass.armId);
 
@@ -62,7 +64,14 @@ export function ProgressScreen() {
         {data.pupils.length === 0 ? (
           <EmptyState icon={Users} title="No active pupils in this class." />
         ) : (
-          <ReadinessGrid readiness={data} />
+          <div className="flex flex-col gap-2">
+            <FormError message={print.error instanceof ApiError ? print.error.message : null} />
+            <ReadinessGrid
+              readiness={data}
+              onPrint={set?.state === 'Published' && can('result.print') ? (pupilId) => print.mutate(pupilId) : undefined}
+              printing={print.isPending}
+            />
+          </div>
         )}
       </div>
     );

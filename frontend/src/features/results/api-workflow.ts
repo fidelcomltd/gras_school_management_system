@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/api/client';
+import { getFile, saveFile } from '@/lib/http';
 import { RecordsKeys } from './api-records';
 import { ResultsKeys } from './types';
 
@@ -56,6 +57,21 @@ export function useTransition(armId: string, termId: string) {
       void queryClient.invalidateQueries({ queryKey: [WorkflowKeys.Readiness, armId, termId] });
       void queryClient.invalidateQueries({ queryKey: [ResultsKeys.ScoreSheet, armId] });
       void queryClient.invalidateQueries({ queryKey: [RecordsKeys.Sheet] });
+    },
+  });
+}
+
+/**
+ * A published arm's result sheets as one PDF, or one pupil's with `pupilId`, saved under the server's name. Staff sheets
+ * always show the outstanding-fee line. Not audited: it reprints what is already published.
+ */
+export function usePrintResultSheets(armId: string, termId: string) {
+  return useMutation({
+    mutationKey: [WorkflowKeys.Transition, 'print', armId, termId],
+    mutationFn: async (pupilId?: string) => {
+      const query = new URLSearchParams({ termId });
+      if (pupilId) query.set('pupilId', pupilId);
+      saveFile(await getFile(`/api/v1/arms/${encodeURIComponent(armId)}/result-sheets/pdf?${query.toString()}`, 'result-sheets.pdf'));
     },
   });
 }

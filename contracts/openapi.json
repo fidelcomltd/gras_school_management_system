@@ -13402,6 +13402,114 @@
         }
       }
     },
+    "/api/v1/arms/{armId}/result-sheets/pdf": {
+      "get": {
+        "tags": [
+          "Result sheets"
+        ],
+        "summary": "Print an arm's published result sheets",
+        "description": "The A4 result sheets for a published arm-term, as one PDF: every pupil with a result, in name order, each starting on a fresh page and numbered within itself; or one pupil's sheet with `pupilId`. The same sheet the parent downloads, except that the outstanding-fee line always shows. 409 `result_set.not_published` until the arm's results for the term are published; 404 `result_sheet.not_found` when the pupil has no result in this arm, `result_sheet.none` when no pupil does. Fetch it and save the blob.",
+        "operationId": "PrintResultSheets",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "termId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pupilId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/roles": {
       "post": {
         "tags": [
@@ -39244,6 +39352,9 @@
     },
     {
       "name": "Result sets"
+    },
+    {
+      "name": "Result sheets"
     },
     {
       "name": "Roles"

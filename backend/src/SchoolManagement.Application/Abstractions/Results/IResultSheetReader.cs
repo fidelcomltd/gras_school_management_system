@@ -74,4 +74,7 @@ public interface IResultSheetReader
     /// or null when there is no such result set.
     /// </summary>
     Task<ResultSheetData?> ReadAsync(Guid pupilId, Guid termId, CancellationToken cancellationToken);
+
+    /// <summary>The pupils with at least one computed subject line in <paramref name="resultSetId"/>, in no particular order.</summary>
+    Task<IReadOnlyList<Guid>> ListPupilsWithLinesAsync(Guid resultSetId, CancellationToken cancellationToken);
 }

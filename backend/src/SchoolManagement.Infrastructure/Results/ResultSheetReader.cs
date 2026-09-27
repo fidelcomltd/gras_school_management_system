@@ -8,6 +8,13 @@ namespace SchoolManagement.Infrastructure.Results;
 /// <summary>Reads one pupil's sheet data for one term: the arm they were enrolled in, its result set, and their rows.</summary>
 internal sealed class ResultSheetReader(ApplicationDbContext context) : IResultSheetReader
 {
+    public async Task<IReadOnlyList<Guid>> ListPupilsWithLinesAsync(Guid resultSetId, CancellationToken cancellationToken) =>
+        await context.SubjectResultLines.AsNoTracking()
+            .Where(line => line.ResultSetId == resultSetId)
+            .Select(line => line.PupilId)
+            .Distinct()
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<ResultSheetData?> ReadAsync(Guid pupilId, Guid termId, CancellationToken cancellationToken)
     {
         var term = await context.Terms.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.Id == termId, cancellationToken).ConfigureAwait(false);
