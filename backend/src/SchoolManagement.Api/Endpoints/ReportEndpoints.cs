@@ -3,6 +3,7 @@ using SchoolManagement.Api.Http;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Reports;
+using SchoolManagement.Application.Reports.Register;
 using SchoolManagement.Application.Reports.Results;
 
 namespace SchoolManagement.Api.Endpoints;
@@ -99,6 +100,51 @@ internal sealed record PupilRecordParameters([FromQuery(Name = "pupilId")] strin
     public PupilRecordFilters ToFilters() => new(PupilId);
 }
 
+/// <summary><c>sessionId</c>, <c>levelId</c>, <c>armId</c>, <c>status</c>, <c>sex</c>.</summary>
+internal sealed record NominalRollParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "levelId")] string? LevelId,
+    [FromQuery(Name = "armId")] string? ArmId,
+    [FromQuery(Name = "status")] string? Status,
+    [FromQuery(Name = "sex")] string? Sex) : IReportParameters<NominalRollFilters>
+{
+    public NominalRollFilters ToFilters() => new(SessionId, LevelId, ArmId, Status, Sex);
+}
+
+/// <summary><c>sessionId</c>, <c>status</c>.</summary>
+internal sealed record EnrolmentSummaryParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "status")] string? Status) : IReportParameters<EnrolmentSummaryFilters>
+{
+    public EnrolmentSummaryFilters ToFilters() => new(SessionId, Status);
+}
+
+/// <summary><c>sessionId</c>, <c>armId</c>.</summary>
+internal sealed record GuardianContactParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "armId")] string? ArmId) : IReportParameters<GuardianContactFilters>
+{
+    public GuardianContactFilters ToFilters() => new(SessionId, ArmId);
+}
+
+/// <summary><c>sessionId</c>, <c>levelId</c>, <c>armId</c>, <c>documentType</c>.</summary>
+internal sealed record OutstandingDocumentsParameters(
+    [FromQuery(Name = "sessionId")] string? SessionId,
+    [FromQuery(Name = "levelId")] string? LevelId,
+    [FromQuery(Name = "armId")] string? ArmId,
+    [FromQuery(Name = "documentType")] string? DocumentType) : IReportParameters<OutstandingDocumentsFilters>
+{
+    public OutstandingDocumentsFilters ToFilters() => new(SessionId, LevelId, ArmId, DocumentType);
+}
+
+/// <summary><c>levelId</c>, <c>minDays</c>.</summary>
+internal sealed record AdmissionsPipelineParameters(
+    [FromQuery(Name = "levelId")] string? LevelId,
+    [FromQuery(Name = "minDays")] int? MinDays) : IReportParameters<AdmissionsPipelineFilters>
+{
+    public AdmissionsPipelineFilters ToFilters() => new(LevelId, MinDays);
+}
+
 /// <summary>
 /// Spec 15 section 10's reports. Each report is two routes: <c>GET /reports/{name}</c> (the table as JSON) and
 /// <c>GET /reports/{name}/export?format=csv|pdf</c> (a file, <c>report.export</c>, audited as <c>report.export</c> with the
@@ -167,6 +213,27 @@ public sealed class ReportEndpoints : IEndpointModule
             "One pupil across every session: term by term class, average, grade, class and level position and publication " +
             "status, each session closed by its annual result and promotion outcome. An arm-restricted holder sees only the " +
             "terms spent in their arms (403 when none). `report.view`.");
+        Map<NominalRollParameters, NominalRollFilters>(
+            group, "nominal-roll", "NominalRoll", "Nominal roll",
+            "The session's register, grouped by class: registration number, name, sex, date of birth, age (today, Lagos), " +
+            "admission date, status and primary guardian with phone. Filters: `levelId`, `armId`, `status` (Active when " +
+            "absent), `sex`. `report.view`, arm-scoped. PDF landscape.");
+        Map<EnrolmentSummaryParameters, EnrolmentSummaryFilters>(
+            group, "enrolment-summary", "EnrolmentSummary", "Enrolment summary",
+            "Per arm: boys, girls, total, capacity and space left, a subtotal per level and a total. `status` (Active when " +
+            "absent). `report.view`.");
+        Map<GuardianContactParameters, GuardianContactFilters>(
+            group, "guardian-contacts", "GuardianContacts", "Guardian contact list",
+            "One arm's active pupils with their primary guardian, relationship, phone and alternate phone; nothing more, by " +
+            "design (spec 15). `contact.view` (the spec's `guardian.view`), arm-scoped; export needs `report.export` too.");
+        Map<OutstandingDocumentsParameters, OutstandingDocumentsFilters>(
+            group, "outstanding-documents", "OutstandingDocuments", "Outstanding admission documents",
+            "One row per active pupil per admission document not yet received (the pupil record's own completeness check), " +
+            "oldest record first. Filters: `levelId`, `armId`, `documentType`. `report.view`.");
+        Map<AdmissionsPipelineParameters, AdmissionsPipelineFilters>(
+            group, "admissions-pipeline", "AdmissionsPipeline", "Admissions pipeline",
+            "Every pending admission by level applied for: created, days since, the step it is held at and what blocks " +
+            "approval. Filters: `levelId`, `minDays`. `report.view` school-wide (a pending record has no class). PDF landscape.");
     }
 
     private static void Map<TParameters, TFilters>(RouteGroupBuilder group, string path, string name, string summary, string description)

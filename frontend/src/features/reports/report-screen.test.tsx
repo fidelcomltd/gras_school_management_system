@@ -139,6 +139,28 @@ describe('ReportScreen', () => {
     return waitFor(() => expect(screen.getByText(/Open a pupil’s record/)).toBeInTheDocument());
   });
 
+  it('runs the nominal roll for the whole school by default, and narrows by sex when chosen', async () => {
+    mockMe('report.view');
+    mockClasses();
+    const asked: URLSearchParams[] = [];
+    server.use(
+      http.get(apiUrl('/api/v1/reports/nominal-roll'), ({ request }) => {
+        asked.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ ...broadsheet, key: 'nominal-roll', title: 'Nominal roll' });
+      }),
+    );
+
+    const { user } = renderReport('nominal-roll');
+
+    expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
+    expect(asked[0]?.get('sessionId')).toBe('s-1');
+    expect(asked[0]?.has('armId')).toBe(false);
+    expect(asked[0]?.has('status')).toBe(false);
+    await user.click(screen.getByRole('combobox', { name: 'Sex' }));
+    await user.click(await screen.findByRole('option', { name: 'Female' }));
+    await waitFor(() => expect(asked.at(-1)?.get('sex')).toBe('Female'));
+  });
+
   it('lists only the reports the caller may open', () => {
     mockMe('report.view');
 

@@ -1,4 +1,5 @@
 using SchoolManagement.Domain.Promotion;
+using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Results;
 
 namespace SchoolManagement.Application.Abstractions.Reports;
@@ -160,6 +161,22 @@ public sealed record ReportPupilTerm(
     Guid SessionId, int TermOrdinal, string TermName, Guid ArmId, decimal Average, string Grade,
     int? ArmPosition, bool ArmTied, int? LevelPosition, bool LevelTied, ResultSetState State);
 
+/// <summary>A pupil on a session's register: their details and the arm of their latest enrolment in that session.</summary>
+/// <param name="PupilId">The pupil.</param>
+/// <param name="Surname">Surname.</param>
+/// <param name="GivenNames">First and middle names.</param>
+/// <param name="RegistrationNumber">Their number, if issued.</param>
+/// <param name="Sex">Sex.</param>
+/// <param name="DateOfBirth">Date of birth.</param>
+/// <param name="Status">Current status.</param>
+/// <param name="ArmId">The arm.</param>
+public sealed record ReportRegisterPupil(
+    Guid PupilId, string Surname, string GivenNames, string? RegistrationNumber, PupilSex Sex, DateOnly DateOfBirth, PupilStatus Status, Guid ArmId)
+{
+    /// <summary>"OKAFOR Chidera Ada".</summary>
+    public string DisplayName => $"{Surname.ToUpperInvariant()} {GivenNames}".Trim();
+}
+
 /// <summary>Read-only projections the reports assemble from (spec 15 section 10). Every list is small: one session's worth.</summary>
 public interface IReportReader
 {
@@ -231,6 +248,18 @@ public interface IReportReader
 
     /// <summary>These arms with their levels, whatever their session.</summary>
     Task<IReadOnlyDictionary<Guid, ReportArm>> FindArmsAsync(IReadOnlyCollection<Guid> armIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every non-pending pupil enrolled in one of the session's arms at any point, with the arm of their latest enrolment there
+    /// (a mid-session move lists them once, under the class they moved to).
+    /// </summary>
+    Task<IReadOnlyList<ReportRegisterPupil>> ListRegisterAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>Every pupil still pending admission (spec 6.5.14), the one list that opts out of the pending filter.</summary>
+    Task<IReadOnlyList<Guid>> ListPendingPupilIdsAsync(CancellationToken cancellationToken);
+
+    /// <summary>These class levels' names, by id.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> FindLevelNamesAsync(IReadOnlyCollection<Guid> levelIds, CancellationToken cancellationToken);
 
     /// <summary>These subjects' names, by id.</summary>
     Task<IReadOnlyDictionary<Guid, string>> FindSubjectNamesAsync(IReadOnlyCollection<Guid> subjectIds, CancellationToken cancellationToken);

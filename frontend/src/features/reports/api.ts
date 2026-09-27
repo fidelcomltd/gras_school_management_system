@@ -13,56 +13,57 @@ export interface ReportParams {
   termId?: string;
   sessionId?: string;
   pupilId?: string;
-  outcome?: string;
   armId?: string;
   levelId?: string;
   top?: number;
   state?: string;
+  outcome?: string;
+  status?: string;
+  sex?: string;
+  documentType?: string;
+  minDays?: number;
+}
+
+/** Only the filters that are set: an absent one is omitted, never sent blank. */
+function set<T extends object>(values: T): { [K in keyof T]?: Exclude<T[K], undefined | ''> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== '')) as {
+    [K in keyof T]?: Exclude<T[K], undefined | ''>;
+  };
 }
 
 function fetchReport(key: ReportKey, params: ReportParams, signal: AbortSignal): Promise<ReportDto> {
-  const { termId = '', sessionId = '', pupilId = '', armId, levelId, top, state, outcome } = params;
+  const { termId = '', sessionId = '', pupilId = '', armId, levelId, top, state, outcome, status, sex, documentType, minDays } = params;
   switch (key) {
     case 'broadsheet':
-      return apiGet('/api/v1/reports/broadsheet', { termId, ...(armId ? { armId } : {}) }, { signal });
+      return apiGet('/api/v1/reports/broadsheet', { termId, ...set({ armId }) }, { signal });
     case 'merit-list':
-      return apiGet(
-        '/api/v1/reports/merit-list',
-        { termId, ...(armId ? { armId } : {}), ...(levelId ? { levelId } : {}), ...(top ? { top } : {}) },
-        { signal },
-      );
+      return apiGet('/api/v1/reports/merit-list', { termId, ...set({ armId, levelId, top }) }, { signal });
     case 'result-entry-progress':
-      return apiGet(
-        '/api/v1/reports/result-entry-progress',
-        { termId, ...(levelId ? { levelId } : {}), ...(state ? { state } : {}) },
-        { signal },
-      );
+      return apiGet('/api/v1/reports/result-entry-progress', { termId, ...set({ levelId, state }) }, { signal });
     case 'grade-distribution':
-      return apiGet(
-        '/api/v1/reports/grade-distribution',
-        { termId, ...(armId ? { armId } : {}), ...(levelId ? { levelId } : {}) },
-        { signal },
-      );
+      return apiGet('/api/v1/reports/grade-distribution', { termId, ...set({ armId, levelId }) }, { signal });
     case 'subject-performance':
-      return apiGet('/api/v1/reports/subject-performance', { termId, ...(levelId ? { levelId } : {}) }, { signal });
+      return apiGet('/api/v1/reports/subject-performance', { termId, ...set({ levelId }) }, { signal });
     case 'development-summary':
-      return apiGet('/api/v1/reports/development-summary', { termId, ...(armId ? { armId } : {}) }, { signal });
+      return apiGet('/api/v1/reports/development-summary', { termId, ...set({ armId }) }, { signal });
     case 'fee-notice-audit':
-      return apiGet('/api/v1/reports/fee-notice-audit', { termId, ...(levelId ? { levelId } : {}) }, { signal });
+      return apiGet('/api/v1/reports/fee-notice-audit', { termId, ...set({ levelId }) }, { signal });
     case 'annual-cumulative':
-      return apiGet(
-        '/api/v1/reports/annual-cumulative',
-        { sessionId, ...(armId ? { armId } : {}), ...(levelId ? { levelId } : {}) },
-        { signal },
-      );
+      return apiGet('/api/v1/reports/annual-cumulative', { sessionId, ...set({ armId, levelId }) }, { signal });
     case 'promotion-list':
-      return apiGet(
-        '/api/v1/reports/promotion-list',
-        { sessionId, ...(levelId ? { levelId } : {}), ...(outcome ? { outcome } : {}) },
-        { signal },
-      );
+      return apiGet('/api/v1/reports/promotion-list', { sessionId, ...set({ levelId, outcome }) }, { signal });
     case 'pupil-record':
       return apiGet('/api/v1/reports/pupil-record', { pupilId }, { signal });
+    case 'nominal-roll':
+      return apiGet('/api/v1/reports/nominal-roll', { sessionId, ...set({ armId, levelId, status, sex }) }, { signal });
+    case 'enrolment-summary':
+      return apiGet('/api/v1/reports/enrolment-summary', { sessionId, ...set({ status }) }, { signal });
+    case 'guardian-contacts':
+      return apiGet('/api/v1/reports/guardian-contacts', { sessionId, ...set({ armId }) }, { signal });
+    case 'outstanding-documents':
+      return apiGet('/api/v1/reports/outstanding-documents', { sessionId, ...set({ armId, levelId, documentType }) }, { signal });
+    case 'admissions-pipeline':
+      return apiGet('/api/v1/reports/admissions-pipeline', set({ levelId, minDays }), { signal });
   }
 }
 
