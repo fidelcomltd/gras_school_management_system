@@ -5158,6 +5158,529 @@
         }
       }
     },
+    "/api/v1/fee-notices": {
+      "get": {
+        "tags": [
+          "Fee notice"
+        ],
+        "summary": "Read a section's fee notice grid for a term",
+        "description": "Spec 6.2.13: the section's lines (rows) against its active class levels (columns), with the amounts printed on `termId`'s result sheets, which carry what to pay NEXT term. A section that has saved no lines gets the six seeded lines with `isDefault: true`, unsaved. `previousTermId` is the term before, for \"copy from previous term\".",
+        "operationId": "GetFeeNoticeGrid",
+        "parameters": [
+          {
+            "name": "sectionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "termId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeNoticeGridDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Fee notice"
+        ],
+        "summary": "Save a section's fee notice grid for a term",
+        "description": "The whole grid in one save: the lines as listed become the section's lines in that order (renamed, reordered or new); a saved line left out is removed together with its amounts in every term. Cells are this term's amounts in naira; a null amount clears the cell and levels not listed are left as they are. At most one line is the per-pupil outstanding figure, which takes no amounts and carries the portal switch. Nothing is invoiced, receipted or carried forward. `Idempotency-Key` is accepted, not required.",
+        "operationId": "SaveFeeNoticeGrid",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFeeNoticeGridCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeNoticeGridDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arms/{armId}/outstanding-fees": {
+      "get": {
+        "tags": [
+          "Fee notice"
+        ],
+        "summary": "Read an arm's outstanding-fee figures for a term",
+        "description": "Spec 6.2.13's bulk grid: the arm's active pupils against one outstanding figure each, typed from the school's own records. Blank (null) is the normal case and prints as a dash. `locked` is true once the arm's results for the term are published.",
+        "operationId": "GetOutstandingFees",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "termId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutstandingFeeSheetDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Fee notice"
+        ],
+        "summary": "Save an arm's outstanding-fee figures for a term",
+        "description": "Saves the listed pupils' figures in naira; a null amount clears one and pupils not listed are left as they are. 409 once the arm's results for the term are published (withdraw them to correct a figure). No figure ever blocks a result, a pin or a portal lookup. `Idempotency-Key` is accepted, not required.",
+        "operationId": "SaveOutstandingFees",
+        "parameters": [
+          {
+            "name": "armId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOutstandingFeesCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutstandingFeeSheetDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/geography/states": {
       "get": {
         "tags": [
@@ -24628,6 +25151,407 @@
           "armIds": [ ]
         }
       },
+      "FeeGridAmountDto": {
+        "required": [
+          "classLevelId",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "description": "The column.",
+            "format": "uuid",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Naira. Zero prints as a dash.",
+            "format": "int32",
+            "example": 45000
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cell.",
+        "example": {
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "amount": 45000
+        }
+      },
+      "FeeGridAmountInput": {
+        "required": [
+          "classLevelId",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "description": "The column.",
+            "format": "uuid",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Naira; null clears the cell.",
+            "format": "int32",
+            "example": 45000
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cell as submitted.",
+        "example": {
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "amount": 45000
+        }
+      },
+      "FeeGridLevelDto": {
+        "required": [
+          "classLevelId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "classLevelId": {
+            "type": "string",
+            "description": "The level.",
+            "format": "uuid",
+            "example": "0192f0c4-04b6-7263-1705-b363e24f9528"
+          },
+          "name": {
+            "type": "string",
+            "description": "For example Primary 3.",
+            "example": "Primary 3"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A column of the grid.",
+        "example": {
+          "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+          "name": "Primary 3"
+        }
+      },
+      "FeeGridLineDto": {
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "showOnPortal",
+          "amounts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The saved line; null for an unsaved default.",
+            "format": "uuid",
+            "example": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01"
+          },
+          "label": {
+            "type": "string",
+            "description": "As printed.",
+            "example": "Tuition Fee"
+          },
+          "kind": {
+            "description": "Amount, or the one per-pupil Outstanding line.",
+            "$ref": "#/components/schemas/FeeLabelKind"
+          },
+          "showOnPortal": {
+            "type": "boolean",
+            "description": "Outstanding line only: whether parents see the figure on the portal. Off by default.",
+            "example": false
+          },
+          "amounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeeGridAmountDto"
+            },
+            "description": "One per level that has an amount set; an outstanding line has none.",
+            "example": [
+              {
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "amount": 45000
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "A row of the grid.",
+        "example": {
+          "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+          "label": "Tuition Fee",
+          "kind": "Amount",
+          "showOnPortal": false,
+          "amounts": [
+            {
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "amount": 45000
+            }
+          ]
+        }
+      },
+      "FeeGridLineInput": {
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "showOnPortal",
+          "amounts"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The saved line; null for a new one (or a default being saved for the first time).",
+            "format": "uuid",
+            "example": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01"
+          },
+          "label": {
+            "type": "string",
+            "description": "1 to 60 characters.",
+            "example": "Tuition Fee"
+          },
+          "kind": {
+            "description": "Amount or Outstanding; a saved line's kind never changes.",
+            "$ref": "#/components/schemas/FeeLabelKind"
+          },
+          "showOnPortal": {
+            "type": "boolean",
+            "description": "Outstanding line only.",
+            "example": false
+          },
+          "amounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeeGridAmountInput"
+            },
+            "description": "Cells for this term; a null amount clears the cell. Levels not listed are left as they are.",
+            "example": [
+              {
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "amount": 45000
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "One row as the grid screen submits it.",
+        "example": {
+          "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+          "label": "Tuition Fee",
+          "kind": "Amount",
+          "showOnPortal": false,
+          "amounts": [
+            {
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "amount": 45000
+            }
+          ]
+        }
+      },
+      "FeeLabelKind": {
+        "enum": [
+          "Amount",
+          "Outstanding"
+        ],
+        "description": "What a fee line prints (spec 6.2.13): a configured amount, or the pupil's own outstanding figure.",
+        "example": "Amount"
+      },
+      "FeeNoticeGridDto": {
+        "required": [
+          "sectionId",
+          "sectionName",
+          "termId",
+          "termName",
+          "sessionName",
+          "previousTermId",
+          "previousTermLabel",
+          "isDefault",
+          "levels",
+          "lines",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string",
+            "description": "The section.",
+            "format": "uuid",
+            "example": "00000000-0000-0000-0000-000000000302"
+          },
+          "sectionName": {
+            "type": "string",
+            "description": "For example Primary.",
+            "example": "Primary"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term whose sheets print it.",
+            "format": "uuid",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "termName": {
+            "type": "string",
+            "description": "For example First Term.",
+            "example": "First Term"
+          },
+          "sessionName": {
+            "type": "string",
+            "description": "For example 2026/2027.",
+            "example": "2026/2027"
+          },
+          "previousTermId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The term before, for \"copy from previous term\"; null when this is the first term on record.",
+            "format": "uuid",
+            "example": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02"
+          },
+          "previousTermLabel": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "For example \"Third Term 2025/2026\".",
+            "example": "Third Term 2025/2026"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "True when the section has saved no lines yet and Lines are spec 6.2.13's seed, unsaved.",
+            "example": false
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeeGridLevelDto"
+            },
+            "description": "The section's active class levels, in progression order.",
+            "example": [
+              {
+                "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                "name": "Primary 3"
+              }
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeeGridLineDto"
+            },
+            "description": "In print order.",
+            "example": [
+              {
+                "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+                "label": "Tuition Fee",
+                "kind": "Amount",
+                "showOnPortal": false,
+                "amounts": [
+                  {
+                    "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                    "amount": 45000
+                  }
+                ]
+              },
+              {
+                "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03",
+                "label": "Exam & PTA",
+                "kind": "Amount",
+                "showOnPortal": false,
+                "amounts": [
+                  {
+                    "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                    "amount": 5000
+                  }
+                ]
+              },
+              {
+                "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+                "label": "Outstanding Fee",
+                "kind": "Outstanding",
+                "showOnPortal": false,
+                "amounts": [ ]
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Opaque; sent back with a save so a stale screen cannot overwrite (or delete) newer lines. Null before any save.",
+            "example": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Spec 6.2.13's entry grid for one section and one term: the lines as rows, the section's class levels as columns, the\namounts as cells. The term is the one whose result sheets print the notice (human ruling 2026-09-27).",
+        "example": {
+          "sectionId": "00000000-0000-0000-0000-000000000302",
+          "sectionName": "Primary",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "termName": "First Term",
+          "sessionName": "2026/2027",
+          "previousTermId": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02",
+          "previousTermLabel": "Third Term 2025/2026",
+          "isDefault": false,
+          "levels": [
+            {
+              "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+              "name": "Primary 3"
+            }
+          ],
+          "lines": [
+            {
+              "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+              "label": "Tuition Fee",
+              "kind": "Amount",
+              "showOnPortal": false,
+              "amounts": [
+                {
+                  "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                  "amount": 45000
+                }
+              ]
+            },
+            {
+              "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03",
+              "label": "Exam & PTA",
+              "kind": "Amount",
+              "showOnPortal": false,
+              "amounts": [
+                {
+                  "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                  "amount": 5000
+                }
+              ]
+            },
+            {
+              "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+              "label": "Outstanding Fee",
+              "kind": "Outstanding",
+              "showOnPortal": false,
+              "amounts": [ ]
+            }
+          ],
+          "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+        }
+      },
       "GeneratePinBatchCommand": {
         "required": [
           "sessionId",
@@ -25460,6 +26384,171 @@
             "Anambra East",
             "Awka North",
             "Awka South"
+          ]
+        }
+      },
+      "OutstandingFeeInput": {
+        "required": [
+          "pupilId",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "A pupil on the arm's roster.",
+            "format": "uuid",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Naira; null clears it.",
+            "format": "int32",
+            "example": 12500
+          }
+        },
+        "additionalProperties": false,
+        "description": "One pupil's figure as submitted.",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "amount": 12500
+        }
+      },
+      "OutstandingFeeRowDto": {
+        "required": [
+          "pupilId",
+          "displayName",
+          "registrationNumber",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "pupilId": {
+            "type": "string",
+            "description": "The pupil.",
+            "format": "uuid",
+            "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Surname first.",
+            "example": "Okafor Chidera Ngozi"
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "As issued.",
+            "example": "GRA/2026/0014"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Naira; null when blank, which prints as a dash.",
+            "format": "int32",
+            "example": 12500
+          }
+        },
+        "additionalProperties": false,
+        "description": "One pupil's figure.",
+        "example": {
+          "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+          "displayName": "Okafor Chidera Ngozi",
+          "registrationNumber": "GRA/2026/0014",
+          "amount": 12500
+        }
+      },
+      "OutstandingFeeSheetDto": {
+        "required": [
+          "armId",
+          "armName",
+          "termId",
+          "termName",
+          "locked",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "The arm.",
+            "format": "uuid",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "armName": {
+            "type": "string",
+            "description": "For example Primary 3A.",
+            "example": "Primary 3A"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term.",
+            "format": "uuid",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "termName": {
+            "type": "string",
+            "description": "For example First Term.",
+            "example": "First Term"
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True once the arm's results for the term are published (human ruling 2026-09-27).",
+            "example": false
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutstandingFeeRowDto"
+            },
+            "description": "The arm's active roster, surname first.",
+            "example": [
+              {
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "displayName": "Okafor Chidera Ngozi",
+                "registrationNumber": "GRA/2026/0014",
+                "amount": 12500
+              },
+              {
+                "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+                "displayName": "Bello Amina",
+                "registrationNumber": "GRA/2025/0031",
+                "amount": null
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "Spec 6.2.13's bulk grid: an arm's pupils against one outstanding-fee figure for a term. Blank is the normal case.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "armName": "Primary 3A",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "termName": "First Term",
+          "locked": false,
+          "rows": [
+            {
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "displayName": "Okafor Chidera Ngozi",
+              "registrationNumber": "GRA/2026/0014",
+              "amount": 12500
+            },
+            {
+              "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+              "displayName": "Bello Amina",
+              "registrationNumber": "GRA/2025/0031",
+              "amount": null
+            }
           ]
         }
       },
@@ -31540,6 +32629,117 @@
           }
         }
       },
+      "SaveFeeNoticeGridCommand": {
+        "required": [
+          "sectionId",
+          "termId",
+          "lines",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string",
+            "description": "The section.",
+            "format": "uuid",
+            "example": "00000000-0000-0000-0000-000000000302"
+          },
+          "termId": {
+            "type": "string",
+            "description": "The term whose sheets print it.",
+            "format": "uuid",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeeGridLineInput"
+            },
+            "description": "Every line, in print order. Empty removes the notice: the section's sheets then print no fees block.",
+            "example": [
+              {
+                "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+                "label": "Tuition Fee",
+                "kind": "Amount",
+                "showOnPortal": false,
+                "amounts": [
+                  {
+                    "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                    "amount": 45000
+                  }
+                ]
+              },
+              {
+                "id": null,
+                "label": "Uniform",
+                "kind": "Amount",
+                "showOnPortal": false,
+                "amounts": [
+                  {
+                    "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                    "amount": 0
+                  }
+                ]
+              },
+              {
+                "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+                "label": "Outstanding Fee",
+                "kind": "Outstanding",
+                "showOnPortal": false,
+                "amounts": [ ]
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The string? FeeNoticeGridDto.Version the screen was loaded with; 409 when the grid has changed since.",
+            "example": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/fee-notices` (spec 6.2.13): the whole grid in one save. The rows as listed become the section's lines in\n        that order; a saved line left out is removed, with its amounts in every term. Needs `fee.manage`.",
+        "example": {
+          "sectionId": "00000000-0000-0000-0000-000000000302",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "lines": [
+            {
+              "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+              "label": "Tuition Fee",
+              "kind": "Amount",
+              "showOnPortal": false,
+              "amounts": [
+                {
+                  "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                  "amount": 45000
+                }
+              ]
+            },
+            {
+              "id": null,
+              "label": "Uniform",
+              "kind": "Amount",
+              "showOnPortal": false,
+              "amounts": [
+                {
+                  "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+                  "amount": 0
+                }
+              ]
+            },
+            {
+              "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+              "label": "Outstanding Fee",
+              "kind": "Outstanding",
+              "showOnPortal": false,
+              "amounts": [ ]
+            }
+          ],
+          "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+        }
+      },
       "SaveHeadTeacherRemarksCommand": {
         "required": [
           "armId",
@@ -31603,6 +32803,61 @@
             }
           ],
           "fillEmpty": "Keep up the good work."
+        }
+      },
+      "SaveOutstandingFeesCommand": {
+        "required": [
+          "armId",
+          "termId",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "armId": {
+            "type": "string",
+            "description": "From the route.",
+            "format": "uuid",
+            "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
+          },
+          "termId": {
+            "type": "string",
+            "description": "A term of the arm's session.",
+            "format": "uuid",
+            "example": "0192f0c4-15c7-7364-2816-c474f3608639"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutstandingFeeInput"
+            },
+            "description": "The figures.",
+            "example": [
+              {
+                "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+                "amount": 12500
+              },
+              {
+                "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+                "amount": null
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "`PUT /api/v1/arms/{armId}/outstanding-fees`: saves the listed pupils' figures; pupils not listed are left as they are.\n        Refused once the arm's results for the term are published. Needs `fee.manage`.",
+        "example": {
+          "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+          "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+          "rows": [
+            {
+              "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+              "amount": 12500
+            },
+            {
+              "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+              "amount": null
+            }
+          ]
         }
       },
       "SavePickupPersonsCommand": {
@@ -37956,6 +39211,9 @@
     },
     {
       "name": "Development ratings"
+    },
+    {
+      "name": "Fee notice"
     },
     {
       "name": "Reference"

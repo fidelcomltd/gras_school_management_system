@@ -180,6 +180,16 @@ public static class Privileges
         public const string Decide = "promotion.decide";
     }
 
+    /// <summary>
+    /// Fee notice (spec 6.2.13). NOT from spec 4.4's table: human ruling 2026-09-27 gives the notice its own privilege so the
+    /// Bursar can keep it without settings or marks access. Not scopable.
+    /// </summary>
+    public static class Fee
+    {
+        /// <summary>Set the fee notice lines and amounts, and type pupils' outstanding figures.</summary>
+        public const string Manage = "fee.manage";
+    }
+
     /// <summary>Class levels (spec 4.4.3). None are scopable.</summary>
     public static class Level
     {

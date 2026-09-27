@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BookOpen,
   CalendarCheck,
   CalendarRange,
@@ -68,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Classes', to: paths.classes, icon: Layers, requires: 'level.view' },
       { label: 'Arms', to: paths.arms, icon: LayoutGrid, requires: 'arm.view' },
       { label: 'Subjects', to: paths.subjects, icon: BookOpen, requires: 'subject.view' },
+      { label: 'Fee notices', to: paths.feeNotices, icon: Banknote, requires: 'fee.manage' },
     ],
   },
   {

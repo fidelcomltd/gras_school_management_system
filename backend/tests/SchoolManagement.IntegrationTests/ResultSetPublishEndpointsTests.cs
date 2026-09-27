@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Results;
 using SchoolManagement.Domain.Classes;
+using SchoolManagement.Domain.Fees;
 using SchoolManagement.Domain.Results;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Settings;
@@ -51,6 +52,35 @@ public sealed class ResultSetPublishEndpointsTests(ApiTestFixture fixture) : Int
         snapshot.RootElement.GetProperty("settings").GetProperty("identity").ValueKind.ShouldBe(JsonValueKind.Object);
         snapshot.RootElement.GetProperty("arm").GetProperty("displayName").GetString().ShouldNotBeNullOrWhiteSpace();
         snapshot.RootElement.GetProperty("logoUploadGroupId").GetGuid().ShouldNotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task Publish_FreezesTheSectionsFeeLinesAndThisLevelsAmounts()
+    {
+        RequireDatabase();
+        var (resultSetId, jar) = await SeedAsync();
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var set = await context.ResultSets.AsNoTracking().SingleAsync(r => r.Id == resultSetId, TestContext.Current.CancellationToken);
+            var arm = await context.Arms.AsNoTracking().SingleAsync(a => a.Id == set.ArmId, TestContext.Current.CancellationToken);
+            var tuition = FeeLabel.Create(Guid.CreateVersion7(), SeededClassLevels.PrimarySectionId, "Tuition Fee", 1, FeeLabelKind.Amount, false).Value;
+            var outstanding = FeeLabel.Create(Guid.CreateVersion7(), SeededClassLevels.PrimarySectionId, "Outstanding Fee", 2, FeeLabelKind.Outstanding, false).Value;
+            context.AddRange(tuition, outstanding);
+            context.Add(FeeAmount.Create(Guid.CreateVersion7(), tuition.Id, set.TermId, arm.ClassLevelId, 45000).Value);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        (await PublishAsync(resultSetId, jar)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using var read = Fixture.CreateScope();
+        var published = await read.ServiceProvider.GetRequiredService<ApplicationDbContext>().ResultSets.AsNoTracking()
+            .SingleAsync(r => r.Id == resultSetId, TestContext.Current.CancellationToken);
+        using var snapshot = JsonDocument.Parse(published.ConfigSnapshotJson!);
+        var lines = snapshot.RootElement.GetProperty("feeNotice").GetProperty("lines").EnumerateArray().ToList();
+        lines.Select(line => line.GetProperty("label").GetString()).ShouldBe(["Tuition Fee", "Outstanding Fee"]);
+        lines[0].GetProperty("amount").GetInt32().ShouldBe(45000);
+        lines[1].GetProperty("kind").GetString().ShouldBe("Outstanding");
     }
 
     [Fact]

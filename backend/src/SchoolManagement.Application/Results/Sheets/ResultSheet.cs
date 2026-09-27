@@ -53,6 +53,9 @@ public sealed record SheetGradeKeyRow(string Grade, string Range, string Word);
 /// <param name="Absent">Opened minus present.</param>
 public sealed record SheetAttendance(int? Opened, int? Present, int? Absent);
 
+/// <summary>One line of the next-term fees block (E.6, F.5). A null or zero amount prints as a dash.</summary>
+public sealed record SheetFeeLine(string Label, int? Amount);
+
 /// <summary>
 /// The render-ready sheet (Appendices E and F; C.8). Every value is read from the stored rows and the publication
 /// snapshot. Nothing is computed here beyond formatting, age, absent-days and the grand totals the contract names.
@@ -86,13 +89,19 @@ public sealed record ResultSheet(
     string? SchoolAddress = null,
     string? SchoolMotto = null,
     string? HeadTeacherName = null,
-    int RevisionNumber = 1);
+    int RevisionNumber = 1,
+    IReadOnlyList<SheetFeeLine>? Fees = null,
+    int? FeeTotal = null);
 
 /// <summary>Builds a <see cref="ResultSheet"/> from <see cref="ResultSheetData"/>. Pure, so it is unit-tested directly.</summary>
 public static class ResultSheetBuilder
 {
-    /// <summary>Builds the sheet, or null when the set has no snapshot (never published).</summary>
-    public static ResultSheet? Build(ResultSheetData data)
+    /// <summary>
+    /// Builds the sheet, or null when the set has no snapshot (never published). <paramref name="forParent"/> is the portal: the
+    /// outstanding-fee line is left off unless the school switched it on (spec 6.2.13), so a fee dispute does not travel with a
+    /// result sheet.
+    /// </summary>
+    public static ResultSheet? Build(ResultSheetData data, bool forParent = false)
     {
         ArgumentNullException.ThrowIfNull(data);
         if (data.SnapshotJson is null)
@@ -217,6 +226,9 @@ public static class ResultSheetBuilder
                 : $"Revised result, issued {Wat(issued):dd/MM/yyyy}.";
         }
 
+        var fees = Fees(root, data.OutstandingFee, forParent);
+        int? feeTotal = fees.Count == 0 ? null : fees.Sum(line => line.Amount ?? 0);
+
         var termName = Str(term, "name") ?? string.Empty;
         var armName = TryGet(root, "arm", "displayName")?.GetString() ?? string.Empty;
         return new ResultSheet(
@@ -248,8 +260,28 @@ public static class ResultSheetBuilder
             TryGet(settings, "identity", "address")?.GetString(),
             TryGet(settings, "identity", "motto")?.GetString(),
             TryGet(settings, "identity", "headTeacherName")?.GetString(),
-            data.RevisionNumber);
+            data.RevisionNumber,
+            fees,
+            feeTotal);
     }
+
+    // The lines frozen at publication (Appendix C.8 rule 2: a reprint never reads live settings); the outstanding figure is the
+    // pupil's own. A term nobody filled in (every line blank) prints no block rather than a table of dashes.
+    private static List<SheetFeeLine> Fees(JsonElement root, int? outstanding, bool forParent)
+    {
+        var lines = FeeLines(root, outstanding, forParent);
+        return lines.Any(line => line.Amount is not null) ? lines : [];
+    }
+
+    private static List<SheetFeeLine> FeeLines(JsonElement root, int? outstanding, bool forParent) =>
+        Array(root, "feeNotice", "lines")
+            .Where(line => Str(line, "kind") != "Outstanding" || !forParent || (TryGet(line, "showOnPortal")?.GetBoolean() ?? false))
+            .Select(line => new SheetFeeLine(
+                Str(line, "label") ?? string.Empty,
+                Str(line, "kind") == "Outstanding"
+                    ? outstanding
+                    : TryGet(line, "amount") is { ValueKind: JsonValueKind.Number } amount ? amount.GetInt32() : null))
+            .ToList();
 
     /// <summary>Whole years at <paramref name="asOf"/> (6.5.3).</summary>
     public static int AgeAt(DateOnly dateOfBirth, DateOnly asOf)
