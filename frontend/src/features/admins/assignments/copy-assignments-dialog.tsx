@@ -37,7 +37,8 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
   const copy = useCopyAssignments();
   const [fromChoice, setFromChoice] = useState<string | null>(null);
   const [toChoice, setToChoice] = useState<string | null>(null);
-  const [preview, setPreview] = useState<AssignmentCopyResultDto | null>(null);
+  // A preview belongs to the pair it was run for; one for another pair never shows or drives the copy.
+  const [previewed, setPreviewed] = useState<{ fromId: string; toId: string; result: AssignmentCopyResultDto } | null>(null);
   const [done, setDone] = useState<AssignmentCopyResultDto | null>(null);
 
   const open = sessions.filter((session) => session.state !== 'Closed');
@@ -46,15 +47,16 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
   const toId = toChoice ?? open.find((session) => session.state === 'Upcoming')?.id ?? '';
   const ready = fromId !== '' && toId !== '' && fromId !== toId;
   const error = copy.error instanceof ApiError ? copy.error.message : null;
+  const preview = previewed && previewed.fromId === fromId && previewed.toId === toId ? previewed.result : null;
 
-  const run = (dryRun: boolean) =>
-    copy.mutate(
-      { fromSessionId: fromId, toSessionId: toId, dryRun },
-      { onSuccess: (result) => (dryRun ? setPreview(result) : setDone(result)) },
-    );
-  const choose = (set: (id: string) => void) => (id: string) => {
-    set(id);
-    setPreview(null);
+  const runPreview = () => {
+    const pair = { fromId, toId };
+    copy.mutate({ fromSessionId: fromId, toSessionId: toId, dryRun: true }, { onSuccess: (result) => setPreviewed({ ...pair, result }) });
+  };
+  const runCopy = () => {
+    if (previewed) {
+      copy.mutate({ fromSessionId: previewed.fromId, toSessionId: previewed.toId, dryRun: false }, { onSuccess: setDone });
+    }
   };
 
   const body = () => {
@@ -75,7 +77,7 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
           placeholder="Session"
           value={fromId}
           options={sessions.map((session) => ({ value: session.id, label: session.name }))}
-          onChange={choose(setFromChoice)}
+          onChange={setFromChoice}
           className="w-full"
         />
         <LabelledSelect
@@ -83,7 +85,7 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
           placeholder="An open session"
           value={toId}
           options={open.map((session) => ({ value: session.id, label: session.name }))}
-          onChange={choose(setToChoice)}
+          onChange={setToChoice}
           className="w-full"
         />
         {preview ? (
@@ -123,11 +125,11 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
             {done ? 'Close' : 'Cancel'}
           </Button>
           {done ? null : preview ? (
-            <Button disabled={copy.isPending || preview.copied.length === 0} onClick={() => run(false)}>
+            <Button disabled={copy.isPending || preview.copied.length === 0} onClick={runCopy}>
               Copy {preview.copied.length} assignment{preview.copied.length === 1 ? '' : 's'}
             </Button>
           ) : (
-            <Button disabled={!ready || copy.isPending} onClick={() => run(true)}>
+            <Button disabled={!ready || copy.isPending} onClick={runPreview}>
               Preview
             </Button>
           )}

@@ -1,12 +1,14 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Auth;
+using SchoolManagement.Application.Abstractions.Authorization;
 using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Security;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Auth;
+using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 using SchoolManagement.Domain.Sessions;
@@ -18,9 +20,10 @@ namespace SchoolManagement.Application.Security.Assignments;
 /// copied into the target, or skipped with a reason, never silently changed: a school-wide one copies as is; an
 /// arm-scoped one maps each class to the target session's class with the same level and label, and is skipped whole
 /// when any class has no match. Skipped too: the caller's own (escalation rule 1), a deactivated account, an archived
-/// role, a role that can no longer take the scope, and anything the target already holds. The route requires
-/// <c>role.assign</c>, which is non-scopable and so school-wide, so rule 3 (no grant wider than the caller's own) holds
-/// for every copy. One audit event per created assignment, naming its source.
+/// role, the Super Admin role, a role that can no longer take the scope, and anything the target already covers (the
+/// same role school-wide, or over every one of the classes). The route requires <c>role.assign</c>; an arm-scoped copy
+/// also needs <c>role.scope.assign</c> within the caller's own scope, exactly as creating one does (rule 3). One audit
+/// event per created assignment, naming its source.
 /// </summary>
 internal sealed class CopyAssignmentsToSessionCommandHandler(
     IRoleAssignmentRepository assignments,
@@ -29,6 +32,7 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
     IAcademicSessionRepository sessions,
     IArmRepository arms,
     AssignmentNames assignmentNames,
+    IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink)
     : IRequestHandler<CopyAssignmentsToSessionCommand, Result<AssignmentCopyResultDto>>
@@ -60,15 +64,18 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
         }
 
         var source = await assignments.ListActiveForSessionReadOnlyAsync(from.Id, cancellationToken).ConfigureAwait(false);
-        var held = (await assignments.ListActiveForSessionReadOnlyAsync(to.Id, cancellationToken).ConfigureAwait(false))
-            .Select(Key)
-            .ToHashSet(StringComparer.Ordinal);
+        var held = (await assignments.ListActiveForSessionReadOnlyAsync(to.Id, cancellationToken).ConfigureAwait(false)).ToList();
+        var scopeGrants = (await effectivePrivilegeProvider.GetGrantsAsync(actorIdText, cancellationToken).ConfigureAwait(false))
+            .Where(grant => string.Equals(grant.Privilege, Privileges.Role.ScopeAssign, StringComparison.Ordinal))
+            .ToList();
+        var actorScopeIsSchoolWide = scopeGrants.Any(grant => grant.Scope == ScopeType.SchoolWide);
+        var actorArmIds = scopeGrants.Where(grant => grant.Scope == ScopeType.ArmList).SelectMany(grant => grant.ArmIds).ToHashSet();
         var names = await assignmentNames.LoadAsync(source, cancellationToken).ConfigureAwait(false);
 
         var allArms = await arms.ListAllReadOnlyAsync(cancellationToken).ConfigureAwait(false);
         var armsById = allArms.ToDictionary(arm => arm.Id);
         var targetArms = allArms
-            .Where(arm => arm.SessionId == to.Id)
+            .Where(arm => arm.SessionId == to.Id && arm.Status == ArmStatus.Active)
             .ToDictionary(arm => (arm.ClassLevelId, arm.LabelKey));
 
         var accountsById = new Dictionary<Guid, AdminAccount?>();
@@ -119,11 +126,19 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
             }
 
             var reason = assignment.AdminAccountId == actorId ? "Your own roles are copied by another Super Admin."
-                : account is null || account.Status == AdminAccountStatus.Deactivated ? "The account is deactivated."
+                : account is null ? "The account no longer exists."
+                : account.Status == AdminAccountStatus.Deactivated ? "The account is deactivated."
                 : role is null || role.Status == RoleStatus.Archived ? "The role is archived."
+                : role.Id == SeededRoles.SuperAdminId ? "The Super Admin role is the account's own flag, never an assignment."
                 : RoleScopeGuard.ValidateAssignable(role.Privileges, assignment.ScopeType) is { IsFailure: true } unassignable
                     ? unassignable.Error.Description
                 : unmatched is not null ? $"{unmatched} has no class in {to.Name}."
+                : assignment.ScopeType == ScopeType.ArmList
+                    && (scopeGrants.Count == 0
+                        || RoleScopeGuard.ValidateGrantWithinActorScope(actorScopeIsSchoolWide, actorArmIds, ScopeType.ArmList, mapped).IsFailure)
+                    ? "You do not hold role.scope.assign over these classes."
+                : held.Any(existing => Covers(existing, assignment.AdminAccountId, assignment.RoleId, assignment.ScopeType, mapped))
+                    ? $"Already assigned in {to.Name}."
                 : null;
 
             var copy = reason is null
@@ -134,11 +149,6 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
                 reason = copy.Error.Description;
             }
 
-            if (reason is null && !held.Add(Key(copy!.Value)))
-            {
-                reason = $"Already assigned in {to.Name}.";
-            }
-
             if (reason is not null)
             {
                 skipped.Add(Row(sourceArmNames, reason));
@@ -146,6 +156,7 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
             }
 
             var created = copy!.Value;
+            held.Add(created);
             copied.Add(Row([.. created.ArmIds.Select(names.Arm)], null));
             if (request.DryRun)
             {
@@ -169,11 +180,10 @@ internal sealed class CopyAssignmentsToSessionCommandHandler(
         return Result.Success(new AssignmentCopyResultDto(request.DryRun, from.Name, to.Name, copied, skipped));
     }
 
-    // Same account, role, scope and classes: the target already has it.
-    private static string Key(RoleAssignment assignment) => string.Join(
-        '|',
-        assignment.AdminAccountId.ToString("N", CultureInfo.InvariantCulture),
-        assignment.RoleId.ToString("N", CultureInfo.InvariantCulture),
-        assignment.ScopeType.ToString(),
-        string.Join(',', assignment.ArmIds.Order().Select(id => id.ToString("N", CultureInfo.InvariantCulture))));
+    // The target already gives this account this role at least as widely: school-wide, or over every one of the classes.
+    private static bool Covers(RoleAssignment existing, Guid accountId, Guid roleId, ScopeType scopeType, List<Guid> armIds) =>
+        existing.AdminAccountId == accountId
+        && existing.RoleId == roleId
+        && (existing.ScopeType == ScopeType.SchoolWide
+            || (scopeType == ScopeType.ArmList && armIds.All(existing.ArmIds.Contains)));
 }

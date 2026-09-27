@@ -59,8 +59,9 @@ internal sealed class CopyAssignmentsToSessionCommandValidator : AbstractValidat
             .Must(value => Guid.TryParse(value, out _))
             .WithMessage("toSessionId must be a valid identifier.");
 
-        RuleFor(command => command.ToSessionId)
-            .NotEqual(command => command.FromSessionId)
+        RuleFor(command => command)
+            .Must(command => !Guid.TryParse(command.FromSessionId, out var from) || !Guid.TryParse(command.ToSessionId, out var to) || from != to)
+            .WithName("toSessionId")
             .WithMessage("Choose a different session to copy into.");
     }
 }
