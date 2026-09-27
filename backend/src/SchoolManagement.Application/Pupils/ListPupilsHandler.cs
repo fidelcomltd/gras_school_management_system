@@ -17,6 +17,7 @@ namespace SchoolManagement.Application.Pupils;
 /// </remarks>
 internal sealed class ListPupilsQueryHandler(
     IPupilRepository pupils,
+    IPupilRecordRepository records,
     IEffectivePrivilegeProvider grantsProvider,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
@@ -69,12 +70,34 @@ internal sealed class ListPupilsQueryHandler(
         }
 
         var pageSize = Math.Clamp(request.PageSize ?? CursorPageRequest.DefaultPageSize, 1, CursorPageRequest.MaxPageSize);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         var page = await pupils
             .ListAsync(request.Status, request.Search, request.Cursor, pageSize, today, allowedArmIds, cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success(page);
+        return Result.Success(await WithCompletenessAsync(page, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Spec 6.5.15's completeness column: each row's chased percentage, by the same rules as the record's own report. One
+    /// page at a time (at most the page size), so the cost is a fixed handful of queries, never the whole register.
+    /// </summary>
+    private async Task<CursorPage<PupilDto>> WithCompletenessAsync(CursorPage<PupilDto> page, CancellationToken cancellationToken)
+    {
+        if (page.Items.Count == 0)
+        {
+            return page;
+        }
+
+        var ids = page.Items.Select(item => Guid.Parse(item.Id)).ToList();
+        var entities = (await pupils.ListReadOnlyByIdsAsync(ids, cancellationToken).ConfigureAwait(false)).ToDictionary(pupil => pupil.Id);
+        var set = await records.LoadForPupilsAsync(ids, cancellationToken).ConfigureAwait(false);
+        var items = page.Items
+            .Select(item => entities.TryGetValue(Guid.Parse(item.Id), out var pupil)
+                ? item with { ChasedPercent = Records.AdmissionCompleteness.Evaluate(pupil, set).ChasedPercent }
+                : item)
+            .ToList();
+        return page with { Items = items };
     }
 }

@@ -3,6 +3,7 @@ import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/
 import { Button } from '@/components/ui/button';
 import { useContacts, useSaveContacts, type ContactRole, type PupilContactDto, type PupilContactInput } from './api';
 import { TextField } from './fields';
+import { PhoneDuplicateWarning } from './phone-duplicates';
 import { errorText, localPhone } from './format';
 
 const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean }[] = [
@@ -37,7 +38,12 @@ export function ContactsPanel({ pupilId, canEdit }: { pupilId: string; canEdit: 
   const contacts = useContacts(pupilId);
   if (contacts.isPending) return <LoadingState label="Loading contacts…" />;
   if (contacts.isError) return <QueryErrorState error={contacts.error} onRetry={() => void contacts.refetch()} />;
-  return <ContactsForm key={JSON.stringify(contacts.data.items)} pupilId={pupilId} items={contacts.data.items} canEdit={canEdit} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <PhoneDuplicateWarning pupilId={pupilId} phones={contacts.data.items.flatMap((item) => [item.phone, item.whatsappNumber])} />
+      <ContactsForm key={JSON.stringify(contacts.data.items)} pupilId={pupilId} items={contacts.data.items} canEdit={canEdit} />
+    </div>
+  );
 }
 
 function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: PupilContactDto[]; canEdit: boolean }) {

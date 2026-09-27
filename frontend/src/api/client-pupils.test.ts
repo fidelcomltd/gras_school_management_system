@@ -110,10 +110,10 @@ describe('apiGet — GET /api/v1/pupils/duplicates (FindPupilDuplicates)', () =>
     expect(result[0]?.registrationNumber).toBeNull();
   });
 
-  it('an unknown query key is rejected — proves contactPhone is not (yet) part of this operation', () => {
-    // @ts-expect-error — `contactPhone` is not a declared query param on
-    // `FindPupilDuplicates`; only surname/firstName/dateOfBirth are.
-    void apiGet('/api/v1/pupils/duplicates', { surname: 'Okafor', firstName: 'Chidera', dateOfBirth: '2020-05-03', contactPhone: '0800' });
+  it('an unknown query key is rejected, while the optional contactPhone (spec 6.5.11) is accepted', () => {
+    // @ts-expect-error — `nickname` is not a declared query param on `FindPupilDuplicates`.
+    void apiGet('/api/v1/pupils/duplicates', { surname: 'Okafor', firstName: 'Chidera', dateOfBirth: '2020-05-03', nickname: 'Chi' });
+    void apiGet('/api/v1/pupils/duplicates', { surname: 'Okafor', firstName: 'Chidera', dateOfBirth: '2020-05-03', contactPhone: '08031234567' });
   });
 
   it('omitting a required query param fails typecheck', () => {

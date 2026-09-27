@@ -14,12 +14,13 @@ namespace SchoolManagement.Application.Pupils;
 /// <param name="Surname">Exact match, case-insensitive.</param>
 /// <param name="FirstName">Exact match, case-insensitive.</param>
 /// <param name="DateOfBirth">Exact match.</param>
+/// <param name="ContactPhone">Optional; either Nigerian form. Surname plus any contact phone also matches (spec 6.5.11).</param>
 /// <remarks>
 /// Contact-phone matching (spec 6.5.11's other half of duplicate detection) is the NEXT card's —
 /// <c>pupil_contact</c> does not exist yet. Only the surname+first-name+date-of-birth half is built
 /// here, disclosed rather than silently narrowed.
 /// </remarks>
-public sealed record FindPupilDuplicatesQuery(string Surname, string FirstName, DateOnly DateOfBirth)
+public sealed record FindPupilDuplicatesQuery(string Surname, string FirstName, DateOnly DateOfBirth, string? ContactPhone = null)
     : IQuery<Result<IReadOnlyList<PupilDto>>>;
 
 /// <summary>Validates <see cref="FindPupilDuplicatesQuery"/>.</summary>
@@ -29,5 +30,9 @@ internal sealed class FindPupilDuplicatesQueryValidator : AbstractValidator<Find
     {
         RuleFor(query => query.Surname).NotEmpty().MaximumLength(Pupil.NameMaxLength);
         RuleFor(query => query.FirstName).NotEmpty().MaximumLength(Pupil.NameMaxLength);
+        RuleFor(query => query.ContactPhone)
+            .Must(phone => NigerianPhoneNumber.TryNormalize(phone!, out _))
+            .When(query => !string.IsNullOrWhiteSpace(query.ContactPhone))
+            .WithMessage("contactPhone must be a Nigerian phone number.");
     }
 }

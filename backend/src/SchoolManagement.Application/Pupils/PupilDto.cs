@@ -56,6 +56,10 @@ namespace SchoolManagement.Application.Pupils;
 /// When the current photograph was uploaded, or <see langword="null"/> when there is none (spec 6.5.4). A client's cache
 /// key: the bytes come from <c>GET /pupils/{id}/photo</c> and <c>/photo/thumbnail</c>.
 /// </param>
+/// <param name="ChasedPercent">
+/// The record's completeness across spec 6.5.12's chased set, 0 to 100. Populated ONLY by the pupil list (the list column
+/// of spec 6.5.15); null everywhere else, where the record's own completeness report is the source.
+/// </param>
 public sealed record PupilDto(
     string Id,
     string? RegistrationNumber,
@@ -80,4 +84,5 @@ public sealed record PupilDto(
     string? LevelAppliedFor = null,
     DateOnly? DateApplicationReceived = null,
     IReadOnlyList<string>? Missing = null,
-    DateTimeOffset? PhotoUpdatedAtUtc = null);
+    DateTimeOffset? PhotoUpdatedAtUtc = null,
+    int? ChasedPercent = null);

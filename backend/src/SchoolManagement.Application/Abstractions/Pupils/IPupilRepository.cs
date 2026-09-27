@@ -84,6 +84,7 @@ public interface IPupilRepository
     /// <param name="surname">Exact match, case-insensitive.</param>
     /// <param name="firstName">Exact match, case-insensitive.</param>
     /// <param name="dateOfBirth">Exact match.</param>
+    /// <param name="contactPhone">Canonical +234 form; when given, surname plus any contact phone also matches.</param>
     /// <param name="maxResults">A small cap — this is a candidates panel, not a paged list.</param>
     /// <param name="asOfDate">"Today", for each row's derived age.</param>
     /// <param name="cancellationToken">Propagated to the underlying query.</param>
@@ -91,9 +92,13 @@ public interface IPupilRepository
         string surname,
         string firstName,
         DateOnly dateOfBirth,
+        string? contactPhone,
         int maxResults,
         DateOnly asOfDate,
         CancellationToken cancellationToken);
+
+    /// <summary>The pupils with these ids, any status, read-only; unknown ids are skipped.</summary>
+    Task<IReadOnlyList<Pupil>> ListReadOnlyByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 
     /// <summary>
     /// How many pupils, in ANY status, currently hold a non-null <c>registration_number</c> beginning
