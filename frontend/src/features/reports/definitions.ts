@@ -16,21 +16,33 @@ export type ReportKey =
   | 'fee-notice-audit'
   | 'annual-cumulative'
   | 'promotion-list'
-  | 'pupil-record';
+  | 'pupil-record'
+  | 'nominal-roll'
+  | 'enrolment-summary'
+  | 'guardian-contacts'
+  | 'outstanding-documents'
+  | 'admissions-pipeline';
 
 /**
- * Which filter set a report's screen shows: a class; a class or a whole level (with a top N for the merit list); a required
- * level; an optional level (with a result-set state for progress).
+ * One filter control on a report's screen. The period is a term or a session; a class is required (`arm`); a class or a
+ * whole level is required (`scope`) or optional with "whole school" (`scopeAll`); a level is required (`level`) or optional
+ * (`levelAll`); the rest are optional refinements. `pupil` comes from the address, set by the pupil's own page.
  */
-export type ReportFilterKind =
-  | 'term-arm'
-  | 'term-scope'
-  | 'term-scope-top'
-  | 'term-level'
-  | 'term-level-state'
-  | 'term-level-any'
-  | 'session-scope'
-  | 'session-level-outcome'
+export type ReportControl =
+  | 'term'
+  | 'session'
+  | 'arm'
+  | 'scope'
+  | 'scopeAll'
+  | 'top'
+  | 'level'
+  | 'levelAll'
+  | 'state'
+  | 'outcome'
+  | 'status'
+  | 'sex'
+  | 'documentType'
+  | 'minDays'
   | 'pupil';
 
 export interface TableReport {
@@ -40,7 +52,7 @@ export interface TableReport {
   description: string;
   group: string;
   privilege: string;
-  filters: ReportFilterKind;
+  controls: ReportControl[];
 }
 
 /** A report with a screen of its own, listed here so the hub shows every report in one place. */
@@ -55,98 +67,120 @@ export interface LinkedReport {
 
 export type ReportDefinition = TableReport | LinkedReport;
 
+const table = (report: Omit<TableReport, 'kind' | 'privilege'> & { privilege?: string }): TableReport => ({
+  kind: 'table',
+  privilege: 'report.view',
+  ...report,
+});
+
 /** Spec 15 section 10, in the order the hub lists them. */
 export const REPORTS: ReportDefinition[] = [
-  {
-    kind: 'table',
+  table({
     key: 'broadsheet',
     title: 'Arm broadsheet',
     description: 'Every pupil in a class with each subject’s CA, exam and total, then average and positions.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-arm',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'arm'],
+  }),
+  table({
     key: 'merit-list',
     title: 'Merit list',
     description: 'Position order for a class or a whole level, for prize-giving.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-scope-top',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'scope', 'top'],
+  }),
+  table({
     key: 'result-entry-progress',
     title: 'Result entry progress',
     description: 'Every class’s marks, ratings, attendance and remarks, complete of total, and where each set stands.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-level-state',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'levelAll', 'state'],
+  }),
+  table({
     key: 'grade-distribution',
     title: 'Grade distribution',
     description: 'How many pupils earned each grade, per subject and overall, for a class or a level.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-scope',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'scope'],
+  }),
+  table({
     key: 'subject-performance',
     title: 'Subject performance',
     description: 'Each subject’s average, range and pass rate, class by class across a level.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-level',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'level'],
+  }),
+  table({
     key: 'development-summary',
     title: 'Development domain summary',
     description: 'Nursery: how many children sit at each rating point of each indicator.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'term-arm',
-  },
-  {
-    kind: 'table',
+    controls: ['term', 'arm'],
+  }),
+  table({
     key: 'annual-cumulative',
     title: 'Annual cumulative report',
     description: 'Each pupil’s three term averages, cumulative average, annual position and promotion status.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'session-scope',
-  },
-  {
-    kind: 'table',
+    controls: ['session', 'scope'],
+  }),
+  table({
     key: 'promotion-list',
     title: 'Promotion list',
     description: 'Proposed and final promotion outcomes with core subject results and target classes. The document the school files.',
     group: 'Results',
-    privilege: 'report.view',
-    filters: 'session-level-outcome',
-  },
-  {
-    kind: 'table',
+    controls: ['session', 'levelAll', 'outcome'],
+  }),
+  table({
+    key: 'nominal-roll',
+    title: 'Nominal roll',
+    description: 'The register by class: number, name, sex, age, admission date, status and primary guardian.',
+    group: 'Pupils',
+    controls: ['session', 'scopeAll', 'status', 'sex'],
+  }),
+  table({
+    key: 'enrolment-summary',
+    title: 'Enrolment summary',
+    description: 'Boys, girls, capacity and space left, class by class, level by level.',
+    group: 'Pupils',
+    controls: ['session', 'status'],
+  }),
+  table({
+    key: 'guardian-contacts',
+    title: 'Guardian contact list',
+    description: 'One class’s primary guardians and phone numbers, for calling parents. Nothing more.',
+    group: 'Pupils',
+    privilege: 'contact.view',
+    controls: ['session', 'arm'],
+  }),
+  table({
+    key: 'outstanding-documents',
+    title: 'Outstanding admission documents',
+    description: 'Every document still to collect, oldest record first.',
+    group: 'Pupils',
+    controls: ['session', 'scopeAll', 'documentType'],
+  }),
+  table({
+    key: 'admissions-pipeline',
+    title: 'Admissions pipeline',
+    description: 'Pending admissions by level, how long each has waited and what blocks approval.',
+    group: 'Pupils',
+    controls: ['levelAll', 'minDays'],
+  }),
+  table({
     key: 'pupil-record',
     title: 'Pupil cumulative record',
     description: 'One pupil across every session, term by term. Open it from the pupil’s own page.',
     group: 'Pupils',
-    privilege: 'report.view',
-    filters: 'pupil',
-  },
-  {
-    kind: 'table',
+    controls: ['pupil'],
+  }),
+  table({
     key: 'fee-notice-audit',
     title: 'Fee notice audit',
     description: 'The fee lines each level’s sheets print, and the outstanding figures typed against them.',
     group: 'Fees',
-    privilege: 'report.view',
-    filters: 'term-level-any',
-  },
+    controls: ['term', 'levelAll'],
+  }),
   {
     kind: 'link',
     title: 'Weekly report completion',

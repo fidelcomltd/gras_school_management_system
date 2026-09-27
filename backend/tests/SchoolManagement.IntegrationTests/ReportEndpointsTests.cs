@@ -221,6 +221,51 @@ public sealed class ReportEndpointsTests(ApiTestFixture fixture) : IntegrationTe
     }
 
     [Fact]
+    public async Task RegisterReports_ListTheArmsPupils_TheirGuardians_AndTheCounts()
+    {
+        RequireDatabase();
+        var (jar, _) = await SignInAdminAsync();
+        var seeded = await SeedAsync();
+        Guid sessionId;
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            sessionId = await context.Terms.Where(term => term.Id == seeded.TermId).Select(term => term.SessionId).SingleAsync(TestContext.Current.CancellationToken);
+            var mother = PupilContact.Create(Guid.CreateVersion7(), seeded.PupilIds[1], ContactRole.Mother);
+            mother.Apply("Ngozi Eze", "Mother", "08031234567", null, null, null, isPrimary: true).IsSuccess.ShouldBeTrue();
+            var father = PupilContact.Create(Guid.CreateVersion7(), seeded.PupilIds[1], ContactRole.Father);
+            father.Apply("Emeka Eze", "Father", "08059876543", null, null, null, isPrimary: false).IsSuccess.ShouldBeTrue();
+            context.AddRange(mother, father);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+            // Okafor has since graduated: on that session's register she still counts, because she was on its roll at its end.
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE enrolments SET effective_to = (SELECT end_date FROM academic_sessions WHERE id = {sessionId}) WHERE pupil_id = {seeded.PupilIds[0]}",
+                TestContext.Current.CancellationToken);
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE pupils SET status = {nameof(PupilStatus.Graduated)} WHERE id = {seeded.PupilIds[0]}", TestContext.Current.CancellationToken);
+        }
+
+        var roll = await GetReportAsync(jar, $"/api/v1/reports/nominal-roll?sessionId={sessionId}&armId={seeded.ArmId}");
+        roll.Rows.Count(row => row.Kind == ReportRowKind.Data).ShouldBe(2);
+        roll.Rows.ShouldContain(row => row.Cells[1] == "EZE Chidera" && row.Cells[2] == "Female" && row.Cells[7] == "Ngozi Eze" && (row.Cells[8] ?? string.Empty).EndsWith("8031234567", StringComparison.Ordinal));
+
+        var summary = await GetReportAsync(jar, $"/api/v1/reports/enrolment-summary?sessionId={sessionId}");
+        summary.Rows.ShouldContain(row => row.Cells[0] == seeded.ArmName && row.Cells[1] == "0" && row.Cells[2] == "2" && row.Cells[3] == "2");
+
+        var contacts = await GetReportAsync(jar, $"/api/v1/reports/guardian-contacts?sessionId={sessionId}&armId={seeded.ArmId}");
+        contacts.Rows.ShouldContain(row => row.Cells[0] == "EZE Chidera" && row.Cells[1] == "Ngozi Eze" && (row.Cells[4] ?? string.Empty).EndsWith("8059876543", StringComparison.Ordinal));
+
+        (await GetReportAsync(jar, $"/api/v1/reports/outstanding-documents?sessionId={sessionId}&armId={seeded.ArmId}")).Key.ShouldBe("outstanding-documents");
+        (await GetReportAsync(jar, "/api/v1/reports/admissions-pipeline?minDays=0")).Key.ShouldBe("admissions-pipeline");
+
+        using var badType = await GetAsync(jar, $"/api/v1/reports/outstanding-documents?sessionId={sessionId}&documentType=Passport");
+        badType.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        using var badSex = await GetAsync(jar, $"/api/v1/reports/nominal-roll?sessionId={sessionId}&sex=1");
+        badSex.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task Broadsheet_WithoutAnArm_IsAValidationError()
     {
         RequireDatabase();
