@@ -89,3 +89,14 @@ export function visibleNavGroups(session: AuthSession): NavGroup[] {
     items: group.items.filter((item) => !item.requires || hasPrivilege(session, item.requires)),
   })).filter((group) => group.items.length > 0);
 }
+
+/** The menu entry for `to`, if the sidebar has one: its label and the privilege it needs. */
+export function navItemFor(to: string): NavItem | undefined {
+  return NAV_GROUPS.flatMap((group) => group.items).find((item) => item.to === to);
+}
+
+/** Whether this caller may open `to`: always for a path the menu does not gate. */
+export function canOpen(session: AuthSession, to: string): boolean {
+  const item = navItemFor(to);
+  return !item?.requires || hasPrivilege(session, item.requires);
+}

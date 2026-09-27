@@ -8,6 +8,8 @@ import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useWeeklyCompletion, useWeeklyIllness } from './api';
 import { formatDate, weekLabel } from './types';
 import { EmptyState } from '@/components/feedback/empty-state';
+import { PageTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
 
 const lagosDateTime = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
@@ -69,6 +71,7 @@ export function WeeklyCompletionScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTrail trail={[{ to: paths.weekly }, { label: 'Weekly report completion' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Weekly report completion</h1>
         <p className="text-sm text-muted-foreground">Which classes have written their weekly notes, week by week.</p>

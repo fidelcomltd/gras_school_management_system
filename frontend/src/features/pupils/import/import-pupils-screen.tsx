@@ -11,6 +11,7 @@ import { ApiError, saveFile } from '@/lib/http';
 import { formatDate } from '@/shared/format/date';
 import { useCommitImport, useDownloadImportTemplate, useValidateImport, type PupilImportReport, type PupilImportResult } from './api';
 import { reportToCsv } from './report-csv';
+import { PageTrail } from '@/components/layout/page-trail';
 
 /** Spec 6.5.16: above this the interface warns that the import may take a minute. */
 const LARGE_FILE_ROWS = 500;
@@ -66,6 +67,7 @@ export function ImportPupilsScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTrail trail={[{ to: paths.pupils }, { label: 'Import pupils' }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">Import pupils</h1>

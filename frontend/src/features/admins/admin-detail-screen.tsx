@@ -10,6 +10,8 @@ import { EditAdminDialog } from './components/edit-admin-dialog';
 import { ResetPasswordDialog } from './components/reset-password-dialog';
 import type { AdminAccountStatus } from './types';
 import { LoadingState } from '@/components/feedback/query-states';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
 
 /** The status an account of each current status could legally move to. */
 const STATUS_TARGETS: Record<AdminAccountStatus, AdminAccountStatus[]> = {
@@ -34,19 +36,11 @@ export function AdminDetailScreen() {
   const [showReset, setShowReset] = useState(false);
 
   if (admin.isPending) {
-    return <LoadingState label="Loading admin account…" />;
+    return <WithTrail trail={[{ to: paths.admins }, { label: 'Admin account' }]}><LoadingState label="Loading admin account…" /></WithTrail>;
   }
 
   if (admin.isError) {
-    if (admin.error instanceof ApiError && admin.error.kind === 'unauthorized') return null;
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{admin.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void admin.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <TrailedError trail={[{ to: paths.admins }, { label: 'Admin account' }]} error={admin.error} onRetry={() => void admin.refetch()} />;
   }
 
   const detail = admin.data;
@@ -72,6 +66,7 @@ export function AdminDetailScreen() {
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
+      <PageTrail trail={[{ to: paths.admins }, { label: detail.staffName }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.staffName}</h1>
