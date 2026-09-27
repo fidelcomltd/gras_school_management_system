@@ -147,7 +147,7 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
         // hypothetical "POST /sessions/{id}/terms" that could produce a two-or-fewer-term session, fails here
         // until it is reviewed and added.
         postSessionRoutes.Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
-            .ShouldBe(["/api/v1/sessions", "/api/v1/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
+            .ShouldBe(["/api/v{version:apiVersion}/sessions/", "/api/v{version:apiVersion}/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
     }
 
     // Review criterion 1, session half: the partial unique index is what stops two active sessions,
