@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
@@ -38,6 +38,8 @@ export function SessionDetailScreen() {
   const canOpenTerm = !!me.data && hasPrivilege(me.data, 'term.open');
   const canCloseTerm = !!me.data && hasPrivilege(me.data, 'term.close');
   const canReopenTerm = !!me.data && me.data.isSuperAdmin && hasPrivilege(me.data, 'term.close');
+  const canPromote = !!me.data && hasPrivilege(me.data, 'promotion.run');
+  const thirdTermClosed = detail.terms.some((term) => Number(term.ordinal) === 3 && term.state === 'Closed');
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,6 +72,25 @@ export function SessionDetailScreen() {
           </li>
         ))}
       </ul>
+
+      {canPromote ? (
+        <section
+          aria-labelledby="promotion-panel"
+          className={thirdTermClosed ? 'rounded-lg border border-border bg-surface p-5' : 'rounded-lg border border-dashed border-border p-5 opacity-70'}
+        >
+          <h2 id="promotion-panel" className="font-semibold text-foreground">
+            End-of-session promotion
+          </h2>
+          {thirdTermClosed ? (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Move every active pupil into next session's classes, repeat or graduate them.</p>
+              <Button render={<Link to={paths.sessionPromotion(detail.id)} />}>Review promotion</Button>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">Promotion opens once Third Term is closed.</p>
+          )}
+        </section>
+      ) : null}
 
       {showEdit ? (
         <EditSessionDialog session={detail} onClose={() => setShowEdit(false)} />

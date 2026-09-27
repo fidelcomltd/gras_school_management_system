@@ -192,6 +192,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     internal DbSet<Domain.Portal.PinUse> PinUses => Set<Domain.Portal.PinUse>();
 
+    internal DbSet<Domain.Promotion.PromotionBatch> PromotionBatches => Set<Domain.Promotion.PromotionBatch>();
+
     internal DbSet<Domain.Portal.PortalAttempt> PortalAttempts => Set<Domain.Portal.PortalAttempt>();
 
     /// <summary>
