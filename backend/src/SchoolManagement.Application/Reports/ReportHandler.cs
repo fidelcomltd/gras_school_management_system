@@ -259,7 +259,7 @@ internal sealed class ReportServices(
     /// The session a report belongs to (TASK-0060, spec 4.2.1): its <c>SessionId</c> filter, else its <c>TermId</c>
     /// filter's session, else the active session (a pupil's record, the admissions pipeline, the audit log: today's
     /// school). Read by property name, as the export's audit metadata reads the filters, so a new report with either
-    /// filter is covered unasked. An unknown term yields none; the builder then refuses it with a 404.
+    /// filter is covered unasked. An unknown term falls back to the active session; the builder then refuses it with a 404.
     /// </summary>
     private async Task<Guid?> TargetSessionAsync(IReportFilters filters, CancellationToken cancellationToken)
     {
@@ -269,9 +269,10 @@ internal sealed class ReportServices(
             return sessionId;
         }
 
-        if (Guid.TryParse(type.GetProperty("TermId")?.GetValue(filters) as string, out var termId))
+        if (Guid.TryParse(type.GetProperty("TermId")?.GetValue(filters) as string, out var termId)
+            && await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false) is { } term)
         {
-            return (await terms.FindReadOnlyByIdAsync(termId, cancellationToken).ConfigureAwait(false))?.SessionId;
+            return term.SessionId;
         }
 
         return (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
@@ -282,7 +283,7 @@ internal sealed class ReportServices(
     private async Task<ReportScope?> ResolveScopeAsync(
         string viewPrivilege, bool export, string? extraExportPrivilege, Guid? sessionId, CancellationToken cancellationToken)
     {
-        var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await privileges.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var view = Scope(grants, viewPrivilege, sessionId);
         if (view is null || !export)
         {

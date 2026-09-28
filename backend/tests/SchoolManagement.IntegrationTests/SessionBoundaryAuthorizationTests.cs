@@ -62,6 +62,26 @@ public sealed class SessionBoundaryAuthorizationTests(ApiTestFixture fixture) : 
             seeded, Privileges.Report.View, $"/api/v1/reports/broadsheet?termId={seeded.TermId}&armId={seeded.ArmId}");
     }
 
+    // TASK-0046 B, ruled (a) 2026-09-28: a target with no session of its own (a non-scopable operation) belongs to the
+    // ACTIVE session, so last session's assignment no longer carries over (spec 4.2.2). The seed makes the target active.
+    [Fact]
+    public async Task NonScopableRoute_SchoolWideGrantOnlyInLastSession_Returns403()
+    {
+        RequireDatabase();
+        var seeded = await SeedAsync();
+
+        await AssertOnlyTargetSessionPassesAsync(seeded, Privileges.Role.View, "/api/v1/roles");
+    }
+
+    [Fact]
+    public async Task NonScopableHandlerCheck_SchoolWideGrantOnlyInLastSession_Returns403()
+    {
+        RequireDatabase();
+        var seeded = await SeedAsync();
+
+        await AssertOnlyTargetSessionPassesAsync(seeded, Privileges.Results.RemarkHeadTeacher, "/api/v1/remark-templates?kind=HeadTeacher");
+    }
+
     private async Task AssertOnlyTargetSessionPassesAsync(Seeded seeded, string privilege, string url)
     {
         var roleId = await SeedRoleAsync(privilege);

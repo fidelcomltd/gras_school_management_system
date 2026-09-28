@@ -17,8 +17,9 @@ namespace SchoolManagement.Application.Authorization;
 /// sessionless Super Admin grant) covers it, per <see cref="PrivilegeGrant.AppliesToSession"/>. Arm-list grants could
 /// not leak anyway, because an assignment's arms must belong to its session; the school-wide grant is what this stops.
 /// A pupil with no open enrolment resolves to <see cref="ScopeResolution.RequiresSchoolWide"/> in the active session.
-/// A level, <see cref="ScopeResolution.NotApplicable"/> and <see cref="ScopeResolution.AnyGrant"/> name no session and
-/// are not filtered: whether non-scopable operations follow the active session is a spec 4.2.2 question left open. Handler-level checks
+/// A level, <see cref="ScopeResolution.NotApplicable"/> and <see cref="ScopeResolution.AnyGrant"/> name no session: their
+/// callers pass only the grants that count now (<c>IEffectivePrivilegeProvider.GetGrantsAsync</c>, the active session;
+/// TASK-0046 B, ruled 2026-09-28), never every session's. Handler-level checks
 /// (<c>PupilAccessGuard</c>) apply the same filter with the session of the pupil, arm or report they target.
 /// </para>
 /// </remarks>

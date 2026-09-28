@@ -20,7 +20,9 @@ internal sealed class RoleAssignmentRoleNames(ActiveRoleAssignmentLoader loader)
             return [SuperAdminName];
         }
 
-        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+        // The same current assignments the privileges come from (TASK-0046 B), so the header never names a role whose
+        // privileges no longer count.
+        var active = await loader.LoadCurrentAsync(accountId, cancellationToken).ConfigureAwait(false);
         var names = new SortedSet<string>(active.Select(pair => pair.Role.Name), StringComparer.OrdinalIgnoreCase);
         return [.. names];
     }

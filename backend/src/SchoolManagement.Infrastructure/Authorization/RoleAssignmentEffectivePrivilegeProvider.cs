@@ -46,8 +46,14 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     ];
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(
-        string userId, CancellationToken cancellationToken)
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: false, cancellationToken);
+
+    private async Task<IReadOnlyCollection<PrivilegeGrant>> BuildAsync(string userId, bool current, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(userId);
 
@@ -68,7 +74,9 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
             return SuperAdminGrants;
         }
 
-        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+        var active = current
+            ? await loader.LoadCurrentAsync(accountId, cancellationToken).ConfigureAwait(false)
+            : await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
         var grants = new List<PrivilegeGrant>();
         foreach (var (assignment, role) in active)
         {

@@ -285,6 +285,10 @@ internal sealed class FakeEffectivePrivilegeProvider : IEffectivePrivilegeProvid
     public Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(string userId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<PrivilegeGrant>>(
             _grantsByUser.TryGetValue(userId, out var grants) ? grants : []);
+
+    // The fake has no sessions: every grant counts now and in every session alike.
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        GetGrantsAsync(userId, cancellationToken);
 }
 
 /// <summary>Records every rejection <see cref="PrivilegeAuthorizationTests"/> can assert against.</summary>

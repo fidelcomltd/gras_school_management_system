@@ -44,7 +44,7 @@ internal sealed class ListPupilsQueryHandler(
                 "pupils.invalid_cursor", "The cursor is invalid or has expired. Start again from the first page."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
         // The register's pupils belong to the active session (spec 4.2.1, "arm of record for the active term"), so only
         // grants in it count (TASK-0060); an arm-list grant still reaches only its own arms.
         var activeSessionId = (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
