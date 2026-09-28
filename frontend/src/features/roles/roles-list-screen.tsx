@@ -1,6 +1,7 @@
 import { ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
@@ -23,6 +24,7 @@ export function RolesListScreen() {
   const deleteRole = useDeleteRole();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<RoleDto | null>(null);
+  const [deleting, setDeleting] = useState<RoleDto | null>(null);
 
   const canCreate = !!me.data && hasPrivilege(me.data, 'role.create');
   const canEdit = !!me.data && hasPrivilege(me.data, 'role.update');
@@ -45,7 +47,6 @@ export function RolesListScreen() {
   }
 
   const items = roles.data.pages.flatMap((page) => page.items);
-  const deleteError = deleteRole.error instanceof ApiError ? deleteRole.error.message : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,12 +57,6 @@ export function RolesListScreen() {
         </div>
         {canCreate ? <Button onClick={() => setShowCreate(true)}>New role</Button> : null}
       </header>
-
-      {deleteError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      ) : null}
 
       {items.length === 0 ? (
         <EmptyState icon={ShieldCheck} title="No roles yet." />
@@ -91,11 +86,7 @@ export function RolesListScreen() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => {
-                      if (window.confirm(`Delete ${role.name}? This cannot be undone.`)) {
-                        deleteRole.mutate(role.id);
-                      }
-                    }}
+                    onClick={() => setDeleting(role)}
                   >
                     Delete
                   </Button>
@@ -112,6 +103,16 @@ export function RolesListScreen() {
 
       {showCreate ? <CreateRoleDialog onClose={() => setShowCreate(false)} /> : null}
       {editing ? <EditRoleDialog role={editing} onClose={() => setEditing(null)} /> : null}
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          description="This cannot be undone."
+          confirmLabel="Delete role"
+          pendingLabel="Deleting…"
+          onConfirm={() => deleteRole.mutateAsync(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      ) : null}
     </div>
   );
 }

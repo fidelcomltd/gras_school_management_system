@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
 import { useAdmin, useRevokeAdminSessions } from './api';
 import { lagosDateTime } from '@/shared/format/date';
 import { AssignmentsSection } from './assignments/assignments-section';
@@ -36,6 +36,7 @@ export function AdminDetailScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   if (admin.isPending) {
     return <WithTrail trail={[{ to: paths.admins }, { label: 'Admin account' }]}><LoadingState label="Loading admin account…" /></WithTrail>;
@@ -65,8 +66,6 @@ export function AdminDetailScreen() {
           }
           return hasPrivilege(me.data, 'admin.suspend');
         });
-
-  const revokeError = revokeSessions.error instanceof ApiError ? revokeSessions.error.message : null;
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
@@ -101,12 +100,6 @@ export function AdminDetailScreen() {
         ))}
       </dl>
 
-      {revokeError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {revokeError}
-        </p>
-      ) : null}
-
       <div className="flex flex-wrap gap-2">
         {statusTargets.length > 0 ? (
           <Button variant="outline" size="sm" onClick={() => setShowStatus(true)}>
@@ -123,15 +116,7 @@ export function AdminDetailScreen() {
             variant="destructive"
             size="sm"
             disabled={revokeSessions.isPending}
-            onClick={() => {
-              if (
-                window.confirm(
-                  `Revoke every active session for ${detail.staffName}? They will be signed out everywhere.`,
-                )
-              ) {
-                revokeSessions.mutate(detail.id);
-              }
-            }}
+            onClick={() => setConfirmRevoke(true)}
           >
             {revokeSessions.isPending ? 'Revoking…' : 'Revoke sessions'}
           </Button>
@@ -145,6 +130,17 @@ export function AdminDetailScreen() {
         canAssign={canAssign}
         canScopeAssign={canScopeAssign}
       />
+
+      {confirmRevoke ? (
+        <ConfirmDialog
+          title={`Revoke every session for ${detail.staffName}?`}
+          description="They will be signed out everywhere at once and must sign in again."
+          confirmLabel="Revoke sessions"
+          pendingLabel="Revoking…"
+          onConfirm={() => revokeSessions.mutateAsync(detail.id)}
+          onClose={() => setConfirmRevoke(false)}
+        />
+      ) : null}
 
       {showEdit ? (
         <EditAdminDialog admin={detail} canGrantSuperAdmin={canGrantSuperAdmin} onClose={() => setShowEdit(false)} />

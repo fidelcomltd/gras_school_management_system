@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
-import { ApiError } from '@/lib/http';
 import { useAssignments, useRevokeAssignment } from './api';
 import { AssignRoleDialog } from './assign-role-dialog';
 import type { RoleAssignmentDto } from './types';
@@ -27,12 +27,12 @@ export function AssignmentsSection({
   const assignments = useAssignments(adminId);
   const revoke = useRevokeAssignment(adminId);
   const [assigning, setAssigning] = useState(false);
+  const [revoking, setRevoking] = useState<RoleAssignmentDto | null>(null);
 
   const sessionName = (assignment: RoleAssignmentDto) => assignment.sessionName ?? 'Every session';
   const describe = (assignment: RoleAssignmentDto) => `${assignment.roleName}, ${sessionName(assignment)}`;
 
   const canGrant = !isSelf && (canAssign || canScopeAssign);
-  const revokeError = revoke.error instanceof ApiError ? revoke.error.message : null;
 
   const body = () => {
     if (assignments.isPending) return <LoadingState label="Loading roles…" />;
@@ -59,11 +59,7 @@ export function AssignmentsSection({
                     size="sm"
                     disabled={revoke.isPending}
                     aria-label={`Revoke ${describe(assignment)}`}
-                    onClick={() => {
-                      if (window.confirm(`Revoke ${describe(assignment)} from ${staffName}? They lose its privileges at once.`)) {
-                        revoke.mutate(assignment.id);
-                      }
-                    }}
+                    onClick={() => setRevoking(assignment)}
                   >
                     Revoke
                   </Button>
@@ -94,12 +90,17 @@ export function AssignmentsSection({
         ) : null}
       </div>
       {isSelf ? <p className="text-sm text-muted-foreground">Your own roles are changed by another Super Admin.</p> : null}
-      {revokeError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {revokeError}
-        </p>
-      ) : null}
       {body()}
+      {revoking ? (
+        <ConfirmDialog
+          title={`Revoke ${describe(revoking)} from ${staffName}?`}
+          description="They lose its privileges at once."
+          confirmLabel="Revoke role"
+          pendingLabel="Revoking…"
+          onConfirm={() => revoke.mutateAsync(revoking.id)}
+          onClose={() => setRevoking(null)}
+        />
+      ) : null}
       {assigning ? (
         <AssignRoleDialog
           adminId={adminId}

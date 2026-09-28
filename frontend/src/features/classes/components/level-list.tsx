@@ -1,6 +1,7 @@
 import { Layers } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
@@ -28,6 +29,7 @@ export function LevelList() {
   const deleteLevel = useDeleteLevel();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<LevelDto | null>(null);
+  const [deleting, setDeleting] = useState<LevelDto | null>(null);
 
   const canCreate = !!me.data && hasPrivilege(me.data, 'level.create');
   const canEdit = !!me.data && hasPrivilege(me.data, 'level.update');
@@ -65,7 +67,6 @@ export function LevelList() {
     reorder.mutate({ orderedLevelIds: next.map((level) => level.id) });
   }
 
-  const deleteError = deleteLevel.error instanceof ApiError ? deleteLevel.error.message : null;
 
   return (
     <div className="flex flex-col gap-4 pt-4">
@@ -76,12 +77,6 @@ export function LevelList() {
         </label>
         {canCreate ? <Button size="sm" onClick={() => setShowCreate(true)}>New level</Button> : null}
       </div>
-
-      {deleteError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      ) : null}
 
       {items.length === 0 ? (
         <EmptyState icon={Layers} title="No levels yet." />
@@ -131,11 +126,7 @@ export function LevelList() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => {
-                      if (window.confirm(`Delete ${level.name}? This cannot be undone.`)) {
-                        deleteLevel.mutate(level.id);
-                      }
-                    }}
+                    onClick={() => setDeleting(level)}
                   >
                     Delete
                   </Button>
@@ -151,6 +142,16 @@ export function LevelList() {
       ) : null}
 
       {showCreate ? <CreateLevelDialog levels={items} onClose={() => setShowCreate(false)} /> : null}
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          description="This cannot be undone."
+          confirmLabel="Delete level"
+          pendingLabel="Deleting…"
+          onConfirm={() => deleteLevel.mutateAsync(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      ) : null}
       {editing ? (
         <EditLevelDialog
           levels={items}
