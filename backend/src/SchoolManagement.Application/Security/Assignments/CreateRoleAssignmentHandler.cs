@@ -10,6 +10,7 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Sessions;
 
 namespace SchoolManagement.Application.Security.Assignments;
 
@@ -114,6 +115,20 @@ internal sealed class CreateRoleAssignmentCommandHandler(
         {
             return Result.Failure<RoleAssignmentDto>(Error.NotFound(
                 "session.not_found", "No session was found with that id."));
+        }
+
+        // Spec 6.1.13 (TASK-0046 C). Existing assignments of an archived role keep working (6.1.4); new ones are refused.
+        if (role.Status == RoleStatus.Archived)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.role_archived", "This role is archived and cannot be newly assigned."));
+        }
+
+        if (session.State == SessionState.Closed)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.session_closed",
+                $"The session {session.Name} is closed. Assignments can only be made in an open session."));
         }
 
         var requestedArmIds = (request.ArmIds ?? [])

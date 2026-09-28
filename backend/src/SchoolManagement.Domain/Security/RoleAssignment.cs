@@ -194,4 +194,10 @@ public sealed class RoleAssignment : Entity<Guid>, IAuditableEntity
 
     /// <summary>Moves to <see cref="RoleAssignmentStatus.Revoked"/> (spec 6.1.5, 6.1.10). Idempotent-safe: revoking an already-revoked row is a no-op.</summary>
     public void Revoke() => Status = RoleAssignmentStatus.Revoked;
+
+    /// <summary>
+    /// Spec 6.1.13: an arm deleted under this assignment is removed from its arm list. Returns true when that empties an
+    /// arm-scoped list, which the caller then revokes (with an audit event).
+    /// </summary>
+    public bool RemoveArm(Guid armId) => _armIds.Remove(armId) && ScopeType == ScopeType.ArmList && _armIds.Count == 0;
 }

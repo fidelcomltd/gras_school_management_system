@@ -36,7 +36,8 @@ export function AssignRoleDialog({
   const sessionsQuery = useSessions();
   const privilegesQuery = usePrivileges();
   const allRoles = useAllPages(rolesQuery).filter((role) => !role.isSystem);
-  const sessions = useAllPages(sessionsQuery);
+  // A Closed session cannot take a new assignment (spec 6.1.13), so it is not offered.
+  const sessions = useAllPages(sessionsQuery).filter((session) => session.state !== 'Closed');
 
   const [roleChoice, setRoleChoice] = useState('');
   const [sessionChoice, setSessionChoice] = useState<string | null>(null);
