@@ -117,20 +117,6 @@ internal sealed class CreateRoleAssignmentCommandHandler(
                 "session.not_found", "No session was found with that id."));
         }
 
-        // Spec 6.1.13 (TASK-0046 C). Existing assignments of an archived role keep working (6.1.4); new ones are refused.
-        if (role.Status == RoleStatus.Archived)
-        {
-            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
-                "role_assignment.role_archived", "This role is archived and cannot be newly assigned."));
-        }
-
-        if (session.State == SessionState.Closed)
-        {
-            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
-                "role_assignment.session_closed",
-                $"The session {session.Name} is closed. Assignments can only be made in an open session."));
-        }
-
         var requestedArmIds = (request.ArmIds ?? [])
             .Select(Guid.Parse)
             .ToArray();
@@ -203,6 +189,21 @@ internal sealed class CreateRoleAssignmentCommandHandler(
                 cancellationToken).ConfigureAwait(false);
 
             return Result.Failure<RoleAssignmentDto>(withinScope.Error);
+        }
+
+        // Spec 6.1.13 (TASK-0046 C), after the privilege and escalation checks so a caller without the privilege learns
+        // nothing about the role or session. Existing assignments of an archived role keep working (6.1.4); new ones are refused.
+        if (role.Status == RoleStatus.Archived)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.role_archived", "This role is archived and cannot be newly assigned."));
+        }
+
+        if (session.State == SessionState.Closed)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.session_closed",
+                $"The session {session.Name} is closed. Assignments can only be made in an open session."));
         }
 
         var creation = RoleAssignment.Create(

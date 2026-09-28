@@ -22,8 +22,8 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// (spec 4.2: "the union of all privileges from all active assignments held by the account, each
 /// tagged with the scope it arrived through"), regardless of whether the granting role is currently
 /// active or archived — 6.1.4's "existing assignments continue until the session ends" for an
-/// archived role, and the lifecycle cascade for a closed session or a deleted arm, is TASK-0046
-/// (spec 6.1.13; the task card's own out-of-scope list).
+/// archived role. A deleted arm leaves (or revokes) its assignments in <c>DeleteArmHandler</c>; a closed
+/// session's assignments stop counting for non-scopable checks through <c>GetGrantsAsync</c> (TASK-0046).
 /// </para>
 /// <para>
 /// Roles are looked up one at a time rather than through a new bulk-fetch repository method: an

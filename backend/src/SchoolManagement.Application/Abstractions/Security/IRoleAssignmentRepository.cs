@@ -25,8 +25,8 @@ public interface IRoleAssignmentRepository
     Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountReadOnlyAsync(
         Guid adminAccountId, CancellationToken cancellationToken);
 
-    /// <summary>Every ACTIVE assignment in <paramref name="sessionId"/>, TRACKED — an arm deleted in that session (TASK-0046 C).</summary>
-    Task<IReadOnlyList<RoleAssignment>> ListActiveForSessionTrackedAsync(Guid sessionId, CancellationToken cancellationToken);
+    /// <summary>Every ACTIVE arm-scoped assignment in <paramref name="sessionId"/>, TRACKED — an arm deleted in that session (TASK-0046 C).</summary>
+    Task<IReadOnlyList<RoleAssignment>> ListActiveArmScopedForSessionTrackedAsync(Guid sessionId, CancellationToken cancellationToken);
 
     /// <summary>Every ACTIVE assignment in <paramref name="sessionId"/>, <c>AsNoTracking</c> — copy-to-session (TASK-0046 B).</summary>
     Task<IReadOnlyList<RoleAssignment>> ListActiveForSessionReadOnlyAsync(Guid sessionId, CancellationToken cancellationToken);

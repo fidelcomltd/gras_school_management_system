@@ -32,9 +32,12 @@ internal sealed class RoleAssignmentRepository(ApplicationDbContext context) : I
             .ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RoleAssignment>> ListActiveForSessionTrackedAsync(Guid sessionId, CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyList<RoleAssignment>> ListActiveArmScopedForSessionTrackedAsync(Guid sessionId, CancellationToken cancellationToken) =>
         await context.RoleAssignments
-            .Where(assignment => assignment.SessionId == sessionId && assignment.Status == RoleAssignmentStatus.Active)
+            .Where(assignment =>
+                assignment.SessionId == sessionId
+                && assignment.Status == RoleAssignmentStatus.Active
+                && assignment.ScopeType == ScopeType.ArmList)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 

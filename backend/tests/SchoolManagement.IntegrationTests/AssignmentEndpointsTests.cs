@@ -223,6 +223,7 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         var (teacherId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
         var both = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.ArmList, [doomed, kept], granterId);
         var onlyDoomed = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.ArmList, [doomed], granterId);
+        var schoolWide = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.SchoolWide, [], granterId);
 
         using (var deleted = await DeleteAsync(Client, $"/api/v1/arms/{doomed}", jar))
         {
@@ -236,6 +237,12 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         trimmed.Status.ShouldBe(RoleAssignmentStatus.Active);
         var emptied = await context.RoleAssignments.AsNoTracking().SingleAsync(a => a.Id == onlyDoomed, TestContext.Current.CancellationToken);
         emptied.Status.ShouldBe(RoleAssignmentStatus.Revoked);
+        emptied.ArmIds.ShouldBe([doomed], "a revoked row keeps the class it covered");
+        (await context.RoleAssignments.AsNoTracking().SingleAsync(a => a.Id == schoolWide, TestContext.Current.CancellationToken))
+            .Status.ShouldBe(RoleAssignmentStatus.Active);
+        (await context.AuditEvents.AsNoTracking().CountAsync(
+            e => e.Action == "role_assignment.arm_removed" && e.EntityId == both.ToString(),
+            TestContext.Current.CancellationToken)).ShouldBe(1);
         (await context.AuditEvents.AsNoTracking().CountAsync(
             e => e.Action == "role_assignment.revoked_arm_deleted" && e.EntityId == onlyDoomed.ToString(),
             TestContext.Current.CancellationToken)).ShouldBe(1);

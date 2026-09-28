@@ -196,8 +196,37 @@ public sealed class RoleAssignment : Entity<Guid>, IAuditableEntity
     public void Revoke() => Status = RoleAssignmentStatus.Revoked;
 
     /// <summary>
-    /// Spec 6.1.13: an arm deleted under this assignment is removed from its arm list. Returns true when that empties an
-    /// arm-scoped list, which the caller then revokes (with an audit event).
+    /// Spec 6.1.13: an arm deleted under this assignment leaves its arm list. When it is the list's last arm the assignment
+    /// is revoked instead, keeping the arm, so a revoked row never breaks the "arm-scoped means a non-empty list" rule and
+    /// its history still says which class it covered. The caller writes the audit event.
     /// </summary>
-    public bool RemoveArm(Guid armId) => _armIds.Remove(armId) && ScopeType == ScopeType.ArmList && _armIds.Count == 0;
+    public ArmRemoval RemoveArm(Guid armId)
+    {
+        if (!_armIds.Contains(armId))
+        {
+            return ArmRemoval.NotPresent;
+        }
+
+        if (_armIds.Count == 1)
+        {
+            Revoke();
+            return ArmRemoval.Revoked;
+        }
+
+        _armIds.Remove(armId);
+        return ArmRemoval.Removed;
+    }
+}
+
+/// <summary>What <see cref="RoleAssignment.RemoveArm"/> did.</summary>
+public enum ArmRemoval
+{
+    /// <summary>The assignment did not name the arm.</summary>
+    NotPresent,
+
+    /// <summary>The arm left the list; others remain.</summary>
+    Removed,
+
+    /// <summary>It was the last arm: the assignment was revoked, arm kept.</summary>
+    Revoked,
 }
