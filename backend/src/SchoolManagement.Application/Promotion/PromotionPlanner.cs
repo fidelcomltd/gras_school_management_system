@@ -67,7 +67,7 @@ internal sealed class PromotionPlanner(
             return Result.Failure<PromotionPlan>(Error.NotFound("promotion.target_session_not_found", "No session was found with that target id."));
         }
 
-        var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await privileges.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         // A promotion spans both sessions, so a school-wide grant in either decides it (TASK-0060).
         var canDecide = PupilAccessGuard.Resolve(grants, Privileges.Promotion.Decide, source.Id) == PupilAccessScope.SchoolWide
             || (target is not null && PupilAccessGuard.Resolve(grants, Privileges.Promotion.Decide, target.Id) == PupilAccessScope.SchoolWide);

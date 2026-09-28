@@ -26,7 +26,7 @@ internal sealed class PupilRecordAccess(
             return Result.Failure<Pupil>(Error.Unauthenticated("authentication.required", "Sign in to perform this action."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
         if (PupilAccessGuard.Resolve(grants, privilege, targetSessionId: null) == PupilAccessScope.Forbidden)
         {
             return Forbidden(privilege);
@@ -57,7 +57,7 @@ internal sealed class PupilRecordAccess(
     /// </summary>
     public async Task<Result> CheckArmAsync(Guid armId, string privilege, CancellationToken cancellationToken)
     {
-        var grants = await grantsProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await grantsProvider.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var sessionId = (await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false))?.SessionId;
         var covered = PupilAccessGuard.Resolve(grants, privilege, sessionId) switch
         {

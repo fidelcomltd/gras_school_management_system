@@ -151,7 +151,7 @@ internal sealed class SafeguardingSheetBuilder(
     public async Task<Result<(SafeguardingSheetDto Sheet, IReadOnlyDictionary<string, ReadOnlyMemory<byte>> Photos)>> BuildAsync(
         Guid armId, string format, CancellationToken cancellationToken)
     {
-        var grants = await effectivePrivilegeProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await effectivePrivilegeProvider.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var arm = await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false);
 
         // Only grants in the class's session count (TASK-0060).

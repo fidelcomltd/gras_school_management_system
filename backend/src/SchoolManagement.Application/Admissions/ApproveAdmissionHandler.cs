@@ -188,7 +188,7 @@ internal sealed class ApproveAdmissionCommandHandler(
         if (healthOverridden)
         {
             var grants = await effectivePrivilegeProvider
-                .GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
+                .GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
                 .ConfigureAwait(false);
             if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.AdmissionOverride, arm.SessionId) != PupilAccessScope.SchoolWide)
             {

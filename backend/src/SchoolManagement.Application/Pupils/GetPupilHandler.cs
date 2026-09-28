@@ -30,7 +30,7 @@ internal sealed class GetPupilQueryHandler(
             return Result.Failure<PupilDto>(Error.Unauthenticated("authentication.required", "Sign in to perform this action."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
         if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.View, targetSessionId: null) == PupilAccessScope.Forbidden)
         {
             return Result.Failure<PupilDto>(Error.Forbidden(

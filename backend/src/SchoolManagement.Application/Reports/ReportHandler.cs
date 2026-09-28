@@ -282,7 +282,7 @@ internal sealed class ReportServices(
     private async Task<ReportScope?> ResolveScopeAsync(
         string viewPrivilege, bool export, string? extraExportPrivilege, Guid? sessionId, CancellationToken cancellationToken)
     {
-        var grants = await privileges.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await privileges.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var view = Scope(grants, viewPrivilege, sessionId);
         if (view is null || !export)
         {

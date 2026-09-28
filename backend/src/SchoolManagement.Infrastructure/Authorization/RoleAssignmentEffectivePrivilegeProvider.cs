@@ -1,5 +1,6 @@
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Infrastructure.Authorization;
@@ -34,7 +35,8 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// </remarks>
 internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     IAdminAccountRepository accounts,
-    ActiveRoleAssignmentLoader loader)
+    ActiveRoleAssignmentLoader loader,
+    IAcademicSessionRepository sessions)
     : IEffectivePrivilegeProvider
 {
     private static readonly IReadOnlyCollection<PrivilegeGrant> NoGrants = [];
@@ -47,6 +49,20 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
 
     /// <inheritdoc />
     public async Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(
+        string userId, CancellationToken cancellationToken)
+    {
+        var all = await GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (all.Count == 0 || all.All(grant => grant.SessionId is null))
+        {
+            return all;
+        }
+
+        var activeSessionId = (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
+        return [.. all.Where(grant => grant.AppliesToSession(activeSessionId))];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(
         string userId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(userId);

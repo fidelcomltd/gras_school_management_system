@@ -49,7 +49,7 @@ internal sealed class UpdatePupilBiographicalHandler(
                 "The registration number cannot be changed through this endpoint. It is issued once, at admission approval, and never edited afterwards."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
         if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.Update, targetSessionId: null) == PupilAccessScope.Forbidden)
         {
             return Result.Failure<PupilDto>(Error.Forbidden(

@@ -307,7 +307,7 @@ internal sealed class CommitPupilImportHandler(
         }
 
         // Spec 6.4.6, as approval: school-wide, or arm-restricted to every arm going over; in the import's session (TASK-0060).
-        var grants = await effectivePrivilegeProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var grants = await effectivePrivilegeProvider.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
         var scope = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride, sessionId);
         var allowedArms = scope == PupilAccessScope.ArmRestricted ? PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride, sessionId) : null;
         var refused = overCapacity.FirstOrDefault(warning => scope switch
