@@ -27,7 +27,11 @@ const TEMP_PASSWORD = 'not-a-real-password-fixture';
 function summaryOf(detail: Record<string, unknown>): Record<string, unknown> {
   const { id, staffName, email, phone, status, isSuperAdmin, mustChangePassword, lastLoginAtUtc, createdAtUtc } =
     detail;
-  return { id, staffName, email, phone, status, isSuperAdmin, mustChangePassword, lastLoginAtUtc, createdAtUtc };
+  // A fresh account holds no roles yet, which the list reports as no roles and an empty scope.
+  return {
+    id, staffName, email, phone, status, isSuperAdmin, mustChangePassword, lastLoginAtUtc, createdAtUtc,
+    rolesHeld: [], scopeSummary: '',
+  };
 }
 
 async function stubBackOffice(page: Page): Promise<void> {
