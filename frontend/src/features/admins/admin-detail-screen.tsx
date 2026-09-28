@@ -5,6 +5,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmin, useRevokeAdminSessions } from './api';
+import { lagosDateTime } from '@/shared/format/date';
 import { AssignmentsSection } from './assignments/assignments-section';
 import { ChangeStatusDialog } from './components/change-status-dialog';
 import { EditAdminDialog } from './components/edit-admin-dialog';
@@ -89,8 +90,8 @@ export function AdminDetailScreen() {
             ['Status', detail.status],
             ['Super Admin', detail.isSuperAdmin ? 'Yes' : 'No'],
             ['Must change password', detail.mustChangePassword ? 'Yes' : 'No'],
-            ['Last signed in', detail.lastLoginAtUtc ?? 'Never'],
-            ['Created', detail.createdAtUtc],
+            ['Last signed in', detail.lastLoginAtUtc ? lagosDateTime(detail.lastLoginAtUtc) : 'Never'],
+            ['Created', lagosDateTime(detail.createdAtUtc)],
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="flex flex-col gap-0.5">

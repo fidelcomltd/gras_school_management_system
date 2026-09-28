@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useArms } from '@/features/arms/api';
@@ -118,11 +118,7 @@ export function AssignRoleDialog({
             }
           }}
         >
-          {formError ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {formError}
-            </p>
-          ) : null}
+          <FormError message={formError} />
 
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-sm font-medium text-foreground">Where it applies</legend>

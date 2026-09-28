@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { apiGet } from '@/api/client';
 import type { components } from '@/api/schema';
 import { getFile, saveFile } from '@/lib/http';
@@ -37,6 +37,8 @@ export function useAuditEvents(filters: AuditFilters) {
       apiGet('/api/v1/audit-events', { ...toQuery(filters), ...(pageParam !== undefined ? { cursor: pageParam } : {}) }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    // Filters apply as they change; the list stays in place until the new one arrives instead of flashing a spinner.
+    placeholderData: keepPreviousData,
   });
 }
 

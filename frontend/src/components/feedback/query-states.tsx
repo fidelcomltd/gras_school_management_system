@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { ApiError } from '@/lib/http';
@@ -34,8 +35,20 @@ export function QueryErrorState({ error, onRetry }: { error: Error; onRetry: () 
 
 /** A server rejection shown at the top of a form, verbatim. */
 export function FormError({ message }: { message: string | null | undefined }) {
+  // A server's answer must be seen wherever the user is (lead, 2026-09-28): a long form's submit button sits far below
+  // this banner, so it scrolls into view when a message arrives and, inside a form or a dialog, stays pinned under the
+  // page header (at the top of a dialog) while the user scrolls back to fix the field. A page-level banner is not
+  // pinned, so a stale one never covers a list.
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (message) ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [message]);
   return message ? (
-    <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+    <p
+      ref={ref}
+      role="alert"
+      className="z-10 scroll-mt-20 rounded-md border border-destructive/30 bg-destructive-subtle px-3 py-2 text-sm text-destructive shadow-sm in-[form]:sticky in-[form]:top-20 in-[[role=dialog]]:sticky in-[[role=dialog]]:top-0 in-[[role=dialog]]:scroll-mt-0"
+    >
       {message}
     </p>
   ) : null;

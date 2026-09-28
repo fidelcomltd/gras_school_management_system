@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -44,11 +45,7 @@ export function SignInForm() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
-      {formError ? (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {formError}
-        </p>
-      ) : null}
+      <FormError message={formError} />
 
       <Field invalid={!!errors.email}>
         <FieldLabel>Email address</FieldLabel>

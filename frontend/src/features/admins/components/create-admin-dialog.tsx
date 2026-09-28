@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormError } from '@/components/feedback/query-states';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -61,11 +62,7 @@ export function CreateAdminDialog({ onClose }: { onClose: () => void }) {
           <TemporaryPasswordReveal password={reveal.temporaryPassword} onDone={onClose} />
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-            {formError ? (
-              <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {formError}
-              </p>
-            ) : null}
+            <FormError message={formError} />
 
             <Field invalid={!!errors.staffName}>
               <FieldLabel>Staff name</FieldLabel>
