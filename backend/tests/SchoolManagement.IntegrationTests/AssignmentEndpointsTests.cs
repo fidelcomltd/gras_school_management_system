@@ -157,6 +157,106 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         (await CopyAsync(dryRun: true)).Copied.ShouldBeEmpty("copying twice finds everything already assigned");
     }
 
+    // TASK-0046 C, spec 6.1.13.
+    [Fact]
+    public async Task Create_WithAnArchivedRole_Returns409()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var (targetId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        var roleId = await SeedRoleAsync("Retired Role", [Privileges.Pupil.View]);
+        var sessionId = await SeedSessionAsync("2026/2027");
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            (await context.Roles.SingleAsync(role => role.Id == roleId, TestContext.Current.CancellationToken)).ChangeStatus(RoleStatus.Archived);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var response = await PostAsync(
+            $"{AdminsUrl}/{targetId}/assignments",
+            jar,
+            new CreateRoleAssignmentCommand(targetId.ToString(), roleId.ToString(), sessionId.ToString(), ScopeType.SchoolWide, null),
+            idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role_assignment.role_archived");
+    }
+
+    [Fact]
+    public async Task Create_InAClosedSession_Returns409()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var (targetId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        var roleId = await SeedRoleAsync("Late Role", [Privileges.Pupil.View]);
+        var sessionId = await SeedSessionAsync("2025/2026");
+        await CloseSessionAsync(sessionId);
+
+        var response = await PostAsync(
+            $"{AdminsUrl}/{targetId}/assignments",
+            jar,
+            new CreateRoleAssignmentCommand(targetId.ToString(), roleId.ToString(), sessionId.ToString(), ScopeType.SchoolWide, null),
+            idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role_assignment.session_closed");
+        document.RootElement.GetProperty("detail").GetString().ShouldBe(
+            "The session 2025/2026 is closed. Assignments can only be made in an open session.");
+    }
+
+    [Fact]
+    public async Task DeletingAnArm_TakesItOffEveryAssignment_AndRevokesOneItEmpties()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var sessionId = await SeedSessionAsync("2026/2027");
+        var doomed = await SeedArmAsync(sessionId, "2A");
+        var kept = await SeedArmAsync(sessionId, "2B");
+        var (granterId, _) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        var roleId = await SeedRoleAsync("Class Teacher Too", [Privileges.Pupil.View]);
+        var (teacherId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        var both = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.ArmList, [doomed, kept], granterId);
+        var onlyDoomed = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.ArmList, [doomed], granterId);
+        var schoolWide = await SeedAssignmentAsync(teacherId, roleId, sessionId, ScopeType.SchoolWide, [], granterId);
+
+        using (var deleted = await DeleteAsync(Client, $"/api/v1/arms/{doomed}", jar))
+        {
+            deleted.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        }
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var trimmed = await context.RoleAssignments.AsNoTracking().SingleAsync(a => a.Id == both, TestContext.Current.CancellationToken);
+        trimmed.ArmIds.ShouldBe([kept]);
+        trimmed.Status.ShouldBe(RoleAssignmentStatus.Active);
+        var emptied = await context.RoleAssignments.AsNoTracking().SingleAsync(a => a.Id == onlyDoomed, TestContext.Current.CancellationToken);
+        emptied.Status.ShouldBe(RoleAssignmentStatus.Revoked);
+        emptied.ArmIds.ShouldBe([doomed], "a revoked row keeps the class it covered");
+        (await context.RoleAssignments.AsNoTracking().SingleAsync(a => a.Id == schoolWide, TestContext.Current.CancellationToken))
+            .Status.ShouldBe(RoleAssignmentStatus.Active);
+        (await context.AuditEvents.AsNoTracking().CountAsync(
+            e => e.Action == "role_assignment.arm_removed" && e.EntityId == both.ToString(),
+            TestContext.Current.CancellationToken)).ShouldBe(1);
+        (await context.AuditEvents.AsNoTracking().CountAsync(
+            e => e.Action == "role_assignment.revoked_arm_deleted" && e.EntityId == onlyDoomed.ToString(),
+            TestContext.Current.CancellationToken)).ShouldBe(1);
+    }
+
+    private async Task CloseSessionAsync(Guid sessionId)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE academic_sessions SET state = {SessionState.Closed.ToString()} WHERE id = {sessionId}",
+            TestContext.Current.CancellationToken);
+    }
+
     [Fact]
     public async Task CopyToSession_IntoAClosedSession_Returns409()
     {
@@ -165,13 +265,7 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
         var jar = await SignInAsSuperAdminAsync();
         var fromId = await SeedSessionAsync("2026/2027");
         var closedId = await SeedSessionAsync("2025/2026");
-        await using (var scope = Fixture.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await context.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE academic_sessions SET state = {SessionState.Closed.ToString()} WHERE id = {closedId}",
-                TestContext.Current.CancellationToken);
-        }
+        await CloseSessionAsync(closedId);
 
         var response = await PostAsync(
             "/api/v1/assignments/copy-to-session",

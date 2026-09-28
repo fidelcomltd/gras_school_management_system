@@ -132,7 +132,8 @@ public sealed class AssignmentEndpoints : IEndpointModule
                 "another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for " +
                 "the privilege it is exercising. Both rejections write an audit event. The seeded " +
                 "Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only " +
-                "through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.")
+                "through `PATCH /admins/{id}`. 409 `role_assignment.role_archived` for an archived role and " +
+                "`role_assignment.session_closed` for a Closed session (spec 6.1.13). `Idempotency-Key` is REQUIRED.")
             .Produces<RoleAssignmentDto>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status400BadRequest)
