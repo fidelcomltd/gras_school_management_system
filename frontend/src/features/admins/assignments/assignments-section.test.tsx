@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
-import { renderWithProviders, screen, waitFor } from '@/test/render';
+import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { AssignmentsSection } from './assignments-section';
@@ -60,7 +60,6 @@ describe('AssignmentsSection', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const { user } = renderWithProviders(<AssignmentsSection adminId="admin-1" staffName="Ngozi Adeyemi" isSelf={false} canAssign canScopeAssign />);
 
@@ -68,6 +67,8 @@ describe('AssignmentsSection', () => {
     expect(await screen.findByText(/2026\/2027 · Primary 4A/)).toBeInTheDocument();
     expect(screen.getByText(/1 revoked assignment is kept/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Revoke Class Teacher, 2026/2027' }));
+    const dialog = await screen.findByRole('dialog', { name: /Ngozi Adeyemi/ });
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke role' }));
     await waitFor(() => expect(revoked).toBe('as-1'));
   });
 

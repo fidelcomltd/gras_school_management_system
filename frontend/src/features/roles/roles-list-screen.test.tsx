@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, userEvent, waitFor } from '@/test/render';
+import { describe, expect, it } from 'vitest';
+import { render, screen, userEvent, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { RolesListScreen } from './roles-list-screen';
@@ -195,13 +195,14 @@ describe('RolesListScreen — deleting a system role surfaces the 409 verbatim',
         problemResponse(409, { detail: 'Super Admin is a system role and cannot be deleted.' }),
       ),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const user = userEvent.setup();
     renderScreen();
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Super Admin?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete role' }));
 
-    expect(await screen.findByText('Super Admin is a system role and cannot be deleted.')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Super Admin is a system role and cannot be deleted.')).toBeInTheDocument();
   });
 });

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
 import { useArm, useDeleteArm } from './api';
 import { EditArmDialog } from './components/edit-arm-dialog';
 import { FormTeacherLabel } from './components/form-teacher-label';
@@ -27,6 +27,7 @@ export function ArmDetailScreen() {
   const me = useMe();
   const deleteArm = useDeleteArm();
   const [showEdit, setShowEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const canUpdate = !!me.data && hasPrivilege(me.data, 'arm.update');
   const canDelete = !!me.data && hasPrivilege(me.data, 'arm.delete');
@@ -47,7 +48,6 @@ export function ArmDetailScreen() {
   }
 
   const detail = arm.data;
-  const deleteError = deleteArm.error instanceof ApiError ? deleteArm.error.message : null;
   const currentFormTeacherName = detail.formTeacherAdminId
     ? formTeacherNames[detail.formTeacherAdminId]
     : undefined;
@@ -66,12 +66,6 @@ export function ArmDetailScreen() {
           </Button>
         ) : null}
       </header>
-
-      {deleteError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      ) : null}
 
       <dl className="flex flex-col gap-3">
         <div className="flex flex-col gap-0.5">
@@ -99,14 +93,21 @@ export function ArmDetailScreen() {
           variant="destructive"
           size="sm"
           className="self-start"
-          onClick={() => {
-            if (window.confirm(`Delete ${detail.displayName}? This cannot be undone.`)) {
-              deleteArm.mutate(detail.id, { onSuccess: () => navigate(paths.arms) });
-            }
-          }}
+          onClick={() => setConfirmDelete(true)}
         >
           Delete arm
         </Button>
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title={`Delete ${detail.displayName}?`}
+          description="This cannot be undone."
+          confirmLabel="Delete arm"
+          pendingLabel="Deleting…"
+          onConfirm={() => deleteArm.mutateAsync(detail.id).then(() => navigate(paths.arms))}
+          onClose={() => setConfirmDelete(false)}
+        />
       ) : null}
 
       {showEdit ? (

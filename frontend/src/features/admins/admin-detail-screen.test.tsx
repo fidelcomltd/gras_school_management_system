@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, userEvent, waitFor } from '@/test/render';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { render, screen, userEvent, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { AdminDetailScreen } from './admin-detail-screen';
@@ -154,7 +154,6 @@ describe('AdminDetailScreen — revoke sessions', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const user = userEvent.setup();
@@ -163,7 +162,9 @@ describe('AdminDetailScreen — revoke sessions', () => {
     await screen.findByRole('heading', { name: 'Ngozi Adeyemi' });
     await user.click(screen.getByRole('button', { name: 'Revoke sessions' }));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Ngozi Adeyemi'));
+    const dialog = await screen.findByRole('dialog', { name: /Ngozi Adeyemi/ });
+    expect(revoked).toBe(false);
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke sessions' }));
     await waitFor(() => expect(revoked).toBe(true));
   });
 
@@ -177,7 +178,6 @@ describe('AdminDetailScreen — revoke sessions', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const user = userEvent.setup();
@@ -185,7 +185,9 @@ describe('AdminDetailScreen — revoke sessions', () => {
 
     await screen.findByRole('heading', { name: 'Ngozi Adeyemi' });
     await user.click(screen.getByRole('button', { name: 'Revoke sessions' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
 
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(revoked).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen, userEvent, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -133,7 +133,6 @@ describe('ArmDetailScreen — delete (DeleteArm)', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const user = userEvent.setup();
     renderScreen();
@@ -141,7 +140,9 @@ describe('ArmDetailScreen — delete (DeleteArm)', () => {
     await screen.findByRole('heading', { name: 'Primary 2C' });
     await user.click(screen.getByRole('button', { name: 'Delete arm' }));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Primary 2C'));
+    const dialog = await screen.findByRole('dialog', { name: /Primary 2C/ });
+    expect(deleted).toBe(false);
+    await user.click(within(dialog).getByRole('button', { name: 'Delete arm' }));
     await waitFor(() => expect(deleted).toBe(true));
     expect(await screen.findByText('arms list')).toBeInTheDocument();
   });
@@ -156,14 +157,15 @@ describe('ArmDetailScreen — delete (DeleteArm)', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     const user = userEvent.setup();
     renderScreen();
 
     await screen.findByRole('heading', { name: 'Primary 2C' });
     await user.click(screen.getByRole('button', { name: 'Delete arm' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
 
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(deleted).toBe(false);
   });
 });
