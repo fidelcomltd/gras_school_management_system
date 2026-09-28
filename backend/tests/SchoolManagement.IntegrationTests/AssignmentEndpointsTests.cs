@@ -102,6 +102,98 @@ public sealed class AssignmentEndpointsTests(ApiTestFixture fixture) : Integrati
     }
 
     [Fact]
+    public async Task CopyToSession_DryRunWritesNothing_ThenCopiesWhatMapsAndSkipsTheRestWithReasons()
+    {
+        // TASK-0046 B, spec 4.2.2 / 6.1.14.
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var fromId = await SeedSessionAsync("2026/2027");
+        var toId = await SeedSessionAsync("2027/2028");
+        var from2A = await SeedArmAsync(fromId, "2A");
+        var from5B = await SeedArmAsync(fromId, "5B");
+        var to2A = await SeedArmAsync(toId, "2A");
+        var (granterId, _) = await AdminAccountSeeder.SeedAsync(Fixture, mustChangePassword: false);
+        var teacherRole = await SeedRoleAsync("Copy Teacher", [Privileges.Pupil.View]);
+        var headRole = await SeedRoleAsync("Copy Head", [Privileges.Pupil.View]);
+
+        var (mapsId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(mapsId, teacherRole, fromId, ScopeType.ArmList, [from2A], granterId);
+        var (unmatchedId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(unmatchedId, teacherRole, fromId, ScopeType.ArmList, [from5B], granterId);
+        var (headId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(headId, headRole, fromId, ScopeType.SchoolWide, [], granterId);
+        var (heldId, _, _) = await AdminAccountSeeder.SeedRegularAsync(Fixture);
+        await SeedAssignmentAsync(heldId, headRole, fromId, ScopeType.SchoolWide, [], granterId);
+        await SeedAssignmentAsync(heldId, headRole, toId, ScopeType.SchoolWide, [], granterId);
+
+        async Task<AssignmentCopyResultDto> CopyAsync(bool dryRun)
+        {
+            var response = await PostAsync(
+                "/api/v1/assignments/copy-to-session",
+                jar,
+                new CopyAssignmentsToSessionCommand(fromId.ToString(), toId.ToString(), dryRun),
+                idempotencyKey: $"key-{Guid.NewGuid():N}");
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            return await ReadAsync<AssignmentCopyResultDto>(response);
+        }
+
+        string Id(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
+
+        var preview = await CopyAsync(dryRun: true);
+        preview.Copied.Select(row => row.AdminAccountId).ShouldBe([Id(mapsId), Id(headId)], ignoreOrder: true);
+        preview.Skipped.Single(row => row.AdminAccountId == Id(unmatchedId)).SkipReason!.ShouldContain("has no class in 2027/2028");
+        preview.Skipped.Single(row => row.AdminAccountId == Id(heldId)).SkipReason.ShouldBe("Already assigned in 2027/2028.");
+        (await ActiveInSessionAsync(toId)).ShouldBe(1, "a dry run writes nothing");
+
+        var done = await CopyAsync(dryRun: false);
+        done.Copied.Count.ShouldBe(2);
+        (await ActiveInSessionAsync(toId)).ShouldBe(3);
+        var mapped = await GetAsync($"{AdminsUrl}/{mapsId}/assignments", jar);
+        var (toText, to2AText) = (Id(toId), Id(to2A));
+        (await ReadAsync<List<RoleAssignmentDto>>(mapped)).ShouldContain(item =>
+            item.SessionId == toText && item.ArmIds.SequenceEqual(new[] { to2AText }));
+
+        (await CopyAsync(dryRun: true)).Copied.ShouldBeEmpty("copying twice finds everything already assigned");
+    }
+
+    [Fact]
+    public async Task CopyToSession_IntoAClosedSession_Returns409()
+    {
+        RequireDatabase();
+
+        var jar = await SignInAsSuperAdminAsync();
+        var fromId = await SeedSessionAsync("2026/2027");
+        var closedId = await SeedSessionAsync("2025/2026");
+        await using (var scope = Fixture.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE academic_sessions SET state = {SessionState.Closed.ToString()} WHERE id = {closedId}",
+                TestContext.Current.CancellationToken);
+        }
+
+        var response = await PostAsync(
+            "/api/v1/assignments/copy-to-session",
+            jar,
+            new CopyAssignmentsToSessionCommand(fromId.ToString(), closedId.ToString(), DryRun: true),
+            idempotencyKey: $"key-{Guid.NewGuid():N}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using var document = await ReadJsonAsync(response);
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("role_assignment.session_closed");
+    }
+
+    private async Task<int> ActiveInSessionAsync(Guid sessionId)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.RoleAssignments.CountAsync(
+            assignment => assignment.SessionId == sessionId && assignment.Status == RoleAssignmentStatus.Active,
+            TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ListAdmins_ShowsRolesHeldAndScopeSummary()
     {
         // TASK-0046, spec 6.1.8's "Roles held" and "Scope summary" columns.

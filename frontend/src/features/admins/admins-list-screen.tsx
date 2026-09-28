@@ -7,6 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
+import { CopyAssignmentsDialog } from './assignments/copy-assignments-dialog';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
 import { LoadingState } from '@/components/feedback/query-states';
@@ -30,7 +31,9 @@ export function AdminsListScreen() {
   const admins = useAdmins(status === '' ? undefined : status);
   const me = useMe();
   const [showCreate, setShowCreate] = useState(false);
+  const [showCopy, setShowCopy] = useState(false);
   const canCreate = !!me.data && hasPrivilege(me.data, 'admin.create');
+  const canCopy = !!me.data && hasPrivilege(me.data, 'role.assign');
 
   if (admins.isPending) {
     return <LoadingState label="Loading admin accounts…" />;
@@ -57,7 +60,14 @@ export function AdminsListScreen() {
           <h1 className="font-display text-2xl font-semibold text-foreground">Admin accounts</h1>
           <p className="text-sm text-muted-foreground">Who else has access, and what they can do.</p>
         </div>
-        {canCreate ? <Button onClick={() => setShowCreate(true)}>New admin</Button> : null}
+        <div className="flex flex-wrap gap-2">
+          {canCopy ? (
+            <Button variant="outline" onClick={() => setShowCopy(true)}>
+              Copy assignments…
+            </Button>
+          ) : null}
+          {canCreate ? <Button onClick={() => setShowCreate(true)}>New admin</Button> : null}
+        </div>
       </header>
 
       <label className="flex items-center gap-2 text-sm text-foreground">
@@ -104,6 +114,7 @@ export function AdminsListScreen() {
       ) : null}
 
       {showCreate ? <CreateAdminDialog onClose={() => setShowCreate(false)} /> : null}
+      {showCopy ? <CopyAssignmentsDialog onClose={() => setShowCopy(false)} /> : null}
     </div>
   );
 }

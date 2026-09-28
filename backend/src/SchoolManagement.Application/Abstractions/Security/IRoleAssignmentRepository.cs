@@ -25,6 +25,9 @@ public interface IRoleAssignmentRepository
     Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountReadOnlyAsync(
         Guid adminAccountId, CancellationToken cancellationToken);
 
+    /// <summary>Every ACTIVE assignment in <paramref name="sessionId"/>, <c>AsNoTracking</c> — copy-to-session (TASK-0046 B).</summary>
+    Task<IReadOnlyList<RoleAssignment>> ListActiveForSessionReadOnlyAsync(Guid sessionId, CancellationToken cancellationToken);
+
     /// <summary>Every ACTIVE assignment held by any of <paramref name="adminAccountIds"/>, <c>AsNoTracking</c> — one page of <c>GET /admins</c>.</summary>
     Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountsReadOnlyAsync(
         IReadOnlyCollection<Guid> adminAccountIds, CancellationToken cancellationToken);

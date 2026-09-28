@@ -2976,6 +2976,192 @@
         }
       }
     },
+    "/api/v1/assignments/copy-to-session": {
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Copy a session's role assignments into another session",
+        "description": "Spec 6.1.14 and 4.2.2: last session's assignments do not carry over on their own. Every ACTIVE assignment in `fromSessionId` is copied into `toSessionId` or skipped with a reason: an arm-scoped one maps each class to the target session's class with the same level and label, and is skipped whole when any class has no match; the caller's own (escalation rule 1), a deactivated account, an archived role and anything the target already holds are skipped too. `dryRun: true` reports without writing, for review before the copy. Requires `role.assign`. 409 `role_assignment.session_closed` when the target session is Closed. `Idempotency-Key` is REQUIRED.",
+        "operationId": "CopyAssignmentsToSession",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyAssignmentsToSessionCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCopyResultDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Idempotency-Replay": {
+                "description": "Present and set to \"true\" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/arms/{armId}/attendance": {
       "get": {
         "tags": [
@@ -25467,6 +25653,151 @@
           "isExamination": false
         }
       },
+      "AssignmentCopyResultDto": {
+        "required": [
+          "dryRun",
+          "fromSessionName",
+          "toSessionName",
+          "copied",
+          "skipped"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "description": "Whether this was only a preview.",
+            "example": true
+          },
+          "fromSessionName": {
+            "type": "string",
+            "description": "The source session's name.",
+            "example": "2026/2027"
+          },
+          "toSessionName": {
+            "type": "string",
+            "description": "The target session's name.",
+            "example": "2027/2028"
+          },
+          "copied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentCopyRowDto"
+            },
+            "description": "The assignments created (or that would be).",
+            "example": [
+              {
+                "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+                "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+                "staffName": "Ngozi Adeyemi",
+                "roleName": "Class Teacher",
+                "scopeType": "ArmList",
+                "armNames": [
+                  "Primary 2A"
+                ],
+                "skipReason": null
+              }
+            ]
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentCopyRowDto"
+            },
+            "description": "The assignments not copied, each with its reason.",
+            "example": [ ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "What a copy did, or with a dry run would do.",
+        "example": {
+          "dryRun": true,
+          "fromSessionName": "2026/2027",
+          "toSessionName": "2027/2028",
+          "copied": [
+            {
+              "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+              "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+              "staffName": "Ngozi Adeyemi",
+              "roleName": "Class Teacher",
+              "scopeType": "ArmList",
+              "armNames": [
+                "Primary 2A"
+              ],
+              "skipReason": null
+            }
+          ],
+          "skipped": [ ]
+        }
+      },
+      "AssignmentCopyRowDto": {
+        "required": [
+          "sourceAssignmentId",
+          "adminAccountId",
+          "staffName",
+          "roleName",
+          "scopeType",
+          "armNames",
+          "skipReason"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceAssignmentId": {
+            "type": "string",
+            "description": "The assignment in the source session.",
+            "example": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51"
+          },
+          "adminAccountId": {
+            "type": "string",
+            "description": "The account holding it.",
+            "example": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62"
+          },
+          "staffName": {
+            "type": "string",
+            "description": "That account's staff name.",
+            "example": "Ngozi Adeyemi"
+          },
+          "roleName": {
+            "type": "string",
+            "description": "The role's name.",
+            "example": "Class Teacher"
+          },
+          "scopeType": {
+            "description": "School-wide or a list of classes.",
+            "$ref": "#/components/schemas/ScopeType"
+          },
+          "armNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The classes, as named in the target session when copied, in the source session when skipped.",
+            "example": [
+              "Primary 3B"
+            ]
+          },
+          "skipReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it was not copied; `null` when it was.",
+            "example": "Primary 3B has no class in 2027/2028."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One source assignment in a copy.",
+        "example": {
+          "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+          "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+          "staffName": "Ngozi Adeyemi",
+          "roleName": "Class Teacher",
+          "scopeType": "ArmList",
+          "armNames": [
+            "Primary 3B"
+          ],
+          "skipReason": "Primary 3B has no class in 2027/2028."
+        }
+      },
       "AttendanceRowDto": {
         "required": [
           "pupilId",
@@ -26683,6 +27014,38 @@
         ],
         "description": "The five contact slots of the admission form (spec 6.5.5), sections C and D.",
         "example": "Father"
+      },
+      "CopyAssignmentsToSessionCommand": {
+        "required": [
+          "fromSessionId",
+          "toSessionId",
+          "dryRun"
+        ],
+        "type": "object",
+        "properties": {
+          "fromSessionId": {
+            "type": "string",
+            "description": "The session whose active assignments are copied.",
+            "example": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073"
+          },
+          "toSessionId": {
+            "type": "string",
+            "description": "The session they are copied into; must not be Closed.",
+            "example": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "True to report without writing.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "`POST /assignments/copy-to-session` (spec 6.1.14, 4.2.2; TASK-0046 B): carries a session's active assignments into\n        another session. With DryRun it only reports what it would create and skip, so the list can be\n        reviewed before anything is written.",
+        "example": {
+          "fromSessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+          "toSessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+          "dryRun": true
+        }
       },
       "CopySubjectMappingsCommand": {
         "required": [
