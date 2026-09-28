@@ -6,11 +6,11 @@ Recorded because a scaffold's assumptions are invisible once code is built on th
 assumption turns out to be wrong, twenty files depend on it. Each entry says what was assumed, why, and
 what it would cost to change.
 
-**This file is an index (TASK-0057, 2026-09-28).** An entry is its number, its title and one to three lines
-saying what is now true and what it means for code written today; the full account is in `assumptions/2026-Q3.md` under
-the same number. Numbers are permanent identifiers (65 files cite them): nothing is renumbered, merged or deleted, and an
-obsolete entry gets a note and keeps its number. At card close, the full text goes to `assumptions/` and one index entry
-stays here.
+**This file is an index (TASK-0057, 2026-09-28).** A long entry is its number, its title, one to three lines saying what
+is now true for code written today, and a "Full text:" pointer to the quarter's archive (`assumptions/2026-Q3.md`, then
+`assumptions/<year>-Q<n>.md`) under the same number; an entry with no pointer is complete here. Numbers are permanent
+identifiers cited across the repo: nothing is renumbered, merged or deleted, and an obsolete entry gets a note and keeps its
+number. At card close, the full text goes to the current quarter's archive and one index entry stays here.
 
 Last updated: 2026-09-28 (TASK-0057: §2.14–2.28, §3.8 and §3.9 archived verbatim; index lines left here).
 
@@ -150,7 +150,7 @@ examples and tests, plus a migration dropping the table.
 
 ### 2.14 `Idempotency-Key` mechanism — RESOLVED by TASK-0019, declared per-route from TASK-0027 onward
 
-**STANDING OBLIGATION:** every mutating route that a client may retry declares `.RequireIdempotencyKey(required: …)` when it ships, deciding required vs optional per route. The substrate is TASK-0019's: fingerprint = method + path + caller + normalised body hash; replay with an `Idempotency-Replay` header; `[RedactFromIdempotencyReplay]` for one-time-display fields; 24-hour purge.
+**STANDING OBLIGATION on every card:** each mutating route states, when it ships, whether `Idempotency-Key` is required, accepted (`.RequireIdempotencyKey(required: …)`), or excluded with a written reason; review greps for `MapPost`/`MapPatch`/`MapPut`/`MapDelete` without `RequireIdempotencyKey` and each hit needs that reason. Substrate (TASK-0019): fingerprint = method + path + caller + normalised body hash, replay with an `Idempotency-Replay` header, `[RedactFromIdempotencyReplay]` for one-time fields, 24-hour purge.
 
 Full text: `assumptions/2026-Q3.md` §2.14.
 
@@ -198,7 +198,7 @@ Full text: `assumptions/2026-Q3.md` §2.21.
 
 ### 2.22 TASK-0035 — academic sessions and terms
 
-A session's `state` is derived from its terms, never set by an endpoint; reopening Third Term reads "the following term" off that state. Some spec 6.3.6 preconditions and the list counts were deferred here (later cards added them; check the code). The session list's cursor is keyed on the name.
+A session's `state` is derived from its terms, never set by an endpoint; reopening Third Term reads "the following term" off that state. The preconditions and counts this entry deferred all exist now: opening a term needs an arm in the session, closing one is blocked by unfinished result sets (`term.close_blocked_by_result_sets`), and the session DTOs carry the 6.3.8 counts. The session list's cursor is keyed on the name.
 
 Full text: `assumptions/2026-Q3.md` §2.22.
 
@@ -216,19 +216,19 @@ Full text: `assumptions/2026-Q3.md` §2.24.
 
 ### 2.25 TASK-0048 — `audit_event` persistence and the append-only guarantee
 
-`ISystemAuditSink` has two methods: `RecordAsync` joins the request's transaction; `RecordRejectionAsync` commits at once on its own connection (and fails open since TASK-0058). `reason` is a trailing optional parameter after the `CancellationToken`. `audit_event` is append-only (UPDATE/DELETE revoked from `CURRENT_USER`), with a BIGSERIAL id, `actor_label` resolved at write time, and IP and user agent from `ICurrentUser`.
+`ISystemAuditSink` has two methods: `RecordAsync` joins the request's transaction; `RecordRejectionAsync` commits at once on its own connection (and fails open since TASK-0058). `reason` (and, on `RecordAsync`, `beforeMetadata`) are optional parameters AFTER the `CancellationToken`: pass them by name. `audit_event` is append-only (UPDATE/DELETE revoked from `CURRENT_USER`), with a BIGSERIAL id, `actor_label` resolved at write time, and IP and user agent from `ICurrentUser`.
 
 Full text: `assumptions/2026-Q3.md` §2.25.
 
 ### 2.26 TASK-0005c — registration-number configuration: the counter's two partitions, and two authored user-facing sentences
 
-Reg-number user messages are authored per group. Width reduction is a 409 (not audited); the change confirmation token is the literal `CHANGE`; the abbreviation-change reason is required, at most 500 characters. `registration_counter` is keyed on the counter string; reg-number enums cross the wire in PascalCase (`PerYear`). **Superseded:** `abbreviation.issuedCount` is no longer null (a live count since TASK-0051).
+Reg-number user messages are authored per group. Width reduction is a 409 (not audited); the change confirmation token is the literal `CHANGE`; the abbreviation-change reason is required, at most 500 characters, with no minimum (authored). `registration_counter` is keyed on the counter string; reg-number enums cross the wire in PascalCase (`PerYear`). **Superseded:** `abbreviation.issuedCount` is no longer null (a live count since TASK-0051).
 
 Full text: `assumptions/2026-Q3.md` §2.26.
 
 ### 2.27 TASK-0050 — pupil entity, the pending-exclusion invariant, arm-scoped `pupil.view`/`pupil.update` with no arm on the entity, and the Nigerian state/LGA reference data
 
-A pupil has no arm column; its arm is its OPEN enrolment's. Arm-scoped `pupil.*` checks run in the handler through `PupilAccessGuard` (route-level `ScopeParameterKind.Pupil` would refuse even a school-wide holder for a pupil with no enrolment), and since TASK-0060 they count only grants in the target's session. Pending pupils are hidden by a model-level query filter (`IgnoreQueryFilters()` to see them). **Superseded:** the default sort is class progression (TASK-0061).
+A pupil has no arm column; its arm is its OPEN enrolment's. Arm-scoped `pupil.*` checks run in the handler through `PupilAccessGuard` (route-level `ScopeParameterKind.Pupil` would refuse even a school-wide holder for a pupil with no enrolment), and since TASK-0060 they count only grants in the target's session. Pending pupils are hidden by a model-level query filter (`IgnoreQueryFilters()` to see them). **Open:** the Nigerian state/LGA list was transcribed, never checked against an authoritative source; check it before anything reports on LGAs. **Superseded:** the default sort is class progression (TASK-0061).
 
 Full text: `assumptions/2026-Q3.md` §2.27.
 
@@ -316,6 +316,8 @@ Full text: `assumptions/2026-Q3.md` §3.8.
 RESOLVED by TASK-0011: the first real gitleaks run found nine pre-existing non-secret matches, cleared with rule-scoped (`targetRules`) allowlist entries rather than path allowlists, and the rule was proven still to fire.
 
 Full text: `assumptions/2026-Q3.md` §3.9.
+
+---
 
 ## 4. Defects found by the first real integration run
 

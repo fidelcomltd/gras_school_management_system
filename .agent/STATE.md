@@ -41,7 +41,8 @@ to open it. **If the test does not apply to your card, do not open the file.**
 | `backend/AGENTS.md` | 10 | `backend-dev` | the concrete recipes behind §6. Section 4 is the endpoint recipe — read that section, not the file |
 | `frontend/CONVENTIONS.md` | 17 | `frontend-dev` | the concrete conventions behind §7. Section 4 is the feature-folder layout. Read the section your card names |
 | `frontend/HANDOFF.md` | 8 | `frontend-dev` | deliberate omissions and their reasons; only if your card questions why something is absent |
-| `backend/docs/ASSUMPTIONS.md` | 108 | `backend-dev` | **NEVER whole.** Five sections: 1 decisions taken on recommendation, 2 decisions taken unasked, 3 open/needs-a-human, 4 defects found by the first real integration run, 5 verified facts. `grep -n "^### "` for the numbered item your card names |
+| `backend/docs/ASSUMPTIONS.md` | 25 | `backend-dev` | An INDEX since TASK-0057 (one to three lines per entry). Five sections: 1 decisions taken on recommendation, 2 decisions taken unasked, 3 open/needs-a-human, 4 defects found by the first real integration run, 5 verified facts. `grep -n "^### "` for the numbered item your card names |
+| `backend/docs/assumptions/2026-Q3.md` | 95 | `backend-dev` | **NEVER whole.** Full text of the long `ASSUMPTIONS.md` entries under their numbers; open only the one an index line points to |
 | `frontend/src/api/README.md` | 2 | `frontend-dev` | how the generated seam is shaped |
 
 ### Archives — full text behind this file's index lines
@@ -282,7 +283,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0060 | Enforce the session boundary in scope decisions | orchestrator | **DONE 2026-09-27** (`fix/session-boundary`, on local staging); see `## Decisions` |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | orchestrator | **DONE 2026-09-27** (`fix/audit-fail-open`, on local staging); see `## Decisions` |
 | TASK-0056 | Emit a machine-readable gate summary file | orchestrator | **DONE 2026-09-28** (on local staging); see `## Decisions` |
-| TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
+| TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | orchestrator | **DONE 2026-09-28** (on local staging); see `## Decisions` |
 | TASK-0036 | End-of-session promotion | orchestrator | **DONE 2026-09-27** (`feat/promotion`, on staging) — row corrected 2026-09-27; see `## Decisions` |
 | TASK-0046 | Assignments: read surface (A), copy-to-session (B), lifecycle (C) | orchestrator | **DONE 2026-09-28** (A, B, C on local staging); see `## Decisions` |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | orchestrator | **DONE 2026-09-27** (`fix/pupil-page-seam`, on local staging); see `## Decisions` |
@@ -293,6 +294,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-28 **`ASSUMPTIONS.md` indexed (TASK-0057)**, `docs/assumptions-index`: §2.14–2.28, §3.8, §3.9 moved verbatim to `backend/docs/assumptions/2026-Q3.md`; each leaves its heading and one to three "what is now true" lines. Headings one-to-one; 112 KB → 25 KB, archive ≥ bytes shed. **Decided unasked, needs review:** 25 KB, over the 20 KB target, to keep useful entries. → `decisions/2026-Q3.md`
 - 2026-09-28 **Gate summary files (TASK-0056)**, `tooling/gate-summary-file`: `ci.ps1` and `npm run verify` write `artifacts/gate-summary.txt` on every exit path (PASS/FAIL first, each gate, SKIPPED-NOT-RUN, totals, coverage, failing lines in full; FAIL-in-progress from the start). **Quote that file, never the log** (`gates.md` §5). Proven on failing runs by self-tests in CI and a planted compile error. → `decisions/2026-Q3.md`
 - 2026-09-28 **Assignment lifecycle (TASK-0046 C); TASK-0046 closed**, `feat/assignments-lifecycle`: assigning an archived role or into a Closed session is a 409 (after the privilege checks); deleting an arm takes it off every assignment in its session and revokes one it would empty (arm kept for history), audited. Form-teacher reassignment stays revoke-then-create. Red first: 201, 201, arm still listed. **Recorded:** a concurrent create can still name a deleted arm. → `decisions/2026-Q3.md`
 - 2026-09-28 **UI fixes from the lead (deployed-app feedback)**, `fix/ui-feedback-and-prominence`: server errors scroll into view and pin inside forms/dialogs (24 inline copies unified); admin list is a table with roles, scope, status, last login; "Map subjects to classes" is Subjects' primary button; audit filters apply live and match the whole code or the start of any part, ignoring case. App-wide rules saved to shared memory. Contract description-only `4ba23b8d`. → `decisions/2026-Q3.md`
@@ -983,6 +985,7 @@ One decision clears all four.
 
 ### Live — build and tooling
 
+- 2026-09-28 **About 15 code comments cite `ASSUMPTIONS.md` with no section number** (e.g. `UpdateAbbreviation.cs`, `NigerianPhoneNumber.cs`, `ReopenTermHandler.cs`); since TASK-0057 their detail is in `assumptions/2026-Q3.md`. *Trigger: the next card touching one of those files adds the `§n`. Owner: orchestrator.*
 - 2026-09-27 **The test Postgres (`postgres:17.6-alpine`, local and CI) collates bytewise; a glibc production Postgres does not.** Any ordering or comparison that differs by collation is invisible to the suite unless a test sets a collation itself (TASK-0068 does, for `pupils.surname`). *Trigger: deployment (choose the prod image/locale), or any card sorting user text. Owner: orchestrator.*
 - 2026-09-18 **A UnitTests namespace segment named `Results` shadows `Microsoft.AspNetCore.Http.Results`** (and
   `Pupils` under `.Application` shadows a static field), breaking unrelated tests with CS0234. *Trigger: a new UnitTests
