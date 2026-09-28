@@ -28,19 +28,26 @@ function readScripts(): Record<string, string> {
 }
 
 describe('package.json verify ordering', () => {
-  it('chains typecheck -> lint -> test -> build with && in that exact order', () => {
+  // TASK-0056: verify runs through scripts/verify.mjs, which writes the gate summary file; the order lives in
+  // scripts/verify-lib.mjs's step list, and its stop-at-the-first-failure behaviour is proven by scripts/verify.test.mjs.
+  it('runs typecheck -> lint -> test -> script tests -> build in that exact order', () => {
     const scripts = readScripts();
-
-    expect(scripts['verify']).toBe(
-      'npm run typecheck && npm run lint && npm run test && npm run build',
+    const runner = readFileSync(path.join(FRONTEND_ROOT, 'scripts', 'verify-lib.mjs'), 'utf8');
+    const order = ['npm run typecheck', 'npm run lint', 'npm run test', 'npm run test:scripts', 'npm run build'].map((command) =>
+      runner.indexOf(`'${command}'`),
     );
+
+    expect(scripts['verify']).toBe('node scripts/verify.mjs');
+    expect(order.every((index) => index > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
   it('keeps check:api-drift defined but out of the verify chain', () => {
     const scripts = readScripts();
+    const runner = readFileSync(path.join(FRONTEND_ROOT, 'scripts', 'verify-lib.mjs'), 'utf8');
 
     expect(scripts['check:api-drift']).toBeTruthy();
-    expect(scripts['verify']).not.toContain('check:api-drift');
+    expect(runner).not.toContain('check:api-drift');
   });
 });
 

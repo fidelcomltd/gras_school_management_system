@@ -117,6 +117,12 @@ jobs:
         # not after a full build and a database round trip.
         run: ./scripts/tests/gate-summary.tests.ps1
 
+      - name: Self-test the gate summary file
+        working-directory: backend
+        shell: pwsh
+        # TASK-0056: ci.ps1 writes artifacts/gate-summary.txt on every exit path; this proves a FAILING run leaves one.
+        run: ./scripts/tests/gate-summary-file.tests.ps1
+
       - name: Self-test the postgres-test-connection resolver
         working-directory: backend
         shell: pwsh

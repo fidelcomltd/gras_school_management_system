@@ -281,7 +281,7 @@ archive and never against the working tree, so an under-claiming header was invi
 |---|---|---|---|
 | TASK-0060 | Enforce the session boundary in scope decisions | orchestrator | **DONE 2026-09-27** (`fix/session-boundary`, on local staging); see `## Decisions` |
 | TASK-0058 | Stop an audit-write failure turning a 403 into a 500 | orchestrator | **DONE 2026-09-27** (`fix/audit-fail-open`, on local staging); see `## Decisions` |
-| TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
+| TASK-0056 | Emit a machine-readable gate summary file | orchestrator | **DONE 2026-09-28** (on local staging); see `## Decisions` |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | orchestrator | **DONE 2026-09-27** (`feat/promotion`, on staging) — row corrected 2026-09-27; see `## Decisions` |
 | TASK-0046 | Assignments: read surface (A), copy-to-session (B), lifecycle (C) | orchestrator | **DONE 2026-09-28** (A, B, C on local staging); see `## Decisions` |
@@ -293,6 +293,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-28 **Gate summary files (TASK-0056)**, `tooling/gate-summary-file`: `ci.ps1` and `npm run verify` write `artifacts/gate-summary.txt` on every exit path (PASS/FAIL first, each gate, SKIPPED-NOT-RUN, totals, coverage, failing lines in full; FAIL-in-progress from the start). **Quote that file, never the log** (`gates.md` §5). Proven on failing runs by self-tests in CI and a planted compile error. → `decisions/2026-Q3.md`
 - 2026-09-28 **Assignment lifecycle (TASK-0046 C); TASK-0046 closed**, `feat/assignments-lifecycle`: assigning an archived role or into a Closed session is a 409 (after the privilege checks); deleting an arm takes it off every assignment in its session and revokes one it would empty (arm kept for history), audited. Form-teacher reassignment stays revoke-then-create. Red first: 201, 201, arm still listed. **Recorded:** a concurrent create can still name a deleted arm. → `decisions/2026-Q3.md`
 - 2026-09-28 **UI fixes from the lead (deployed-app feedback)**, `fix/ui-feedback-and-prominence`: server errors scroll into view and pin inside forms/dialogs (24 inline copies unified); admin list is a table with roles, scope, status, last login; "Map subjects to classes" is Subjects' primary button; audit filters apply live and match the whole code or the start of any part, ignoring case. App-wide rules saved to shared memory. Contract description-only `4ba23b8d`. → `decisions/2026-Q3.md`
 - 2026-09-28 **Non-scopable operations follow the active session (TASK-0046 B, ruled (a))**, `fix/non-scopable-active-session`: `GetGrantsAsync` returns the grants that count now (active session + sessionless; all before any session is active), `GetAllGrantsAsync` every session's for target-session checks only; settings, accounts, roles, subjects, templates and `/auth/me` follow the active session by default. Red first: last session's school-wide grant got 200. **Run copy-to-session before a new First Term opens**, or unreassigned staff lose non-scopable access. Full gate 2113/2113. → `decisions/2026-Q3.md`
@@ -940,7 +941,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
   guard's other half (a new-path snapshot diff) is proven, but no case was constructed that makes
   VSTest write no `.trx` at all, because forcing that on demand is not reliably reproducible.
   *Trigger: the next card touching the integration stage of `ci.ps1`, or TASK-0065. Owner: `backend-dev`.*
-- 2026-09-16 **`ci.ps1` prints `PASS: Coverage threshold` live while the SUMMARY records `N/A:`** —
+- 2026-09-16 **STRUCK 2026-09-28 by TASK-0056** (the summary file carries the corrected N/A). **`ci.ps1` prints `PASS: Coverage threshold` live while the SUMMARY records `N/A:`** —
   `Invoke-Gate` writes its own verdict before the correction is applied. The card's requirement is about
   the SUMMARY block, so this is accepted, not a defect. *Trigger: any card making the console output
   load-bearing (e.g. TASK-0056's machine-readable gate summary). Owner: `backend-dev`.*
