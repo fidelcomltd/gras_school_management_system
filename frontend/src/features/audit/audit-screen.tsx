@@ -31,15 +31,24 @@ export function AuditScreen() {
     latest.current = { ...latest.current, ...change };
     setDraft(latest.current);
   };
+  // A date is applied only once complete (a browser reports each typed year digit) and never with To before From,
+  // which the API refuses.
+  const settled = (date: string) => date === '' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= '2000-01-01');
+  const apply = () => {
+    const next = latest.current;
+    if (settled(next.from) && settled(next.to) && (next.from === '' || next.to === '' || next.from <= next.to)) {
+      setFilters(next);
+    }
+  };
   const applyNow = (change: Partial<AuditFilters>) => {
     window.clearTimeout(typing.current);
     edit(change);
-    setFilters(latest.current);
+    apply();
   };
   const applySoon = (change: Partial<AuditFilters>) => {
     edit(change);
     window.clearTimeout(typing.current);
-    typing.current = window.setTimeout(() => setFilters(latest.current), 400);
+    typing.current = window.setTimeout(apply, 400);
   };
   const filtered = JSON.stringify(filters) !== JSON.stringify(EMPTY);
 
@@ -55,8 +64,7 @@ export function AuditScreen() {
           className="flex flex-wrap items-end gap-3 text-sm"
           onSubmit={(event) => {
             event.preventDefault();
-            window.clearTimeout(typing.current);
-            setFilters(latest.current);
+            applyNow({});
           }}
         >
           <label className="flex flex-col gap-1">
@@ -67,8 +75,8 @@ export function AuditScreen() {
             To
             <input type="date" className={control} value={draft.to} onChange={(e) => applyNow({ to: e.target.value })} />
           </label>
-          <Input aria-label="Action" placeholder="Action, e.g. publish" className="w-56" value={draft.action} onChange={(e) => applySoon({ action: e.target.value })} />
-          <Input aria-label="Record type" placeholder="Record type, e.g. result" className="w-52" value={draft.entityType} onChange={(e) => applySoon({ entityType: e.target.value })} />
+          <Input aria-label="Action" placeholder="Action, e.g. publish" className="w-56" value={draft.action} onChange={(e) => applySoon({ action: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyNow({})} />
+          <Input aria-label="Record type" placeholder="Record type, e.g. result" className="w-52" value={draft.entityType} onChange={(e) => applySoon({ entityType: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyNow({})} />
           <label className="flex flex-col gap-1">
             Outcome
             <select className={control} value={draft.outcome} onChange={(e) => applyNow({ outcome: e.target.value as AuditFilters['outcome'] })}>
@@ -83,7 +91,11 @@ export function AuditScreen() {
             </Button>
           ) : null}
           {canExport ? (
-            <Button type="button" variant="ghost" disabled={exportCsv.isPending} onClick={() => exportCsv.mutate(filters)}>
+            <Button type="button" variant="ghost" disabled={exportCsv.isPending} onClick={() => {
+                // What the boxes show, including text still waiting on its pause.
+                applyNow({});
+                exportCsv.mutate(latest.current);
+              }}>
               {exportCsv.isPending ? 'Exporting…' : 'Export CSV'}
             </Button>
           ) : null}

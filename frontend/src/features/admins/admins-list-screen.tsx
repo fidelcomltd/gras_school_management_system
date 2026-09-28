@@ -7,7 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
-import { formatLagosDateTime } from './format';
+import { lagosDateTime } from '@/shared/format/date';
 import { CopyAssignmentsDialog } from './assignments/copy-assignments-dialog';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
@@ -103,7 +103,7 @@ export function AdminsListScreen() {
             </thead>
             <tbody className="divide-y divide-border bg-surface">
               {items.map((admin) => (
-                <tr key={admin.id} className="hover:bg-muted">
+                <tr key={admin.id}>
                   <td className="px-3 py-2">
                     <Link to={paths.adminDetail(admin.id)} aria-label={admin.staffName} className="flex flex-col hover:underline">
                       <span className="font-medium text-foreground">{admin.staffName}</span>
@@ -115,7 +115,7 @@ export function AdminsListScreen() {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{admin.scopeSummary}</td>
                   <td className="px-3 py-2 text-muted-foreground">{admin.status}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? formatLagosDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? lagosDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
                 </tr>
               ))}
             </tbody>

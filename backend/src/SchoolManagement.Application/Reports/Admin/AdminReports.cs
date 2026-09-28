@@ -22,7 +22,7 @@ public sealed record PinUsageFilters(string? SessionId, string? ArmId, string? B
 /// <param name="From">First day (yyyy-MM-dd, Lagos).</param>
 /// <param name="To">Last day, inclusive.</param>
 /// <param name="ActorAdminId">One actor.</param>
-/// <param name="Action">One action code, e.g. <c>result.score.enter</c>.</param>
+/// <param name="Action">An action code, e.g. <c>result.score.enter</c>, or the start of any part of one (<c>score</c>).</param>
 /// <param name="EntityType">One entity type, e.g. <c>subject_score</c>.</param>
 /// <param name="Outcome">Success or Rejected.</param>
 public sealed record AuditReportFilters(string? From, string? To, string? ActorAdminId, string? Action, string? EntityType, string? Outcome) : IReportFilters;
@@ -263,7 +263,7 @@ internal sealed class AuditReport(IAuditEventQueryRepository events, IReportRead
             filterLines.Add($"Actor: {names.GetValueOrDefault(actor, "an admin account")}");
         }
 
-        filterLines.AddRange(new[] { ("Action", action), ("Entity", entityType), ("Outcome", outcomeName) }
+        filterLines.AddRange(new[] { ("Action matching", action), ("Entity matching", entityType), ("Outcome", outcomeName) }
             .Where(entry => entry.Item2 is not null)
             .Select(entry => $"{entry.Item1}: {entry.Item2}"));
 

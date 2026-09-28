@@ -149,7 +149,7 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
     }
 
     [Fact]
-    public async Task List_Filters_ActionAndRecordTypeMatchAnyPart_IgnoringCase()
+    public async Task List_Filters_ActionAndRecordTypeMatchTheStartOfAnyPart_IgnoringCase()
     {
         // Lead, 2026-09-28: nobody types an internal code exactly, so the filters "did not seem to work".
         RequireDatabase();
@@ -161,11 +161,17 @@ public sealed class AuditEventEndpointsTests(ApiTestFixture fixture) : Integrati
         var jar = await SignInWithGrantAsync([Privileges.Audit.View]);
 
         var partial = marker[5..].ToUpperInvariant();
-        var response = await GetAsync($"{AuditEventsUrl}?action={partial}&entityType=ULT_S", jar);
+        var response = await GetAsync($"{AuditEventsUrl}?action={partial}&entityType=RESULT_S", jar);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         // The underscore is literal, not a LIKE wildcard, so resultXset does not match.
         (await ReadAsync<CursorPage<AuditEventDto>>(response)).Items.Select(item => item.Id).ShouldBe([target]);
+
+        // "publish" starts a part of x.publish but not of x.unpublish.
+        var published = await SeedAuditEventAsync(BaseInstant, marker + ".publish", "result_set", actorId, AuditOutcome.Success);
+        await SeedAuditEventAsync(BaseInstant, marker + ".unpublish", "result_set", actorId, AuditOutcome.Success);
+        using var byWord = await GetAsync($"{AuditEventsUrl}?action=publish&actorAdminId={actorId}", jar);
+        (await ReadAsync<CursorPage<AuditEventDto>>(byWord)).Items.Select(item => item.Id).ShouldBe([published]);
     }
 
     [Fact]
