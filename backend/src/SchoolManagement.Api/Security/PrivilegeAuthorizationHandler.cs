@@ -63,7 +63,8 @@ internal sealed class PrivilegeAuthorizationHandler(
 
         // A target with a session of its own is checked against every grant, filtered to that session by the decision;
         // anything else (a non-scopable operation, a level) against the grants that count now (TASK-0046 B).
-        var targetHasSession = resolution is ScopeResolution.ResolvedArm { SessionId: not null }
+        // A resolved arm always counts as a target: an unknown one carries no session, so any grant reaches the handler's 404.
+        var targetHasSession = resolution is ScopeResolution.ResolvedArm
             or ScopeResolution.RequiresSchoolWide { SessionId: not null };
         var grants = targetHasSession
             ? await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false)

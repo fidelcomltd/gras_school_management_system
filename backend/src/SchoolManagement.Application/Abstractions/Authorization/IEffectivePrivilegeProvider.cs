@@ -33,10 +33,9 @@ public interface IEffectivePrivilegeProvider
     /// <summary>
     /// Every active grant in every session, for a check that then filters by its TARGET's session
     /// (<see cref="PrivilegeGrant.AppliesToSession"/>): last year's grant still reaches last year's classes and results.
-    /// A provider with no session notion returns <see cref="GetGrantsAsync"/>.
+    /// Deliberately not defaulted: a provider must say what "every session" means rather than inherit the narrower view.
     /// </summary>
     /// <param name="userId">The account's stable identifier.</param>
     /// <param name="cancellationToken">Cancellation for the lookup.</param>
-    Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken) =>
-        GetGrantsAsync(userId, cancellationToken);
+    Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken);
 }

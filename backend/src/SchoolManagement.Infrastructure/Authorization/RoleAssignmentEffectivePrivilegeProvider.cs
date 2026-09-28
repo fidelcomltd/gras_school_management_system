@@ -1,6 +1,5 @@
 using SchoolManagement.Application.Abstractions.Auth;
 using SchoolManagement.Application.Abstractions.Authorization;
-using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Infrastructure.Authorization;
@@ -35,8 +34,7 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// </remarks>
 internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     IAdminAccountRepository accounts,
-    ActiveRoleAssignmentLoader loader,
-    IAcademicSessionRepository sessions)
+    ActiveRoleAssignmentLoader loader)
     : IEffectivePrivilegeProvider
 {
     private static readonly IReadOnlyCollection<PrivilegeGrant> NoGrants = [];
@@ -48,22 +46,14 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     ];
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(
-        string userId, CancellationToken cancellationToken)
-    {
-        var all = await GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
-        if (all.Count == 0 || all.All(grant => grant.SessionId is null))
-        {
-            return all;
-        }
-
-        var activeSessionId = (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id;
-        return [.. all.Where(grant => grant.AppliesToSession(activeSessionId))];
-    }
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: true, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(
-        string userId, CancellationToken cancellationToken)
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: false, cancellationToken);
+
+    private async Task<IReadOnlyCollection<PrivilegeGrant>> BuildAsync(string userId, bool current, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(userId);
 
@@ -84,7 +74,9 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
             return SuperAdminGrants;
         }
 
-        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+        var active = current
+            ? await loader.LoadCurrentAsync(accountId, cancellationToken).ConfigureAwait(false)
+            : await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
         var grants = new List<PrivilegeGrant>();
         foreach (var (assignment, role) in active)
         {

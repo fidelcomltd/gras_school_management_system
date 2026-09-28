@@ -56,10 +56,8 @@ public abstract record ScopeResolution
     /// <see cref="ScopeParameterKind"/>/<c>ScopeResolver</c>, because which of two DIFFERENT
     /// privileges (<c>result.remark.classteacher</c> vs <c>result.remark.headteacher</c>) applies
     /// depends on a request's <c>kind</c> (query string, body field, or a stored row), never on a
-    /// route parameter the declarative mechanism can read. Like every other resolution here, this
-    /// does not consult <c>PrivilegeGrant.SessionId</c> — the same pre-existing gap
-    /// TODO(TASK-0060) on <c>PrivilegeDecision</c> describes, not newly introduced or widened by
-    /// this case.
+    /// route parameter the declarative mechanism can read. It names no session: callers pass only the
+    /// grants that count now (the active session; TASK-0046 B), so last session's grant does not satisfy it.
     /// </remarks>
     public sealed record AnyGrant : ScopeResolution;
 }
