@@ -114,6 +114,13 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         }
     }
 
+    private const string LikeEscape = "\\";
+
+    private static string Contains(string text) =>
+        "%" + text.Trim().Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
+            .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
+            .Replace("_", LikeEscape + "_", StringComparison.Ordinal) + "%";
+
     private static IQueryable<AuditEvent> ApplyFilters(
         IQueryable<AuditEvent> query,
         DateTimeOffset? fromUtc,
@@ -139,14 +146,18 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
             query = query.Where(auditEvent => auditEvent.ActorAdminId == actor);
         }
 
+        // Action and record type match any part, ignoring case: nobody types an internal code like result.publish exactly
+        // (lead, 2026-09-28: the filters "did not seem to work"). LIKE wildcards in the input are matched literally.
         if (action is not null)
         {
-            query = query.Where(auditEvent => auditEvent.Action == action);
+            var pattern = Contains(action);
+            query = query.Where(auditEvent => EF.Functions.ILike(auditEvent.Action, pattern, LikeEscape));
         }
 
         if (entityType is not null)
         {
-            query = query.Where(auditEvent => auditEvent.EntityType == entityType);
+            var pattern = Contains(entityType);
+            query = query.Where(auditEvent => EF.Functions.ILike(auditEvent.EntityType, pattern, LikeEscape));
         }
 
         if (entityId is not null)

@@ -1,5 +1,5 @@
 import { ScrollText } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,26 @@ export function AuditScreen() {
   const exportCsv = useExportAudit();
   const me = useMe();
   const canExport = !!me.data && hasPrivilege(me.data, 'audit.export');
-  const set = (change: Partial<AuditFilters>) => setDraft((current) => ({ ...current, ...change }));
+  // Filters apply as they change (lead, 2026-09-28: waiting for a quiet "Filter" button read as broken). A date or the
+  // outcome applies at once; typed text after a short pause, or at once on Enter.
+  // Every apply takes the whole draft, so choosing a date also applies text still waiting on its pause.
+  const typing = useRef<number | undefined>(undefined);
+  const latest = useRef<AuditFilters>(EMPTY);
+  const edit = (change: Partial<AuditFilters>) => {
+    latest.current = { ...latest.current, ...change };
+    setDraft(latest.current);
+  };
+  const applyNow = (change: Partial<AuditFilters>) => {
+    window.clearTimeout(typing.current);
+    edit(change);
+    setFilters(latest.current);
+  };
+  const applySoon = (change: Partial<AuditFilters>) => {
+    edit(change);
+    window.clearTimeout(typing.current);
+    typing.current = window.setTimeout(() => setFilters(latest.current), 400);
+  };
+  const filtered = JSON.stringify(filters) !== JSON.stringify(EMPTY);
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,30 +55,33 @@ export function AuditScreen() {
           className="flex flex-wrap items-end gap-3 text-sm"
           onSubmit={(event) => {
             event.preventDefault();
-            setFilters(draft);
+            window.clearTimeout(typing.current);
+            setFilters(latest.current);
           }}
         >
           <label className="flex flex-col gap-1">
             From
-            <input type="date" className={control} value={draft.from} onChange={(e) => set({ from: e.target.value })} />
+            <input type="date" className={control} value={draft.from} onChange={(e) => applyNow({ from: e.target.value })} />
           </label>
           <label className="flex flex-col gap-1">
             To
-            <input type="date" className={control} value={draft.to} onChange={(e) => set({ to: e.target.value })} />
+            <input type="date" className={control} value={draft.to} onChange={(e) => applyNow({ to: e.target.value })} />
           </label>
-          <Input aria-label="Action, e.g. result.publish" placeholder="Action, e.g. result.publish" className="w-56" value={draft.action} onChange={(e) => set({ action: e.target.value })} />
-          <Input aria-label="Record type, e.g. result_set" placeholder="Record type, e.g. result_set" className="w-52" value={draft.entityType} onChange={(e) => set({ entityType: e.target.value })} />
+          <Input aria-label="Action" placeholder="Action, e.g. publish" className="w-56" value={draft.action} onChange={(e) => applySoon({ action: e.target.value })} />
+          <Input aria-label="Record type" placeholder="Record type, e.g. result" className="w-52" value={draft.entityType} onChange={(e) => applySoon({ entityType: e.target.value })} />
           <label className="flex flex-col gap-1">
             Outcome
-            <select className={control} value={draft.outcome} onChange={(e) => set({ outcome: e.target.value as AuditFilters['outcome'] })}>
+            <select className={control} value={draft.outcome} onChange={(e) => applyNow({ outcome: e.target.value as AuditFilters['outcome'] })}>
               <option value="">Any</option>
               <option value="Success">Succeeded</option>
               <option value="Rejected">Refused</option>
             </select>
           </label>
-          <Button type="submit" variant="outline">
-            Filter
-          </Button>
+          {filtered ? (
+            <Button type="button" variant="ghost" onClick={() => applyNow(EMPTY)}>
+              Clear filters
+            </Button>
+          ) : null}
           {canExport ? (
             <Button type="button" variant="ghost" disabled={exportCsv.isPending} onClick={() => exportCsv.mutate(filters)}>
               {exportCsv.isPending ? 'Exporting…' : 'Export CSV'}

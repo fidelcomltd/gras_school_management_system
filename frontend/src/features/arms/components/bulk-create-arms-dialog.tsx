@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { useEffect, useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -83,11 +84,7 @@ export function BulkCreateArmsDialog({ onClose }: { onClose: () => void }) {
         </DialogHeader>
 
         <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
-          {formError ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {formError}
-            </p>
-          ) : null}
+          <FormError message={formError} />
 
           <Field>
             <FieldLabel>Session</FieldLabel>

@@ -1,4 +1,4 @@
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Grid3x3 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -31,10 +31,21 @@ export function SubjectsScreen() {
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">Subjects</h1>
           <p className="text-sm text-muted-foreground">
-            The subjects the school teaches. <Link className="text-primary hover:underline" to={paths.subjectMapping}>Map them to classes</Link> for each term.
+            The subjects the school teaches, and which classes take each one every term.
           </p>
         </div>
-        {can('subject.create') ? <Button onClick={() => setEditing('new')}>New subject</Button> : null}
+        <div className="flex flex-wrap gap-2">
+          {can('subject.create') ? (
+            <Button variant="outline" onClick={() => setEditing('new')}>
+              New subject
+            </Button>
+          ) : null}
+          {/* The screen's main job each term, so its most prominent control (lead, 2026-09-28). */}
+          <Button render={<Link to={paths.subjectMapping} />}>
+            <Grid3x3 aria-hidden />
+            Map subjects to classes
+          </Button>
+        </div>
       </header>
 
       <FormError message={remove.error instanceof ApiError ? remove.error.message : null} />

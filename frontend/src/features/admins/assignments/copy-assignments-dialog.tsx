@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSessions } from '@/features/sessions/api';
@@ -113,11 +113,7 @@ export function CopyAssignmentsDialog({ onClose }: { onClose: () => void }) {
           <DialogTitle>Copy assignments to a new session</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          {error ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
+          <FormError message={error} />
           {body()}
         </div>
         <DialogFooter>

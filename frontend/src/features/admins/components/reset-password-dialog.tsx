@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/http';
@@ -44,11 +45,7 @@ export function ResetPasswordDialog({ admin, onClose }: { admin: AdminAccountDet
               This mints a new temporary password for {admin.staffName} and signs them out of every active
               session.
             </p>
-            {formError ? (
-              <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {formError}
-              </p>
-            ) : null}
+            <FormError message={formError} />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel

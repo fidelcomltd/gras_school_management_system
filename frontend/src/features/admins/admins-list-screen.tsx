@@ -7,6 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
+import { formatLagosDateTime } from './format';
 import { CopyAssignmentsDialog } from './assignments/copy-assignments-dialog';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
@@ -88,25 +89,38 @@ export function AdminsListScreen() {
       {items.length === 0 ? (
         <EmptyState icon={ShieldUser} title="No admin accounts found." />
       ) : (
-        <ul aria-label="Admin accounts" className="flex flex-col gap-2">
-          {items.map((admin) => (
-            <li key={admin.id}>
-              <Link
-                to={paths.adminDetail(admin.id)}
-                className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3 text-sm hover:bg-muted"
-              >
-                <span className="flex flex-col">
-                  <span className="font-medium text-foreground">{admin.staffName}</span>
-                  <span className="text-xs text-muted-foreground">{admin.email}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {admin.rolesHeld.length === 0 ? 'No roles yet' : `${admin.rolesHeld.join(', ')} · ${admin.scopeSummary}`}
-                  </span>
-                </span>
-                <span className="text-muted-foreground">{admin.status}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        // Spec 6.1.8's columns: who can do what is the question this list answers, so roles and scope are columns.
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table aria-label="Admin accounts" className="w-full text-left text-sm">
+            <thead className="bg-surface-sunken text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Staff</th>
+                <th className="px-3 py-2 font-medium">Roles held</th>
+                <th className="px-3 py-2 font-medium">Scope</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Last login</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-surface">
+              {items.map((admin) => (
+                <tr key={admin.id} className="hover:bg-muted">
+                  <td className="px-3 py-2">
+                    <Link to={paths.adminDetail(admin.id)} aria-label={admin.staffName} className="flex flex-col hover:underline">
+                      <span className="font-medium text-foreground">{admin.staffName}</span>
+                      <span className="text-xs text-muted-foreground">{admin.email}</span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-foreground">
+                    {admin.rolesHeld.length === 0 ? <span className="text-muted-foreground">No roles yet</span> : admin.rolesHeld.join(', ')}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.scopeSummary}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.status}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? formatLagosDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {admins.hasNextPage ? (
