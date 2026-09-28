@@ -280,7 +280,7 @@ archive and never against the working tree, so an under-claiming header was invi
 | TASK-0056 | Emit a machine-readable gate summary file | backend-dev | **queued 2026-09-14** — context-budget pass |
 | TASK-0057 | Index-and-archive `backend/docs/ASSUMPTIONS.md` | backend-dev | **queued 2026-09-14** — 108 KB, section 2 alone is 90 KB. Docs only; section numbers are immutable (65 files cite them) |
 | TASK-0036 | End-of-session promotion | orchestrator | **DONE 2026-09-27** (`feat/promotion`, on staging) — row corrected 2026-09-27; see `## Decisions` |
-| TASK-0046 | Assignments: read surface (A), copy-to-session (B), lifecycle (C) | orchestrator | **A and B copy DONE 2026-09-28** (on local staging); B active-session enforcement building, ruled (a); C queued. Card written 2026-09-27 |
+| TASK-0046 | Assignments: read surface (A), copy-to-session (B), lifecycle (C) | orchestrator | **A and B DONE 2026-09-28** (on local staging); C queued. Card written 2026-09-27 |
 | TASK-0068 | Stop `GET /pupils` dropping a pupil at a page seam | orchestrator | **DONE 2026-09-27** (`fix/pupil-page-seam`, on local staging); see `## Decisions` |
 | TASK-0074 | Regenerate the typed client against `152dc1c2…` | frontend-dev | **DONE 2026-09-16** — drift gate re-run by the orchestrator: `No drift`, exit 0; typecheck and lint clean. 4 ops / 10 schemas consumed, no removals, pin and lockfile untouched. **Left one gap, deliberately and correctly: no `apiPut`, so two of the new ops are typed but uncallable** |
 | TASK-0005b | Logo and signature uploads (Cloudinary) | orchestrator | **A–C done 2026-09-22**; stage D (Cloudinary adapter) left, needs the human's keys for the smoke test |
@@ -289,6 +289,7 @@ Full sequence and cards not yet written: `.agent/ROADMAP.md`.
 
 ## Decisions
 
+- 2026-09-28 **Non-scopable operations follow the active session (TASK-0046 B, ruled (a))**, `fix/non-scopable-active-session`: `GetGrantsAsync` returns the grants that count now (active session + sessionless; all before any session is active), `GetAllGrantsAsync` every session's for target-session checks only; settings, accounts, roles, subjects, templates and `/auth/me` follow the active session by default. Red first: last session's school-wide grant got 200. **Run copy-to-session before a new First Term opens**, or unreassigned staff lose non-scopable access. Full gate 2113/2113. → `decisions/2026-Q3.md`
 - 2026-09-28 **Copy assignments to a new session (TASK-0046 B, first half)**, `feat/assignments-copy-to-session`: `POST /assignments/copy-to-session` with a dry run; classes map by level and label to the target's active classes, anything unmapped, own, deactivated, archived, out of the caller's scope or already covered is skipped with a reason; admin list "Copy assignments…" previews then copies. Contract additive `296fc679`. **Recorded:** concurrent copies can double-write (no unique index; create shares it). → `decisions/2026-Q3.md`
 - 2026-09-28 **Deployment done (lead, 2026-09-28):** staging and production have run on the VPS since 2026-09-26, both confirmed working; a push to `origin/staging` now reaches a live environment. The deployment items below are for the lead to close against what was deployed.
 - 2026-09-28 **Assignments read surface (TASK-0046 A)**, `feat/assignments-read-surface`: TASK-0046 carded (A read surface, B copy-to-session, C lifecycle). Assignments carry role, session and class names; `GET /admins` rows carry `rolesHeld` and `scopeSummary` (6.1.8; Closed sessions skipped, classes in class order); create returns a real `createdAtUtc`; the Roles section needs no other lists. Contract additive `2c1bb74e`. **Ruled (a) 2026-09-28:** non-scopable operations follow the active session, with B. → `decisions/2026-Q3.md`
@@ -722,7 +723,7 @@ Earlier decisions (bootstrap through 2026-09-04): `decisions/2026-Q3.md`.
 
 ### Live — product and spec gaps
 
-- 2026-09-27 **Non-scopable operations accept a school-wide grant from any session** (settings, accounts, roles, rule 3, form-teacher and subject checks); spec 4.2.2 implies the active session. Left open by TASK-0060 because enforcing it before copy-to-session exists strands every unreassigned admin at rollover. *Trigger: TASK-0046. Owner: orchestrator (lead to rule).*
+- 2026-09-27 **STRUCK 2026-09-28 by TASK-0046 B (ruled (a)).** **Non-scopable operations accept a school-wide grant from any session** (settings, accounts, roles, rule 3, form-teacher and subject checks); spec 4.2.2 implies the active session. Left open by TASK-0060 because enforcing it before copy-to-session exists strands every unreassigned admin at rollover. *Trigger: TASK-0046. Owner: orchestrator (lead to rule).*
 - 2026-09-21 **The head teacher's remark gates publication only, departing from the §6.7.12 amendment's submission gate list** (human ruling,
   TASK-0088). *Trigger: next spec revision; the publication card enforces it per §6.7.9. Owner: human.* → `decisions/2026-Q3.md`
 - 2026-09-19 **An attendance save racing a term update can leave derived absent negative** — each reads the other's committed state only.
