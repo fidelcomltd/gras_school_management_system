@@ -36,14 +36,16 @@ function Get-GateFailingLines {
     <#
     .SYNOPSIS
         The error lines in a gate's captured output: compiler and analyzer errors (`: error ...`), failed tests
-        (`Failed <name>`) and `FAIL:` lines. Each once, in order.
+        (`Failed <name>`), `FAIL`/`ERROR` lines, a test verdict's skipped or failed tests, gitleaks' findings. Each
+        once, in order; a tally such as "0 Error(s)" is not one.
     #>
     param([object[]]$Output)
 
     $seen = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($line in @($Output)) {
         $text = "$line".TrimEnd()
-        if ($text -match '(:\s*error\b)|(^\s*Failed\s)|(\bFAIL:)' -and $seen.Add($text.Trim())) {
+        $isFailing = $text -match '(:\s*error\b)|(^\s*Failed\s)|(\bFAIL\b)|(^\s*ERROR\b)|(leaks found)|(\b(skipped|failed)=[1-9])|(Skipped \d*[1-9])'
+        if ($isFailing -and $text -notmatch '\b0 Error\(s\)' -and $seen.Add($text.Trim())) {
             $text.Trim()
         }
     }

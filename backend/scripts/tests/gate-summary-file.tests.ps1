@@ -77,6 +77,20 @@ $failing = @(Get-GateFailingLines -Output $captured)
 Assert-True ($failing.Count -eq 3) "three distinct failing lines are found (found $($failing.Count))"
 Assert-True (-not ($failing -like '*Error(s)*')) "a '0 Error(s)' tally is not a failing line"
 
+# 4. The summary's gate list is ci.ps1's: a gate added or renamed there must be added here, or a fail-fast abort would
+#    not list it as SKIPPED-NOT-RUN.
+$ciText = Get-Content (Join-Path $scriptsRoot 'ci.ps1') -Raw
+$declared = @([regex]::Matches($ciText, "Invoke-Gate\s+['`"]([^'`"(]+)") | ForEach-Object { $_.Groups[1].Value.Trim() })
+foreach ($gate in $declared) {
+    # Names are read up to a "(" (Coverage threshold carries its figure), so each must start a listed name.
+    Assert-True ([bool]($script:GateSummaryAllGates | Where-Object { $_ -like "$gate*" })) "ci.ps1 gate '$gate' is in the summary's gate list"
+}
+Assert-True ($declared.Count -eq $script:GateSummaryAllGates.Count) "the summary lists exactly ci.ps1's $($declared.Count) gates"
+
+# 5. A failing test verdict and a secret scan finding are failing lines too.
+$more = @(Get-GateFailingLines -Output @('Tests: total=5 passed=4 failed=0 skipped=1', 'WRN leaks found: 1', 'Tests: total=5 passed=5 failed=0 skipped=0'))
+Assert-True ($more.Count -eq 2) "a skipped-test total and a gitleaks finding are failing lines, a clean total is not (found $($more.Count))"
+
 if ($script:failures.Count -gt 0) {
     Write-Host "$($script:failures.Count) assertion(s) failed." -ForegroundColor Red
     exit 1

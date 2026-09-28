@@ -141,6 +141,9 @@ $script:gateSummaryPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifact
 $script:gateSummaryWritten = $false
 $script:gateFailingLines = [System.Collections.Generic.List[string]]::new()
 
+# Until this run writes its own summary, the file says so: a killed or crashed run never leaves the last run's PASS.
+Write-GateSummaryFile -Path $script:gateSummaryPath -AbortReason 'a gate run started and has not finished (in progress, or killed).'
+
 if ($SkipIntegration -and $IntegrationFilter) {
     Write-Host 'ERROR: -SkipIntegration and -IntegrationFilter are mutually exclusive -- pick one.' -ForegroundColor Red
     Write-GateSummaryFile -Path $script:gateSummaryPath -AbortReason '-SkipIntegration and -IntegrationFilter are mutually exclusive.'
@@ -265,10 +268,17 @@ function Invoke-Gate {
     Write-Host ''
     Write-Host "══════ $Name ══════" -ForegroundColor Cyan
 
-    # TASK-0056: the gate's standard output is kept as it streams, so a failure's error lines reach the summary file.
-    $captured = @()
+    # TASK-0056: everything the gate prints (standard output, native stderr and Write-Host) is kept line by line as it
+    # streams, so a failure's lines reach the summary file even when the gate throws part-way. Shown as plain text.
+    $captured = [System.Collections.Generic.List[string]]::new()
     try {
-        & $Action | Tee-Object -Variable captured
+        & $Action 2>&1 6>&1 | ForEach-Object {
+            $text = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+            elseif ($_ -is [System.Management.Automation.InformationRecord]) { "$($_.MessageData)" }
+            else { "$_" }
+            $captured.Add($text)
+            $text
+        } | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "exit code $LASTEXITCODE"
         }
