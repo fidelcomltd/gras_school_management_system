@@ -34,3 +34,6 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# TASK-0056: the verify summary file
+/artifacts/
