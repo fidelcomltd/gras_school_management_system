@@ -68,6 +68,7 @@ export function SessionDetailScreen() {
               canOpen={canOpenTerm}
               canClose={canCloseTerm}
               canReopen={canReopenTerm}
+              nextTermStart={detail.terms.find((next) => Number(next.ordinal) === Number(term.ordinal) + 1)?.startDate ?? null}
             />
           </li>
         ))}

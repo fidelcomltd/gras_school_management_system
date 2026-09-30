@@ -13,10 +13,13 @@ export function TermDateFields({
   ordinalLabel,
   prefix,
   register,
+  onStartDate,
 }: {
   ordinalLabel: string;
   prefix: 'term1' | 'term2' | 'term3';
   register: UseFormRegister<CreateSessionFormValues>;
+  /** Told each new start date, so the previous term's "next term begins" can follow it. */
+  onStartDate?: (value: string) => void;
 }) {
   return (
     <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
@@ -24,7 +27,7 @@ export function TermDateFields({
 
       <Field>
         <FieldLabel>{ordinalLabel} start date</FieldLabel>
-        <DateInput {...register(`${prefix}.startDate`)} />
+        <DateInput {...register(`${prefix}.startDate`, { onChange: (event: { target: { value: string } }) => onStartDate?.(event.target.value) })} />
       </Field>
 
       <Field>

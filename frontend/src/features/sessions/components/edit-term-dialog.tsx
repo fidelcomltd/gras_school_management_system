@@ -21,10 +21,13 @@ const FIELDS = ['name', 'startDate', 'endDate', 'timesSchoolOpened', 'nextResump
 export function EditTermDialog({
   sessionId,
   term,
+  nextTermStart = null,
   onClose,
 }: {
   sessionId: string;
   term: TermDto;
+  /** Pre-fills an unset "next term begins" (still editable before saving). */
+  nextTermStart?: string | null;
   onClose: () => void;
 }) {
   const updateTerm = useUpdateTerm(sessionId);
@@ -39,7 +42,7 @@ export function EditTermDialog({
       startDate: term.startDate,
       endDate: term.endDate,
       timesSchoolOpened: term.timesSchoolOpened === null ? '' : String(term.timesSchoolOpened),
-      nextResumptionDate: term.nextResumptionDate ?? '',
+      nextResumptionDate: term.nextResumptionDate ?? nextTermStart ?? '',
     },
   });
 
