@@ -1,5 +1,5 @@
 ﻿# CONTRACT.lock â€” GENERATED. Do not edit by hand.
 # Regenerate with: backend/scripts/generate-openapi.ps1 -Promote
-openapi.json.sha256 = 3812445d8c768d73a9c4787927516b72de32f76fcd6f8990a3256459eda6c2b7
+openapi.json.sha256 = c61c6dc3ffe84525b85a9ff32e4f7ae2d3f3ea8394345ff4b3d0d7548f87aa1a
 generator = Microsoft.Extensions.ApiDescription.Server/10.0.10
 dotnet.sdk = 10.0.401

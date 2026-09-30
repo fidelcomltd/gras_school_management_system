@@ -44,6 +44,18 @@ internal static class SignatureCleaner
 
     private const float MaxThreshold = 0.6f;
 
+    /// <summary>Below one 8-bit step a pixel encodes as transparent anyway, so it must not count as ink or widen the trim.</summary>
+    private const float MinAlpha = 1.5f / 255f;
+
+    /// <summary>
+    /// A region whose brightest pixel is under this share of the paper's is not paper at all (the desk or floor round a
+    /// photographed sheet): wholly transparent, and ink touching it is the paper's shadowed edge, not a stroke.
+    /// </summary>
+    private const float OffPaperRatio = 0.55f;
+
+    /// <summary>Ink blobs smaller than this, in pixels, are dust or sensor noise.</summary>
+    private const int MinComponentPixels = 6;
+
     /// <summary>
     /// The cleaned signature, as an unpremultiplied RGBA bitmap the caller owns; <see langword="null"/> when no strokes
     /// were found (a blank page, a solid colour, or a photograph with no contrast).
@@ -52,17 +64,9 @@ internal static class SignatureCleaner
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var scale = Math.Min(1.0, (double)MaxLongEdge / Math.Max(source.Width, source.Height));
-        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
-        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        var (width, height) = SkiaImages.FitWithin(source.Width, source.Height, MaxLongEdge);
 
-        using var flat = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque));
-        using (var canvas = new SKCanvas(flat))
-        using (var image = SKImage.FromBitmap(source))
-        {
-            canvas.Clear(SKColors.White);
-            canvas.DrawImage(image, SKRect.Create(width, height), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
-        }
+        using var flat = SkiaImages.FlattenScaled(source, width, height);
 
         var pixels = flat.GetPixelSpan();
         var rowBytes = flat.RowBytes;
@@ -76,7 +80,7 @@ internal static class SignatureCleaner
             }
         }
 
-        var paper = PaperEstimate(luminance, width, height);
+        var (paper, offPaper) = PaperEstimate(luminance, width, height);
         var darkness = new float[luminance.Length];
         for (var index = 0; index < luminance.Length; index++)
         {
@@ -90,20 +94,30 @@ internal static class SignatureCleaner
         // How dark solid ink is here: the median over pixels well past the cut-off. Opacity is a pixel's darkness as a
         // share of that, so an edge pixel that is a third ink is a third opaque, and un-blends to the ink's own colour
         // rather than leaving a pale fringe on coloured paper.
-        var solidInk = darkness.Where(value => value >= high).OrderBy(value => value).ToArray();
-        var inkDarkness = solidInk.Length == 0 ? high : Math.Max(high, solidInk[solidInk.Length / 2]);
+        var inkDarkness = Math.Max(high, MedianAtLeast(darkness, high));
 
         var alpha = new float[darkness.Length];
+        for (var index = 0; index < alpha.Length; index++)
+        {
+            if (offPaper[index])
+            {
+                continue;
+            }
+
+            var ramp = Math.Clamp((darkness[index] - low) / (high - low), 0f, 1f);
+            var gate = ramp * ramp * (3f - (2f * ramp)); // smoothstep: what counts as ink at all
+            var value = gate * Math.Min(1f, darkness[index] / inkDarkness);
+            alpha[index] = value >= MinAlpha ? value : 0f;
+        }
+
+        RemoveNonStrokes(alpha, offPaper, width, height);
+
         int left = width, top = height, right = -1, bottom = -1, solid = 0;
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                var index = (y * width) + x;
-                var ramp = Math.Clamp((darkness[index] - low) / (high - low), 0f, 1f);
-                var gate = ramp * ramp * (3f - (2f * ramp)); // smoothstep: what counts as ink at all
-                var value = gate * Math.Min(1f, darkness[index] / inkDarkness);
-                alpha[index] = value;
+                var value = alpha[(y * width) + x];
                 if (value <= 0f)
                 {
                     continue;
@@ -167,8 +181,12 @@ internal static class SignatureCleaner
         return cleaned;
     }
 
-    /// <summary>Per-pixel paper brightness: block maxima, dilated, smoothed, then sampled bilinearly.</summary>
-    private static float[] PaperEstimate(float[] luminance, int width, int height)
+    /// <summary>
+    /// Per-pixel paper brightness (block maxima, dilated, smoothed, then sampled bilinearly), and which pixels lie in a
+    /// region that is not paper: a block whose dilated maximum is under <see cref="OffPaperRatio"/> of the paper level
+    /// (the 90th percentile of block maxima). Dilated first, so a thick stroke filling a block never reads as desk.
+    /// </summary>
+    private static (float[] Paper, bool[] OffPaper) PaperEstimate(float[] luminance, int width, int height)
     {
         var block = Math.Max(4, Math.Max(width, height) / 40);
         var gridWidth = (width + block - 1) / block;
@@ -187,6 +205,11 @@ internal static class SignatureCleaner
         var dilated = Neighbourhood(maxima, gridWidth, gridHeight, (sum, count, max) => max);
         var smoothed = Neighbourhood(dilated, gridWidth, gridHeight, (sum, count, max) => sum / count);
 
+        var ranked = (float[])dilated.Clone();
+        Array.Sort(ranked);
+        var paperLevel = ranked[(int)(ranked.Length * 0.9)];
+        var offPaper = new bool[width * height];
+
         var paper = new float[width * height];
         for (var y = 0; y < height; y++)
         {
@@ -203,10 +226,95 @@ internal static class SignatureCleaner
                 var upper = (smoothed[(y0 * gridWidth) + x0] * (1 - fx)) + (smoothed[(y0 * gridWidth) + x1] * fx);
                 var lower = (smoothed[(y1 * gridWidth) + x0] * (1 - fx)) + (smoothed[(y1 * gridWidth) + x1] * fx);
                 paper[(y * width) + x] = (upper * (1 - fy)) + (lower * fy);
+                offPaper[(y * width) + x] = dilated[((y / block) * gridWidth) + (x / block)] < OffPaperRatio * paperLevel;
             }
         }
 
-        return paper;
+        return (paper, offPaper);
+    }
+
+    /// <summary>
+    /// Clears every ink blob (8-connected) that touches a region which is not paper, since that is the sheet's shadowed
+    /// edge against the desk, or that is smaller than <see cref="MinComponentPixels"/>.
+    /// </summary>
+    private static void RemoveNonStrokes(float[] alpha, bool[] offPaper, int width, int height)
+    {
+        var visited = new bool[alpha.Length];
+        var stack = new Stack<int>();
+        var blob = new List<int>();
+        for (var seed = 0; seed < alpha.Length; seed++)
+        {
+            if (visited[seed] || alpha[seed] <= 0f)
+            {
+                continue;
+            }
+
+            blob.Clear();
+            var touchesOffPaper = false;
+            visited[seed] = true;
+            stack.Push(seed);
+            while (stack.Count > 0)
+            {
+                var index = stack.Pop();
+                blob.Add(index);
+                int x = index % width, y = index / width;
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= width || ny >= height)
+                        {
+                            continue;
+                        }
+
+                        var next = (ny * width) + nx;
+                        touchesOffPaper |= offPaper[next];
+                        if (!visited[next] && alpha[next] > 0f)
+                        {
+                            visited[next] = true;
+                            stack.Push(next);
+                        }
+                    }
+                }
+            }
+
+            if (touchesOffPaper || blob.Count < MinComponentPixels)
+            {
+                foreach (var index in blob)
+                {
+                    alpha[index] = 0f;
+                }
+            }
+        }
+    }
+
+    /// <summary>The median of the values at or above <paramref name="floor"/>, from a 256-bin histogram (no sort, no copy).</summary>
+    private static float MedianAtLeast(float[] values, float floor)
+    {
+        const int Bins = 256;
+        var histogram = new int[Bins];
+        var count = 0;
+        foreach (var value in values)
+        {
+            if (value >= floor)
+            {
+                histogram[Math.Min(Bins - 1, (int)(value * (Bins - 1)))]++;
+                count++;
+            }
+        }
+
+        var seen = 0;
+        for (var bin = 0; bin < Bins; bin++)
+        {
+            seen += histogram[bin];
+            if (seen * 2 > count)
+            {
+                return (bin + 0.5f) / (Bins - 1);
+            }
+        }
+
+        return floor;
     }
 
     /// <summary>Applies <paramref name="reduce"/> over each cell's 3 by 3 neighbourhood (clipped at the edges).</summary>

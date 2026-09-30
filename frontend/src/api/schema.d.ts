@@ -2906,7 +2906,7 @@ export interface paths {
         put?: never;
         /**
          * Upload the head teacher's signature
-         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension. The paper is removed and only the pen strokes kept: stored as a transparent PNG trimmed to the strokes, at most 1200 pixels on the long edge, with all metadata stripped. `422 school_image.no_signature_found` when no strokes can be told from the paper. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension, though it must hold pen strokes that can be told from the paper. The paper is removed and only the pen strokes kept: stored as a transparent PNG trimmed to the strokes, at most 1200 pixels on the long edge, with all metadata stripped. `422 school_image.no_signature_found` when no strokes can be told from the paper. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
          */
         post: operations["UploadHeadTeacherSignature"];
         delete?: never;
@@ -5334,7 +5334,7 @@ export interface components {
          *       "status": "Active",
          *       "mustChangePassword": true,
          *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
-         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *       "temporaryPassword": "482915730264"
          *     }
          */
         CreateAdminAccountResponse: {
@@ -5376,7 +5376,7 @@ export interface components {
              *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the
              *     approved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay
              *     that returned it verbatim would be a second display).
-             * @example aB3xQ9mK2pL7vN4wR8dT
+             * @example 482915730264
              */
             temporaryPassword: null | string;
         };
@@ -11722,7 +11722,7 @@ export interface components {
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *       "temporaryPassword": "482915730264"
          *     }
          */
         ResetAdminAccountPasswordResponse: {
@@ -11734,7 +11734,7 @@ export interface components {
             /**
              * @description The generated plaintext password. Present on the live response; REDACTED (`null`)
              *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.
-             * @example aB3xQ9mK2pL7vN4wR8dT
+             * @example 482915730264
              */
             temporaryPassword: null | string;
         };

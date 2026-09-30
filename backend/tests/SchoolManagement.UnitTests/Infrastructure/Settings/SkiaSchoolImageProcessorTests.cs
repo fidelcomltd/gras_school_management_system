@@ -164,6 +164,17 @@ public sealed class SkiaSchoolImageProcessorTests
     }
 
     [Fact]
+    public void ProcessSignature_ASheetPhotographedOnADarkDesk_KeepsNoBandOfDeskAlongThePapersEdge()
+    {
+        var result = _processor.ProcessSignature(CreateSignatureOnDeskJpeg(1000, 800));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Trimmed to the stroke across the middle, not to the sheet or the whole photograph.
+        result.Value.Original.WidthPixels.ShouldBeLessThan(500);
+        result.Value.Original.HeightPixels.ShouldBeLessThan(60);
+    }
+
+    [Fact]
     public void ProcessSignature_ALargeScan_IsScaledDownTo1200OnTheLongEdge()
     {
         var result = _processor.ProcessSignature(CreateSignatureJpeg(3000, 1000, strokeWidth: 30));
@@ -463,6 +474,21 @@ public sealed class SkiaSchoolImageProcessorTests
         canvas.DrawRect(0, 0, width, height, paper);
         using var pen = new SKPaint { Color = new SKColor(35, 45, 130), StrokeWidth = strokeWidth, IsAntialias = true, Style = SKPaintStyle.Stroke };
         canvas.DrawLine(width * 0.2f, height / 2f, width * 0.8f, height / 2f, pen);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+        return data.ToArray();
+    }
+
+    /// <summary>A sheet of paper on a dark wooden desk, with a blue stroke across the middle of the sheet, as a JPEG.</summary>
+    private static byte[] CreateSignatureOnDeskJpeg(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(new SKColor(70, 52, 38));
+        using var paper = new SKPaint { Color = new SKColor(232, 229, 222) };
+        canvas.DrawRect(width * 0.15f, height * 0.15f, width * 0.7f, height * 0.7f, paper);
+        using var pen = new SKPaint { Color = new SKColor(35, 45, 130), StrokeWidth = 6, IsAntialias = true, Style = SKPaintStyle.Stroke };
+        canvas.DrawLine(width * 0.3f, height / 2f, width * 0.7f, height / 2f, pen);
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
         return data.ToArray();

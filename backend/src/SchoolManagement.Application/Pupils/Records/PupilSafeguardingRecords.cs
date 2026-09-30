@@ -188,6 +188,10 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
             return Result.Failure<BarredPersonsDto>(allowed.Error);
         }
 
+        // Only a photograph uploaded for THIS pupil may attach: an id from another pupil's list must not (and so be served) here.
+        var pupilPhotos = request.Persons.Any(person => !string.IsNullOrWhiteSpace(person.PhotoId))
+            ? (await records.ListBarredPhotosAsync(request.PupilId, cancellationToken).ConfigureAwait(false)).Select(photo => photo.Id).ToHashSet()
+            : [];
         var created = new List<BarredPerson>();
         for (var index = 0; index < request.Persons.Count; index++)
         {
@@ -195,11 +199,7 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
             Guid? photoId = null;
             if (!string.IsNullOrWhiteSpace(input.PhotoId))
             {
-                // Only a photograph uploaded for THIS pupil: an id from another pupil's list must not attach (and so be served) here.
-                var photo = Guid.TryParse(input.PhotoId, out var parsed)
-                    ? await records.FindBarredPhotoAsync(parsed, cancellationToken).ConfigureAwait(false)
-                    : null;
-                if (photo is null || photo.PupilId != request.PupilId)
+                if (!Guid.TryParse(input.PhotoId, out var parsed) || !pupilPhotos.Contains(parsed))
                 {
                     return Result.Failure<BarredPersonsDto>(new ValidationError(new Dictionary<string, string[]>(StringComparer.Ordinal)
                     {
@@ -207,7 +207,7 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
                     }));
                 }
 
-                photoId = photo.Id;
+                photoId = parsed;
             }
 
             var person = BarredPerson.Create(Guid.CreateVersion7(), request.PupilId, input.FullName, input.Details, index, photoId);
@@ -231,7 +231,8 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
             answer.Answer(request.HasBarredPersons);
         }
 
-        foreach (var old in await records.ListBarredPersonsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false))
+        var previousPersons = await records.ListBarredPersonsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false);
+        foreach (var old in previousPersons)
         {
             await records.RemoveAsync(old, cancellationToken).ConfigureAwait(false);
         }
@@ -245,9 +246,18 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
         // than pupil.safeguarding.view.
         await auditSink.RecordAsync(
             Privileges.Pupil.SafeguardingUpdate, "barred_person", PupilContactsMapper.Id(request.PupilId),
-            new Dictionary<string, object?>(StringComparer.Ordinal) { ["hasBarredPersons"] = request.HasBarredPersons, ["count"] = created.Count },
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["hasBarredPersons"] = request.HasBarredPersons,
+                ["count"] = created.Count,
+                ["photos"] = created.Count(person => person.PhotoId is not null),
+            },
             currentUser.UserId, cancellationToken,
-            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["hasBarredPersons"] = previous })
+            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["hasBarredPersons"] = previous,
+                ["photos"] = previousPersons.Count(person => person.PhotoId is not null),
+            })
             .ConfigureAwait(false);
 
         return Result.Success(BarredMapper.ToDto(request.PupilId, request.HasBarredPersons, created));

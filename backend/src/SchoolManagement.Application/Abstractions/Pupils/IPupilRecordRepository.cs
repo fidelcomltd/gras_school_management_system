@@ -21,6 +21,9 @@ public interface IPupilRecordRepository
     /// <summary>The barred persons, in entry order.</summary>
     Task<IReadOnlyList<BarredPerson>> ListBarredPersonsAsync(Guid pupilId, bool track, CancellationToken cancellationToken);
 
+    /// <summary>Every barred-person photograph uploaded for the pupil (a handful at most).</summary>
+    Task<IReadOnlyList<BarredPersonPhoto>> ListBarredPhotosAsync(Guid pupilId, CancellationToken cancellationToken);
+
     /// <summary>A barred-person photograph, or null when there is no such row.</summary>
     Task<BarredPersonPhoto?> FindBarredPhotoAsync(Guid photoId, CancellationToken cancellationToken);
 

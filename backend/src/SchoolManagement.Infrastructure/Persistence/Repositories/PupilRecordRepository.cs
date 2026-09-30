@@ -26,6 +26,10 @@ internal sealed class PupilRecordRepository(ApplicationDbContext context) : IPup
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<BarredPersonPhoto>> ListBarredPhotosAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        await Query<BarredPersonPhoto>(track: false).Where(photo => photo.PupilId == pupilId).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
     public Task<BarredPersonPhoto?> FindBarredPhotoAsync(Guid photoId, CancellationToken cancellationToken) =>
         Query<BarredPersonPhoto>(track: false).FirstOrDefaultAsync(photo => photo.Id == photoId, cancellationToken);
 

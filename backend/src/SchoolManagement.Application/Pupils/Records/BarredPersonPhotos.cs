@@ -70,7 +70,7 @@ internal sealed class UploadBarredPersonPhotoHandler(
         var photo = BarredPersonPhoto.Create(Guid.CreateVersion7(), request.PupilId, assetId);
         await records.AddAsync(photo, cancellationToken).ConfigureAwait(false);
         await auditSink.RecordAsync(
-            AuditAction, "barred_person", PupilContactsMapper.Id(request.PupilId), PupilFiles.AssetMetadata(assetId), currentUser.UserId, cancellationToken)
+            AuditAction, "barred_person_photo", PupilContactsMapper.Id(request.PupilId), PupilFiles.AssetMetadata(assetId), currentUser.UserId, cancellationToken)
             .ConfigureAwait(false);
 
         return Result.Success(new BarredPersonPhotoDto(PupilContactsMapper.Id(photo.Id)));

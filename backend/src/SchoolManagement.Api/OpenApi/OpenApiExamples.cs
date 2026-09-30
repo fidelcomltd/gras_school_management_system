@@ -895,7 +895,7 @@ internal static class OpenApiExamples
               "status": "Active",
               "mustChangePassword": true,
               "createdAtUtc": "{{CanonicalTimestamp}}",
-              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+              "temporaryPassword": "482915730264"
             }
             """,
 
@@ -971,7 +971,7 @@ internal static class OpenApiExamples
         [typeof(ResetAdminAccountPasswordResponse)] = $$"""
             {
               "id": "{{ExampleId}}",
-              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+              "temporaryPassword": "482915730264"
             }
             """,
 
