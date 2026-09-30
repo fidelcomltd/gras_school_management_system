@@ -2798,7 +2798,7 @@ export interface paths {
         put?: never;
         /**
          * Create a session
-         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
+         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. Each term's `timesSchoolOpened` starts as its weekdays (Monday to Friday, start to end inclusive), for the school to correct for holidays and breaks with `PATCH /terms/{id}`. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
          */
         post: operations["CreateSession"];
         delete?: never;

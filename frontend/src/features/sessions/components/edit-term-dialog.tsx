@@ -3,7 +3,7 @@ import { FormError } from '@/components/feedback/query-states';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/http';
 import { hasFieldError } from '@/shared/forms/field-message';
@@ -94,6 +94,10 @@ export function EditTermDialog({
           <Field invalid={!!errors.timesSchoolOpened}>
             <FieldLabel>Times school opened</FieldLabel>
             <Input type="number" min={1} max={200} {...register('timesSchoolOpened')} />
+            <FieldDescription>
+              Days school actually opened this term; printed on every result sheet, and times absent is worked out from it. It
+              starts as the term's weekdays: take off public holidays and breaks.
+            </FieldDescription>
           </Field>
 
           <Field invalid={!!errors.nextResumptionDate}>

@@ -103,6 +103,10 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
             <FieldError match={true}>{errors.endDate?.message}</FieldError>
           </Field>
 
+          <p className="text-sm text-muted-foreground">
+            Each term's times school opened starts as its weekdays (Monday to Friday). Edit the term later to take off public
+            holidays and breaks.
+          </p>
           <TermDateFields ordinalLabel="First term" prefix="term1" register={register} />
           <TermDateFields ordinalLabel="Second term" prefix="term2" register={register} onStartDate={follow('term1.nextResumptionDate')} />
           <TermDateFields ordinalLabel="Third term" prefix="term3" register={register} onStartDate={follow('term2.nextResumptionDate')} />
