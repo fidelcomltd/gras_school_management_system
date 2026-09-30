@@ -66,6 +66,17 @@ public interface ISchoolImageProcessor
     Result<ProcessedPupilPhoto> ProcessPupilPhoto(byte[] fileBytes);
 
     /// <summary>
+    /// Validates and processes a photograph of a person barred from collecting a child: a JPEG at quality 80, at most 800
+    /// pixels on the long edge, never cropped (it may be a full-length picture), metadata stripped.
+    /// </summary>
+    /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
+    /// <returns>
+    /// On failure, the pupil photograph's codes: <see cref="PupilUploadErrorCodes.PhotoUnsupportedType"/> or
+    /// <see cref="PupilUploadErrorCodes.PhotoTooLarge"/>.
+    /// </returns>
+    Result<SchoolImageRendition> ProcessPersonPhoto(byte[] fileBytes);
+
+    /// <summary>
     /// Validates a document-checklist scan (spec 6.5.8): PDF, JPEG or PNG by magic bytes, at most
     /// <see cref="SchoolImageLimits.MaxDocumentScanBytes"/>. A JPEG or PNG is re-encoded at its own size, which strips EXIF
     /// and GPS (a phone photograph of a birth certificate carries where it was taken); a PDF is returned as it came.

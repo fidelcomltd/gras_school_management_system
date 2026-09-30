@@ -29,6 +29,7 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
     private const int JpegQuality = 90;
     private const int PupilPhotoJpegQuality = 80;
     private const string PdfContentType = "application/pdf";
+    private const int PersonPhotoMaxEdge = 800;
 
     // Magic-byte signatures (spec 9.6: content type is decided by inspecting the file's bytes, never
     // a declared content type or extension — this port is never even given a file name).
@@ -139,6 +140,43 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
         return Result.Success(new ProcessedPupilPhoto(
             EncodeSquareJpeg(square, 400, SchoolImageSizeVariant.Square400),
             EncodeSquareJpeg(square, 96, SchoolImageSizeVariant.Square96)));
+    }
+
+    /// <inheritdoc />
+    public Result<SchoolImageRendition> ProcessPersonPhoto(byte[] fileBytes)
+    {
+        ArgumentNullException.ThrowIfNull(fileBytes);
+
+        if (fileBytes.LongLength > SchoolImageLimits.MaxPupilPhotoBytes)
+        {
+            return Result.Failure<SchoolImageRendition>(Error.Validation(
+                PupilUploadErrorCodes.PhotoTooLarge,
+                $"This photograph is {Megabytes(fileBytes.LongLength)} MB. The limit is {SchoolImageLimits.MaxPupilPhotoBytes / (1024 * 1024)} MB."));
+        }
+
+        var decoded = DecodeAndDetectType(fileBytes);
+        if (decoded.IsFailure)
+        {
+            return Result.Failure<SchoolImageRendition>(decoded.Error.Code == SchoolImageErrorCodes.TooManyPixels
+                ? Error.Validation(PupilUploadErrorCodes.PhotoTooLarge, decoded.Error.Description)
+                : Error.Validation(PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
+        }
+
+        using var bitmap = decoded.Value.Bitmap;
+        var scale = Math.Min(1.0, PersonPhotoMaxEdge / (double)Math.Max(bitmap.Width, bitmap.Height));
+        var width = Math.Max(1, (int)Math.Round(bitmap.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(bitmap.Height * scale));
+        using var flattened = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque));
+        using (var canvas = new SKCanvas(flattened))
+        using (var image = SKImage.FromBitmap(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+            canvas.DrawImage(image, SKRect.Create(width, height), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+        }
+
+        using var output = SKImage.FromBitmap(flattened);
+        using var encoded = output.Encode(SKEncodedImageFormat.Jpeg, PupilPhotoJpegQuality);
+        return Result.Success(new SchoolImageRendition(SchoolImageSizeVariant.Original, encoded.ToArray(), width, height, JpegContentType));
     }
 
     /// <inheritdoc />

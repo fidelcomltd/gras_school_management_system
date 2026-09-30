@@ -191,7 +191,26 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
         var created = new List<BarredPerson>();
         for (var index = 0; index < request.Persons.Count; index++)
         {
-            var person = BarredPerson.Create(Guid.CreateVersion7(), request.PupilId, request.Persons[index].FullName, request.Persons[index].Details, index);
+            var input = request.Persons[index];
+            Guid? photoId = null;
+            if (!string.IsNullOrWhiteSpace(input.PhotoId))
+            {
+                // Only a photograph uploaded for THIS pupil: an id from another pupil's list must not attach (and so be served) here.
+                var photo = Guid.TryParse(input.PhotoId, out var parsed)
+                    ? await records.FindBarredPhotoAsync(parsed, cancellationToken).ConfigureAwait(false)
+                    : null;
+                if (photo is null || photo.PupilId != request.PupilId)
+                {
+                    return Result.Failure<BarredPersonsDto>(new ValidationError(new Dictionary<string, string[]>(StringComparer.Ordinal)
+                    {
+                        [$"Persons[{index}]"] = ["That photograph was not found. Upload it again."],
+                    }));
+                }
+
+                photoId = photo.Id;
+            }
+
+            var person = BarredPerson.Create(Guid.CreateVersion7(), request.PupilId, input.FullName, input.Details, index, photoId);
             if (person.IsFailure)
             {
                 return Result.Failure<BarredPersonsDto>(new ValidationError(
@@ -356,7 +375,9 @@ internal static class BarredMapper
 {
     public static BarredPersonsDto ToDto(Guid pupilId, bool? answer, IEnumerable<BarredPerson> persons) =>
         new(PupilContactsMapper.Id(pupilId), answer, persons.OrderBy(person => person.DisplayOrder)
-            .Select(person => new BarredPersonDto(PupilContactsMapper.Id(person.Id), person.FullName, person.Details)).ToList());
+            .Select(person => new BarredPersonDto(
+                PupilContactsMapper.Id(person.Id), person.FullName, person.Details, person.PhotoId is { } photoId ? PupilContactsMapper.Id(photoId) : null))
+            .ToList());
 }
 
 /// <summary>Health mapping; no row reads as every question unanswered.</summary>

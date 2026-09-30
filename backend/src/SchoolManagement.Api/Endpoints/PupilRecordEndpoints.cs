@@ -182,6 +182,28 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        Upload(pupils.MapPost("/barred-persons/photos", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
+                {
+                    var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                    return (await sender.SendAsync(new UploadBarredPersonPhotoCommand(pupilId, bytes), cancellationToken)).Match(TypedResults.Ok);
+                }),
+            "UploadBarredPersonPhoto", "Upload a photograph of someone who must not collect the pupil",
+            "Multipart, one `file` part. JPEG or PNG only, verified by magic bytes; maximum 3 MB. Stored as a JPEG at most 800 " +
+            "pixels on the long edge, never cropped, with all metadata stripped. Attached to nobody until `PUT /barred-persons` " +
+            "names the returned `photoId` on a person, and only this pupil's list may use it. Audited as " +
+            "`pupil.safeguarding.photo_uploaded`. Needs `pupil.safeguarding.update` over the pupil. `Idempotency-Key` is REQUIRED.")
+            .Produces<BarredPersonPhotoDto>(StatusCodes.Status200OK);
+
+        Read(pupils.MapGet("/barred-persons/photos/{photoId:guid}", async (
+                    Guid pupilId, Guid photoId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new ReadBarredPersonPhotoCommand(pupilId, photoId), cancellationToken))
+                .Match(content => FileResponses.Serve(httpContext, content, "inline", "no-store"))),
+            "GetBarredPersonPhoto", "Read a barred person's photograph",
+            "The JPEG, `inline`, `nosniff`, `Cache-Control: no-store`. Only a photograph a current barred person of this pupil " +
+            "carries: `404 barred_person.photo_not_found` otherwise. Every view is audited as `pupil.safeguarding.read`. Needs " +
+            "`pupil.safeguarding.view` over the pupil.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/jpeg");
+
         Upload(pupils.MapPost("/photo", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
                 {
                     var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);

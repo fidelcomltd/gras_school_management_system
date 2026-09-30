@@ -3102,19 +3102,31 @@ internal static class OpenApiExamples
             """,
 
         [typeof(BarredPersonDto)] = """
-            { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            {
+              "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.",
+              "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+            }
+            """,
+
+        [typeof(BarredPersonPhotoDto)] = """
+            { "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40" }
             """,
 
         [typeof(BarredPersonsDto)] = $$"""
             {
               "pupilId": "{{ExamplePupilId}}",
               "hasBarredPersons": true,
-              "items": [ { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." } ]
+              "items": [
+                {
+                  "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.",
+                  "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+                }
+              ]
             }
             """,
 
         [typeof(BarredPersonInput)] = """
-            { "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            { "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.", "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40" }
             """,
 
         [typeof(SaveBarredPersonsCommand)] = $$"""

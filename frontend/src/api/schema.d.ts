@@ -1519,6 +1519,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pupils/{pupilId}/barred-persons/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photograph of someone who must not collect the pupil
+         * @description Multipart, one `file` part. JPEG or PNG only, verified by magic bytes; maximum 3 MB. Stored as a JPEG at most 800 pixels on the long edge, never cropped, with all metadata stripped. Attached to nobody until `PUT /barred-persons` names the returned `photoId` on a person, and only this pupil's list may use it. Audited as `pupil.safeguarding.photo_uploaded`. Needs `pupil.safeguarding.update` over the pupil. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadBarredPersonPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a barred person's photograph
+         * @description The JPEG, `inline`, `nosniff`, `Cache-Control: no-store`. Only a photograph a current barred person of this pupil carries: `404 barred_person.photo_not_found` otherwise. Every view is audited as `pupil.safeguarding.read`. Needs `pupil.safeguarding.view` over the pupil.
+         */
+        get: operations["GetBarredPersonPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils/{pupilId}/photo": {
         parameters: {
             query?: never;
@@ -2866,7 +2906,7 @@ export interface paths {
         put?: never;
         /**
          * Upload the head teacher's signature
-         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension. The paper is removed and only the pen strokes kept: stored as a transparent PNG trimmed to the strokes, at most 1200 pixels on the long edge, with all metadata stripped. `422 school_image.no_signature_found` when no strokes can be told from the paper. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
          */
         post: operations["UploadHeadTeacherSignature"];
         delete?: never;
@@ -4537,7 +4577,8 @@ export interface components {
          * @example {
          *       "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
          *       "fullName": "John Doe",
-         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *       "details": "Court order dated 03/02/2026; office holds a copy.",
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *     }
          */
         BarredPersonDto: {
@@ -4556,12 +4597,19 @@ export interface components {
              * @example Court order dated 03/02/2026; office holds a copy.
              */
             details: null | string;
+            /**
+             * @description The person's photograph, or null for none: read it from
+             *     `GET /api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}` (audited).
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId: null | string;
         };
         /**
          * @description One barred person as submitted.
          * @example {
          *       "fullName": "John Doe",
-         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *       "details": "Court order dated 03/02/2026; office holds a copy.",
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *     }
          */
         BarredPersonInput: {
@@ -4575,6 +4623,25 @@ export interface components {
              * @example Court order dated 03/02/2026; office holds a copy.
              */
             details: null | string;
+            /**
+             * @description Optional: a photograph uploaded for this pupil through `POST /barred-persons/photos`. Send it again on every save to
+             *     keep it; leave it out to remove it.
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId?: null | string;
+        };
+        /**
+         * @description An uploaded barred-person photograph, attached to nobody until the barred list is saved with its id.
+         * @example {
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+         *     }
+         */
+        BarredPersonPhotoDto: {
+            /**
+             * @description Send as `photoId` on the person in `PUT /barred-persons`.
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId: string;
         };
         /**
          * @description Section E's exclusion question and its answer (spec 6.5.6). Safeguarding data: every read is audited.
@@ -4585,7 +4652,8 @@ export interface components {
          *         {
          *           "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
          *           "fullName": "John Doe",
-         *           "details": "Court order dated 03/02/2026; office holds a copy."
+         *           "details": "Court order dated 03/02/2026; office holds a copy.",
+         *           "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *         }
          *       ]
          *     }
@@ -4607,7 +4675,8 @@ export interface components {
              *       {
              *         "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
              *         "fullName": "John Doe",
-             *         "details": "Court order dated 03/02/2026; office holds a copy."
+             *         "details": "Court order dated 03/02/2026; office holds a copy.",
+             *         "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
              *       }
              *     ]
              */
@@ -24759,6 +24828,155 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadBarredPersonPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BarredPersonPhotoDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBarredPersonPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
