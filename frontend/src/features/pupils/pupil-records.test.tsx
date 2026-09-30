@@ -1,7 +1,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
-import { renderWithProviders, screen, waitFor } from '@/test/render';
+import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { PupilDetailScreen } from './pupil-detail-screen';
@@ -70,12 +70,37 @@ describe('PupilDetailScreen admission sections', () => {
     await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
     await user.type(await screen.findByLabelText('Father: full name'), 'Emeka Okafor');
     await user.type(screen.getByLabelText('Father: phone'), '08031234567');
-    await user.click(screen.getByRole('button', { name: 'Copy from father' }));
+    const emergency = screen.getByRole('group', { name: 'Primary emergency contact' });
+    expect(within(emergency).queryByRole('button', { name: 'Copy from guardian' })).not.toBeInTheDocument();
+    await user.click(within(emergency).getByRole('button', { name: 'Copy from father' }));
     await user.click(screen.getByRole('button', { name: 'Save contacts' }));
 
     await waitFor(() => expect(saved?.contacts).toHaveLength(2));
     expect(saved?.contacts[0]).toMatchObject({ role: 'Father', fullName: 'Emeka Okafor', phone: '08031234567', isPrimaryContact: true });
     expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyPrimary', fullName: 'Emeka Okafor', relationship: 'Father', isPrimaryContact: false });
+  });
+
+  it("copies the guardian into the alternative emergency slot with the guardian's own relationship", async () => {
+    mockMe('pupil.view', 'contact.view', 'contact.update');
+    mockPendingPupil();
+    let saved: { contacts: { role: string; fullName: string; phone: string; relationship: string | null }[] } | undefined;
+    server.use(
+      http.put(apiUrl('/api/v1/pupils/:pupilId/contacts'), async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json({ pupilId: 'pupil-1', items: [] });
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
+    await user.type(await screen.findByLabelText('Guardian (if applicable): full name'), 'Ngozi Eze');
+    await user.type(screen.getByLabelText('Guardian (if applicable): relationship to the pupil'), 'Aunt');
+    await user.type(screen.getByLabelText('Guardian (if applicable): phone'), '08031234567');
+    await user.click(within(screen.getByRole('group', { name: 'Alternative emergency contact' })).getByRole('button', { name: 'Copy from guardian' }));
+    await user.click(screen.getByRole('button', { name: 'Save contacts' }));
+
+    await waitFor(() => expect(saved?.contacts).toHaveLength(2));
+    expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyAlternate', fullName: 'Ngozi Eze', phone: '08031234567', relationship: 'Aunt' });
   });
 
   it("shows a rejected contact's own reason, not the generic validation message", async () => {
