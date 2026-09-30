@@ -6,6 +6,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SchoolManagement.Application.Abstractions.Results;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Results.Sheets;
 using SchoolManagement.Domain.Results;
 using SchoolManagement.Infrastructure.Pins;
@@ -604,7 +605,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
 
             row.ConstantItem(130).AlignRight().AlignBottom().Column(column =>
             {
-                column.Item().AlignRight().Text($"Printed {extras.PrintedAt.ToOffset(TimeSpan.FromHours(1)).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)} WAT").FontSize(6.5f);
+                column.Item().AlignRight().Text($"Printed {PrintedTime.Format(extras.PrintedAt)}").FontSize(6.5f);
                 column.Item().AlignRight().Text(text =>
                 {
                     text.DefaultTextStyle(style => style.FontSize(6.5f));

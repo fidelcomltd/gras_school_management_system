@@ -3,6 +3,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Common;
 
 namespace SchoolManagement.Infrastructure.Pupils;
 
@@ -81,7 +82,7 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
                     row.RelativeItem().AlignBottom().AlignRight().Text(text =>
                     {
                         text.DefaultTextStyle(style => style.FontSize(8).FontColor(Colors.Grey.Darken2));
-                        text.Span($"Printed {slip.PrintedAtLagos.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)} (Lagos) by {slip.PrintedBy}.");
+                        text.Span($"Printed {PrintedTime.Format(slip.PrintedAtLagos)} by {slip.PrintedBy}.");
                     });
                 });
             });
