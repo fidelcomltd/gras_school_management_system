@@ -46,10 +46,11 @@ public interface ISchoolImageProcessor
     /// </summary>
     /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
     /// <returns>
-    /// On success, one <see cref="SchoolImageSizeVariant.Original"/> rendition — re-encoded to strip
-    /// metadata, but NEVER resized (600x200 is a recommendation, not a requirement). On failure,
-    /// <see cref="SchoolImageErrorCodes.UnsupportedType"/> or <see cref="SchoolImageErrorCodes.TooLarge"/>
-    /// (over <see cref="SchoolImageLimits.MaxSignatureBytes"/>) — there is no minimum dimension.
+    /// On success, one <see cref="SchoolImageSizeVariant.Original"/> rendition: always a transparent PNG holding only
+    /// the pen strokes, the paper removed, trimmed to the strokes and at most 1200 pixels on the long edge (project
+    /// lead, 2026-09-30). On failure, <see cref="SchoolImageErrorCodes.UnsupportedType"/>,
+    /// <see cref="SchoolImageErrorCodes.TooLarge"/> (over <see cref="SchoolImageLimits.MaxSignatureBytes"/>) or
+    /// <see cref="SchoolImageErrorCodes.NoSignatureFound"/> — there is no minimum dimension.
     /// </returns>
     Result<ProcessedSchoolImage> ProcessSignature(byte[] fileBytes);
 
@@ -198,6 +199,9 @@ public static class SchoolImageErrorCodes
 
     /// <summary>Logo only: under the minimum pixel dimensions.</summary>
     public const string TooSmall = "school_image.too_small";
+
+    /// <summary>Signature only: no pen strokes could be told apart from the paper (a blank page or a solid colour).</summary>
+    public const string NoSignatureFound = "school_image.no_signature_found";
 
     /// <summary>Declares more than <see cref="SchoolImageLimits.MaxDecodedPixels"/>; refused before decoding.</summary>
     public const string TooManyPixels = "school_image.too_many_pixels";

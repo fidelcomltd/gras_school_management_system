@@ -3,7 +3,7 @@ import type { components } from '@/api/schema';
 import { deleteRequest, getFile, postRequest, saveFile } from '@/lib/http';
 import { PupilsKeys } from '../types';
 import { RecordKeys, useSave, type PupilDocumentListDto, type PupilDocumentType } from './api';
-import { assertFileSize, downscaleImage, PHOTO_MAX_BYTES, PHOTO_MAX_EDGE, SCAN_MAX_BYTES, SCAN_MAX_EDGE } from './downscale';
+import { assertFileSize, downscaleImage, PHOTO_MAX_BYTES, PHOTO_MAX_EDGE, SCAN_MAX_BYTES, SCAN_MAX_EDGE } from '@/shared/images/downscale';
 
 /** Photograph and document-scan calls (spec 6.5.4, 6.5.8, 9.6). */
 

@@ -89,10 +89,18 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
             return Result.Failure<ProcessedSchoolImage>(decoded.Error);
         }
 
-        // Never resized: 600x200 is only a recommendation, and a signature is rendered at a fixed
-        // height wherever it is printed (spec 9.6), so there is no derivative to produce here.
+        // The paper goes and only the pen strokes stay (project lead, 2026-09-30), so the result is always a
+        // transparent PNG, trimmed to the strokes; there is still no smaller derivative to produce.
         using var bitmap = decoded.Value.Bitmap;
-        List<SchoolImageRendition> renditions = [Encode(bitmap, decoded.Value.ContentType, SchoolImageSizeVariant.Original)];
+        using var cleaned = SignatureCleaner.Clean(bitmap);
+        if (cleaned is null)
+        {
+            return Result.Failure<ProcessedSchoolImage>(Error.Validation(
+                SchoolImageErrorCodes.NoSignatureFound,
+                "No pen strokes were found in this image. Sign in dark ink on plain white paper and photograph it close up."));
+        }
+
+        List<SchoolImageRendition> renditions = [Encode(cleaned, PngContentType, SchoolImageSizeVariant.Original)];
 
         return Result.Success(new ProcessedSchoolImage(renditions));
     }

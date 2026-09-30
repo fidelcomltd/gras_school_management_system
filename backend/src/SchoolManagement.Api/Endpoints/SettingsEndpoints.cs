@@ -166,8 +166,9 @@ public sealed class SettingsEndpoints : IEndpointModule
             .WithSummary("Upload the head teacher's signature")
             .WithDescription(
                 "Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; " +
-                "maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded " +
-                "to strip all metadata but never resized. Repoints the current signature; the previous " +
+                "maximum 1 MB; no minimum dimension. The paper is removed and only the pen strokes kept: stored " +
+                "as a transparent PNG trimmed to the strokes, at most 1200 pixels on the long edge, with all metadata " +
+                "stripped. `422 school_image.no_signature_found` when no strokes can be told from the paper. Repoints the current signature; the previous " +
                 "asset is never deleted. `Idempotency-Key` is REQUIRED.")
             .Produces<SchoolImageDto>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
