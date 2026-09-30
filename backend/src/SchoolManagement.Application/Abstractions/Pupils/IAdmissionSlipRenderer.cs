@@ -22,6 +22,11 @@ public interface IAdmissionSlipRenderer
 /// <param name="DateAdmitted">Section A's admission date.</param>
 /// <param name="PrintedAtLagos">When it was printed, Lagos time (every printed artefact carries it).</param>
 /// <param name="PrintedBy">The account that printed it.</param>
+/// <param name="SchoolMotto">Under the name, when the school has one.</param>
+/// <param name="SchoolContact">The school's phone and email, one line.</param>
+/// <param name="HeadTeacherName">Under the signature line.</param>
+/// <param name="Logo">The current logo (the 200 pixel rendition), or empty for none.</param>
+/// <param name="Signature">The head teacher's current signature (strokes only, transparent), or empty for none.</param>
 public sealed record AdmissionSlipDocument(
     string SchoolName,
     string SchoolAddress,
@@ -33,4 +38,9 @@ public sealed record AdmissionSlipDocument(
     string SessionName,
     DateOnly DateAdmitted,
     DateTime PrintedAtLagos,
-    string PrintedBy);
+    string PrintedBy,
+    string? SchoolMotto = null,
+    string? SchoolContact = null,
+    string? HeadTeacherName = null,
+    ReadOnlyMemory<byte> Logo = default,
+    ReadOnlyMemory<byte> Signature = default);

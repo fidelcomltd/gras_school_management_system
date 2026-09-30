@@ -59,17 +59,7 @@ export function Brand() {
   );
 }
 
-/**
- * Placeholder mark. Swap for the real crest once the asset is committed to
- * `public/` — see CONVENTIONS.md §8.
- */
+/** The school's crest (`public/crest.png`, cut from the school's own logo with its background removed). */
 function Crest() {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid size-9 shrink-0 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground ring-2 ring-accent"
-    >
-      GRA
-    </span>
-  );
+  return <img src="/crest.png" alt="" aria-hidden="true" width={40} height={38} className="h-10 w-auto shrink-0" />;
 }

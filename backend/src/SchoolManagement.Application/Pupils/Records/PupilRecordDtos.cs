@@ -56,7 +56,15 @@ public sealed record PickupPersonInput(string FullName, string Relationship, str
 /// <param name="Id">The row.</param>
 /// <param name="FullName">Required.</param>
 /// <param name="Details">Relevant information.</param>
-public sealed record BarredPersonDto(string Id, string FullName, string? Details);
+/// <param name="PhotoId">
+/// The person's photograph, or null for none: read it from
+/// <c>GET /api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}</c> (audited).
+/// </param>
+public sealed record BarredPersonDto(string Id, string FullName, string? Details, string? PhotoId);
+
+/// <summary>An uploaded barred-person photograph, attached to nobody until the barred list is saved with its id.</summary>
+/// <param name="PhotoId">Send as <c>photoId</c> on the person in <c>PUT /barred-persons</c>.</param>
+public sealed record BarredPersonPhotoDto(string PhotoId);
 
 /// <summary>Section E's exclusion question and its answer (spec 6.5.6). Safeguarding data: every read is audited.</summary>
 /// <param name="PupilId">The pupil.</param>
@@ -67,7 +75,11 @@ public sealed record BarredPersonsDto(string PupilId, bool? HasBarredPersons, IR
 /// <summary>One barred person as submitted.</summary>
 /// <param name="FullName">Required.</param>
 /// <param name="Details">Optional, at most 500 characters.</param>
-public sealed record BarredPersonInput(string FullName, string? Details);
+/// <param name="PhotoId">
+/// Optional: a photograph uploaded for this pupil through <c>POST /barred-persons/photos</c>. Send it again on every save to
+/// keep it; leave it out to remove it.
+/// </param>
+public sealed record BarredPersonInput(string FullName, string? Details, string? PhotoId = null);
 
 /// <summary>Section F (spec 6.5.7). Null answers mean "not asked yet". Safeguarding data: every read is audited.</summary>
 /// <param name="PupilId">The pupil.</param>

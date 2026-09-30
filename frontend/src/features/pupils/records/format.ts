@@ -1,5 +1,5 @@
 import { ApiError } from '@/lib/http';
-import { FileTooLargeError } from './downscale';
+import { FileTooLargeError } from '@/shared/images/downscale';
 
 /** A save failure as the office should read it: a 422's per-field reasons, which its generic message hides. */
 export function errorText(error: unknown): string | null {

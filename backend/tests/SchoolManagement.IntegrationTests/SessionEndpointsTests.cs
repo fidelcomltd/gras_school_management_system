@@ -96,6 +96,8 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
         body.Terms[0].Name.ShouldBe("First Term");
         body.Terms[1].Name.ShouldBe("Second Term");
         body.Terms[2].Name.ShouldBe("Third Term");
+        // Suggested as each term's weekdays, for the school to correct later.
+        body.Terms.Select(term => term.TimesSchoolOpened).ShouldBe([70, 64, 69]);
     }
 
     // Review criterion 2, half A: POST /sessions creates the session AND all three terms in one

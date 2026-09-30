@@ -130,6 +130,32 @@ public sealed class Term : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
+    /// A starting figure for <see cref="TimesSchoolOpened"/>: the weekdays, Monday to Friday, from
+    /// <paramref name="startDate"/> to <paramref name="endDate"/> inclusive (project lead, 2026-09-30: stored on creation
+    /// by default, edited by the school later). Public holidays and breaks are the school's to take off; there is no
+    /// holiday calendar here to do it. <see langword="null"/> when the count falls outside the accepted range.
+    /// </summary>
+    public static int? SuggestTimesSchoolOpened(DateOnly startDate, DateOnly endDate)
+    {
+        var days = endDate.DayNumber - startDate.DayNumber + 1;
+        if (days <= 0)
+        {
+            return null;
+        }
+
+        var weekdays = days / 7 * 5;
+        for (var offset = days / 7 * 7; offset < days; offset++)
+        {
+            if (startDate.AddDays(offset).DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            {
+                weekdays++;
+            }
+        }
+
+        return weekdays is >= MinTimesSchoolOpened and <= MaxTimesSchoolOpened ? weekdays : null;
+    }
+
+    /// <summary>
     /// Edits label, dates and next-resumption date (spec 6.3.10). Chronology against the session and
     /// sibling terms is the caller's job — it needs repository lookups this entity cannot perform.
     /// Reachable regardless of <see cref="State"/>: spec 6.3.6 calls out only

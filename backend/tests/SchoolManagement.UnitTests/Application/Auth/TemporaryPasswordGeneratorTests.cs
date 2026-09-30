@@ -3,20 +3,18 @@ using SchoolManagement.Domain.Auth;
 
 namespace SchoolManagement.UnitTests.Application.Auth;
 
-/// <summary>Tests <see cref="TemporaryPasswordGenerator"/> against spec 6.1.11's composition rule.</summary>
+/// <summary>Tests <see cref="TemporaryPasswordGenerator"/>: digits only, at the policy's minimum length.</summary>
 public sealed class TemporaryPasswordGeneratorTests
 {
     [Fact]
-    public void Generate_MeetsThePolicyLengthAndCompositionRules()
+    public void Generate_IsDigitsOnlyAtThePolicyMinimumLength()
     {
         for (var i = 0; i < 50; i++)
         {
             var password = TemporaryPasswordGenerator.Generate();
 
-            password.Length.ShouldBeGreaterThanOrEqualTo(AuthPolicy.PasswordMinLength);
-            password.Length.ShouldBeLessThanOrEqualTo(AuthPolicy.PasswordMaxLength);
-            password.Any(char.IsLetter).ShouldBeTrue();
-            password.Any(char.IsDigit).ShouldBeTrue();
+            password.Length.ShouldBe(AuthPolicy.PasswordMinLength);
+            password.All(char.IsAsciiDigit).ShouldBeTrue();
         }
     }
 

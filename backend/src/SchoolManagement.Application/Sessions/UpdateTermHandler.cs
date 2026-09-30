@@ -31,6 +31,7 @@ internal sealed class UpdateTermHandler(
             return Result.Failure<TermDto>(Error.NotFound("term.not_found", "No term was found with that id."));
         }
 
+        var (previousStart, previousEnd) = (term.StartDate, term.EndDate);
         var touchesSchedule = request.Name is not null
             || request.StartDate is not null
             || request.EndDate is not null
@@ -130,6 +131,8 @@ internal sealed class UpdateTermHandler(
             }
         }
 
+        await FollowSuggestedTimesSchoolOpenedAsync(term, request, previousStart, previousEnd, cancellationToken).ConfigureAwait(false);
+
         await auditSink.RecordAsync(
             Privileges.Session.Update,
             "term",
@@ -139,5 +142,31 @@ internal sealed class UpdateTermHandler(
             cancellationToken).ConfigureAwait(false);
 
         return Result.Success(SessionMapper.ToTermDto(term));
+    }
+
+    /// <summary>
+    /// A term's times school opened starts as its weekdays (<see cref="Term.SuggestTimesSchoolOpened"/>). While it still
+    /// equals the suggestion for the dates it had, nobody has corrected it, so it follows a change of dates; a figure the
+    /// school entered is never touched. Skipped, never refused, when it would fall below recorded times present or the
+    /// term is closed: the date edit itself still succeeds.
+    /// </summary>
+    private async Task FollowSuggestedTimesSchoolOpenedAsync(
+        Term term, UpdateTermCommand request, DateOnly previousStart, DateOnly previousEnd, CancellationToken cancellationToken)
+    {
+        if (request.TimesSchoolOpened is not null
+            || (term.StartDate == previousStart && term.EndDate == previousEnd)
+            || term.TimesSchoolOpened is not { } current
+            || current != Term.SuggestTimesSchoolOpened(previousStart, previousEnd)
+            || Term.SuggestTimesSchoolOpened(term.StartDate, term.EndDate) is not { } fresh
+            || fresh == current)
+        {
+            return;
+        }
+
+        var maxTimesPresent = await attendanceEntries.FindMaxTimesPresentByTermAsync(term.Id, cancellationToken).ConfigureAwait(false);
+        if (maxTimesPresent is null || fresh >= maxTimesPresent)
+        {
+            _ = term.SetTimesSchoolOpened(fresh);
+        }
     }
 }

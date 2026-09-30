@@ -7,11 +7,14 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Portal;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Application.Weekly;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
+using DomainSizeVariant = SchoolManagement.Domain.Settings.SchoolImageSizeVariant;
 
 namespace SchoolManagement.Application.Pupils.Records;
 
@@ -34,6 +37,8 @@ internal sealed class GetAdmissionSlipHandler(
     IClassLevelRepository classLevels,
     IAcademicSessionRepository sessions,
     ISchoolProfileRepository schoolProfiles,
+    ISchoolImageRepository schoolImages,
+    ISchoolImageStore imageStore,
     IAdminAccountRepository accounts,
     ICurrentUser currentUser,
     IAdmissionSlipRenderer renderer,
@@ -80,6 +85,14 @@ internal sealed class GetAdmissionSlipHandler(
             ? (await accounts.FindReadOnlyByIdAsync(accountId, cancellationToken).ConfigureAwait(false))?.StaffName
             : null;
 
+        // The slip carries the school's current branding (project lead, 2026-09-30): a reprint shows today's logo and head
+        // teacher, like any other document printed today, unlike a published result, which keeps its snapshot.
+        var logo = await SnapshotImages.ReadAsync(schoolImages, imageStore, profile.CurrentLogoGroupId, DomainSizeVariant.Size200, cancellationToken)
+            .ConfigureAwait(false);
+        var signature = await SnapshotImages.ReadAsync(schoolImages, imageStore, profile.CurrentSignatureGroupId, DomainSizeVariant.Original, cancellationToken)
+            .ConfigureAwait(false);
+        var contact = string.Join("  ·  ", new[] { profile.Phone, profile.Email }.Where(part => !string.IsNullOrWhiteSpace(part)));
+
         var name = string.Join(' ', new[] { pupil.Surname.ToUpperInvariant(), pupil.FirstName, pupil.MiddleName }.Where(part => !string.IsNullOrWhiteSpace(part)));
         var slip = new AdmissionSlipDocument(
             profile.SchoolName,
@@ -92,7 +105,12 @@ internal sealed class GetAdmissionSlipHandler(
             session?.Name ?? string.Empty,
             dateAdmitted.Value,
             timeProvider.GetUtcNow().ToOffset(WeeklyProjection.LagosOffset).DateTime,
-            printedBy ?? "Unknown account");
+            printedBy ?? "Unknown account",
+            profile.Motto,
+            contact,
+            profile.HeadTeacherName,
+            logo,
+            signature);
         var bytes = renderer.Render(slip);
         return Result.Success(new SchoolImageContent(new MemoryStream(bytes, writable: false), "application/pdf", "admission-slip.pdf"));
     }

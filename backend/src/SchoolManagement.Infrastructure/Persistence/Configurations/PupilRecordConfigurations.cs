@@ -83,6 +83,25 @@ internal sealed class BarredPersonConfiguration : IEntityTypeConfiguration<Barre
         builder.Property(person => person.ModifiedBy).HasMaxLength(128);
         builder.HasIndex(person => person.PupilId).HasDatabaseName("ix_barred_person_pupil");
         builder.HasOne<Pupil>().WithMany().HasForeignKey(person => person.PupilId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<BarredPersonPhoto>().WithMany().HasForeignKey(person => person.PhotoId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>Mapping for <see cref="BarredPersonPhoto"/>.</summary>
+internal sealed class BarredPersonPhotoConfiguration : IEntityTypeConfiguration<BarredPersonPhoto>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<BarredPersonPhoto> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.ToTable("barred_person_photo");
+        builder.HasKey(photo => photo.Id);
+        builder.Property(photo => photo.Id).ValueGeneratedNever();
+        builder.Property(photo => photo.AssetId).IsRequired().HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
+        builder.Property(photo => photo.CreatedBy).HasMaxLength(128);
+        builder.Property(photo => photo.ModifiedBy).HasMaxLength(128);
+        builder.HasIndex(photo => photo.PupilId).HasDatabaseName("ix_barred_person_photo_pupil");
+        builder.HasOne<Pupil>().WithMany().HasForeignKey(photo => photo.PupilId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

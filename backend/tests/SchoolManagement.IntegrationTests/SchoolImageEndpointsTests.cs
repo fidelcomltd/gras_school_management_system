@@ -64,18 +64,19 @@ public sealed class SchoolImageEndpointsTests(ApiTestFixture fixture) : Integrat
     }
 
     [Fact]
-    public async Task UploadSignature_ThenServeIt_AtItsOriginalSize()
+    public async Task UploadSignature_ThenServeIt_AsTheStrokesOnly()
     {
         RequireDatabase();
         var jar = await SignInAsSuperAdminAsync();
 
-        (await UploadAsync(SignatureUrl, jar, Png(600, 200))).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await UploadAsync(SignatureUrl, jar, SignaturePng(600, 200))).StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var served = await GetAsync(SignatureUrl, jar);
         served.StatusCode.ShouldBe(HttpStatusCode.OK);
+        served.Content.Headers.ContentType?.MediaType.ShouldBe("image/png");
         using var decoded = SKBitmap.Decode(await served.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
-        decoded.Width.ShouldBe(600);
-        decoded.Height.ShouldBe(200);
+        decoded.Height.ShouldBeLessThan(200); // trimmed to the stroke
+        decoded.GetPixel(0, 0).Alpha.ShouldBe((byte)0); // the paper is gone
     }
 
     [Fact]
@@ -136,6 +137,21 @@ public sealed class SchoolImageEndpointsTests(ApiTestFixture fixture) : Integrat
         var conflict = await UploadAsync(LogoUrl, jar, Png(500, 500), key);
         conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await ReadRootAsync(conflict)).GetProperty("errorCode").GetString().ShouldBe("idempotency.key_conflict");
+    }
+
+    private static byte[] SignaturePng(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(bitmap))
+        using (var pen = new SKPaint { Color = SKColors.Navy, StrokeWidth = 6, IsAntialias = true })
+        {
+            canvas.Clear(SKColors.White);
+            canvas.DrawLine(100, 100, 500, 110, pen);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     private static byte[] Png(int width, int height)

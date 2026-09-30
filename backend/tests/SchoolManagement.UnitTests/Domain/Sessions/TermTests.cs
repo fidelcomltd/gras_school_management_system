@@ -12,6 +12,15 @@ public sealed class TermTests
 
     private static Term CreateUpcoming() => Term.Create(FixedId, SessionId, 1, "First Term", Start, End).Value;
 
+    [Theory]
+    [InlineData("2026-09-14", "2026-12-18", 70)] // Monday to Friday: fourteen whole weeks
+    [InlineData("2027-01-05", "2027-04-02", 64)] // starts on a Tuesday
+    [InlineData("2027-04-20", "2027-07-25", 69)] // ends on a Sunday
+    [InlineData("2026-09-19", "2026-09-20", null)] // a weekend only: nothing to suggest
+    public void SuggestTimesSchoolOpened_CountsTheWeekdaysInclusive(string start, string end, int? expected) =>
+        Term.SuggestTimesSchoolOpened(DateOnly.Parse(start, System.Globalization.CultureInfo.InvariantCulture), DateOnly.Parse(end, System.Globalization.CultureInfo.InvariantCulture))
+            .ShouldBe(expected);
+
     [Fact]
     public void Create_WithValidFields_Succeeds()
     {

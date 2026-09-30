@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
 import { renderWithProviders, screen, waitFor } from '@/test/render';
@@ -80,6 +81,28 @@ describe('ClassRecordsScreen', () => {
 
     expect(screen.getByRole('button', { name: 'Save attendance' })).toBeDisabled();
     expect(screen.getByText('Times present must be a whole number from 0 to 60.')).toBeInTheDocument();
+  });
+
+  it('explains that times absent waits for the term\'s times school opened, and where to set it', async () => {
+    mockMe('result.view', 'result.attendance.enter', 'session.update');
+    mockPrimaryClass();
+    server.use(
+      http.get(apiUrl('/api/v1/arms/:armId/attendance'), () =>
+        HttpResponse.json({ armId: 'arm-1', termId: 't-1', version: 'v1', resultSet: DRAFT, timesSchoolOpened: null, rows: ROWS.map((row) => ({ ...row, timesPresent: null, timesAbsent: null })) }),
+      ),
+    );
+
+    const { user } = renderWithProviders(
+      <MemoryRouter>
+        <ClassRecordsScreen />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Attendance' }));
+
+    expect(await screen.findByText(/Times absent will fill in once the term's "Times school opened" is set/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sessions' })).toHaveAttribute('href', '/sessions');
+    // Times present can still be entered.
+    expect(screen.getByLabelText('Times present for Okafor Chidera')).toBeEnabled();
   });
 
   it("the head teacher's fill-empty phrase is sent with the save", async () => {

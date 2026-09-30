@@ -1,4 +1,5 @@
 import { useFormContext } from 'react-hook-form';
+import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import type { BiographicalFormValues } from '../pupil-schema';
@@ -14,10 +15,10 @@ export function BiographicalFields() {
     formState: { errors },
   } = useFormContext<BiographicalFormValues>();
 
-  const text = (name: keyof BiographicalFormValues, label: string, type = 'text') => (
+  const text = (name: keyof BiographicalFormValues, label: string, type: 'text' | 'date' = 'text') => (
     <Field invalid={!!errors[name]}>
       <FieldLabel>{label}</FieldLabel>
-      <Input type={type} {...register(name)} />
+      {type === 'date' ? <DateInput hideInvalidMessage {...register(name)} /> : <Input {...register(name)} />}
       <FieldError match={true}>{errors[name]?.message}</FieldError>
     </Field>
   );

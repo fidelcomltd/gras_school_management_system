@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,7 @@ using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Infrastructure.Persistence;
 using SchoolManagement.IntegrationTests.Infrastructure;
+using SkiaSharp;
 
 namespace SchoolManagement.IntegrationTests;
 
@@ -135,6 +137,55 @@ public sealed class PupilRecordEndpointsTests(ApiTestFixture fixture) : Integrat
     }
 
     [Fact]
+    public async Task BarredPersons_APhotoUploadedForThePupil_AttachesOnSave_IsServedAudited_AndGoesWithThePerson()
+    {
+        RequireDatabase();
+        var pupilId = await SeedPendingAdmissionAsync();
+        var otherPupilId = await SeedPendingAdmissionAsync();
+        var jar = await SignInAsync();
+        var url = $"/api/v1/pupils/{pupilId}/barred-persons";
+
+        var uploaded = await UploadAsync($"{url}/photos", jar, Jpeg(1200, 1600));
+        uploaded.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var photoId = (await ReadAsync<BarredPersonPhotoDto>(uploaded)).PhotoId;
+
+        // Uploaded but attached to nobody yet: not served.
+        (await GetAsync($"{url}/photos/{photoId}", jar)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        // Another pupil's list cannot borrow it.
+        (await PutAsync($"/api/v1/pupils/{otherPupilId}/barred-persons", jar, new { hasBarredPersons = true, persons = new[] { new { fullName = "John Doe", details = (string?)null, photoId } } }))
+            .StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        (await PutAsync(url, jar, new { hasBarredPersons = true, persons = new[] { new { fullName = "John Doe", details = (string?)null, photoId } } }))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<BarredPersonsDto>(await GetAsync(url, jar))).Items.Single().PhotoId.ShouldBe(photoId);
+
+        var served = await GetAsync($"{url}/photos/{photoId}", jar);
+        served.StatusCode.ShouldBe(HttpStatusCode.OK);
+        served.Content.Headers.ContentType?.MediaType.ShouldBe("image/jpeg");
+        served.Headers.CacheControl?.NoStore.ShouldBeTrue();
+        using (var decoded = SKBitmap.Decode(await served.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)))
+        {
+            // Never cropped: the portrait stays portrait, scaled to 800 on the long edge.
+            decoded.Width.ShouldBe(600);
+            decoded.Height.ShouldBe(800);
+        }
+
+        await using (var scope = Fixture.CreateScope())
+        {
+            (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().AuditEvents.AsNoTracking()
+                .CountAsync(audit => audit.Action == "pupil.safeguarding.read" && audit.EntityType == "barred_person_photo" && audit.EntityId == pupilId.ToString(),
+                    TestContext.Current.CancellationToken))
+                .ShouldBe(1);
+        }
+
+        // Saved again without the photograph: the person keeps no picture, and it is no longer served.
+        (await PutAsync(url, jar, new { hasBarredPersons = true, persons = new[] { new { fullName = "John Doe", details = (string?)null } } }))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await GetAsync($"{url}/photos/{photoId}", jar)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Completeness_ListsTheBlockingSteps_UntilEachIsAnswered_AndDocumentsAreOnlyChased()
     {
         RequireDatabase();
@@ -250,6 +301,32 @@ public sealed class PupilRecordEndpointsTests(ApiTestFixture fixture) : Integrat
         var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
         jar.Capture(response);
         return response;
+    }
+
+    private async Task<HttpResponseMessage> UploadAsync(string url, CookieJar jar, byte[] bytes)
+    {
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var form = new MultipartFormDataContent { { file, "file", "upload.bin" } };
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = form };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
+        jar.ApplyWithCsrf(request);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
+        jar.Capture(response);
+        return response;
+    }
+
+    private static byte[] Jpeg(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.SlateGray);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 80);
+        return data.ToArray();
     }
 
     private static Task<string> ReadAsStringAsync(HttpResponseMessage response) => response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);

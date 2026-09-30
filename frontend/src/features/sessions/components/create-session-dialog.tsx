@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormError } from '@/components/feedback/query-states';
+import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,6 +11,7 @@ import { hasFieldError } from '@/shared/forms/field-message';
 import { useCreateSession } from '../api';
 import { createSessionSchema, type CreateSessionFormValues } from '../session-schema';
 import { TermDateFields } from './term-date-fields';
+import { DateInput } from '@/components/ui/date-input';
 
 const TOP_LEVEL_FIELDS = ['name', 'startDate', 'endDate'] as const;
 
@@ -24,6 +26,8 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
   const {
     register,
     handleSubmit,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<CreateSessionFormValues>({
     resolver: zodResolver(createSessionSchema),
@@ -36,6 +40,18 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
       term3: { startDate: '', endDate: '', nextResumptionDate: '' },
     },
   });
+
+  // "Next term begins" follows the next term's start date (project lead, 2026-09-30), until someone types a different
+  // date into it: a field still empty, or still holding what was last filled in for it, is filled; anything else is kept.
+  // Third term's stays manual: it is next session's first day.
+  const filled = useRef<Record<string, string>>({});
+  const follow = (target: 'term1.nextResumptionDate' | 'term2.nextResumptionDate') => (start: string) => {
+    const current = getValues(target);
+    if (current === '' || current === filled.current[target]) {
+      filled.current[target] = start;
+      setValue(target, start);
+    }
+  };
 
   const onSubmit = handleSubmit((values) => {
     createSession.mutate(
@@ -77,19 +93,23 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Session start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput hideInvalidMessage {...register('startDate')} />
             <FieldError match={true}>{errors.startDate?.message}</FieldError>
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>Session end date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput hideInvalidMessage {...register('endDate')} />
             <FieldError match={true}>{errors.endDate?.message}</FieldError>
           </Field>
 
+          <p className="text-sm text-muted-foreground">
+            Each term's times school opened starts as its weekdays (Monday to Friday). Edit the term later to take off public
+            holidays and breaks.
+          </p>
           <TermDateFields ordinalLabel="First term" prefix="term1" register={register} />
-          <TermDateFields ordinalLabel="Second term" prefix="term2" register={register} />
-          <TermDateFields ordinalLabel="Third term" prefix="term3" register={register} />
+          <TermDateFields ordinalLabel="Second term" prefix="term2" register={register} onStartDate={follow('term1.nextResumptionDate')} />
+          <TermDateFields ordinalLabel="Third term" prefix="term3" register={register} onStartDate={follow('term2.nextResumptionDate')} />
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose}>

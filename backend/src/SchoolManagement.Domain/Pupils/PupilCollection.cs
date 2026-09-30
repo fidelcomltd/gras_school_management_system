@@ -122,13 +122,14 @@ public sealed class BarredPerson : Entity<Guid>, IAuditableEntity
     /// <summary>Spec 6.5.6: Text 500.</summary>
     public const int DetailsMaxLength = 500;
 
-    private BarredPerson(Guid id, Guid pupilId, string fullName, string? details, int displayOrder)
+    private BarredPerson(Guid id, Guid pupilId, string fullName, string? details, int displayOrder, Guid? photoId)
         : base(id)
     {
         PupilId = pupilId;
         FullName = fullName;
         Details = details;
         DisplayOrder = displayOrder;
+        PhotoId = photoId;
     }
 
     // EF Core materialisation constructor.
@@ -150,6 +151,9 @@ public sealed class BarredPerson : Entity<Guid>, IAuditableEntity
     /// <summary>Entry order.</summary>
     public int DisplayOrder { get; private set; }
 
+    /// <summary>An optional photograph of the person, so staff at the gate can recognise them: a <see cref="BarredPersonPhoto"/> of the same pupil.</summary>
+    public Guid? PhotoId { get; private set; }
+
     /// <inheritdoc />
     public DateTimeOffset CreatedAtUtc { get; set; }
 
@@ -163,7 +167,7 @@ public sealed class BarredPerson : Entity<Guid>, IAuditableEntity
     public string? ModifiedBy { get; set; }
 
     /// <summary>A validated row. A single name is accepted here: a barred person may be known only by one.</summary>
-    public static Result<BarredPerson> Create(Guid id, Guid pupilId, string fullName, string? details, int displayOrder)
+    public static Result<BarredPerson> Create(Guid id, Guid pupilId, string fullName, string? details, int displayOrder, Guid? photoId = null)
     {
         if (PersonFields.Clean(fullName) is not { Length: <= PersonFields.FullNameMaxLength } cleanName)
         {
@@ -176,6 +180,50 @@ public sealed class BarredPerson : Entity<Guid>, IAuditableEntity
             return Result.Failure<BarredPerson>(Error.Validation("barred.details_too_long", "Details must be at most 500 characters."));
         }
 
-        return Result.Success(new BarredPerson(id, pupilId, cleanName, cleanDetails, displayOrder));
+        return Result.Success(new BarredPerson(id, pupilId, cleanName, cleanDetails, displayOrder, photoId));
     }
+}
+
+/// <summary>
+/// A photograph of someone barred from collecting the child (project lead, 2026-09-30), uploaded before the barred list is
+/// saved and attached by <see cref="BarredPerson.PhotoId"/>. Its own row because the list is replaced whole on every save,
+/// while the photograph must survive that. As sensitive as the names: <c>pupil.safeguarding.view</c> only, audited on
+/// every view, never printed or exported. The stored image is never deleted (the school-image precedent).
+/// </summary>
+public sealed class BarredPersonPhoto : Entity<Guid>, IAuditableEntity
+{
+    private BarredPersonPhoto(Guid id, Guid pupilId, string assetId)
+        : base(id)
+    {
+        PupilId = pupilId;
+        AssetId = assetId;
+    }
+
+    // EF Core materialisation constructor.
+    private BarredPersonPhoto()
+        : base()
+    {
+        AssetId = string.Empty;
+    }
+
+    /// <summary>The pupil whose barred list may use it; no other pupil's may.</summary>
+    public Guid PupilId { get; private set; }
+
+    /// <summary>The stored JPEG's opaque id.</summary>
+    public string AssetId { get; private set; }
+
+    /// <inheritdoc />
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    /// <inheritdoc />
+    public string? CreatedBy { get; set; }
+
+    /// <inheritdoc />
+    public DateTimeOffset? ModifiedAtUtc { get; set; }
+
+    /// <inheritdoc />
+    public string? ModifiedBy { get; set; }
+
+    /// <summary>A new photograph row for a stored asset.</summary>
+    public static BarredPersonPhoto Create(Guid id, Guid pupilId, string assetId) => new(id, pupilId, assetId);
 }

@@ -51,7 +51,11 @@ export function SchoolImageField({ kind, image, canEdit }: { kind: 'logo' | 'sig
             {upload.isPending ? <Spinner className="size-4" /> : <Upload aria-hidden="true" />}
             {upload.isPending ? 'Uploading…' : action}
           </FileButton>
-          <span className="text-xs text-muted-foreground">PNG or JPEG{kind === 'logo' ? ', up to 2 MB' : ', up to 1 MB'}</span>
+          <span className="text-xs text-muted-foreground">
+            {kind === 'logo'
+              ? 'PNG or JPEG, up to 2 MB'
+              : 'PNG or JPEG, up to 1 MB (a larger photograph is shrunk first). Sign in dark ink on plain paper and photograph it close up: the paper is removed automatically.'}
+          </span>
         </div>
       ) : null}
     </section>

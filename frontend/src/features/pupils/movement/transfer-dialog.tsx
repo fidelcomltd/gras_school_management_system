@@ -9,8 +9,8 @@ import { lagosToday } from '@/shared/format/date';
 import { errorText } from '../records/format';
 import { canCommit, useActiveArms, useTransferPupil, type PupilMovementOutcome } from './api';
 import { Consequences } from './consequences';
+import { DateInput } from '@/components/ui/date-input';
 
-const dateInput = 'h-9 w-44 rounded-md border border-input bg-background px-2 text-sm text-foreground';
 
 /**
  * `POST /api/v1/pupils/{id}/transfer` (spec 6.5.17, 06 §6.4.4): a dry run first, so the office sees which result sets
@@ -81,10 +81,9 @@ export function TransferDialog({
           </Field>
           <Field>
             <FieldLabel>First day in the new class</FieldLabel>
-            <input
-              type="date"
+            <DateInput
               aria-label="First day in the new class"
-              className={dateInput}
+              className="w-44"
               value={effectiveDate}
               max={today}
               onChange={(event) => change(() => setEffectiveDate(event.target.value))}

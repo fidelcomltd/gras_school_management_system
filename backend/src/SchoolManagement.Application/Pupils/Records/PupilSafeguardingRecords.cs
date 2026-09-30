@@ -188,10 +188,29 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
             return Result.Failure<BarredPersonsDto>(allowed.Error);
         }
 
+        // Only a photograph uploaded for THIS pupil may attach: an id from another pupil's list must not (and so be served) here.
+        var pupilPhotos = request.Persons.Any(person => !string.IsNullOrWhiteSpace(person.PhotoId))
+            ? (await records.ListBarredPhotosAsync(request.PupilId, cancellationToken).ConfigureAwait(false)).Select(photo => photo.Id).ToHashSet()
+            : [];
         var created = new List<BarredPerson>();
         for (var index = 0; index < request.Persons.Count; index++)
         {
-            var person = BarredPerson.Create(Guid.CreateVersion7(), request.PupilId, request.Persons[index].FullName, request.Persons[index].Details, index);
+            var input = request.Persons[index];
+            Guid? photoId = null;
+            if (!string.IsNullOrWhiteSpace(input.PhotoId))
+            {
+                if (!Guid.TryParse(input.PhotoId, out var parsed) || !pupilPhotos.Contains(parsed))
+                {
+                    return Result.Failure<BarredPersonsDto>(new ValidationError(new Dictionary<string, string[]>(StringComparer.Ordinal)
+                    {
+                        [$"Persons[{index}]"] = ["That photograph was not found. Upload it again."],
+                    }));
+                }
+
+                photoId = parsed;
+            }
+
+            var person = BarredPerson.Create(Guid.CreateVersion7(), request.PupilId, input.FullName, input.Details, index, photoId);
             if (person.IsFailure)
             {
                 return Result.Failure<BarredPersonsDto>(new ValidationError(
@@ -212,7 +231,8 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
             answer.Answer(request.HasBarredPersons);
         }
 
-        foreach (var old in await records.ListBarredPersonsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false))
+        var previousPersons = await records.ListBarredPersonsAsync(request.PupilId, track: true, cancellationToken).ConfigureAwait(false);
+        foreach (var old in previousPersons)
         {
             await records.RemoveAsync(old, cancellationToken).ConfigureAwait(false);
         }
@@ -226,9 +246,18 @@ internal sealed class SaveBarredPersonsHandler(PupilRecordAccess access, IPupilR
         // than pupil.safeguarding.view.
         await auditSink.RecordAsync(
             Privileges.Pupil.SafeguardingUpdate, "barred_person", PupilContactsMapper.Id(request.PupilId),
-            new Dictionary<string, object?>(StringComparer.Ordinal) { ["hasBarredPersons"] = request.HasBarredPersons, ["count"] = created.Count },
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["hasBarredPersons"] = request.HasBarredPersons,
+                ["count"] = created.Count,
+                ["photos"] = created.Count(person => person.PhotoId is not null),
+            },
             currentUser.UserId, cancellationToken,
-            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal) { ["hasBarredPersons"] = previous })
+            beforeMetadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["hasBarredPersons"] = previous,
+                ["photos"] = previousPersons.Count(person => person.PhotoId is not null),
+            })
             .ConfigureAwait(false);
 
         return Result.Success(BarredMapper.ToDto(request.PupilId, request.HasBarredPersons, created));
@@ -356,7 +385,9 @@ internal static class BarredMapper
 {
     public static BarredPersonsDto ToDto(Guid pupilId, bool? answer, IEnumerable<BarredPerson> persons) =>
         new(PupilContactsMapper.Id(pupilId), answer, persons.OrderBy(person => person.DisplayOrder)
-            .Select(person => new BarredPersonDto(PupilContactsMapper.Id(person.Id), person.FullName, person.Details)).ToList());
+            .Select(person => new BarredPersonDto(
+                PupilContactsMapper.Id(person.Id), person.FullName, person.Details, person.PhotoId is { } photoId ? PupilContactsMapper.Id(photoId) : null))
+            .ToList());
 }
 
 /// <summary>Health mapping; no row reads as every question unanswered.</summary>
