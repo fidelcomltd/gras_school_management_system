@@ -96,6 +96,26 @@ public sealed class TermEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Update_NewDates_MoveAnUntouchedSuggestedTimesSchoolOpened_ButNeverOneTheSchoolSet()
+    {
+        RequireDatabase();
+
+        // First Term's 70 is exactly its weekdays (14/09 to 18/12/2026): the untouched suggestion. Second Term's 45 was set.
+        var (_, termIds) = await SeedSessionAsync("2026/2027", SessionState.Upcoming, [TermState.Upcoming, TermState.Upcoming, TermState.Upcoming]);
+        var jar = await SignInWithGrantsAsync(Privileges.Session.Update);
+        (await PatchAsync($"{TermsUrl}/{termIds[0]}", jar, new { timesSchoolOpened = 70 })).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await PatchAsync($"{TermsUrl}/{termIds[1]}", jar, new { timesSchoolOpened = 45 })).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var first = await PatchAsync($"{TermsUrl}/{termIds[0]}", jar, new { endDate = "2026-12-11" });
+        first.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<TermDto>(first)).TimesSchoolOpened.ShouldBe(65);
+
+        var second = await PatchAsync($"{TermsUrl}/{termIds[1]}", jar, new { endDate = "2027-03-26" });
+        second.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ReadAsync<TermDto>(second)).TimesSchoolOpened.ShouldBe(45);
+    }
+
+    [Fact]
     public async Task Update_TimesSchoolOpenedOnAClosedTerm_Returns409()
     {
         RequireDatabase();
