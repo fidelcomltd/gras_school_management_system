@@ -160,7 +160,8 @@ function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredP
                 hasBarredPersons: answer === true,
                 persons: answer
                   ? persons
-                      .filter((person) => person.fullName.trim() !== '')
+                      // A row with a photograph but no name is sent, so the server's "enter the name" shows instead of the photo vanishing.
+                      .filter((person) => person.fullName.trim() !== '' || person.photoId !== null)
                       .map((person) => ({ fullName: person.fullName, details: person.details || null, photoId: person.photoId }))
                   : [],
               })
@@ -208,6 +209,11 @@ function BarredPhoto({
           </output>
         ) : src ? (
           <img src={src} alt={`Photograph of ${label.toLowerCase()}`} className="size-full object-cover" />
+        ) : photoId && saved.isError ? (
+          // Never the "no photograph" placeholder when there IS one we could not read: staff must not conclude there is none.
+          <button type="button" className="px-1 text-center text-xs text-destructive underline" onClick={() => void saved.refetch()}>
+            Photograph unavailable. Retry
+          </button>
         ) : (
           <UserRound className="size-8 text-muted-foreground/60" aria-label="No photograph" />
         )}

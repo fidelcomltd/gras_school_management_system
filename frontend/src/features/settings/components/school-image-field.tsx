@@ -54,7 +54,7 @@ export function SchoolImageField({ kind, image, canEdit }: { kind: 'logo' | 'sig
           <span className="text-xs text-muted-foreground">
             {kind === 'logo'
               ? 'PNG or JPEG, up to 2 MB'
-              : 'PNG or JPEG. Sign in dark ink on plain paper and photograph it close up: the paper is removed automatically.'}
+              : 'PNG or JPEG, up to 1 MB (a larger photograph is shrunk first). Sign in dark ink on plain paper and photograph it close up: the paper is removed automatically.'}
           </span>
         </div>
       ) : null}

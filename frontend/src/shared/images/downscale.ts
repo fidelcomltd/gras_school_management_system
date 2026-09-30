@@ -12,7 +12,7 @@ const SCALABLE = new Set(['image/jpeg', 'image/png']);
  * the device; the server strips it again regardless. Anything else (a PDF), an image already small enough, or a browser
  * without the canvas APIs gets the file back untouched: the server's own limits still apply.
  */
-export async function downscaleImage(file: File, maxEdge: number): Promise<File> {
+export async function downscaleImage(file: File, maxEdge: number, options: { maxBytes?: number } = {}): Promise<File> {
   if (!SCALABLE.has(file.type) || typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
 
   let bitmap: ImageBitmap;
@@ -22,13 +22,14 @@ export async function downscaleImage(file: File, maxEdge: number): Promise<File>
     return file; // Not decodable here; the server's magic-byte check gives the real answer.
   }
 
+  // Small enough on both counts: untouched. Over `maxBytes` alone, it is re-encoded at its own size, which is usually enough.
   const longEdge = Math.max(bitmap.width, bitmap.height);
-  if (longEdge <= maxEdge) {
+  if (longEdge <= maxEdge && (options.maxBytes === undefined || file.size <= options.maxBytes)) {
     bitmap.close();
     return file;
   }
 
-  const scale = maxEdge / longEdge;
+  const scale = Math.min(1, maxEdge / longEdge);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
