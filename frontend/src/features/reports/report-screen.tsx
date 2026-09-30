@@ -17,6 +17,7 @@ import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useExportReport, useReport, type ReportParams } from './api';
 import { tableReport, type ReportControl, type TableReport } from './definitions';
 import { ReportTable } from './report-table';
+import { DateInput } from '@/components/ui/date-input';
 
 type ChoiceParam = 'state' | 'outcome' | 'status' | 'sex' | 'documentType' | 'group';
 
@@ -302,11 +303,11 @@ function ReportView({ definition }: { definition: TableReport }) {
           <>
             <label htmlFor="report-from" className="flex items-center gap-2 text-sm text-foreground">
               From
-              <Input id="report-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="w-40" />
+              <DateInput id="report-from" value={from} onChange={(event) => setFrom(event.target.value)} className="w-40" />
             </label>
             <label htmlFor="report-to" className="flex items-center gap-2 text-sm text-foreground">
               To
-              <Input id="report-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} className="w-40" />
+              <DateInput id="report-to" value={to} onChange={(event) => setTo(event.target.value)} className="w-40" />
             </label>
           </>
         ) : null}

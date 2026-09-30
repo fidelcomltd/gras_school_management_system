@@ -10,6 +10,7 @@ import { useAuditEvents, useExportAudit, type AuditFilters } from './api';
 import { AuditRow } from './audit-row';
 import { LoadMoreButton } from '@/components/ui/load-more-button';
 import { EmptyState } from '@/components/feedback/empty-state';
+import { DateInput } from '@/components/ui/date-input';
 
 const EMPTY: AuditFilters = { from: '', to: '', action: '', entityType: '', outcome: '' };
 const control = 'h-10 rounded-md border border-input bg-background px-2 text-sm';
@@ -67,13 +68,13 @@ export function AuditScreen() {
             applyNow({});
           }}
         >
-          <label className="flex flex-col gap-1">
+          <label htmlFor="audit-from" className="flex flex-col gap-1">
             From
-            <input type="date" className={control} value={draft.from} onChange={(e) => applyNow({ from: e.target.value })} />
+            <DateInput id="audit-from" className="w-44" value={draft.from} onChange={(e) => applyNow({ from: e.target.value })} />
           </label>
-          <label className="flex flex-col gap-1">
+          <label htmlFor="audit-to" className="flex flex-col gap-1">
             To
-            <input type="date" className={control} value={draft.to} onChange={(e) => applyNow({ to: e.target.value })} />
+            <DateInput id="audit-to" className="w-44" value={draft.to} onChange={(e) => applyNow({ to: e.target.value })} />
           </label>
           <Input aria-label="Action" placeholder="Action, e.g. publish" className="w-56" value={draft.action} onChange={(e) => applySoon({ action: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyNow({})} />
           <Input aria-label="Record type" placeholder="Record type, e.g. result" className="w-52" value={draft.entityType} onChange={(e) => applySoon({ entityType: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && applyNow({})} />

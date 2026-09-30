@@ -10,6 +10,7 @@ import { hasFieldError } from '@/shared/forms/field-message';
 import { useUpdateSession } from '../api';
 import { editSessionSchema, type EditSessionFormValues } from '../session-schema';
 import type { SessionDetailDto } from '../types';
+import { DateInput } from '@/components/ui/date-input';
 
 const FIELDS = ['name', 'startDate', 'endDate'] as const;
 
@@ -72,12 +73,12 @@ export function EditSessionDialog({
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput {...register('startDate')} />
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>End date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput {...register('endDate')} />
           </Field>
 
           <DialogFooter>

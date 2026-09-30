@@ -42,7 +42,7 @@ describe('AuditScreen', () => {
 
     // Filters apply as they change, no button (lead, 2026-09-28); a part of the action is enough.
     await user.type(screen.getByLabelText('Action'), 'publish');
-    await user.type(screen.getByLabelText('From'), '2026-08-01');
+    await user.type(screen.getByLabelText('From'), '01082026');
 
     await waitFor(() => expect(queries.at(-1)?.get('action')).toBe('publish'));
     expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();

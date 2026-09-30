@@ -1,9 +1,9 @@
 import { Controller, useFormContext } from 'react-hook-form';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { useLevels } from '@/features/classes/api';
 import type { CreatePupilFormValues } from '../pupil-schema';
+import { DateInput } from '@/components/ui/date-input';
 
 /** Section A of the admission form as captured at creation (spec 6.5.9). The session defaults to the active one. */
 export function AdmissionFields() {
@@ -54,7 +54,7 @@ export function AdmissionFields() {
 
       <Field>
         <FieldLabel>Date application received (optional)</FieldLabel>
-        <Input type="date" {...register('dateApplicationReceived')} />
+        <DateInput {...register('dateApplicationReceived')} />
       </Field>
 
       <label className="flex items-center gap-2 text-sm text-foreground">

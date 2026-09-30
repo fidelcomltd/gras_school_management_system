@@ -11,6 +11,7 @@ import { lagosToday } from '@/shared/format/date';
 import { useAdmissionRecord, useUpdateAdmissionRecord } from '../api';
 import { RegistrationNumber } from '../components/registration-number';
 import type { AdmissionRecordDto } from '../types';
+import { DateInput } from '@/components/ui/date-input';
 
 /** Step 6 (section G): one free-text box, skippable with Next. */
 export function OtherInformationStep({ pupil, onSaved, canEdit }: { pupil: PupilDto; onSaved: () => void; canEdit: boolean }) {
@@ -117,11 +118,11 @@ function DeclarationForm({
         The declaration on the paper form has been signed
       </label>
       {signed ? (
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <label htmlFor="declaration-date-signed" className="flex flex-col gap-1 text-xs text-muted-foreground">
           Date signed
-          <input
-            type="date"
-            className="h-9 w-44 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+          <DateInput
+            id="declaration-date-signed"
+            className="w-44"
             value={date}
             max={today}
             onChange={(event) => setDate(event.target.value)}

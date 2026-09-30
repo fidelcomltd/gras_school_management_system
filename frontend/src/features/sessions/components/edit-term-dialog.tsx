@@ -10,6 +10,7 @@ import { hasFieldError } from '@/shared/forms/field-message';
 import { useUpdateTerm } from '../api';
 import { editTermSchema, type EditTermFormValues } from '../term-schema';
 import type { TermDto } from '../types';
+import { DateInput } from '@/components/ui/date-input';
 
 const FIELDS = ['name', 'startDate', 'endDate', 'timesSchoolOpened', 'nextResumptionDate'] as const;
 
@@ -79,12 +80,12 @@ export function EditTermDialog({
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput {...register('startDate')} />
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>End date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput {...register('endDate')} />
           </Field>
 
           <Field invalid={!!errors.timesSchoolOpened}>
@@ -93,8 +94,8 @@ export function EditTermDialog({
           </Field>
 
           <Field invalid={!!errors.nextResumptionDate}>
-            <FieldLabel>Next resumption date</FieldLabel>
-            <Input type="date" {...register('nextResumptionDate')} />
+            <FieldLabel>Next term begins (printed on this term's results)</FieldLabel>
+            <DateInput {...register('nextResumptionDate')} />
           </Field>
 
           <DialogFooter>

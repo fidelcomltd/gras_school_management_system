@@ -10,6 +10,7 @@ import { hasFieldError } from '@/shared/forms/field-message';
 import { useCreateSession } from '../api';
 import { createSessionSchema, type CreateSessionFormValues } from '../session-schema';
 import { TermDateFields } from './term-date-fields';
+import { DateInput } from '@/components/ui/date-input';
 
 const TOP_LEVEL_FIELDS = ['name', 'startDate', 'endDate'] as const;
 
@@ -77,13 +78,13 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Session start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput {...register('startDate')} />
             <FieldError match={true}>{errors.startDate?.message}</FieldError>
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>Session end date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput {...register('endDate')} />
             <FieldError match={true}>{errors.endDate?.message}</FieldError>
           </Field>
 

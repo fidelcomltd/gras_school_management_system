@@ -11,7 +11,7 @@ async function fillRequired(user: ReturnType<typeof renderWithProviders>['user']
   await user.type(screen.getByLabelText('Surname'), 'Okafor');
   await user.type(screen.getByLabelText('First name'), 'Chidera');
   await user.click(screen.getByRole('radio', { name: 'Female' }));
-  await user.type(screen.getByLabelText('Date of birth'), '2020-05-03');
+  await user.type(screen.getByLabelText('Date of birth'), '03/05/2020');
   // Chosen from the server's own list (the contract example's states), never typed free.
   await user.type(await screen.findByRole('combobox', { name: 'State of origin' }), 'Anam');
   await user.click(await screen.findByRole('option', { name: 'Anambra' }));

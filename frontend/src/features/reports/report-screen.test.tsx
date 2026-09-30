@@ -176,7 +176,7 @@ describe('ReportScreen', () => {
 
     expect(await screen.findByRole('cell', { name: 'EZE Chidera' })).toBeInTheDocument();
     expect(asked[0]?.has('from')).toBe(false);
-    await user.type(screen.getByLabelText('From'), '2026-09-01');
+    await user.type(screen.getByLabelText('From'), '01/09/2026');
     await waitFor(() => expect(asked.at(-1)?.get('from')).toBe('2026-09-01'));
   });
 
