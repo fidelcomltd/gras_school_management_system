@@ -79,6 +79,34 @@ export const useRemoveDocumentFile = (pupilId: string) =>
     deleteRequest<PupilDocumentListDto>(`/api/v1/pupils/${pupilId}/documents/${documentType}/file`),
   );
 
+/**
+ * Uploads a photograph of a barred person (downscaled here first) and returns its id with a local preview, so the form can
+ * show it straight away without a server read (each read of it is audited). It is attached to the person on save.
+ */
+export const useUploadBarredPhoto = (pupilId: string) =>
+  useMutation({
+    mutationKey: [RecordKeys.Barred, 'photo', pupilId],
+    mutationFn: async (file: File) => {
+      const scaled = assertFileSize(await downscaleImage(file, PHOTO_MAX_EDGE), PHOTO_MAX_BYTES, 'photograph');
+      const uploaded = await postRequest<S['BarredPersonPhotoDto'], FormData>(`/api/v1/pupils/${pupilId}/barred-persons/photos`, multipart(scaled), {
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+      });
+      return { photoId: uploaded.photoId, preview: await dataUrl(scaled) };
+    },
+  });
+
+/** A saved barred person's photograph, as a `data:` URL. Audited on the server, so fetched once and kept. */
+export const useBarredPhotoUrl = (pupilId: string, photoId: string | null) =>
+  useQuery({
+    queryKey: [RecordKeys.Barred, 'photo', pupilId, photoId],
+    queryFn: async () => dataUrl((await getFile(`/api/v1/pupils/${pupilId}/barred-persons/photos/${photoId}`, 'photo.jpg')).blob),
+    enabled: !!photoId,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
 /** Downloads a scan under the server's own name for it. */
 export async function downloadDocumentFile(pupilId: string, documentType: PupilDocumentType): Promise<void> {
   saveFile(await getFile(`/api/v1/pupils/${pupilId}/documents/${documentType}/file`, 'document'));

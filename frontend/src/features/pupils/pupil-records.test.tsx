@@ -103,6 +103,31 @@ describe('PupilDetailScreen admission sections', () => {
     expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyAlternate', fullName: 'Ngozi Eze', phone: '08031234567', relationship: 'Aunt' });
   });
 
+  it('uploads a photograph for a barred person and attaches it when the answer is saved', async () => {
+    mockMe('pupil.view', 'contact.view', 'pupil.safeguarding.view', 'pupil.safeguarding.update');
+    mockPendingPupil();
+    let saved: { hasBarredPersons: boolean; persons: { fullName: string; photoId: string | null }[] } | undefined;
+    server.use(
+      http.get(apiUrl('/api/v1/pupils/:pupilId/pickup-persons'), () => HttpResponse.json({ pupilId: 'pupil-1', items: [] })),
+      http.get(apiUrl('/api/v1/pupils/:pupilId/barred-persons'), () => HttpResponse.json({ pupilId: 'pupil-1', hasBarredPersons: null, items: [] })),
+      http.post(apiUrl('/api/v1/pupils/:pupilId/barred-persons/photos'), () => HttpResponse.json({ photoId: 'photo-1' })),
+      http.put(apiUrl('/api/v1/pupils/:pupilId/barred-persons'), async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json({ pupilId: 'pupil-1', hasBarredPersons: true, items: [] });
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Collection' }));
+    await user.click(await screen.findByRole('radio', { name: 'Yes' }));
+    await user.type(screen.getByLabelText('Barred person 1: name'), 'John Doe');
+    await user.upload(screen.getByLabelText('Barred person 1: photograph'), new File(['jpeg'], 'john.jpg', { type: 'image/jpeg' }));
+    expect(await screen.findByRole('img', { name: 'Photograph of barred person 1' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save answer' }));
+
+    await waitFor(() => expect(saved?.persons).toEqual([{ fullName: 'John Doe', details: null, photoId: 'photo-1' }]));
+  });
+
   it("shows a rejected contact's own reason, not the generic validation message", async () => {
     mockMe('pupil.view', 'contact.view', 'contact.update');
     mockPendingPupil();
