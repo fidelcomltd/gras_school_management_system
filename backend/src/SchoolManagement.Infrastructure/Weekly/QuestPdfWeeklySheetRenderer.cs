@@ -3,6 +3,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SchoolManagement.Application.Abstractions.Weekly;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Weekly;
 
 namespace SchoolManagement.Infrastructure.Weekly;
@@ -49,8 +50,7 @@ internal sealed class QuestPdfWeeklySheetRenderer : IWeeklySheetPdfRenderer
                         column.Item().ShowEntire().Element(panel => Panel(panel, day, sheet.WeekNumber));
                     }
                 });
-                page.Footer().AlignRight().Text(string.Create(
-                    CultureInfo.InvariantCulture, $"Printed {printedAt.ToOffset(TimeSpan.FromHours(1)):dd/MM/yyyy HH:mm}")).FontSize(7);
+                page.Footer().AlignRight().Text($"Printed {PrintedTime.Format(printedAt)}").FontSize(7);
             }))
             .WithMetadata(new DocumentMetadata
             {

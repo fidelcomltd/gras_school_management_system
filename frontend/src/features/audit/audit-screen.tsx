@@ -57,7 +57,7 @@ export function AuditScreen() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Audit log</h1>
-        <p className="text-sm text-muted-foreground">Every change and every refused attempt, newest first. Times are Lagos time.</p>
+        <p className="text-sm text-muted-foreground">Every change and every refused attempt, newest first. Times are WAT (West African Time).</p>
       </header>
 
       <search>
