@@ -1,7 +1,7 @@
 import { CalendarDays } from 'lucide-react';
-import { useRef, useState, type Ref, type RefCallback } from 'react';
+import { useEffect, useRef, useState, type Ref, type RefCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { ISO, isoToSchool, schoolToIso } from './date-text';
+import { INVALID_DATE_MESSAGE, ISO, isoToSchool, schoolToIso } from './date-text';
 import { Input } from './input';
 
 /** What `onChange` receives: shaped like an input event, so react-hook-form's `register` and a `(e) => e.target.value` handler both work. */
@@ -28,6 +28,8 @@ export interface DateInputProps {
   minLength?: number | undefined;
   maxLength?: number | undefined;
   pattern?: string | undefined;
+  /** For a field whose form already shows its own error text under it, so the message is not said twice. */
+  hideInvalidMessage?: boolean;
   /** Sizes the whole control (a width utility, e.g. `w-44`). */
   className?: string;
   /**
@@ -76,11 +78,13 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
  * A date field that always reads DD/MM/YYYY, the way the school writes dates. A native `<input type="date">` shows the
  * browser's locale instead (MM/DD/YYYY on most machines here), so the text is ours and the browser's calendar is only
  * borrowed, behind the button. Values in and out stay ISO `YYYY-MM-DD`, so a call site swaps `<Input type="date">` for
- * this and changes nothing else. Incomplete or impossible text reports `''`, and is flagged once the field is left.
+ * this and changes nothing else. Incomplete or impossible text is explained under the field once it is left; a
+ * registered field is handed the text itself, so its schema refuses to submit it (see `isIsoOrEmpty`).
  */
 export function DateInput(props: DateInputProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `register`'s constraint props, dropped on purpose
-  const { value, onChange, onBlur, name = '', min, max, id, disabled, className, ref, required, minLength, maxLength, pattern, ...rest } = props;
+  // `register`'s constraint props (required, minLength, maxLength, pattern) are dropped on purpose: the schema validates.
+  const { value, onChange, onBlur, name = '', min, max, id, disabled, className, ref, hideInvalidMessage, ...spread } = props;
+  const { required: _required, minLength: _minLength, maxLength: _maxLength, pattern: _pattern, ...rest } = spread;
   const textRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<HTMLInputElement | null>(null);
   const [text, setText] = useState(() => isoToSchool(value));
@@ -94,15 +98,25 @@ export function DateInput(props: DateInputProps) {
   }
 
   const writePicker = (next: string) => {
-    if (pickerRef.current) valueOf?.set?.call(pickerRef.current, next);
+    if (pickerRef.current) valueOf?.set?.call(pickerRef.current, ISO.test(next) ? next : '');
   };
 
+  // The calendar always opens on the value the parent last saw, including after a parent's reset.
+  useEffect(() => {
+    writePicker(iso);
+  });
+
+  // `iso` is what the parent was last told, so an unchanged value is never reported twice and a changed one never skipped.
   const emit = (next: string) => {
-    if (next === (pickerRef.current ? valueOf?.get?.call(pickerRef.current) : iso)) return;
+    if (next === iso) return;
     writePicker(next);
     setIso(next);
     onChange?.({ target: { name, value: next }, type: 'change' });
   };
+
+  // What typed text reports. A registered field (no `value` prop) is given the bad text itself, so the form's schema
+  // refuses to submit it; a controlled filter or dialog is told '' and the message below says why.
+  const report = (typed: string) => schoolToIso(typed) ?? (value === undefined && typed.trim() !== '' ? typed.trim() : '');
 
   // A new callback each render, as a native input's `register` ref is: React detaches the old and attaches this one.
   const attachPicker: RefCallback<HTMLInputElement> = (element) => {
@@ -114,7 +128,7 @@ export function DateInput(props: DateInputProps) {
         get: () => valueOf?.get?.call(element) as string,
         set: (next: string | null | undefined) => {
           const clean = next ?? '';
-          valueOf?.set?.call(element, clean);
+          valueOf?.set?.call(element, ISO.test(clean) ? clean : '');
           setIso(clean);
           setText(isoToSchool(clean));
         },
@@ -137,58 +151,60 @@ export function DateInput(props: DateInputProps) {
   const invalid = touched && text.trim() !== '' && schoolToIso(text) === null;
 
   return (
-    <div className={cn('relative w-full', className)}>
-      <Input
-        {...rest}
-        ref={textRef}
-        id={id}
-        value={text}
-        disabled={disabled}
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="dd/mm/yyyy"
-        aria-invalid={invalid || undefined}
-        className={cn('pr-10', invalid && 'border-destructive')}
-        onChange={(event) => {
-          const next = mask(event.target.value, text);
-          setText(next);
-          emit(schoolToIso(next) ?? '');
-        }}
-        onBlur={() => {
-          setTouched(true);
-          const parsed = schoolToIso(text);
-          if (parsed) setText(isoToSchool(parsed));
-          onBlur?.({ target: { name, value: parsed ?? '' }, type: 'blur' });
-        }}
-      />
-      <button
-        type="button"
-        aria-label="Choose a date from the calendar"
-        disabled={disabled}
-        onClick={openCalendar}
-        className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
-      >
-        <CalendarDays className="size-4" aria-hidden="true" />
-      </button>
-      {/* The browser's calendar, borrowed: never seen or tabbed to, only opened by the button beside the text. */}
-      <input
-        ref={attachPicker}
-        type="date"
-        name={name}
-        defaultValue={iso}
-        tabIndex={-1}
-        aria-hidden="true"
-        min={min === undefined ? undefined : String(min)}
-        max={max === undefined ? undefined : String(max)}
-        className="pointer-events-none absolute bottom-0 left-0 h-px w-full opacity-0"
-        onChange={(event) => {
-          const next = event.target.value;
-          setText(isoToSchool(next));
-          setTouched(false);
-          setIso(next);
-          onChange?.({ target: { name, value: next }, type: 'change' });
-        }}
-      />
+    <div className={cn('w-full', className)}>
+      <div className="relative">
+        <Input
+          {...rest}
+          ref={textRef}
+          id={id}
+          value={text}
+          disabled={disabled}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="dd/mm/yyyy"
+          aria-invalid={invalid || undefined}
+          className={cn('pr-10', invalid && 'border-destructive')}
+          onChange={(event) => {
+            const next = mask(event.target.value, text);
+            setText(next);
+            emit(report(next));
+          }}
+          onBlur={() => {
+            setTouched(true);
+            const parsed = schoolToIso(text);
+            if (parsed) setText(isoToSchool(parsed));
+            onBlur?.({ target: { name, value: report(text) }, type: 'blur' });
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Choose a date from the calendar"
+          disabled={disabled}
+          onClick={openCalendar}
+          className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
+        >
+          <CalendarDays className="size-4" aria-hidden="true" />
+        </button>
+        {/* The browser's calendar, borrowed: never seen or tabbed to, only opened by the button beside the text. */}
+        <input
+          ref={attachPicker}
+          type="date"
+          name={name}
+          defaultValue={iso}
+          tabIndex={-1}
+          aria-hidden="true"
+          min={min === undefined ? undefined : String(min)}
+          max={max === undefined ? undefined : String(max)}
+          className="pointer-events-none absolute bottom-0 left-0 h-px w-full opacity-0"
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(isoToSchool(next));
+            setTouched(false);
+            emit(next);
+          }}
+        />
+      </div>
+      {invalid && !hideInvalidMessage ? <p className="mt-1 text-xs text-destructive">{INVALID_DATE_MESSAGE}</p> : null}
     </div>
   );
 }

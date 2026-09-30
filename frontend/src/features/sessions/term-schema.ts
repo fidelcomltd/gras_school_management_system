@@ -1,12 +1,15 @@
 import { z } from 'zod';
+import { INVALID_DATE_MESSAGE, isIsoOrEmpty } from '@/components/ui/date-text';
+
+const date = z.string().refine(isIsoOrEmpty, INVALID_DATE_MESSAGE);
 
 /** `PATCH /api/v1/terms/{id}` (spec 6.3.10). Every field left blank means "unchanged". */
 export const editTermSchema = z.object({
   name: z.string(),
-  startDate: z.string(),
-  endDate: z.string(),
+  startDate: date,
+  endDate: date,
   timesSchoolOpened: z.string(),
-  nextResumptionDate: z.string(),
+  nextResumptionDate: date,
 });
 
 export type EditTermFormValues = z.infer<typeof editTermSchema>;

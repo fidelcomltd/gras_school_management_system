@@ -7,14 +7,19 @@ import { DateInput } from './date-input';
 function Controlled({ onValue }: { onValue: (value: string) => void }) {
   const [value, setValue] = useState('2026-09-01');
   return (
-    <DateInput
-      aria-label="Day"
-      value={value}
-      onChange={(event) => {
-        setValue(event.target.value);
-        onValue(event.target.value);
-      }}
-    />
+    <>
+      <DateInput
+        aria-label="Day"
+        value={value}
+        onChange={(event) => {
+          setValue(event.target.value);
+          onValue(event.target.value);
+        }}
+      />
+      <button type="button" onClick={() => setValue('')}>
+        Clear
+      </button>
+    </>
   );
 }
 
@@ -55,6 +60,29 @@ describe('DateInput', () => {
     expect(input).not.toHaveAttribute('aria-invalid');
     await user.tab();
     expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Enter a real date as dd/mm/yyyy, for example 01/09/2026.')).toBeInTheDocument();
+  });
+
+  it('reports the same date again after the parent clears it', async () => {
+    const onValue = vi.fn();
+    const { user } = renderWithProviders(<Controlled onValue={onValue} />);
+    const input = screen.getByLabelText('Day');
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(input).toHaveValue('');
+    await user.type(input, '01092026');
+    expect(onValue).toHaveBeenLastCalledWith('2026-09-01');
+  });
+
+  it('hands a registered field the badly typed text, so its schema can refuse it instead of saving nothing', async () => {
+    const onSubmit = vi.fn();
+    const { user } = renderWithProviders(<Registered onSubmit={onSubmit} />);
+    const input = screen.getByLabelText('Day');
+
+    await user.clear(input);
+    await user.type(input, '31/02/2026');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await waitFor(() => expect(onSubmit.mock.calls[0]?.[0]).toEqual({ day: '31/02/2026' }));
   });
 
   it('works under react-hook-form register: defaults, reset and submit all in ISO', async () => {

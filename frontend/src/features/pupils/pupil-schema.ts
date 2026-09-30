@@ -1,17 +1,20 @@
 import { z } from 'zod';
+import { INVALID_DATE_MESSAGE, isIsoOrEmpty } from '@/components/ui/date-text';
 
 /**
  * Client-side mirror of the backend's pupil validation (spec 6.5.3, 6.5.9). The backend is authoritative: a 422 still
  * surfaces through `fieldErrors` or verbatim, this only catches the obvious cases before a round trip.
  */
 const required = (label: string) => z.string().trim().min(1, `${label} is required.`);
+/** A date field's value: ISO, or '' when optional and empty. Badly typed text is refused rather than lost. */
+const date = z.string().refine(isIsoOrEmpty, INVALID_DATE_MESSAGE);
 
 export const biographicalSchema = z.object({
   surname: required('Surname'),
   firstName: required('First name'),
   middleName: z.string(),
   sex: z.enum(['Male', 'Female'], { message: 'Choose male or female.' }),
-  dateOfBirth: required('Date of birth'),
+  dateOfBirth: required('Date of birth').pipe(date),
   nationality: z.string(),
   stateOfOrigin: required('State of origin'),
   lga: required('LGA'),
@@ -26,7 +29,7 @@ export type BiographicalFormValues = z.infer<typeof biographicalSchema>;
 export const createPupilSchema = biographicalSchema.extend({
   classAdmittedInto: required('Class admitted into'),
   admissionType: z.enum(['New', 'Returning'], { message: 'Choose new or returning.' }),
-  dateApplicationReceived: z.string(),
+  dateApplicationReceived: date,
   assessmentRequired: z.boolean(),
 });
 

@@ -18,7 +18,7 @@ export function BiographicalFields() {
   const text = (name: keyof BiographicalFormValues, label: string, type: 'text' | 'date' = 'text') => (
     <Field invalid={!!errors[name]}>
       <FieldLabel>{label}</FieldLabel>
-      {type === 'date' ? <DateInput {...register(name)} /> : <Input {...register(name)} />}
+      {type === 'date' ? <DateInput hideInvalidMessage {...register(name)} /> : <Input {...register(name)} />}
       <FieldError match={true}>{errors[name]?.message}</FieldError>
     </Field>
   );

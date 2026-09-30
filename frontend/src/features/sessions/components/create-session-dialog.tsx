@@ -93,13 +93,13 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Session start date</FieldLabel>
-            <DateInput {...register('startDate')} />
+            <DateInput hideInvalidMessage {...register('startDate')} />
             <FieldError match={true}>{errors.startDate?.message}</FieldError>
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>Session end date</FieldLabel>
-            <DateInput {...register('endDate')} />
+            <DateInput hideInvalidMessage {...register('endDate')} />
             <FieldError match={true}>{errors.endDate?.message}</FieldError>
           </Field>
 
