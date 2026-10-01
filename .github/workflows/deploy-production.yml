@@ -90,7 +90,11 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-          rsync -az --delete \
+          # --no-group --no-owner: the deploy account may not set the build machine's group on the box,
+          # and rsync then exits 23 even though every file arrived (first production run, 2026-10-01).
+          # Ownership is moot anyway: deploy.sh copies the release and chowns it all to root. -a still
+          # keeps permissions, which matters: efbundle must arrive executable.
+          rsync -az --no-group --no-owner --delete \
             -e "ssh -i ~/.ssh/id_deploy" \
             "$RUNNER_TEMP/release/" \
             "$SSH_USER@$SSH_HOST:/tmp/gras-release/"
