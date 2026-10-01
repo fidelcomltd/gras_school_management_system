@@ -1,8 +1,6 @@
+import { schoolDateTime } from '@/shared/format/date';
 import type { AuditEventDto } from './api';
 
-function lagosTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', { timeZone: 'Africa/Lagos', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
 
 function pretty(json: string | null | undefined): string | null {
   if (!json) return null;
@@ -26,7 +24,7 @@ export function AuditRow({ event }: { event: AuditEventDto }) {
           {event.outcome === 'Rejected' ? <span className="ml-2 text-destructive">refused</span> : null}
         </span>
         <time dateTime={event.occurredAtUtc} className="text-muted-foreground">
-          {lagosTime(event.occurredAtUtc)}
+          {schoolDateTime(event.occurredAtUtc)}
         </time>
       </div>
       <p className="text-muted-foreground">

@@ -559,7 +559,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
             signed.RelativeItem().AlignBottom().Text(text =>
             {
                 text.Span("Date issued: ");
-                text.Span(issuedAt is { } issued ? issued.ToOffset(TimeSpan.FromHours(1)).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty).Bold();
+                text.Span(issuedAt is { } issued ? SchoolTime.At(issued).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty).Bold();
             });
         });
 
@@ -605,7 +605,7 @@ internal sealed class QuestPdfResultSheetRenderer : IResultSheetPdfRenderer
 
             row.ConstantItem(130).AlignRight().AlignBottom().Column(column =>
             {
-                column.Item().AlignRight().Text($"Printed {PrintedTime.Format(extras.PrintedAt)}").FontSize(6.5f);
+                column.Item().AlignRight().Text($"Printed {SchoolTime.Stamp(extras.PrintedAt)}").FontSize(6.5f);
                 column.Item().AlignRight().Text(text =>
                 {
                     text.DefaultTextStyle(style => style.FontSize(6.5f));

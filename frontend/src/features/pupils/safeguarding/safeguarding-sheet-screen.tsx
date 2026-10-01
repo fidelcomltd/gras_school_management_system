@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { FormError, LoadingState } from '@/components/feedback/query-states';
 import { Spinner } from '@/components/ui/spinner';
-import { lagosDateTime } from '@/shared/format/date';
+import { schoolDateTime } from '@/shared/format/date';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
@@ -73,7 +73,7 @@ export function SafeguardingSheetScreen() {
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
-                  {shown.armName}, {shown.sessionName}. Generated {lagosDateTime(shown.generatedAtUtc)}.
+                  {shown.armName}, {shown.sessionName}. Generated {schoolDateTime(shown.generatedAtUtc)}.
                 </p>
                 <SheetTable rows={shown.pupils} />
               </>

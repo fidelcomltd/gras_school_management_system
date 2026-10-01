@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Classes;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -56,7 +57,7 @@ internal sealed class UndoPupilStatusChangeHandler(
             return Result.Failure<PupilMovementOutcomeDto>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         var changes = await statusChanges.ListByPupilReadOnlyAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
         var last = changes.Count == 0 ? null : changes[^1];
 
@@ -65,7 +66,7 @@ internal sealed class UndoPupilStatusChangeHandler(
         if (last is not { ArmId: { } leftArmId }
             || last.ToStatus is not (PupilStatus.Transferred or PupilStatus.Withdrawn or PupilStatus.Graduated)
             || pupil.Status != last.ToStatus
-            || Weekly.WeeklyProjection.LagosToday(last.ChangedAtUtc) != today)
+            || SchoolTime.Today(last.ChangedAtUtc) != today)
         {
             return await RefuseAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
         }

@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -73,7 +74,7 @@ internal sealed class PupilImportProcessor(
         }
 
         var arms = await ArmDirectory.LoadAsync(session, classLevels, armRepository, cancellationToken).ConfigureAwait(false);
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today)).ToList();
 
         FlagDuplicatesInFile(drafts);

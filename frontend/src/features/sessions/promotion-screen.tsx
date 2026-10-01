@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
+import { schoolDateTime } from '@/shared/format/date';
 import { CommitPromotionDialog, ReversePromotionDialog } from './components/promotion-dialogs';
 import { usePromotionPreview } from './promotion-api';
 import {
@@ -79,7 +80,7 @@ function CommittedBatch({ batch }: { batch: PromotionBatchDto }) {
         <div>
           <h2 className="font-semibold text-foreground">Promotion committed into {batch.targetSessionName}</h2>
           <p className="text-sm text-muted-foreground">
-            {new Date(batch.committedAtUtc).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' })}
+            {schoolDateTime(batch.committedAtUtc)}
           </p>
         </div>
         {canReverse ? (

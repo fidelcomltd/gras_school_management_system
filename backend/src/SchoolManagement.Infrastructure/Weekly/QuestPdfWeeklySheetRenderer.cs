@@ -50,7 +50,7 @@ internal sealed class QuestPdfWeeklySheetRenderer : IWeeklySheetPdfRenderer
                         column.Item().ShowEntire().Element(panel => Panel(panel, day, sheet.WeekNumber));
                     }
                 });
-                page.Footer().AlignRight().Text($"Printed {PrintedTime.Format(printedAt)}").FontSize(7);
+                page.Footer().AlignRight().Text($"Printed {SchoolTime.Stamp(printedAt)}").FontSize(7);
             }))
             .WithMetadata(new DocumentMetadata
             {

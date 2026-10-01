@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 using SchoolManagement.Application.Abstractions.Weekly;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Portal;
 using SchoolManagement.Application.Results.Sheets;
 using SchoolManagement.Domain.Weekly;
@@ -107,7 +108,7 @@ internal static class PortalHtml
 
         body.Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal?another=1\">Check another pupil</a>");
         body.Append(CultureInfo.InvariantCulture, $"<p class=\"muted\">This will use one more of your pin's uses. You have {session.UsesLeft} left.</p>");
-        body.Append(CultureInfo.InvariantCulture, $"<p class=\"muted\">For security this page closes at {session.ExpiresAt.ToOffset(TimeSpan.FromHours(1)):HH:mm} (30 minutes after you opened it).</p>");
+        body.Append(CultureInfo.InvariantCulture, $"<p class=\"muted\">For security this page closes at {SchoolTime.ClockStamp(session.ExpiresAt)} (30 minutes after you opened it).</p>");
         body.Append("<form method=\"post\" action=\"/portal/end\"><button type=\"submit\" class=\"secondary\">Finish (for shared phones)</button></form>");
         return Page(branding, "Results", body.ToString());
     }
@@ -425,7 +426,7 @@ internal static class PortalHtml
 
     private static string E(string value) => HtmlEncoder.Default.Encode(value);
 
-    private static DateTimeOffset? Wat(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromHours(1));
+    private static DateTimeOffset? Wat(DateTimeOffset? value) => value is { } instant ? SchoolTime.At(instant) : null;
 }
 
 /// <summary>One of spec 6.9.4's parent-facing messages.</summary>

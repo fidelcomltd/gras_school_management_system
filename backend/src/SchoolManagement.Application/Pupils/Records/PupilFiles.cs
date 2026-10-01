@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Settings;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
@@ -243,7 +244,7 @@ internal sealed class UploadPupilDocumentFileHandler(
         var assetId = await store.PutAsync(scan.Bytes, scan.ContentType, cancellationToken).ConfigureAwait(false);
         var now = PupilFiles.StoredInstant(timeProvider.GetUtcNow());
         var attached = document.AttachFile(
-            assetId, scan.ContentType, scan.Bytes.Length, request.FileName, now, Weekly.WeeklyProjection.LagosToday(now), currentUser.UserId);
+            assetId, scan.ContentType, scan.Bytes.Length, request.FileName, now, SchoolTime.Today(now), currentUser.UserId);
         if (attached.IsFailure)
         {
             return Result.Failure<PupilDocumentListDto>(attached.Error);

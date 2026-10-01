@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SchoolManagement.Application.Abstractions.Audit;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Infrastructure.Persistence;
 
 namespace SchoolManagement.Infrastructure.Weekly;
@@ -24,13 +25,12 @@ internal sealed partial class WeeklyAutoPublishService(
 
     private static readonly TimeSpan FirstRunDelay = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(15);
-    private static readonly TimeSpan LagosOffset = TimeSpan.FromHours(1);
     private static readonly TimeOnly PublishTime = new(17, 0);
 
     /// <summary>The Monday of the week due for automatic publishing at <paramref name="now"/>, or null outside Friday 17:00 to Sunday.</summary>
     public static DateOnly? DueWeekStart(DateTimeOffset now)
     {
-        var lagos = now.ToOffset(LagosOffset);
+        var lagos = SchoolTime.At(now);
         var today = DateOnly.FromDateTime(lagos.DateTime);
         var daysSinceFriday = ((int)today.DayOfWeek - (int)DayOfWeek.Friday + 7) % 7;
         if (daysSinceFriday > 2 || (daysSinceFriday == 0 && TimeOnly.FromDateTime(lagos.DateTime) < PublishTime))

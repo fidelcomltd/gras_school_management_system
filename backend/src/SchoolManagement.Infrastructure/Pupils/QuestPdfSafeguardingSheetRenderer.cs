@@ -90,7 +90,7 @@ internal sealed class QuestPdfSafeguardingSheetRenderer : ISafeguardingSheetRend
                 footer.RelativeItem().Text(text =>
                 {
                     text.Span("Generated ");
-                    text.Span(PrintedTime.Format(sheet.GeneratedAtLagos));
+                    text.Span(SchoolTime.Stamp(sheet.GeneratedAt));
                     text.Span($". {sheet.Rows.Count} pupil{(sheet.Rows.Count == 1 ? string.Empty : "s")}.");
                 });
                 footer.RelativeItem().AlignRight().Text(text =>

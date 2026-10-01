@@ -22,7 +22,7 @@ const EVENT = {
 };
 
 describe('AuditScreen', () => {
-  it('lists events in Lagos time with their outcome, and filters by action and dates', async () => {
+  it('lists events in WAT with their outcome, and filters by action and dates', async () => {
     mockMe('audit.view');
     const queries: URLSearchParams[] = [];
     server.use(
@@ -36,7 +36,7 @@ describe('AuditScreen', () => {
 
     expect(await screen.findByText('result.publish')).toBeInTheDocument();
     expect(screen.getByText('refused')).toBeInTheDocument();
-    expect(screen.getByText('03/08/2026, 10:30:00')).toBeInTheDocument();
+    expect(screen.getByText('Aug 3, 2026, 10:30am WAT')).toBeInTheDocument();
     expect(screen.getByText('Reason: Head teacher remark missing')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument();
 

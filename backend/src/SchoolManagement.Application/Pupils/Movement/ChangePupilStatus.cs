@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Classes;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -118,7 +119,7 @@ internal sealed class ChangePupilStatusHandler(
                 "pupil.status_unchanged", $"This pupil is already {request.TargetStatus.ToString().ToLowerInvariant()}."));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         return request.TargetStatus == PupilStatus.Active
             ? await ReactivateAsync(request, pupil, today, cancellationToken).ConfigureAwait(false)

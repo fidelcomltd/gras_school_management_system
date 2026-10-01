@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Classes;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -84,7 +85,7 @@ internal sealed class TransferPupilHandler(
                 "Only an active pupil enrolled in a class can be moved. To bring back a pupil who left, reactivate them from the status screen."));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         var future = PupilMovementEngine.RefuseIfFuture(request.EffectiveDate, today);
         if (future.IsFailure)
         {
