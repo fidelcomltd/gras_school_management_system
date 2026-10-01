@@ -3,6 +3,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -63,7 +64,7 @@ internal sealed class DeclineAdmissionCommandHandler(
             // neither Pupil nor AdmissionRecord has a column to hold it.
             reason: request.Reason).ConfigureAwait(false);
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         return Result.Success(PupilMapper.ToDto(pupil, today));
     }

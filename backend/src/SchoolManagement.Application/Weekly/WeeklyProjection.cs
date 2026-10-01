@@ -7,12 +7,6 @@ namespace SchoolManagement.Application.Weekly;
 /// <summary>Shared shaping for the weekly-report reads, so the grid, the pupil view and the portal agree.</summary>
 internal static class WeeklyProjection
 {
-    /// <summary>Lagos is UTC+1 all year (no daylight saving), so "today" and "17:00 on Friday" are a fixed offset.</summary>
-    public static readonly TimeSpan LagosOffset = TimeSpan.FromHours(1);
-
-    /// <summary>The school's calendar date at <paramref name="now"/>.</summary>
-    public static DateOnly LagosToday(DateTimeOffset now) => DateOnly.FromDateTime(now.ToOffset(LagosOffset).DateTime);
-
     public static string Id(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     public static string DisplayName(string surname, string firstName, string? middleName) =>

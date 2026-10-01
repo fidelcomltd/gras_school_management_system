@@ -7,6 +7,7 @@ using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Admissions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -33,7 +34,7 @@ internal sealed class CreatePupilHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         // Section A's own references (spec 6.5.9) are resolved BEFORE the pupil is created, so a bad
         // session or class level fails the whole request without leaving a pupil row behind — the

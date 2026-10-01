@@ -10,7 +10,8 @@ import { ApiError } from '@/lib/http';
 import { ReasonDialog } from '@/shared/dialogs/reason-dialog';
 import { usePinAction, usePinBatch, usePinDownload } from './api';
 import { PinTable } from './components/pin-table';
-import { formatDateTime, type PinSummaryDto } from './types';
+import { schoolDateTime } from '@/shared/format/date';
+import type { PinSummaryDto } from './types';
 import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 type Asking = { kind: 'revoke-batch' } | { kind: 'revoke-pin' | 'reinstate-pin'; pin: PinSummaryDto };
@@ -86,7 +87,7 @@ export function PinBatchScreen() {
       <p className="text-sm text-muted-foreground">
         {purged
           ? 'The pin values were erased from the server after 30 days, so the slips can no longer be printed.'
-          : `Slips can be printed until ${formatDateTime(batch.plaintextPurgeAt)}; after that the pin values are erased.`}
+          : `Slips can be printed until ${schoolDateTime(batch.plaintextPurgeAt)}; after that the pin values are erased.`}
       </p>
 
       <PinTable

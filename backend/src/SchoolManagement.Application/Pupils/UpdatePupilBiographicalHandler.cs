@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 
@@ -75,7 +76,7 @@ internal sealed class UpdatePupilBiographicalHandler(
                 "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         var update = pupil.UpdateBiographical(
             request.Surname,

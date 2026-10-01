@@ -15,14 +15,18 @@ export function lagosDateOf(iso: string): string {
   return new Date(Date.parse(iso) + 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/** An ISO timestamp as the school reads it, in Lagos time: DD/MM/YYYY, HH:MM. */
-export function lagosDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Africa/Lagos',
-  });
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+/** An ISO timestamp on the school's clock (WAT, fixed UTC+1), as the time alone: "9:58pm WAT". */
+export function schoolClock(iso: string): string {
+  const at = new Date(Date.parse(iso) + 60 * 60 * 1000);
+  const hours = at.getUTCHours();
+  const minutes = String(at.getUTCMinutes()).padStart(2, '0');
+  return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes}${hours < 12 ? 'am' : 'pm'} WAT`;
+}
+
+/** An ISO timestamp as the school reads it, the same form as on its prints: "Sept 30, 2026, 9:58pm WAT". */
+export function schoolDateTime(iso: string): string {
+  const at = new Date(Date.parse(iso) + 60 * 60 * 1000);
+  return `${MONTHS[at.getUTCMonth()]} ${at.getUTCDate()}, ${at.getUTCFullYear()}, ${schoolClock(iso)}`;
 }

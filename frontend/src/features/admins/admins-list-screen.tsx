@@ -7,7 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
-import { lagosDateTime } from '@/shared/format/date';
+import { schoolDateTime } from '@/shared/format/date';
 import { CopyAssignmentsDialog } from './assignments/copy-assignments-dialog';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
@@ -115,7 +115,7 @@ export function AdminsListScreen() {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{admin.scopeSummary}</td>
                   <td className="px-3 py-2 text-muted-foreground">{admin.status}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? lagosDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? schoolDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
                 </tr>
               ))}
             </tbody>

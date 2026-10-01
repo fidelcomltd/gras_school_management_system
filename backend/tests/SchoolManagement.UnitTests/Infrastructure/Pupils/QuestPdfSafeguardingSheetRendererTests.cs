@@ -23,9 +23,10 @@ public sealed class QuestPdfSafeguardingSheetRendererTests
             index % 5 == 0 ? "Yes: see office" : "No")).ToList();
 
         var bytes = new QuestPdfSafeguardingSheetRenderer().Render(
-            new SafeguardingSheetDocument("Golden Royal Ark School", "Primary 2 Gold", "2026/2027", new DateTime(2026, 10, 5, 8, 45, 0), rows));
+            new SafeguardingSheetDocument("Golden Royal Ark School", "Primary 2 Gold", "2026/2027", new DateTimeOffset(2026, 10, 5, 7, 45, 0, TimeSpan.Zero), rows));
 
         bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8).ShouldBeTrue();
+        PdfText.Lines(bytes).ShouldContain(line => line.Contains("Generated Oct 5, 2026, 8:45am WAT. 40 pupils.", StringComparison.Ordinal));
     }
 
     private static byte[] Jpeg()

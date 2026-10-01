@@ -10,7 +10,7 @@ import { formatDate, weekLabel } from './types';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { PageTrail } from '@/components/layout/page-trail';
 import { paths } from '@/app/router/paths';
-import { lagosDateTime } from '@/shared/format/date';
+import { schoolDateTime } from '@/shared/format/date';
 
 /**
  * `/weekly/completion` — spec 6.10.12: which classes wrote what, per week, and (for safeguarding staff) the pupils with
@@ -57,7 +57,7 @@ export function WeeklyCompletionScreen() {
                 </td>
                 <td className="py-1.5 text-center">{row.published ? 'Yes' : 'No'}</td>
                 <td className="py-1.5 text-muted-foreground">
-                  {row.lastEditedAt ? `${row.lastEditedBy ?? 'Unknown'}, ${lagosDateTime(row.lastEditedAt)}` : 'Nothing written'}
+                  {row.lastEditedAt ? `${row.lastEditedBy ?? 'Unknown'}, ${schoolDateTime(row.lastEditedAt)}` : 'Nothing written'}
                 </td>
               </tr>
             ))}

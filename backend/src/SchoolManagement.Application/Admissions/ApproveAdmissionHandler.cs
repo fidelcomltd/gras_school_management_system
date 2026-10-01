@@ -8,6 +8,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Classes;
@@ -127,7 +128,7 @@ internal sealed class ApproveAdmissionCommandHandler(
         var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var resolvedHeadOfSchoolName = request.HeadOfSchoolName ?? profile.HeadTeacherName;
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         // Section J's assessment outcome and head-of-school fields — reuses Update's own
         // null-means-unchanged convention rather than a second setter (every other field left null).

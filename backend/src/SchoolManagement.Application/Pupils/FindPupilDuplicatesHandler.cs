@@ -1,5 +1,6 @@
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Common;
 
 namespace SchoolManagement.Application.Pupils;
@@ -18,7 +19,7 @@ internal sealed class FindPupilDuplicatesQueryHandler(IPupilRepository pupils, T
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         var phone = !string.IsNullOrWhiteSpace(request.ContactPhone) && NigerianPhoneNumber.TryNormalize(request.ContactPhone, out var normalized)
             ? normalized
             : null;

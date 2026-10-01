@@ -105,7 +105,7 @@ public sealed class PupilFileEndpointsTests(ApiTestFixture fixture) : Integratio
         upload.StatusCode.ShouldBe(HttpStatusCode.OK);
         var row = (await ReadAsync<PupilDocumentListDto>(upload)).Items.Single(item => item.DocumentType == PupilDocumentType.BirthCertificate);
         row.Received.ShouldBeTrue();
-        row.ReceivedDate.ShouldBe(Application.Weekly.WeeklyProjection.LagosToday(DateTimeOffset.UtcNow));
+        row.ReceivedDate.ShouldBe(Application.Common.SchoolTime.Today(DateTimeOffset.UtcNow));
         row.File.ShouldNotBeNull().ContentType.ShouldBe("application/pdf");
         row.File.SizeBytes.ShouldBe(pdf.Length);
         row.File.FileName.ShouldBe("upload.bin"); // the name it had on the device, for display only

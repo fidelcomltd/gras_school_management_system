@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 
@@ -68,7 +69,7 @@ internal sealed class GetPupilQueryHandler(
                 "pupil.view_forbidden", "You do not hold the privilege required to view this pupil."));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         return Result.Success(PupilMapper.ToDto(pupil, today));
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using SchoolManagement.Application.Abstractions.Results;
+using SchoolManagement.Application.Common;
 
 namespace SchoolManagement.Application.Results.Sheets;
 
@@ -222,8 +223,8 @@ public static class ResultSheetBuilder
         if (data.RevisionNumber > 1 && data.PublishedAt is { } issued)
         {
             revision = data.PreviousPublishedAt is { } previous
-                ? $"Revised result, issued {Wat(issued):dd/MM/yyyy}. This replaces the version issued {Wat(previous):dd/MM/yyyy}."
-                : $"Revised result, issued {Wat(issued):dd/MM/yyyy}.";
+                ? $"Revised result, issued {SchoolTime.At(issued):dd/MM/yyyy}. This replaces the version issued {SchoolTime.At(previous):dd/MM/yyyy}."
+                : $"Revised result, issued {SchoolTime.At(issued):dd/MM/yyyy}.";
         }
 
         var fees = Fees(root, data.OutstandingFee, forParent);
@@ -299,7 +300,6 @@ public static class ResultSheetBuilder
     private static string? Key(List<(Guid Id, string Code, string Label)> points) =>
         points.Count == 0 ? null : string.Join("  ", points.Select(point => $"{point.Code}-{point.Label}"));
 
-    private static DateTimeOffset Wat(DateTimeOffset value) => value.ToOffset(TimeSpan.FromHours(1));
 
     private static DateOnly? Date(JsonElement? element) =>
         element is { ValueKind: JsonValueKind.String } value ? DateOnly.Parse(value.GetString()!, CultureInfo.InvariantCulture) : null;

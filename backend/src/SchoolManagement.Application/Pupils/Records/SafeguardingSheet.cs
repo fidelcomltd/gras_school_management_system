@@ -9,7 +9,6 @@ using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Settings;
-using SchoolManagement.Application.Weekly;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
@@ -115,7 +114,7 @@ internal sealed class GenerateSafeguardingSheetPdfHandler(
             .ToList();
 
         var document = new SafeguardingSheetDocument(
-            profile.SchoolName, sheet.ArmName, sheet.SessionName, sheet.GeneratedAtUtc.ToOffset(WeeklyProjection.LagosOffset).DateTime, rows);
+            profile.SchoolName, sheet.ArmName, sheet.SessionName, sheet.GeneratedAtUtc, rows);
         var bytes = renderer.Render(document);
         return Result.Success(new SchoolImageContent(new MemoryStream(bytes, writable: false), "application/pdf", "safeguarding-sheet.pdf"));
     }

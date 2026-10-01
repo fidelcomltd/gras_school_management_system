@@ -82,7 +82,7 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
                     row.RelativeItem().AlignBottom().AlignRight().Text(text =>
                     {
                         text.DefaultTextStyle(style => style.FontSize(8).FontColor(Colors.Grey.Darken2));
-                        text.Span($"Printed {PrintedTime.Format(slip.PrintedAtLagos)} by {slip.PrintedBy}.");
+                        text.Span($"Printed {SchoolTime.Stamp(slip.PrintedAt)} by {slip.PrintedBy}.");
                     });
                 });
             });

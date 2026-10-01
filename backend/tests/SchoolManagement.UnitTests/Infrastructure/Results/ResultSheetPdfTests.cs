@@ -28,6 +28,22 @@ public sealed class ResultSheetPdfTests
     }
 
     [Fact]
+    public void TheLongestPrintedStamp_StaysOnOneLineInTheNarrowFooter()
+    {
+        // Twelve o'clock in a four-letter month is the widest the stamp gets; the lead refused a second line for it.
+        var renderer = new QuestPdfResultSheetRenderer(Options.Create(new PortalOptions { PublicUrl = "results.example.sch.ng" }));
+        var printedAt = new DateTimeOffset(2026, 9, 30, 11, 58, 0, TimeSpan.Zero);
+
+        var pdf = renderer.Render(
+            Sheet(subjects: 14),
+            new ResultSheetPdfExtras(ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty, Token, renderer.VerificationUrl(Token), printedAt));
+
+        var lines = PdfText.Lines(pdf);
+        lines.ShouldContain(line => line.Contains("Printed Sept 30, 2026, 12:58pm WAT", StringComparison.Ordinal));
+        lines.ShouldNotContain(line => line.Contains("Lagos", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ALongSubjectList_FlowsOntoASecondPage_WithoutFailing()
     {
         var renderer = new QuestPdfResultSheetRenderer(Options.Create(new PortalOptions()));

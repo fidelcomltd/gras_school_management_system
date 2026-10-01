@@ -5,6 +5,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Weekly;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Sessions;
 using SchoolManagement.Domain.Weekly;
@@ -66,7 +67,7 @@ internal sealed class GetWeeklyGridHandler(
         var derived = TermWeeks.Derive(term.StartDate, term.EndDate);
         var totals = await weekly.SummariseAsync(termId, armId, cancellationToken).ConfigureAwait(false);
         var weeks = WeeklyProjection.Weeks(derived, totals);
-        var weekNumber = request.WeekNumber ?? WeeklyProjection.CurrentWeek(derived, WeeklyProjection.LagosToday(timeProvider.GetUtcNow()));
+        var weekNumber = request.WeekNumber ?? WeeklyProjection.CurrentWeek(derived, SchoolTime.Today(timeProvider.GetUtcNow()));
         if (weeks.FirstOrDefault(week => week.WeekNumber == weekNumber) is not { } week)
         {
             return Result.Failure<WeeklyGridDto>(Error.NotFound("weekly.week_not_found", $"This term has no week {weekNumber}."));

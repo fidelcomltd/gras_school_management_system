@@ -4,6 +4,7 @@ using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
@@ -67,7 +68,7 @@ internal sealed class SavePupilDocumentHandler(
         var document = documents.FirstOrDefault(candidate => candidate.DocumentType == request.DocumentType);
         var isNew = document is null;
         document ??= PupilDocument.Create(Guid.CreateVersion7(), request.PupilId, request.DocumentType);
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         var applied = document.Apply(request.Received, request.ReceivedDate, request.Remarks, request.OtherLabel, today, currentUser.UserId);
         if (applied.IsFailure)
         {
