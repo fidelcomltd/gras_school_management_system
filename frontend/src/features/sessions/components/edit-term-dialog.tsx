@@ -1,14 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/http';
 import { hasFieldError } from '@/shared/forms/field-message';
 import { useUpdateTerm } from '../api';
 import { editTermSchema, type EditTermFormValues } from '../term-schema';
 import type { TermDto } from '../types';
+import { DateInput } from '@/components/ui/date-input';
 
 const FIELDS = ['name', 'startDate', 'endDate', 'timesSchoolOpened', 'nextResumptionDate'] as const;
 
@@ -19,10 +21,13 @@ const FIELDS = ['name', 'startDate', 'endDate', 'timesSchoolOpened', 'nextResump
 export function EditTermDialog({
   sessionId,
   term,
+  nextTermStart = null,
   onClose,
 }: {
   sessionId: string;
   term: TermDto;
+  /** Pre-fills an unset "next term begins" (still editable before saving). */
+  nextTermStart?: string | null;
   onClose: () => void;
 }) {
   const updateTerm = useUpdateTerm(sessionId);
@@ -37,7 +42,7 @@ export function EditTermDialog({
       startDate: term.startDate,
       endDate: term.endDate,
       timesSchoolOpened: term.timesSchoolOpened === null ? '' : String(term.timesSchoolOpened),
-      nextResumptionDate: term.nextResumptionDate ?? '',
+      nextResumptionDate: term.nextResumptionDate ?? nextTermStart ?? '',
     },
   });
 
@@ -69,11 +74,7 @@ export function EditTermDialog({
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-          {formError ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {formError}
-            </p>
-          ) : null}
+          <FormError message={formError} />
 
           <Field invalid={!!errors.name}>
             <FieldLabel>Label</FieldLabel>
@@ -82,22 +83,26 @@ export function EditTermDialog({
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput {...register('startDate')} />
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>End date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput {...register('endDate')} />
           </Field>
 
           <Field invalid={!!errors.timesSchoolOpened}>
             <FieldLabel>Times school opened</FieldLabel>
             <Input type="number" min={1} max={200} {...register('timesSchoolOpened')} />
+            <FieldDescription>
+              Days school actually opened this term; printed on every result sheet, and times absent is worked out from it. It
+              starts as the term's weekdays: take off public holidays and breaks.
+            </FieldDescription>
           </Field>
 
           <Field invalid={!!errors.nextResumptionDate}>
-            <FieldLabel>Next resumption date</FieldLabel>
-            <Input type="date" {...register('nextResumptionDate')} />
+            <FieldLabel>Next term begins (printed on this term's results)</FieldLabel>
+            <DateInput {...register('nextResumptionDate')} />
           </Field>
 
           <DialogFooter>

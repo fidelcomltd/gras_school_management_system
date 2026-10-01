@@ -47,6 +47,18 @@ public static class ApplicationDependencyInjection
         services.AddScoped<Classes.ArmCapacityGuard>();
         services.AddScoped<Pupils.Movement.PupilMovementEngine>();
         services.AddScoped<Pupils.Records.AdmissionCompleteness>();
+        services.AddScoped<Promotion.PromotionPlanner>();
+        services.AddScoped<Fees.FeeNoticeGridReader>();
+        services.AddScoped<Fees.OutstandingFeeReader>();
+        services.AddScoped<Pupils.Records.SafeguardingSheetBuilder>();
+        services.AddScoped<Reports.ReportServices>();
+        services.AddScoped<Security.Assignments.AssignmentNames>();
+
+        // Spec 15 section 10: every report is one IReportBuilder, found by its filters type. Scanned, like the handlers.
+        foreach (var report in Assembly.GetTypes().Where(type => type is { IsAbstract: false, IsInterface: false } && typeof(Reports.IReportBuilder).IsAssignableFrom(type)))
+        {
+            services.AddScoped(typeof(Reports.IReportBuilder), report);
+        }
 
         // Spec 6.5.10: the one registration-number issuance path, shared by admission approval and bulk import.
         services.AddScoped<Settings.RegistrationNumberIssuer>();

@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
 import { useArm, useDeleteArm } from './api';
 import { EditArmDialog } from './components/edit-arm-dialog';
 import { FormTeacherLabel } from './components/form-teacher-label';
 import { useFormTeacherNames } from './hooks/use-form-teacher-names';
+import { LoadingState } from '@/components/feedback/query-states';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 /**
  * `/arms/:id` (spec 6.4.5, 6.4.7). Four required states (CONVENTIONS.md §11)
@@ -25,6 +27,7 @@ export function ArmDetailScreen() {
   const me = useMe();
   const deleteArm = useDeleteArm();
   const [showEdit, setShowEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const canUpdate = !!me.data && hasPrivilege(me.data, 'arm.update');
   const canDelete = !!me.data && hasPrivilege(me.data, 'arm.delete');
@@ -37,29 +40,21 @@ export function ArmDetailScreen() {
   );
 
   if (arm.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading arm…</output>;
+    return <WithTrail trail={[{ to: paths.arms }, { label: 'Arm' }]}><LoadingState label="Loading arm…" /></WithTrail>;
   }
 
   if (arm.isError) {
-    if (arm.error instanceof ApiError && arm.error.kind === 'unauthorized') return null;
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{arm.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void arm.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <TrailedError trail={[{ to: paths.arms }, { label: 'Arm' }]} error={arm.error} onRetry={() => void arm.refetch()} />;
   }
 
   const detail = arm.data;
-  const deleteError = deleteArm.error instanceof ApiError ? deleteArm.error.message : null;
   const currentFormTeacherName = detail.formTeacherAdminId
     ? formTeacherNames[detail.formTeacherAdminId]
     : undefined;
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
+      <PageTrail trail={[{ to: paths.arms }, { label: detail.displayName }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.displayName}</h1>
@@ -71,12 +66,6 @@ export function ArmDetailScreen() {
           </Button>
         ) : null}
       </header>
-
-      {deleteError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      ) : null}
 
       <dl className="flex flex-col gap-3">
         <div className="flex flex-col gap-0.5">
@@ -104,14 +93,21 @@ export function ArmDetailScreen() {
           variant="destructive"
           size="sm"
           className="self-start"
-          onClick={() => {
-            if (window.confirm(`Delete ${detail.displayName}? This cannot be undone.`)) {
-              deleteArm.mutate(detail.id, { onSuccess: () => navigate(paths.arms) });
-            }
-          }}
+          onClick={() => setConfirmDelete(true)}
         >
           Delete arm
         </Button>
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title={`Delete ${detail.displayName}?`}
+          description="This cannot be undone."
+          confirmLabel="Delete arm"
+          pendingLabel="Deleting…"
+          onConfirm={() => deleteArm.mutateAsync(detail.id).then(() => navigate(paths.arms))}
+          onClose={() => setConfirmDelete(false)}
+        />
       ) : null}
 
       {showEdit ? (

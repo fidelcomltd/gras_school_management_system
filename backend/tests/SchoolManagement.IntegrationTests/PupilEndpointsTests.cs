@@ -342,6 +342,92 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
         collected.ShouldBe(expectedOrder.Select(id => id.ToString("D", CultureInfo.InvariantCulture)).ToArray());
     }
 
+    // TASK-0068: a punctuated surname at a page seam. A glibc en_US database ignores the apostrophe (Oakes, Obi,
+    // O'Brien) where an ordinal comparison does not (O'Brien first), so a page ending at Oakes must not lose O'Brien.
+    // One page per pupil makes every row a seam; the class bucket and the trailing leavers block are separate code paths.
+    // The test image (alpine, musl) collates bytewise, which hides the defect, so these tests give the surname column a
+    // punctuation-ignoring ICU collation for their duration (WithProductionLikeSurnameCollationAsync).
+    [Fact]
+    public async Task List_PunctuatedSurnamesInOneClass_EachAppearsOnExactlyOnePage()
+    {
+        RequireDatabase();
+
+        var sessionId = await SeedSessionAsync();
+        var armId = await SeedArmAsync(sessionId, "A", await GetClassLevelIdByNameAsync("Primary 1"));
+        var seeded = new List<Guid>();
+        foreach (var (surname, index) in new[] { "Oakes", "O'Brien", "Obi", "Okafor-Eze" }.Select((name, i) => (name, i)))
+        {
+            var pupilId = await SeedPupilDirectlyAsync(surname, "Chidera");
+            await SetRegistrationNumberAndStatusAsync(pupilId, $"GRAS/2026/S{index}", PupilStatus.Active);
+            await SeedEnrolmentAsync(pupilId, armId, new DateOnly(2026, 9, 1));
+            seeded.Add(pupilId);
+        }
+
+        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync([seeded[0], seeded[2], seeded[1], seeded[3]]));
+    }
+
+    [Fact]
+    public async Task List_PunctuatedSurnamesAmongLeavers_EachAppearsOnExactlyOnePage()
+    {
+        RequireDatabase();
+
+        var seeded = new List<Guid>();
+        foreach (var surname in new[] { "Oakes", "O'Brien", "Obi", "Okafor-Eze" })
+        {
+            var pupilId = await SeedPupilDirectlyAsync(surname, "Chidera");
+            await SetStatusAsync(pupilId, PupilStatus.Withdrawn);
+            seeded.Add(pupilId);
+        }
+
+        await WithProductionLikeSurnameCollationAsync(() => AssertEachPupilOnExactlyOnePageAsync([seeded[0], seeded[2], seeded[1], seeded[3]]));
+    }
+
+    // ICU "shifted" ignores punctuation at the first level, as glibc's en_US.UTF-8 does. Restored afterwards, because the
+    // reset between tests truncates rows and leaves the schema alone.
+    private async Task WithProductionLikeSurnameCollationAsync(Func<Task> body)
+    {
+        await SetSurnameCollationAsync(
+            "CREATE COLLATION IF NOT EXISTS seam_shifted (provider = icu, locale = 'en-u-ka-shifted');", "seam_shifted");
+        try
+        {
+            await body();
+        }
+        finally
+        {
+            await SetSurnameCollationAsync(string.Empty, "\"default\"");
+        }
+    }
+
+    private async Task SetSurnameCollationAsync(string setup, string collation)
+    {
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var sql = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{setup} ALTER TABLE pupils ALTER COLUMN surname TYPE character varying({Pupil.NameMaxLength}) COLLATE {collation};");
+        await context.Database.ExecuteSqlRawAsync(sql, TestContext.Current.CancellationToken);
+    }
+
+    // expectedOrder: the register order with punctuation ignored (Oakes, Obi, O'Brien, Okafor-Eze).
+    private async Task AssertEachPupilOnExactlyOnePageAsync(List<Guid> expectedOrder)
+    {
+        var jar = await SignInWithGrantAsync([Privileges.Pupil.View], ScopeType.SchoolWide);
+        var collected = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var url = cursor is null ? $"{PupilsUrl}?pageSize=1" : $"{PupilsUrl}?pageSize=1&cursor={Uri.EscapeDataString(cursor)}";
+            var response = await GetAsync(url, jar);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var page = await ReadAsync<CursorPage<PupilDto>>(response);
+            collected.AddRange(page.Items.Select(item => item.Id));
+            cursor = page.NextCursor;
+        }
+        while (cursor is not null && collected.Count <= expectedOrder.Count);
+
+        collected.ShouldBe(expectedOrder.Select(id => id.ToString("D", CultureInfo.InvariantCulture)).ToArray());
+    }
+
     [Fact]
     public async Task List_WithNoPupilViewGrantAtAll_Returns403()
     {

@@ -9,6 +9,7 @@ import { ForcedPasswordChange } from '@/features/auth/change-password-screen';
 import { onSessionEnded } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { paths } from './paths';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /**
  * The route guard TASK-0041 asks for: unauthenticated → sign-in, authenticated
@@ -31,7 +32,7 @@ export function ProtectedLayout() {
   if (me.isPending) {
     return (
       <AppShell>
-        <output className="text-sm text-muted-foreground">Loading your account…</output>
+        <LoadingState label="Loading your account…" />
       </AppShell>
     );
   }

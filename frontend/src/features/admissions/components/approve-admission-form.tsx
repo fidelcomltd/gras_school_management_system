@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { Field as BaseField } from '@base-ui/react/field';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
@@ -84,7 +85,7 @@ export function ApproveAdmissionForm({
   if (approveAdmission.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <RegistrationNumber number={approveAdmission.data.registrationNumber ?? '—'} label="Approved. Registration number:" />
+        <RegistrationNumber number={approveAdmission.data.registrationNumber ?? '—'} label="Approved. Registration number:" pupilId={pupil.id} />
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             Done
@@ -99,11 +100,7 @@ export function ApproveAdmissionForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      {formError ? (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {formError}
-        </p>
-      ) : null}
+      <FormError message={formError} />
 
       <Field invalid={!!errors.armId}>
         <FieldLabel>Arm</FieldLabel>

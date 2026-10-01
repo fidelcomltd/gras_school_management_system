@@ -148,9 +148,12 @@ live `dotnet test` / `dotnet build` command line is not.
 
 ## 5. What counts as evidence
 
-**Paste the summary line plus every failing line in full — never a whole log.** For the backend
-that is the `SUMMARY` block alone. `Failed: 0, Passed: 178, Skipped: 0` and the coverage line are
-the evidence; restore chatter is not.
+**Read the summary file, quote it, never the log (TASK-0056).** Every backend gate run writes
+`backend/artifacts/gate-summary.txt` and every `npm run verify` writes
+`frontend/artifacts/gate-summary.txt`, on every exit path including a fail-fast or early abort:
+first line `PASS` or `FAIL`, each gate's outcome (`SKIPPED-NOT-RUN` for gates never reached), the
+test totals, coverage, and the failing lines in full. That file is the evidence; open the log only
+when a failing line needs its surrounding context.
 
 **A skipped suite is not a passing suite.** Gates exit non-zero on `Skipped > 0`. This project's
 costliest defect was a false close on a silently skipping suite.

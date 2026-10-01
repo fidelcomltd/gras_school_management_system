@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormError } from '@/components/feedback/query-states';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,8 @@ const FIELDS = ['staffName', 'email', 'phone'] as const;
 
 /**
  * `POST /api/v1/admins` (spec 6.1.9 step 1, 6.1.14). Role assignment (step
- * two) is TASK-0028's own scope, not this dialog's — an account with zero
- * assignments can exist and sign in.
+ * two) happens on the new account's page, in its Roles section — an account
+ * with zero assignments can exist and sign in, but do nothing.
  *
  * The generated temporary password is credential material (TASK-0043):
  * captured into this component's own `reveal` state only, and the mutation's
@@ -61,11 +62,7 @@ export function CreateAdminDialog({ onClose }: { onClose: () => void }) {
           <TemporaryPasswordReveal password={reveal.temporaryPassword} onDone={onClose} />
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-            {formError ? (
-              <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {formError}
-              </p>
-            ) : null}
+            <FormError message={formError} />
 
             <Field invalid={!!errors.staffName}>
               <FieldLabel>Staff name</FieldLabel>

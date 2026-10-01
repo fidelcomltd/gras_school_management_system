@@ -780,6 +780,185 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("enrolments", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.FeeAmount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("integer")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("ClassLevelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("class_level_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("FeeLabelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fee_label_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("TermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("term_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fee_amount");
+
+                    b.HasIndex("ClassLevelId")
+                        .HasDatabaseName("ix_fee_amount_class_level_id");
+
+                    b.HasIndex("FeeLabelId")
+                        .HasDatabaseName("ix_fee_amount_label");
+
+                    b.HasIndex("TermId", "ClassLevelId", "FeeLabelId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fee_amount_term_level_label_unique");
+
+                    b.ToTable("fee_amount", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.FeeLabel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("label");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("section_id");
+
+                    b.Property<bool>("ShowOnPortal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_on_portal");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fee_label");
+
+                    b.HasIndex("SectionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fee_label_one_outstanding_per_section")
+                        .HasFilter("kind = 'Outstanding'");
+
+                    b.ToTable("fee_label", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.OutstandingFee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("integer")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("ResultSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_set_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outstanding_fee");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_outstanding_fee_pupil");
+
+                    b.HasIndex("ResultSetId", "PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_outstanding_fee_result_set_pupil_unique");
+
+                    b.ToTable("outstanding_fee", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Idempotency.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1141,6 +1320,122 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("portal_attempt", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Promotion.PromotionBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CommittedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("committed_at_utc");
+
+                    b.Property<string>("CommittedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("committed_by");
+
+                    b.Property<string>("ReversalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reversal_reason");
+
+                    b.Property<DateTimeOffset?>("ReversedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("reversed_at_utc");
+
+                    b.Property<string>("ReversedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reversed_by");
+
+                    b.Property<Guid>("SourceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_session_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TargetSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promotion_batch");
+
+                    b.HasIndex("SourceSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_promotion_batch_one_committed_per_session")
+                        .HasFilter("state = 'Committed'");
+
+                    b.HasIndex("TargetSessionId")
+                        .HasDatabaseName("ix_promotion_batch_target_session_id");
+
+                    b.ToTable("promotion_batch", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Promotion.PromotionDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<Guid>("ClosedEnrolmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_enrolment_id");
+
+                    b.Property<Guid>("FromArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_arm_id");
+
+                    b.Property<Guid?>("NewEnrolmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_enrolment_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("ProposedOutcome")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("proposed_outcome");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("TargetArmId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_arm_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promotion_decision");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_promotion_decision_pupil");
+
+                    b.HasIndex("BatchId", "PupilId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_promotion_decision_batch_pupil_unique");
+
+                    b.ToTable("promotion_decision", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.AuthorisedPickupPerson", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1244,6 +1539,10 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("modified_by");
 
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
                     b.Property<Guid>("PupilId")
                         .HasColumnType("uuid")
                         .HasColumnName("pupil_id");
@@ -1255,6 +1554,9 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_barred_person");
+
+                    b.HasIndex("PhotoId")
+                        .HasDatabaseName("ix_barred_person_photo_id");
 
                     b.HasIndex("PupilId")
                         .HasDatabaseName("ix_barred_person_pupil");
@@ -1299,6 +1601,54 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasName("pk_barred_person_answer");
 
                     b.ToTable("barred_person_answer", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pupils.BarredPersonPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssetId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("asset_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("modified_by");
+
+                    b.Property<Guid>("PupilId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pupil_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_barred_person_photo");
+
+                    b.HasIndex("PupilId")
+                        .HasDatabaseName("ix_barred_person_photo_pupil");
+
+                    b.ToTable("barred_person_photo", (string)null);
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.Pupil", b =>
@@ -1552,6 +1902,11 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("file_content_type");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("file_name");
 
                     b.Property<int?>("FileSizeBytes")
                         .HasColumnType("integer")
@@ -2880,7 +3235,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             IsSystem = true,
                             Name = "Super Admin",
                             NameKey = "super admin",
-                            Privileges = "admin.create,admin.deactivate,admin.password.reset,admin.session.revoke,admin.suspend,admin.update,admin.view,arm.capacity.override,arm.create,arm.delete,arm.formteacher.assign,arm.update,arm.view,audit.export,audit.view,contact.create,contact.update,contact.view,level.create,level.deactivate,level.delete,level.update,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,promotion.decide,promotion.reverse,promotion.run,pupil.admission.approve,pupil.admission.override,pupil.create,pupil.delete,pupil.document.manage,pupil.import,pupil.photo.update,pupil.regnumber.correct,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.annual.compute,result.approve,result.attendance.enter,result.compute,result.print,result.publish,result.remark.classteacher,result.remark.headteacher,result.return,result.score.enter,result.score.void,result.submit,result.trait.enter,result.unpublish,result.view,role.assign,role.create,role.delete,role.scope.assign,role.update,role.view,session.create,session.update,session.view,settings.abbreviation.update,settings.assessment.update,settings.developmentdomains.update,settings.grading.update,settings.identity.update,settings.pin.update,settings.ratingscales.update,settings.regnumber.update,settings.reset.defaults,settings.resultrules.update,settings.traits.update,settings.view,subject.create,subject.deactivate,subject.delete,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view,term.close,term.open,weekly.enter,weekly.publish,weekly.view",
+                            Privileges = "admin.create,admin.deactivate,admin.password.reset,admin.session.revoke,admin.suspend,admin.update,admin.view,arm.capacity.override,arm.create,arm.delete,arm.formteacher.assign,arm.update,arm.view,audit.export,audit.view,contact.create,contact.update,contact.view,fee.manage,level.create,level.deactivate,level.delete,level.update,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,promotion.decide,promotion.reverse,promotion.run,pupil.admission.approve,pupil.admission.override,pupil.create,pupil.delete,pupil.document.manage,pupil.import,pupil.photo.update,pupil.regnumber.correct,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.annual.compute,result.approve,result.attendance.enter,result.compute,result.print,result.publish,result.remark.classteacher,result.remark.headteacher,result.return,result.score.enter,result.score.void,result.submit,result.trait.enter,result.unpublish,result.view,role.assign,role.create,role.delete,role.scope.assign,role.update,role.view,session.create,session.update,session.view,settings.abbreviation.update,settings.assessment.update,settings.developmentdomains.update,settings.grading.update,settings.identity.update,settings.pin.update,settings.ratingscales.update,settings.regnumber.update,settings.reset.defaults,settings.resultrules.update,settings.traits.update,settings.view,subject.create,subject.deactivate,subject.delete,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view,term.close,term.open,weekly.enter,weekly.publish,weekly.view",
                             Status = "Active",
                             Version = new Guid("00000000-0000-0000-0000-000000000201")
                         },
@@ -2892,7 +3247,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             IsSystem = false,
                             Name = "School Administrator",
                             NameKey = "school administrator",
-                            Privileges = "admin.view,arm.capacity.override,arm.create,arm.formteacher.assign,arm.update,arm.view,contact.create,contact.update,contact.view,level.create,level.deactivate,level.update,level.view,pin.usage.view,pin.view,promotion.run,pupil.admission.approve,pupil.create,pupil.document.manage,pupil.import,pupil.photo.update,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.print,result.view,role.scope.assign,session.create,session.update,session.view,settings.view,subject.create,subject.deactivate,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view",
+                            Privileges = "admin.view,arm.capacity.override,arm.create,arm.formteacher.assign,arm.update,arm.view,contact.create,contact.update,contact.view,fee.manage,level.create,level.deactivate,level.update,level.view,pin.usage.view,pin.view,promotion.run,pupil.admission.approve,pupil.create,pupil.document.manage,pupil.import,pupil.photo.update,pupil.safeguarding.update,pupil.safeguarding.view,pupil.status.update,pupil.transfer,pupil.update,pupil.view,report.export,report.view,result.print,result.view,role.scope.assign,session.create,session.update,session.view,settings.view,subject.create,subject.deactivate,subject.map,subject.map.arm,subject.unmap,subject.update,subject.view",
                             Status = "Active",
                             Version = new Guid("00000000-0000-0000-0000-000000000202")
                         },
@@ -2928,7 +3283,7 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                             IsSystem = false,
                             Name = "Bursar",
                             NameKey = "bursar",
-                            Privileges = "arm.view,contact.view,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,pupil.view,session.view,weekly.view",
+                            Privileges = "arm.view,contact.view,fee.manage,level.view,pin.generate,pin.print,pin.revoke,pin.usage.view,pin.view,pupil.view,session.view,weekly.view",
                             Status = "Active",
                             Version = new Guid("00000000-0000-0000-0000-000000000205")
                         },
@@ -5384,6 +5739,57 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_enrolments_pupils_pupil_id");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.FeeAmount", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.ClassLevel", null)
+                        .WithMany()
+                        .HasForeignKey("ClassLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_fee_amount_class_levels_class_level_id");
+
+                    b.HasOne("SchoolManagement.Domain.Fees.FeeLabel", null)
+                        .WithMany()
+                        .HasForeignKey("FeeLabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_fee_amount_fee_labels_fee_label_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.Term", null)
+                        .WithMany()
+                        .HasForeignKey("TermId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fee_amount_terms_term_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.FeeLabel", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Classes.Section", null)
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_fee_label_sections_section_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Fees.OutstandingFee", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_outstanding_fee_pupils_pupil_id");
+
+                    b.HasOne("SchoolManagement.Domain.Results.ResultSet", null)
+                        .WithMany()
+                        .HasForeignKey("ResultSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_outstanding_fee_result_sets_result_set_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Pins.Pin", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Pins.PinBatch", null)
@@ -5421,6 +5827,40 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pin_use_pupils_pupil_id");
                 });
 
+            modelBuilder.Entity("SchoolManagement.Domain.Promotion.PromotionBatch", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("SourceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_promotion_batch_academic_sessions_source_session_id");
+
+                    b.HasOne("SchoolManagement.Domain.Sessions.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("TargetSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_promotion_batch_academic_sessions_target_session_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Promotion.PromotionDecision", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Promotion.PromotionBatch", null)
+                        .WithMany("Decisions")
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_promotion_decision_promotion_batch_batch_id");
+
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_promotion_decision_pupils_pupil_id");
+                });
+
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.AuthorisedPickupPerson", b =>
                 {
                     b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
@@ -5433,6 +5873,12 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.BarredPerson", b =>
                 {
+                    b.HasOne("SchoolManagement.Domain.Pupils.BarredPersonPhoto", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_barred_person_barred_person_photo_photo_id");
+
                     b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
                         .WithMany()
                         .HasForeignKey("PupilId")
@@ -5449,6 +5895,16 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_barred_person_answer_pupils_pupil_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Pupils.BarredPersonPhoto", b =>
+                {
+                    b.HasOne("SchoolManagement.Domain.Pupils.Pupil", null)
+                        .WithMany()
+                        .HasForeignKey("PupilId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_barred_person_photo_pupils_pupil_id");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Pupils.PupilContact", b =>
@@ -5941,6 +6397,11 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_weekly_report_day_weekly_report_weekly_report_id");
+                });
+
+            modelBuilder.Entity("SchoolManagement.Domain.Promotion.PromotionBatch", b =>
+                {
+                    b.Navigation("Decisions");
                 });
 
             modelBuilder.Entity("SchoolManagement.Domain.Weekly.WeeklyReport", b =>

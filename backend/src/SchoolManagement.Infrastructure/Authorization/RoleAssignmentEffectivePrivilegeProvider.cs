@@ -22,8 +22,8 @@ namespace SchoolManagement.Infrastructure.Authorization;
 /// (spec 4.2: "the union of all privileges from all active assignments held by the account, each
 /// tagged with the scope it arrived through"), regardless of whether the granting role is currently
 /// active or archived — 6.1.4's "existing assignments continue until the session ends" for an
-/// archived role, and the lifecycle cascade for a closed session or a deleted arm, is TASK-0046
-/// (spec 6.1.13; the task card's own out-of-scope list).
+/// archived role. A deleted arm leaves (or revokes) its assignments in <c>DeleteArmHandler</c>; a closed
+/// session's assignments stop counting for non-scopable checks through <c>GetGrantsAsync</c> (TASK-0046).
 /// </para>
 /// <para>
 /// Roles are looked up one at a time rather than through a new bulk-fetch repository method: an
@@ -46,8 +46,14 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
     ];
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(
-        string userId, CancellationToken cancellationToken)
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyCollection<PrivilegeGrant>> GetAllGrantsAsync(string userId, CancellationToken cancellationToken) =>
+        BuildAsync(userId, current: false, cancellationToken);
+
+    private async Task<IReadOnlyCollection<PrivilegeGrant>> BuildAsync(string userId, bool current, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(userId);
 
@@ -68,7 +74,9 @@ internal sealed class RoleAssignmentEffectivePrivilegeProvider(
             return SuperAdminGrants;
         }
 
-        var active = await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
+        var active = current
+            ? await loader.LoadCurrentAsync(accountId, cancellationToken).ConfigureAwait(false)
+            : await loader.LoadAsync(accountId, cancellationToken).ConfigureAwait(false);
         var grants = new List<PrivilegeGrant>();
         foreach (var (assignment, role) in active)
         {

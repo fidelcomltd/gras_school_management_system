@@ -73,7 +73,7 @@ internal sealed class PupilImportProcessor(
         }
 
         var arms = await ArmDirectory.LoadAsync(session, classLevels, armRepository, cancellationToken).ConfigureAwait(false);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
         var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today)).ToList();
 
         FlagDuplicatesInFile(drafts);

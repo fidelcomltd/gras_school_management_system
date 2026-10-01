@@ -46,10 +46,11 @@ public interface ISchoolImageProcessor
     /// </summary>
     /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
     /// <returns>
-    /// On success, one <see cref="SchoolImageSizeVariant.Original"/> rendition — re-encoded to strip
-    /// metadata, but NEVER resized (600x200 is a recommendation, not a requirement). On failure,
-    /// <see cref="SchoolImageErrorCodes.UnsupportedType"/> or <see cref="SchoolImageErrorCodes.TooLarge"/>
-    /// (over <see cref="SchoolImageLimits.MaxSignatureBytes"/>) — there is no minimum dimension.
+    /// On success, one <see cref="SchoolImageSizeVariant.Original"/> rendition: always a transparent PNG holding only
+    /// the pen strokes, the paper removed, trimmed to the strokes and at most 1200 pixels on the long edge (project
+    /// lead, 2026-09-30). On failure, <see cref="SchoolImageErrorCodes.UnsupportedType"/>,
+    /// <see cref="SchoolImageErrorCodes.TooLarge"/> (over <see cref="SchoolImageLimits.MaxSignatureBytes"/>) or
+    /// <see cref="SchoolImageErrorCodes.NoSignatureFound"/> — there is no minimum dimension.
     /// </returns>
     Result<ProcessedSchoolImage> ProcessSignature(byte[] fileBytes);
 
@@ -63,6 +64,17 @@ public interface ISchoolImageProcessor
     /// (over <see cref="SchoolImageLimits.MaxPupilPhotoBytes"/>, with the spec's own message naming the file's size).
     /// </returns>
     Result<ProcessedPupilPhoto> ProcessPupilPhoto(byte[] fileBytes);
+
+    /// <summary>
+    /// Validates and processes a photograph of a person barred from collecting a child: a JPEG at quality 80, at most 800
+    /// pixels on the long edge, never cropped (it may be a full-length picture), metadata stripped.
+    /// </summary>
+    /// <param name="fileBytes">The raw uploaded bytes, exactly as received.</param>
+    /// <returns>
+    /// On failure, the pupil photograph's codes: <see cref="PupilUploadErrorCodes.PhotoUnsupportedType"/> or
+    /// <see cref="PupilUploadErrorCodes.PhotoTooLarge"/>.
+    /// </returns>
+    Result<SchoolImageRendition> ProcessPersonPhoto(byte[] fileBytes);
 
     /// <summary>
     /// Validates a document-checklist scan (spec 6.5.8): PDF, JPEG or PNG by magic bytes, at most
@@ -198,6 +210,9 @@ public static class SchoolImageErrorCodes
 
     /// <summary>Logo only: under the minimum pixel dimensions.</summary>
     public const string TooSmall = "school_image.too_small";
+
+    /// <summary>Signature only: no pen strokes could be told apart from the paper (a blank page or a solid colour).</summary>
+    public const string NoSignatureFound = "school_image.no_signature_found";
 
     /// <summary>Declares more than <see cref="SchoolImageLimits.MaxDecodedPixels"/>; refused before decoding.</summary>
     public const string TooManyPixels = "school_image.too_many_pixels";

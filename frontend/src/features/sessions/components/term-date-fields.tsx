@@ -1,7 +1,7 @@
 import type { UseFormRegister } from 'react-hook-form';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import type { CreateSessionFormValues } from '../session-schema';
+import { DateInput } from '@/components/ui/date-input';
 
 /**
  * One term's three date fields, reused three times by `CreateSessionDialog`
@@ -13,10 +13,13 @@ export function TermDateFields({
   ordinalLabel,
   prefix,
   register,
+  onStartDate,
 }: {
   ordinalLabel: string;
   prefix: 'term1' | 'term2' | 'term3';
   register: UseFormRegister<CreateSessionFormValues>;
+  /** Told each new start date, so the previous term's "next term begins" can follow it. */
+  onStartDate?: (value: string) => void;
 }) {
   return (
     <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
@@ -24,17 +27,17 @@ export function TermDateFields({
 
       <Field>
         <FieldLabel>{ordinalLabel} start date</FieldLabel>
-        <Input type="date" {...register(`${prefix}.startDate`)} />
+        <DateInput {...register(`${prefix}.startDate`, { onChange: (event: { target: { value: string } }) => onStartDate?.(event.target.value) })} />
       </Field>
 
       <Field>
         <FieldLabel>{ordinalLabel} end date</FieldLabel>
-        <Input type="date" {...register(`${prefix}.endDate`)} />
+        <DateInput {...register(`${prefix}.endDate`)} />
       </Field>
 
       <Field>
-        <FieldLabel>{ordinalLabel} next resumption date</FieldLabel>
-        <Input type="date" {...register(`${prefix}.nextResumptionDate`)} />
+        <FieldLabel>{ordinalLabel}: next term begins (printed on its results)</FieldLabel>
+        <DateInput {...register(`${prefix}.nextResumptionDate`)} />
       </Field>
     </fieldset>
   );

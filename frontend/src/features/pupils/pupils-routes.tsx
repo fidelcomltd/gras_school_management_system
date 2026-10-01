@@ -4,6 +4,7 @@ import { ImportPupilsScreen } from './import/import-pupils-screen';
 import { IncompleteRecordsScreen } from './incomplete/incomplete-records-screen';
 import { PupilDetailScreen } from './pupil-detail-screen';
 import { PupilsListScreen } from './pupils-list-screen';
+import { SafeguardingSheetScreen } from './safeguarding/safeguarding-sheet-screen';
 
 /** This feature's slice of the route table, mounted inside `ProtectedLayout`'s `<Outlet/>`. */
 export const pupilsRoutes: RouteObject[] = [
@@ -28,6 +29,14 @@ export const pupilsRoutes: RouteObject[] = [
     element: (
       <RequirePrivilege privilege="report.view">
         <IncompleteRecordsScreen />
+      </RequirePrivilege>
+    ),
+  },
+  {
+    path: 'reports/safeguarding',
+    element: (
+      <RequirePrivilege privilege="pupil.safeguarding.view">
+        <SafeguardingSheetScreen />
       </RequirePrivilege>
     ),
   },

@@ -80,7 +80,7 @@ export const useBarredPersons = (pupilId: string, enabled: boolean) =>
   });
 
 export const useSaveBarredPersons = (pupilId: string) =>
-  useSave(RecordKeys.Barred, pupilId, (body: { hasBarredPersons: boolean; persons: { fullName: string; details: string | null }[] }) =>
+  useSave(RecordKeys.Barred, pupilId, (body: { hasBarredPersons: boolean; persons: { fullName: string; details: string | null; photoId: string | null }[] }) =>
     apiPut('/api/v1/pupils/{pupilId}/barred-persons', { pupilId, ...body }, { pathParams: { pupilId } }),
   );
 

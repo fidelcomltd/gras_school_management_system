@@ -1,14 +1,17 @@
-import { useId, useState } from 'react';
+import { FileSpreadsheet } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { FormError } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
+import { FileButton } from '@/components/ui/file-button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError, saveFile } from '@/lib/http';
 import { formatDate } from '@/shared/format/date';
 import { useCommitImport, useDownloadImportTemplate, useValidateImport, type PupilImportReport, type PupilImportResult } from './api';
 import { reportToCsv } from './report-csv';
+import { PageTrail } from '@/components/layout/page-trail';
 
 /** Spec 6.5.16: above this the interface warns that the import may take a minute. */
 const LARGE_FILE_ROWS = 500;
@@ -25,7 +28,6 @@ function errorMessage(error: unknown): string | null {
  * order.
  */
 export function ImportPupilsScreen() {
-  const fileInputId = useId();
   const me = useMe();
   const canOverride = !!me.data && hasPrivilege(me.data, 'arm.capacity.override');
   const template = useDownloadImportTemplate();
@@ -65,6 +67,7 @@ export function ImportPupilsScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTrail trail={[{ to: paths.pupils }, { label: 'Import pupils' }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">Import pupils</h1>
@@ -79,22 +82,17 @@ export function ImportPupilsScreen() {
       <FormError message={errorMessage(template.error)} />
 
       <section className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
-        <label htmlFor={fileInputId} className="text-sm font-medium text-foreground">
-          Filled-in template (.xlsx)
-        </label>
+        <p className="text-sm font-medium text-foreground">Filled-in template (.xlsx)</p>
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            id={fileInputId}
-            type="file"
+          <FileButton
+            inputLabel="Filled-in template (.xlsx)"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="text-sm"
-            onChange={(event) => {
-              reset(event.target.files?.[0] ?? null);
-              // Cleared so choosing the same file again, after fixing it, still fires a change.
-              event.target.value = '';
-            }}
-          />
-          {file ? <span className="text-sm text-foreground">{file.name}</span> : null}
+            onFile={(chosen) => reset(chosen)}
+          >
+            <FileSpreadsheet aria-hidden="true" />
+            {file ? 'Choose another file' : 'Choose file'}
+          </FileButton>
+          {file ? <span className="text-sm text-foreground">{file.name}</span> : <span className="text-sm text-muted-foreground">No file chosen yet.</span>}
           <Button onClick={() => file && validate.mutate(file)} disabled={!file || validate.isPending}>
             {validate.isPending ? 'Checking…' : 'Check file'}
           </Button>

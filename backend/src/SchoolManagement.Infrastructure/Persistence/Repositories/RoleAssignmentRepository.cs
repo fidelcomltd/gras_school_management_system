@@ -32,6 +32,35 @@ internal sealed class RoleAssignmentRepository(ApplicationDbContext context) : I
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<RoleAssignment>> ListActiveArmScopedForSessionTrackedAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        await context.RoleAssignments
+            .Where(assignment =>
+                assignment.SessionId == sessionId
+                && assignment.Status == RoleAssignmentStatus.Active
+                && assignment.ScopeType == ScopeType.ArmList)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<RoleAssignment>> ListActiveForSessionReadOnlyAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        await context.RoleAssignments
+            .AsNoTracking()
+            .Where(assignment => assignment.SessionId == sessionId && assignment.Status == RoleAssignmentStatus.Active)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountsReadOnlyAsync(
+        IReadOnlyCollection<Guid> adminAccountIds, CancellationToken cancellationToken) =>
+        await context.RoleAssignments
+            .AsNoTracking()
+            .Where(assignment =>
+                adminAccountIds.Contains(assignment.AdminAccountId) &&
+                assignment.Status == RoleAssignmentStatus.Active)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<RoleAssignment>> ListActiveForAccountReadOnlyAsync(
         Guid adminAccountId, CancellationToken cancellationToken) =>
         await context.RoleAssignments

@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/http';
 import { useAdmissionRecord } from '../api';
 import type { AdmissionQueueRow } from '../types';
 import { ApproveAdmissionForm } from './approve-admission-form';
+import { LoadingState } from '@/components/feedback/query-states';
 
 /**
  * `POST /api/v1/admissions/{id}/approve`. Fetches the admission record first
@@ -38,7 +39,7 @@ export function ApproveAdmissionDialog({
         </DialogHeader>
 
         {record.isPending ? (
-          <output className="text-sm text-muted-foreground">Loading application…</output>
+          <LoadingState label="Loading application…" />
         ) : record.isError ? (
           <div role="alert" className="flex flex-col items-start gap-3">
             <p className="text-sm text-destructive">{record.error.message}</p>

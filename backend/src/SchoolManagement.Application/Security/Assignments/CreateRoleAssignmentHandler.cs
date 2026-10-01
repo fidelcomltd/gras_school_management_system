@@ -10,6 +10,7 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Auth;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Sessions;
 
 namespace SchoolManagement.Application.Security.Assignments;
 
@@ -29,7 +30,9 @@ internal sealed class CreateRoleAssignmentCommandHandler(
     IArmRepository arms,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
-    ISystemAuditSink auditSink)
+    ISystemAuditSink auditSink,
+    AssignmentNames assignmentNames,
+    TimeProvider timeProvider)
     : IRequestHandler<CreateRoleAssignmentCommand, Result<RoleAssignmentDto>>
 {
     private const string EntityType = "role_assignment";
@@ -188,6 +191,21 @@ internal sealed class CreateRoleAssignmentCommandHandler(
             return Result.Failure<RoleAssignmentDto>(withinScope.Error);
         }
 
+        // Spec 6.1.13 (TASK-0046 C), after the privilege and escalation checks so a caller without the privilege learns
+        // nothing about the role or session. Existing assignments of an archived role keep working (6.1.4); new ones are refused.
+        if (role.Status == RoleStatus.Archived)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.role_archived", "This role is archived and cannot be newly assigned."));
+        }
+
+        if (session.State == SessionState.Closed)
+        {
+            return Result.Failure<RoleAssignmentDto>(Error.Conflict(
+                "role_assignment.session_closed",
+                $"The session {session.Name} is closed. Assignments can only be made in an open session."));
+        }
+
         var creation = RoleAssignment.Create(
             Guid.CreateVersion7(),
             targetAccountId,
@@ -214,6 +232,11 @@ internal sealed class CreateRoleAssignmentCommandHandler(
             actorAdminId: currentUser.UserId,
             cancellationToken).ConfigureAwait(false);
 
-        return Result.Success(RoleAssignmentMapper.ToDto(assignment));
+        // CreatedAtUtc is stamped by the auditing interceptor at SaveChanges, after this DTO is built, so the response
+        // carries the clock's reading now rather than a default (TASK-0046; the TASK-0086 approach). The stored value
+        // is stamped moments later, at commit.
+        var names = await assignmentNames.LoadAsync([assignment], cancellationToken).ConfigureAwait(false);
+        var dto = RoleAssignmentMapper.ToDto(assignment, names);
+        return Result.Success(dto.CreatedAtUtc == default ? dto with { CreatedAtUtc = timeProvider.GetUtcNow() } : dto);
     }
 }

@@ -43,6 +43,7 @@ public sealed record SheetRatingRow(Guid ItemId, Guid PointId, string? Comment);
 /// <param name="TimesPresent">Stored attendance.</param>
 /// <param name="TeacherComment">Class teacher's remark.</param>
 /// <param name="HeadTeacherComment">Head teacher's remark.</param>
+/// <param name="OutstandingFee">Spec 6.2.13: the pupil's typed outstanding-fee figure for this result set; null when blank.</param>
 public sealed record ResultSheetData(
     Guid ResultSetId,
     ResultSetState State,
@@ -62,7 +63,8 @@ public sealed record ResultSheetData(
     IReadOnlyList<SheetRatingRow> DevelopmentRatings,
     int? TimesPresent,
     string? TeacherComment,
-    string? HeadTeacherComment);
+    string? HeadTeacherComment,
+    int? OutstandingFee = null);
 
 /// <summary>Reads everything a result sheet needs for one pupil in one arm-term, in one place.</summary>
 public interface IResultSheetReader
@@ -72,4 +74,11 @@ public interface IResultSheetReader
     /// or null when there is no such result set.
     /// </summary>
     Task<ResultSheetData?> ReadAsync(Guid pupilId, Guid termId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sheet data bound to <paramref name="resultSetId"/> itself, whatever arm a pupil is enrolled in now: every pupil with
+    /// at least one computed subject line, or just <paramref name="pupilId"/> (lines or not), keyed by pupil. A fixed number
+    /// of queries however many pupils.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, ResultSheetData>> ReadSetAsync(Guid resultSetId, Guid? pupilId, CancellationToken cancellationToken);
 }

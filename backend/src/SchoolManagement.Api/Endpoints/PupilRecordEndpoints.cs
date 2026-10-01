@@ -103,6 +103,7 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);
 
         MapFiles(pupils);
+        MapSafeguardingSheet(endpoints);
 
         Read(endpoints.MapGet("/admissions/{id:guid}/completeness", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
                 (await sender.SendAsync(new GetAdmissionCompletenessQuery(id), cancellationToken)).Match(TypedResults.Ok)),
@@ -134,9 +135,75 @@ public sealed class PupilRecordEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }
 
-    /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6).</summary>
+    /// <summary>The class safeguarding sheet (spec 15 section 10.2), on screen and as a PDF.</summary>
+    private static void MapSafeguardingSheet(IEndpointRouteBuilder endpoints)
+    {
+        const string Description =
+            "Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special " +
+            "instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only " +
+            "export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check " +
+            "cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only.";
+
+        // Health data: never kept in a browser's disk cache on a shared staff-room computer.
+        Read(endpoints.MapGet("/reports/safeguarding", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    return (await sender.SendAsync(new GenerateSafeguardingSheetCommand(armId), cancellationToken)).Match(TypedResults.Ok);
+                }),
+                "GetSafeguardingSheet", "The class safeguarding sheet for one arm",
+                Description + " Each pupil's thumbnail travels in the sheet, under the sheet's own privilege. Health answers read " +
+                "`None` or `Not asked`, never blank. `Cache-Control: no-store`.")
+            .WithTags(Tag)
+            .Produces<SafeguardingSheetDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        Read(endpoints.MapGet("/reports/safeguarding/pdf", async (
+                    [FromQuery(Name = "armId")] string? armId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                    (await sender.SendAsync(new GenerateSafeguardingSheetPdfCommand(armId), cancellationToken))
+                    .Match(content => FileResponses.Serve(httpContext, content, "attachment", "no-store"))),
+                "GetSafeguardingSheetPdf", "The class safeguarding sheet as a printable PDF",
+                Description + " A4 landscape with each pupil's photograph, marked confidential; `attachment`, `no-store`.")
+            .WithTags(Tag)
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    /// <summary>Photograph and document-scan routes (spec 6.5.4, 6.5.8, 9.6), and the admission slip.</summary>
     private static void MapFiles(RouteGroupBuilder pupils)
     {
+        Read(pupils.MapGet("/admission-slip", async (Guid pupilId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new GetAdmissionSlipQuery(pupilId), cancellationToken))
+                .Match(content => FileResponses.Serve(httpContext, content, "attachment"))),
+            "GetAdmissionSlip", "Print a pupil's admission slip",
+            "Spec 6.5.11: the slip with the issued registration number, a PDF of half an A4 with the lower half blank (the " +
+            "school files them), stamped with when and by whom it was printed. `409 pupil.not_admitted` before approval. Needs " +
+            "`pupil.view` over the pupil.")
+            .Produces<Stream>(StatusCodes.Status200OK, "application/pdf")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        Upload(pupils.MapPost("/barred-persons/photos", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
+                {
+                    var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
+                    return (await sender.SendAsync(new UploadBarredPersonPhotoCommand(pupilId, bytes), cancellationToken)).Match(TypedResults.Ok);
+                }),
+            "UploadBarredPersonPhoto", "Upload a photograph of someone who must not collect the pupil",
+            "Multipart, one `file` part. JPEG or PNG only, verified by magic bytes; maximum 3 MB. Stored as a JPEG at most 800 " +
+            "pixels on the long edge, never cropped, with all metadata stripped. Attached to nobody until `PUT /barred-persons` " +
+            "names the returned `photoId` on a person, and only this pupil's list may use it. Audited as " +
+            "`pupil.safeguarding.photo_uploaded`. Needs `pupil.safeguarding.update` over the pupil. `Idempotency-Key` is REQUIRED.")
+            .Produces<BarredPersonPhotoDto>(StatusCodes.Status200OK);
+
+        Read(pupils.MapGet("/barred-persons/photos/{photoId:guid}", async (
+                    Guid pupilId, Guid photoId, ISender sender, HttpContext httpContext, CancellationToken cancellationToken) =>
+                (await sender.SendAsync(new ReadBarredPersonPhotoCommand(pupilId, photoId), cancellationToken))
+                .Match(content => FileResponses.Serve(httpContext, content, "inline", "no-store"))),
+            "GetBarredPersonPhoto", "Read a barred person's photograph",
+            "The JPEG, `inline`, `nosniff`, `Cache-Control: no-store`. Only a photograph a current barred person of this pupil " +
+            "carries: `404 barred_person.photo_not_found` otherwise. Every view is audited as `pupil.safeguarding.read`. Needs " +
+            "`pupil.safeguarding.view` over the pupil.")
+            .Produces<Stream>(StatusCodes.Status200OK, "image/jpeg");
+
         Upload(pupils.MapPost("/photo", async (Guid pupilId, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
                 {
                     var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
@@ -176,13 +243,14 @@ public sealed class PupilRecordEndpoints : IEndpointModule
                     Guid pupilId, Domain.Pupils.PupilDocumentType documentType, IFormFile file, ISender sender, CancellationToken cancellationToken) =>
                 {
                     var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
-                    return (await sender.SendAsync(new UploadPupilDocumentFileCommand(pupilId, documentType, bytes), cancellationToken))
+                    return (await sender.SendAsync(new UploadPupilDocumentFileCommand(pupilId, documentType, bytes, file.FileName), cancellationToken))
                         .Match(TypedResults.Ok);
                 }),
             "UploadPupilDocumentFile", "Attach or replace a checklist document's scan",
             "Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG " +
             "is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as " +
-            "received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). " +
+            "received today by the uploader. The file's own name is kept for display only (never the download name, never " +
+            "audited). The Other row needs its label first (`422 document.other_label_required`). " +
             "Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is " +
             "REQUIRED.")
             .Produces<PupilDocumentListDto>(StatusCodes.Status200OK);

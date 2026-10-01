@@ -1,9 +1,11 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
 
@@ -16,6 +18,8 @@ internal sealed class UpdatePupilBiographicalHandler(
     IPupilArmOfRecordLookup armOfRecordLookup,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
+    IArmRepository arms,
+    IAcademicSessionRepository sessions,
     TimeProvider timeProvider)
     : IRequestHandler<UpdatePupilBiographicalCommand, Result<PupilDto>>
 {
@@ -45,10 +49,8 @@ internal sealed class UpdatePupilBiographicalHandler(
                 "The registration number cannot be changed through this endpoint. It is issued once, at admission approval, and never edited afterwards."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.Update);
-
-        if (scope == PupilAccessScope.Forbidden)
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.Update, targetSessionId: null) == PupilAccessScope.Forbidden)
         {
             return Result.Failure<PupilDto>(Error.Forbidden(
                 "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
@@ -61,20 +63,19 @@ internal sealed class UpdatePupilBiographicalHandler(
             return Result.Failure<PupilDto>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
         }
 
-        if (scope == PupilAccessScope.ArmRestricted)
-        {
-            // TASK-0059: same real arm-of-record resolution as GetPupilQueryHandler — see its remarks.
-            var armId = await armOfRecordLookup.GetArmIdAsync(pupil.Id, cancellationToken).ConfigureAwait(false);
-            var allowedArmIds = PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.Update);
+        // TASK-0059/0060: same arm-of-record and session resolution as GetPupilQueryHandler — see its remarks.
+        var (armId, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupil.Id, armOfRecordLookup, arms, sessions, cancellationToken).ConfigureAwait(false);
+        var scope = PupilAccessGuard.Resolve(grants, Privileges.Pupil.Update, sessionId);
 
-            if (armId is not { } resolvedArmId || !allowedArmIds.Contains(resolvedArmId))
-            {
-                return Result.Failure<PupilDto>(Error.Forbidden(
-                    "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
-            }
+        if (scope == PupilAccessScope.Forbidden
+            || (scope == PupilAccessScope.ArmRestricted
+                && (armId is not { } resolvedArmId || !PupilAccessGuard.ResolveArmIds(grants, Privileges.Pupil.Update, sessionId).Contains(resolvedArmId))))
+        {
+            return Result.Failure<PupilDto>(Error.Forbidden(
+                "pupil.update_forbidden", "You do not hold the privilege required to edit this pupil."));
         }
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         var update = pupil.UpdateBiographical(
             request.Surname,

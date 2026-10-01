@@ -18,10 +18,13 @@ internal sealed class FindPupilDuplicatesQueryHandler(IPupilRepository pupils, T
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var phone = !string.IsNullOrWhiteSpace(request.ContactPhone) && NigerianPhoneNumber.TryNormalize(request.ContactPhone, out var normalized)
+            ? normalized
+            : null;
 
         var candidates = await pupils
-            .FindDuplicatesAsync(request.Surname, request.FirstName, request.DateOfBirth, MaxResults, today, cancellationToken)
+            .FindDuplicatesAsync(request.Surname, request.FirstName, request.DateOfBirth, phone, MaxResults, today, cancellationToken)
             .ConfigureAwait(false);
 
         return Result.Success(candidates);

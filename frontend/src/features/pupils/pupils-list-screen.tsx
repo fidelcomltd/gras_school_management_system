@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -9,7 +10,10 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { usePupils } from './api';
 import { CreatePupilDialog } from './components/create-pupil-dialog';
+import { CompletenessBadge, PupilThumbnail } from './components/register-columns';
 import { PUPIL_STATUSES, pupilName, type PupilsFilters } from './types';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const ALL = 'all';
 const STATUS_ITEMS = [{ value: ALL, label: 'All statuses' }, ...PUPIL_STATUSES.map((status) => ({ value: status, label: status }))];
@@ -20,6 +24,7 @@ export function PupilsListScreen() {
   const [draft, setDraft] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const pupils = usePupils(filters);
+  const filtered = !!(filters.search || filters.status);
   const me = useMe();
   const navigate = useNavigate();
   const canCreate = !!me.data && hasPrivilege(me.data, 'pupil.create');
@@ -88,9 +93,11 @@ export function PupilsListScreen() {
       ) : (
         <>
           {pupils.data.pages[0]?.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {filters.search || filters.status ? 'No pupils match these filters.' : 'No pupils yet.'}
-            </p>
+            <EmptyState
+              icon={Users}
+              title={filtered ? 'No pupils match these filters.' : 'No pupils yet.'}
+              description={filtered ? 'Try a different name, number or status.' : undefined}
+            />
           ) : (
             <ul className="flex flex-col gap-2">
               {pupils.data.pages
@@ -101,9 +108,13 @@ export function PupilsListScreen() {
                       to={paths.pupilDetail(pupil.id)}
                       className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3 text-sm hover:bg-muted"
                     >
-                      <span className="font-medium text-foreground">{pupilName(pupil)}</span>
-                      <span className="text-muted-foreground">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <PupilThumbnail pupilId={pupil.id} photoUpdatedAtUtc={pupil.photoUpdatedAtUtc} />
+                        <span className="truncate font-medium text-foreground">{pupilName(pupil)}</span>
+                      </span>
+                      <span className="flex items-center gap-3 text-muted-foreground">
                         {pupil.registrationNumber ?? 'No number yet'} · {pupil.status}
+                        {pupil.chasedPercent == null ? null : <CompletenessBadge percent={Number(pupil.chasedPercent)} />}
                       </span>
                     </Link>
                   </li>
@@ -112,9 +123,7 @@ export function PupilsListScreen() {
           )}
 
           {pupils.hasNextPage ? (
-            <Button variant="outline" size="sm" onClick={() => void pupils.fetchNextPage()} disabled={pupils.isFetchingNextPage}>
-              {pupils.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </Button>
+            <LoadMoreButton loading={pupils.isFetchingNextPage} onClick={() => void pupils.fetchNextPage()} />
           ) : null}
         </>
       )}

@@ -26,6 +26,14 @@ internal sealed class PupilRecordRepository(ApplicationDbContext context) : IPup
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<BarredPersonPhoto>> ListBarredPhotosAsync(Guid pupilId, CancellationToken cancellationToken) =>
+        await Query<BarredPersonPhoto>(track: false).Where(photo => photo.PupilId == pupilId).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<BarredPersonPhoto?> FindBarredPhotoAsync(Guid photoId, CancellationToken cancellationToken) =>
+        Query<BarredPersonPhoto>(track: false).FirstOrDefaultAsync(photo => photo.Id == photoId, cancellationToken);
+
+    /// <inheritdoc />
     public Task<PupilHealth?> FindHealthAsync(Guid pupilId, bool track, CancellationToken cancellationToken) =>
         Query<PupilHealth>(track).FirstOrDefaultAsync(health => health.PupilId == pupilId, cancellationToken);
 
@@ -56,6 +64,35 @@ internal sealed class PupilRecordRepository(ApplicationDbContext context) : IPup
             pickup.ToLookup(row => row.PupilId),
             documents.ToLookup(row => row.PupilId),
             admissions.ToDictionary(row => row.PupilId));
+    }
+
+    /// <inheritdoc />
+    public async Task<ChasedRecordSet> LoadChasedForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+
+        var health = await Query<PupilHealth>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var pickup = await Query<AuthorisedPickupPerson>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var documents = await Query<PupilDocument>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new ChasedRecordSet(health.ToDictionary(row => row.PupilId), pickup.ToLookup(row => row.PupilId), documents.ToLookup(row => row.PupilId));
+    }
+
+    /// <inheritdoc />
+    public async Task<SafeguardingRecordSet> LoadSafeguardingForPupilsAsync(IReadOnlyCollection<Guid> pupilIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pupilIds);
+        var ids = pupilIds.ToArray();
+
+        var health = await Query<PupilHealth>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var pickup = await Query<AuthorisedPickupPerson>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var barred = await Query<BarredPersonAnswer>(track: false).Where(row => ids.Contains(row.PupilId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new SafeguardingRecordSet(health.ToDictionary(row => row.PupilId), pickup.ToLookup(row => row.PupilId), barred.ToDictionary(row => row.PupilId));
     }
 
     /// <inheritdoc />

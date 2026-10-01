@@ -10,6 +10,8 @@ export interface TermChoice {
   sessions: SessionDto[];
   terms: TermDto[];
   isPending: boolean;
+  /** The sessions or the session's terms could not be loaded: never read that as "no session". */
+  isError: boolean;
   setSessionId: (id: string) => void;
   setTermId: (id: string) => void;
 }
@@ -40,6 +42,7 @@ export function useTermChoice(): TermChoice {
     sessions,
     terms,
     isPending: sessionsQuery.isPending || (sessionId !== '' && detail.isPending),
+    isError: sessionsQuery.isError || (sessionId !== '' && detail.isError),
     setSessionId: (id) => {
       setSessionChoice(id);
       setTermChoice(null);

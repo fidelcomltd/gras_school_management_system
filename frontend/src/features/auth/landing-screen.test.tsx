@@ -60,9 +60,19 @@ describe('LandingScreen — four required states', () => {
   });
 
   it('success: greets the signed-in staff member by name', async () => {
-    server.use(http.get(apiUrl('/api/v1/auth/me'), () => HttpResponse.json(SESSION)));
+    const empty = { items: [], nextCursor: null };
+    server.use(
+      http.get(apiUrl('/api/v1/auth/me'), () => HttpResponse.json(SESSION)),
+      // The dashboard's own reads: a school with nothing set up yet.
+      http.get(apiUrl('/api/v1/sessions'), () => HttpResponse.json(empty)),
+      http.get(apiUrl('/api/v1/reports/admissions-pipeline'), () =>
+        HttpResponse.json({ key: 'admissions-pipeline', title: 'x', filters: [], orientation: 'Portrait', twoUp: false, columns: [], rows: [], notes: [], rowCount: 0, generatedAtUtc: '2026-12-11T09:30:00Z' }),
+      ),
+      http.get(apiUrl('/api/v1/reports/incomplete-records'), () => HttpResponse.json({ sessionName: null, pupilsChecked: 0, counts: [], pupils: [] })),
+    );
     renderLanding();
 
     expect(await screen.findByRole('heading', { name: 'Welcome, Chisom Maxwell' })).toBeInTheDocument();
+    expect(await screen.findByText('Nothing pending.')).toBeInTheDocument();
   });
 });

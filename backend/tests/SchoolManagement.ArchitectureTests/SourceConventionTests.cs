@@ -26,6 +26,22 @@ public sealed partial class SourceConventionTests
     }
 
     [Fact]
+    public void OnlyCreateSessionHandlerCreatesASession()
+    {
+        // Spec 6.3: a session always comes into being with its three terms, and CreateSessionHandler is
+        // the one place that builds both together. Any other caller of AcademicSession.Create, reached
+        // through whatever route or verb, could produce a session without terms. This is the rule
+        // SessionEndpointsTests' route guard approximates from the outside.
+        var violations = FindViolations(
+            SessionCreatePattern(),
+            allowedPaths: ["src/SchoolManagement.Application/Sessions/CreateSessionHandler.cs"]);
+
+        violations.ShouldBeEmpty(
+            "Create sessions only through CreateSessionHandler, which creates their three terms with them." +
+            Environment.NewLine + Describe(violations));
+    }
+
+    [Fact]
     public void NoSynchronousBlockingOnTasks()
     {
         // .Result and .Wait() on a task block a thread pool thread while it waits. Under load that
@@ -169,6 +185,9 @@ public sealed partial class SourceConventionTests
 
     [GeneratedRegex(@"\.(Result|Wait)\s*(\(\s*\))?(?=\s*[;.,)])")]
     private static partial Regex BlockingCallPattern();
+
+    [GeneratedRegex(@"\bAcademicSession\s*\.\s*Create\s*\(")]
+    private static partial Regex SessionCreatePattern();
 
     [GeneratedRegex(@"\basync\s+void\b")]
     private static partial Regex AsyncVoidPattern();

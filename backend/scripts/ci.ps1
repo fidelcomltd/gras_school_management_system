@@ -135,8 +135,18 @@ param(
     [switch]$UseHostedDb
 )
 
+# TASK-0056: the SUMMARY is also written to this file on every exit path, so a report quotes it instead of the log.
+. (Join-Path $PSScriptRoot 'lib/gate-summary-file.ps1')
+$script:gateSummaryPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/gate-summary.txt'
+$script:gateSummaryWritten = $false
+$script:gateFailingLines = [System.Collections.Generic.List[string]]::new()
+
+# Until this run writes its own summary, the file says so: a killed or crashed run never leaves the last run's PASS.
+Write-GateSummaryFile -Path $script:gateSummaryPath -AbortReason 'a gate run started and has not finished (in progress, or killed).'
+
 if ($SkipIntegration -and $IntegrationFilter) {
     Write-Host 'ERROR: -SkipIntegration and -IntegrationFilter are mutually exclusive -- pick one.' -ForegroundColor Red
+    Write-GateSummaryFile -Path $script:gateSummaryPath -AbortReason '-SkipIntegration and -IntegrationFilter are mutually exclusive.'
     exit 1
 }
 
@@ -173,6 +183,7 @@ else {
     }
     catch {
         Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Write-GateSummaryFile -Path $script:gateSummaryPath -AbortReason "Integration database: $($_.Exception.Message)"
         Pop-Location
         exit 1
     }
@@ -235,6 +246,11 @@ function Write-FinalSummary {
     else {
         Write-Host 'ALL GATES PASSED' -ForegroundColor Green
     }
+
+    Write-GateSummaryFile -Path $script:gateSummaryPath -Verdicts $gateVerdicts -TestCountsLine $script:testCountsLine `
+        -CoverageLine $script:coverageLine -FailingLines $script:gateFailingLines
+    $script:gateSummaryWritten = $true
+    Write-Host "Summary written to $script:gateSummaryPath" -ForegroundColor DarkGray
 }
 
 function Invoke-Gate {
@@ -252,8 +268,17 @@ function Invoke-Gate {
     Write-Host ''
     Write-Host "══════ $Name ══════" -ForegroundColor Cyan
 
+    # TASK-0056: everything the gate prints (standard output, native stderr and Write-Host) is kept line by line as it
+    # streams, so a failure's lines reach the summary file even when the gate throws part-way. Shown as plain text.
+    $captured = [System.Collections.Generic.List[string]]::new()
     try {
-        & $Action
+        & $Action 2>&1 6>&1 | ForEach-Object {
+            $text = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+            elseif ($_ -is [System.Management.Automation.InformationRecord]) { "$($_.MessageData)" }
+            else { "$_" }
+            $captured.Add($text)
+            $text
+        } | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "exit code $LASTEXITCODE"
         }
@@ -264,6 +289,9 @@ function Invoke-Gate {
         Write-Host "FAIL: $Name -- $($_.Exception.Message)" -ForegroundColor Red
         $failures.Add($Name)
         $gateVerdicts.Add("FAIL: $Name -- $($_.Exception.Message)")
+        foreach ($line in @(Get-GateFailingLines -Output $captured)) {
+            $script:gateFailingLines.Add("[$Name] $line")
+        }
 
         if ($OnFailure) {
             & $OnFailure
@@ -712,5 +740,12 @@ try {
     exit 0
 }
 finally {
+    # An exit path that never reached the summary (an unhandled error) still leaves a file that says FAIL.
+    if (-not $script:gateSummaryWritten) {
+        Write-GateSummaryFile -Path $script:gateSummaryPath -Verdicts $gateVerdicts -TestCountsLine $script:testCountsLine `
+            -CoverageLine $script:coverageLine -FailingLines $script:gateFailingLines `
+            -AbortReason 'the run ended before its summary (an unhandled error; see the log).'
+    }
+
     Pop-Location
 }

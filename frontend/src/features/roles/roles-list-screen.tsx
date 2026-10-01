@@ -1,5 +1,7 @@
+import { ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
@@ -7,12 +9,14 @@ import { useDeleteRole, useRoles } from './api';
 import { CreateRoleDialog } from './components/create-role-dialog';
 import { EditRoleDialog } from './components/edit-role-dialog';
 import type { RoleDto } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
- * `/roles` (TASK-0028 §2). Role *assignments* and scopes are out of scope
- * (TASK-0030, blocked on arms — the backend does not exist yet); this screen
- * only manages the role definitions themselves: name, description,
- * privileges, active/archived.
+ * `/roles` (TASK-0028 §2). Manages the role definitions themselves: name,
+ * description, privileges, active/archived. Who holds a role, and over which
+ * classes, is assigned on each admin's page (Roles section).
  */
 export function RolesListScreen() {
   const roles = useRoles();
@@ -20,13 +24,14 @@ export function RolesListScreen() {
   const deleteRole = useDeleteRole();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<RoleDto | null>(null);
+  const [deleting, setDeleting] = useState<RoleDto | null>(null);
 
   const canCreate = !!me.data && hasPrivilege(me.data, 'role.create');
   const canEdit = !!me.data && hasPrivilege(me.data, 'role.update');
   const canDelete = !!me.data && hasPrivilege(me.data, 'role.delete');
 
   if (roles.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading roles…</output>;
+    return <LoadingState label="Loading roles…" />;
   }
 
   if (roles.isError) {
@@ -42,7 +47,6 @@ export function RolesListScreen() {
   }
 
   const items = roles.data.pages.flatMap((page) => page.items);
-  const deleteError = deleteRole.error instanceof ApiError ? deleteRole.error.message : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,14 +58,8 @@ export function RolesListScreen() {
         {canCreate ? <Button onClick={() => setShowCreate(true)}>New role</Button> : null}
       </header>
 
-      {deleteError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteError}
-        </p>
-      ) : null}
-
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No roles yet.</p>
+        <EmptyState icon={ShieldCheck} title="No roles yet." />
       ) : (
         <ul aria-label="Roles" className="flex flex-col gap-2">
           {items.map((role) => (
@@ -88,11 +86,7 @@ export function RolesListScreen() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => {
-                      if (window.confirm(`Delete ${role.name}? This cannot be undone.`)) {
-                        deleteRole.mutate(role.id);
-                      }
-                    }}
+                    onClick={() => setDeleting(role)}
                   >
                     Delete
                   </Button>
@@ -104,18 +98,21 @@ export function RolesListScreen() {
       )}
 
       {roles.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void roles.fetchNextPage()}
-          disabled={roles.isFetchingNextPage}
-        >
-          {roles.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={roles.isFetchingNextPage} onClick={() => void roles.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateRoleDialog onClose={() => setShowCreate(false)} /> : null}
       {editing ? <EditRoleDialog role={editing} onClose={() => setEditing(null)} /> : null}
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          description="This cannot be undone."
+          confirmLabel="Delete role"
+          pendingLabel="Deleting…"
+          onConfirm={() => deleteRole.mutateAsync(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -24,6 +24,12 @@ public interface IResultSheetPdfRenderer
     /// <summary>The PDF bytes.</summary>
     byte[] Render(ResultSheet sheet, ResultSheetPdfExtras extras);
 
+    /// <summary>
+    /// Several sheets as one PDF, each starting on a fresh page and numbered within itself, exactly as <see cref="Render"/>
+    /// would print it alone. At least one sheet.
+    /// </summary>
+    byte[] RenderMany(IReadOnlyList<(ResultSheet Sheet, ResultSheetPdfExtras Extras)> sheets);
+
     /// <summary>The annual cumulative document (6.7.10): A4, same header and footer as the term sheet, no verification marks.</summary>
     byte[] RenderAnnual(AnnualSheet sheet, ResultSheetPdfExtras extras);
 }

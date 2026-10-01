@@ -1,9 +1,12 @@
 import {
+  Banknote,
   BookOpen,
   CalendarCheck,
   CalendarRange,
   ChartColumn,
+  ClipboardList,
   FileWarning,
+  HeartPulse,
   House,
   KeyRound,
   Layers,
@@ -47,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Pupils', to: paths.pupils, icon: Users, requires: 'pupil.view' },
       { label: 'Admissions', to: paths.admissions, icon: UserPlus, requires: 'pupil.view' },
       { label: 'Incomplete records', to: paths.incompleteRecords, icon: FileWarning, requires: 'report.view' },
+      { label: 'Safeguarding sheet', to: paths.safeguardingSheet, icon: HeartPulse, requires: 'pupil.safeguarding.view' },
     ],
   },
   {
@@ -57,6 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Class records', to: paths.classRecords, icon: NotebookTabs, requires: 'result.view' },
       { label: 'Weekly reports', to: paths.weekly, icon: CalendarCheck, requires: 'weekly.view' },
       { label: 'Pins', to: paths.pins, icon: KeyRound, requires: 'pin.view' },
+      { label: 'Reports', to: paths.reports, icon: ClipboardList, requires: 'report.view', end: true },
     ],
   },
   {
@@ -66,6 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Classes', to: paths.classes, icon: Layers, requires: 'level.view' },
       { label: 'Arms', to: paths.arms, icon: LayoutGrid, requires: 'arm.view' },
       { label: 'Subjects', to: paths.subjects, icon: BookOpen, requires: 'subject.view' },
+      { label: 'Fee notices', to: paths.feeNotices, icon: Banknote, requires: 'fee.manage' },
     ],
   },
   {
@@ -88,4 +94,15 @@ export function visibleNavGroups(session: AuthSession): NavGroup[] {
     ...group,
     items: group.items.filter((item) => !item.requires || hasPrivilege(session, item.requires)),
   })).filter((group) => group.items.length > 0);
+}
+
+/** The menu entry for `to`, if the sidebar has one: its label and the privilege it needs. */
+export function navItemFor(to: string): NavItem | undefined {
+  return NAV_GROUPS.flatMap((group) => group.items).find((item) => item.to === to);
+}
+
+/** Whether this caller may open `to`: always for a path the menu does not gate. */
+export function canOpen(session: AuthSession, to: string): boolean {
+  const item = navItemFor(to);
+  return !item?.requires || hasPrivilege(session, item.requires);
 }

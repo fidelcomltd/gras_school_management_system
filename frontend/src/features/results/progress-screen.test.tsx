@@ -79,6 +79,38 @@ describe('ProgressScreen', () => {
     expect(screen.queryByRole('button', { name: 'Withdraw from parents' })).not.toBeInTheDocument();
   });
 
+  it('prints a published class, and one pupil from the grid, only for a holder of result.print', async () => {
+    mockMe('result.view', 'result.print');
+    mockClass('Published', true);
+    const printed: (string | null)[] = [];
+    server.use(
+      http.get(apiUrl('/api/v1/arms/:armId/result-sheets/pdf'), ({ request }) => {
+        const query = new URL(request.url).searchParams;
+        expect(query.get('termId')).toBe('t-1');
+        printed.push(query.get('pupilId'));
+        return new HttpResponse(new Uint8Array([37, 80, 68, 70]), { headers: { 'Content-Type': 'application/pdf' } });
+      }),
+    );
+
+    const { user } = renderWithProviders(<ProgressScreen />);
+    await user.click(await screen.findByRole('button', { name: 'Print result sheets' }));
+    await waitFor(() => expect(printed).toEqual([null]));
+    await user.click(screen.getByRole('button', { name: "Print Okafor Chidera's result sheet" }));
+
+    await waitFor(() => expect(printed).toEqual([null, 'p-1']));
+  });
+
+  it('offers no printing without result.print', async () => {
+    mockMe('result.view');
+    mockClass('Published', true);
+
+    renderWithProviders(<ProgressScreen />);
+
+    expect(await screen.findByText('Published')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Print result sheets' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Sheet' })).not.toBeInTheDocument();
+  });
+
   it('returns for correction with a reason of at least ten characters', async () => {
     mockMe('result.view', 'result.approve', 'result.return');
     mockClass('AwaitingApproval', true);

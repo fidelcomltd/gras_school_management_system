@@ -13,8 +13,8 @@ import { errorText } from '../records/format';
 import type { PupilStatus } from '../types';
 import { canCommit, useActiveArms, useChangePupilStatus, type PupilMovementOutcome } from './api';
 import { Consequences } from './consequences';
+import { DateInput } from '@/components/ui/date-input';
 
-const dateInput = 'h-9 w-44 rounded-md border border-input bg-background px-2 text-sm text-foreground';
 
 const LABELS: Partial<Record<PupilStatus, string>> = {
   Transferred: 'Transferred to another school',
@@ -123,10 +123,9 @@ export function StatusDialog({ pupilId, status, onClose }: { pupilId: string; st
 
           <Field>
             <FieldLabel>Effective date</FieldLabel>
-            <input
-              type="date"
+            <DateInput
               aria-label="Effective date"
-              className={dateInput}
+              className="w-44"
               value={effectiveDate}
               max={today}
               onChange={(event) => change(() => setEffectiveDate(event.target.value))}

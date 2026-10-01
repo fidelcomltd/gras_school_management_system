@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,6 +10,7 @@ import { hasFieldError } from '@/shared/forms/field-message';
 import { useUpdateSession } from '../api';
 import { editSessionSchema, type EditSessionFormValues } from '../session-schema';
 import type { SessionDetailDto } from '../types';
+import { DateInput } from '@/components/ui/date-input';
 
 const FIELDS = ['name', 'startDate', 'endDate'] as const;
 
@@ -61,11 +63,7 @@ export function EditSessionDialog({
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-          {formError ? (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {formError}
-            </p>
-          ) : null}
+          <FormError message={formError} />
 
           <Field invalid={!!errors.name}>
             <FieldLabel>Session name</FieldLabel>
@@ -75,12 +73,12 @@ export function EditSessionDialog({
 
           <Field invalid={!!errors.startDate}>
             <FieldLabel>Start date</FieldLabel>
-            <Input type="date" {...register('startDate')} />
+            <DateInput {...register('startDate')} />
           </Field>
 
           <Field invalid={!!errors.endDate}>
             <FieldLabel>End date</FieldLabel>
-            <Input type="date" {...register('endDate')} />
+            <DateInput {...register('endDate')} />
           </Field>
 
           <DialogFooter>

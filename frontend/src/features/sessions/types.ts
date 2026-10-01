@@ -32,3 +32,17 @@ export type CreateSessionTermInput = components['schemas']['CreateSessionTermInp
 export type UpdateSessionCommand = components['schemas']['UpdateSessionCommand'];
 export type UpdateTermCommand = components['schemas']['UpdateTermCommand'];
 export type ReopenTermCommand = components['schemas']['ReopenTermCommand'];
+
+export const PromotionKeys = {
+  Preview: 'promotion.preview',
+  Commit: 'promotion.commit',
+  Reverse: 'promotion.reverse',
+} as const;
+
+export type PromotionPreviewDto = components['schemas']['PromotionPreviewDto'];
+export type PromotionRowDto = components['schemas']['PromotionRowDto'];
+export type PromotionTargetArmDto = components['schemas']['PromotionTargetArmDto'];
+export type PromotionBatchDto = components['schemas']['PromotionBatchDto'];
+export type PromotionDecisionOutcome = components['schemas']['PromotionDecisionOutcome'];
+export type PromotionDecisionInput = components['schemas']['PromotionDecisionInput'];
+export type CommitPromotionCommand = components['schemas']['CommitPromotionCommand'];

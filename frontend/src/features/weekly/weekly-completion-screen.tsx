@@ -1,3 +1,4 @@
+import { CalendarCheck } from 'lucide-react';
 import { useState } from 'react';
 import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { useMe } from '@/features/auth/api';
@@ -6,9 +7,10 @@ import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { useWeeklyCompletion, useWeeklyIllness } from './api';
 import { formatDate, weekLabel } from './types';
-
-const lagosDateTime = (iso: string) =>
-  new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+import { EmptyState } from '@/components/feedback/empty-state';
+import { PageTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
+import { lagosDateTime } from '@/shared/format/date';
 
 /**
  * `/weekly/completion` — spec 6.10.12: which classes wrote what, per week, and (for safeguarding staff) the pupils with
@@ -28,7 +30,7 @@ export function WeeklyCompletionScreen() {
   const table = () => {
     if (term.isPending || completion.isPending) return <LoadingState label="Loading the report…" />;
     if (completion.isError) return <QueryErrorState error={completion.error} onRetry={() => void completion.refetch()} />;
-    if (completion.data.items.length === 0) return <p className="text-sm text-muted-foreground">No classes or weeks in this term.</p>;
+    if (completion.data.items.length === 0) return <EmptyState icon={CalendarCheck} title="No classes or weeks in this term." />;
     return (
       <div className="overflow-x-auto">
         <table className="w-full min-w-[48rem] text-sm">
@@ -67,6 +69,7 @@ export function WeeklyCompletionScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTrail trail={[{ to: paths.weekly }, { label: 'Weekly report completion' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Weekly report completion</h1>
         <p className="text-sm text-muted-foreground">Which classes have written their weekly notes, week by week.</p>
@@ -104,7 +107,7 @@ export function WeeklyCompletionScreen() {
           ) : illness.isError ? (
             <QueryErrorState error={illness.error} onRetry={() => void illness.refetch()} />
           ) : illness.data.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pupil has symptoms noted on two or more days.</p>
+            <EmptyState icon={CalendarCheck} title="No pupil has symptoms noted on two or more days." />
           ) : (
             <ul className="flex flex-col gap-2">
               {illness.data.items.map((row) => (

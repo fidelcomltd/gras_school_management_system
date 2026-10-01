@@ -1,3 +1,4 @@
+import { Layers } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
@@ -7,6 +8,8 @@ import { useSections } from '../api';
 import type { SectionDto } from '../types';
 import { CreateSectionDialog } from './create-section-dialog';
 import { EditSectionDialog } from './edit-section-dialog';
+import { LoadingState } from '@/components/feedback/query-states';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * Sections (spec 6.4.9): "a two-row seeded list a school extends rarely." Not
@@ -23,7 +26,7 @@ export function SectionList() {
   const canEdit = !!me.data && hasPrivilege(me.data, 'level.update');
 
   if (sections.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading sections…</output>;
+    return <LoadingState label="Loading sections…" />;
   }
 
   if (sections.isError) {
@@ -47,7 +50,7 @@ export function SectionList() {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No sections yet.</p>
+        <EmptyState icon={Layers} title="No sections yet." />
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((section) => (

@@ -97,7 +97,7 @@ describe('PinBatchScreen', () => {
     );
 
     const { user } = renderBatch();
-    await user.click(await screen.findByRole('button', { name: 'Revoke pin M3PQ' }));
+    await user.click(await screen.findByRole('button', { name: 'Revoke pin starting M3PQ' }));
     await user.type(screen.getByLabelText('Reason'), 'Slip lost');
     await user.click(screen.getByRole('button', { name: 'Revoke' }));
 

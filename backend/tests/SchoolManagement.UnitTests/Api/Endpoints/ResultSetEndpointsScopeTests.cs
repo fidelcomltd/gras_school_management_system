@@ -49,4 +49,24 @@ public sealed class ResultSetEndpointsScopeTests
         requirement.ScopeParameterKind.ShouldBe(ScopeParameterKind.None);
         requirement.RouteParameterName.ShouldBeNull();
     }
+
+    [Fact]
+    public void PrintingResultSheets_IsArmScoped_OnResultPrint()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton(Substitute.For<ISender>());
+        var app = builder.Build();
+        new ResultSheetEndpoints().MapEndpoints(app);
+
+        var requirement = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(dataSource => dataSource.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Single(candidate => candidate.RoutePattern.RawText == "/arms/{armId:guid}/result-sheets/pdf")
+            .Metadata.GetMetadata<PrivilegeRequirement>();
+
+        requirement.ShouldNotBeNull();
+        requirement!.Privilege.ShouldBe(Privileges.Results.Print);
+        requirement.ScopeParameterKind.ShouldBe(ScopeParameterKind.Arm);
+        requirement.RouteParameterName.ShouldBe("armId");
+    }
 }

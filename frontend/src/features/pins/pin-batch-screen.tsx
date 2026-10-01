@@ -1,7 +1,8 @@
+import { pinLabel } from './masked-pin';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { paths } from '@/app/router/paths';
-import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { FormError, LoadingState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
@@ -10,6 +11,7 @@ import { ReasonDialog } from '@/shared/dialogs/reason-dialog';
 import { usePinAction, usePinBatch, usePinDownload } from './api';
 import { PinTable } from './components/pin-table';
 import { formatDateTime, type PinSummaryDto } from './types';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 type Asking = { kind: 'revoke-batch' } | { kind: 'revoke-pin' | 'reinstate-pin'; pin: PinSummaryDto };
 
@@ -24,8 +26,8 @@ export function PinBatchScreen() {
   const [openedAt] = useState(() => Date.now()); // the page's "now", fixed per visit
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
-  if (detail.isPending) return <LoadingState label="Loading pin batch…" />;
-  if (detail.isError) return <QueryErrorState error={detail.error} onRetry={() => void detail.refetch()} />;
+  if (detail.isPending) return <WithTrail trail={[{ to: paths.pins }, { label: 'Pin batch' }]}><LoadingState label="Loading pin batch…" /></WithTrail>;
+  if (detail.isError) return <TrailedError trail={[{ to: paths.pins }, { label: 'Pin batch' }]} error={detail.error} onRetry={() => void detail.refetch()} />;
 
   const { batch, pins } = detail.data;
   const purged = new Date(batch.plaintextPurgeAt).getTime() < openedAt;
@@ -34,9 +36,7 @@ export function PinBatchScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.pins} className="text-sm text-primary hover:underline">
-        ← All pin batches
-      </Link>
+      <PageTrail trail={[{ to: paths.pins }, { label: batch.name }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">{batch.name}</h1>
         <p className="text-sm text-muted-foreground">
@@ -98,7 +98,7 @@ export function PinBatchScreen() {
 
       {asking ? (
         <ReasonDialog
-          title={asking.kind === 'revoke-batch' ? 'Revoke the whole batch' : asking.kind === 'revoke-pin' ? `Revoke pin ${asking.pin.prefix}…` : `Reinstate pin ${asking.pin.prefix}…`}
+          title={asking.kind === 'revoke-batch' ? 'Revoke the whole batch' : asking.kind === 'revoke-pin' ? `Revoke ${pinLabel(asking.pin.prefix)}` : `Reinstate ${pinLabel(asking.pin.prefix)}`}
           description={
             asking.kind === 'revoke-batch'
               ? 'Every pin in it stops working at once, including any parent viewing results with one now.'

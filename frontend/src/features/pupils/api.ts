@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPatch, apiPost } from '@/api/client';
+import { getFile, saveFile } from '@/lib/http';
 import { RecordKeys } from './records/api';
 import {
   PupilsKeys,
@@ -49,6 +50,18 @@ export function usePupilSearch(term: string, enabled: boolean) {
   });
 }
 
+/**
+ * The states and LGAs a pupil record accepts (spec 6.5.4), the same list the server validates against. It changes only
+ * with a deploy, so an hour's staleness is safe (the server caches it for an hour too).
+ */
+export function useNigerianGeography() {
+  return useQuery({
+    queryKey: [PupilsKeys.Geography],
+    queryFn: ({ signal }) => apiGet('/api/v1/geography/states', undefined, { signal }),
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
 /** Gated `pupil.view`. */
 export function usePupil(id: string) {
   return useQuery({
@@ -58,8 +71,8 @@ export function usePupil(id: string) {
 }
 
 /** Spec 6.5.5: possible duplicates by name and date of birth, checked before creating. */
-export function fetchDuplicates(surname: string, firstName: string, dateOfBirth: string) {
-  return apiGet(DUPLICATES_PATH, { surname, firstName, dateOfBirth });
+export function fetchDuplicates(surname: string, firstName: string, dateOfBirth: string, contactPhone?: string) {
+  return apiGet(DUPLICATES_PATH, { surname, firstName, dateOfBirth, ...(contactPhone ? { contactPhone } : {}) });
 }
 
 /** Gated `pupil.create`. Always creates a Pending pupil. `Idempotency-Key` REQUIRED, fresh per submit. */
@@ -101,5 +114,13 @@ export function useCorrectRegistrationNumber(id: string) {
       queryClient.setQueryData([PupilsKeys.Detail, id], pupil);
       void queryClient.invalidateQueries({ queryKey: [PupilsKeys.List] });
     },
+  });
+}
+
+/** Spec 6.5.11: the admission slip PDF, saved under the server's own name. Needs `pupil.view`; 409 before approval. */
+export function useDownloadAdmissionSlip() {
+  return useMutation({
+    mutationKey: [PupilsKeys.Detail, 'admission-slip'],
+    mutationFn: async (pupilId: string) => saveFile(await getFile(`/api/v1/pupils/${pupilId}/admission-slip`, 'admission-slip.pdf')),
   });
 }

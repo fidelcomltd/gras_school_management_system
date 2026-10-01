@@ -134,13 +134,53 @@ public sealed class SkiaSchoolImageProcessorTests
     }
 
     [Fact]
-    public void ProcessSignature_HasNoMinimumDimension_ATinyImageSucceeds()
+    public void ProcessSignature_ABlankOrSolidImage_IsRefusedAsNoSignatureFound()
     {
-        var result = _processor.ProcessSignature(CreatePng(10, 8));
+        var result = _processor.ProcessSignature(CreatePng(600, 200));
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(SchoolImageErrorCodes.NoSignatureFound);
+    }
+
+    [Fact]
+    public void ProcessSignature_OnShadedPaper_KeepsOnlyTheStrokes_TransparentAndTrimmed()
+    {
+        // Paper lit from the left fading into shadow on the right, darker there than the stroke's own cut-off would be
+        // on one global threshold, with a blue stroke across the middle.
+        var result = _processor.ProcessSignature(CreateSignatureJpeg(800, 400));
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Original.WidthPixels.ShouldBe(10);
-        result.Value.Original.HeightPixels.ShouldBe(8);
+        var original = result.Value.Original;
+        original.ContentType.ShouldBe("image/png");
+        // Trimmed to the stroke (plus a small margin), not the 800 by 400 page.
+        original.WidthPixels.ShouldBeLessThan(700);
+        original.HeightPixels.ShouldBeLessThan(80);
+
+        using var decoded = SKBitmap.Decode(original.Bytes.ToArray());
+        decoded.GetPixel(0, 0).Alpha.ShouldBe((byte)0, "paper must be transparent");
+        var ink = decoded.GetPixel(decoded.Width / 2, decoded.Height / 2);
+        ink.Alpha.ShouldBeGreaterThan((byte)200, "the stroke must stay opaque");
+        IsBlueish(ink).ShouldBeTrue($"the stroke keeps its ink colour, got {ink}");
+    }
+
+    [Fact]
+    public void ProcessSignature_ASheetPhotographedOnADarkDesk_KeepsNoBandOfDeskAlongThePapersEdge()
+    {
+        var result = _processor.ProcessSignature(CreateSignatureOnDeskJpeg(1000, 800));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Trimmed to the stroke across the middle, not to the sheet or the whole photograph.
+        result.Value.Original.WidthPixels.ShouldBeLessThan(500);
+        result.Value.Original.HeightPixels.ShouldBeLessThan(60);
+    }
+
+    [Fact]
+    public void ProcessSignature_ALargeScan_IsScaledDownTo1200OnTheLongEdge()
+    {
+        var result = _processor.ProcessSignature(CreateSignatureJpeg(3000, 1000, strokeWidth: 30));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Original.WidthPixels.ShouldBeLessThanOrEqualTo(1200);
     }
 
     // --- Metadata stripping ------------------------------------------------------------------
@@ -174,28 +214,27 @@ public sealed class SkiaSchoolImageProcessorTests
     // --- Orientation (stage B1: review finding on stage A) -----------------------------------
 
     [Fact]
-    public void ProcessSignature_WithExifOrientationSix_RotatesPixelsBeforeStrippingMetadata()
+    public void ProcessDocumentScan_WithExifOrientationSix_RotatesPixelsBeforeStrippingMetadata()
     {
         // Fixture: 40x30 AS STORED, a 4x4 red marker at the STORED top-left corner, tagged EXIF
         // orientation 6 ("rotate 90 CW to display correctly"). A camera that shot this in portrait
         // and stored it landscape-with-a-tag is exactly the scenario this stage exists for.
         var sourceBytes = ReadEmbeddedFixture("orientation-6.jpg");
 
-        var result = _processor.ProcessSignature(sourceBytes);
+        var result = _processor.ProcessDocumentScan(sourceBytes);
 
         result.IsSuccess.ShouldBeTrue();
-        var original = result.Value.Original;
+        using var decoded = SKBitmap.Decode(result.Value.Bytes.ToArray());
 
         // Rotating 40x30 stored pixels 90 degrees CW gives 30x40 displayed pixels — swapped, not
         // just re-encoded at the stored dimensions.
-        original.WidthPixels.ShouldBe(30);
-        original.HeightPixels.ShouldBe(40);
+        decoded.Width.ShouldBe(30);
+        decoded.Height.ShouldBe(40);
 
         // Physically rotating an image 90 CW moves its top-left corner to the top-right. The output
         // has no EXIF any more (stage A), so this decode reads raw pixels with no correction applied
         // — if the marker is where a 90 CW rotation predicts, the correction actually happened before
         // the encode, not merely a claim.
-        using var decoded = SKBitmap.Decode(original.Bytes.ToArray());
         var topRight = decoded.GetPixel(decoded.Width - 1, 0);
         var topLeft = decoded.GetPixel(0, 0);
         var bottomRight = decoded.GetPixel(decoded.Width - 1, decoded.Height - 1);
@@ -206,15 +245,16 @@ public sealed class SkiaSchoolImageProcessorTests
     }
 
     [Fact]
-    public void ProcessSignature_WithNoExifOrientationTag_LeavesPixelsUnchanged()
+    public void ProcessDocumentScan_WithNoExifOrientationTag_LeavesPixelsUnchanged()
     {
         // CreatePng carries no EXIF at all, so SKCodec.EncodedOrigin is TopLeft (the default) and no
         // rotation should be applied — dimensions must come out exactly as authored.
-        var result = _processor.ProcessSignature(CreatePng(600, 200));
+        var result = _processor.ProcessDocumentScan(CreatePng(600, 200));
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Original.WidthPixels.ShouldBe(600);
-        result.Value.Original.HeightPixels.ShouldBe(200);
+        using var decoded = SKBitmap.Decode(result.Value.Bytes.ToArray());
+        decoded.Width.ShouldBe(600);
+        decoded.Height.ShouldBe(200);
     }
 
     private static bool IsReddish(SKColor color) => color.Red > 120 && color.Blue < 120;
@@ -255,17 +295,6 @@ public sealed class SkiaSchoolImageProcessorTests
         var size64 = result.Value.Renditions.Single(r => r.SizeVariant == SchoolImageSizeVariant.Size64);
         size64.WidthPixels.ShouldBe(64);
         size64.HeightPixels.ShouldBe(51);
-    }
-
-    [Fact]
-    public void ProcessSignature_IsNeverResized()
-    {
-        var result = _processor.ProcessSignature(CreatePng(600, 200));
-
-        result.IsSuccess.ShouldBeTrue();
-        result.Value.Renditions.Count.ShouldBe(1);
-        result.Value.Original.WidthPixels.ShouldBe(600);
-        result.Value.Original.HeightPixels.ShouldBe(200);
     }
 
     // --- Pupil photographs and document scans (spec 6.5.4, 6.5.8, 9.6) ---------------------------
@@ -429,6 +458,39 @@ public sealed class SkiaSchoolImageProcessorTests
         canvas.Clear(new SKColor(30, 90, 160));
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    /// <summary>A horizontal blue stroke on paper shading from bright (left) into shadow (right), as a JPEG.</summary>
+    private static byte[] CreateSignatureJpeg(int width, int height, float strokeWidth = 6)
+    {
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        using var canvas = new SKCanvas(bitmap);
+        using var paper = new SKPaint
+        {
+            Shader = SKShader.CreateLinearGradient(
+                new SKPoint(0, 0), new SKPoint(width, 0), [new SKColor(235, 232, 225), new SKColor(150, 148, 142)], SKShaderTileMode.Clamp),
+        };
+        canvas.DrawRect(0, 0, width, height, paper);
+        using var pen = new SKPaint { Color = new SKColor(35, 45, 130), StrokeWidth = strokeWidth, IsAntialias = true, Style = SKPaintStyle.Stroke };
+        canvas.DrawLine(width * 0.2f, height / 2f, width * 0.8f, height / 2f, pen);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+        return data.ToArray();
+    }
+
+    /// <summary>A sheet of paper on a dark wooden desk, with a blue stroke across the middle of the sheet, as a JPEG.</summary>
+    private static byte[] CreateSignatureOnDeskJpeg(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(new SKColor(70, 52, 38));
+        using var paper = new SKPaint { Color = new SKColor(232, 229, 222) };
+        canvas.DrawRect(width * 0.15f, height * 0.15f, width * 0.7f, height * 0.7f, paper);
+        using var pen = new SKPaint { Color = new SKColor(35, 45, 130), StrokeWidth = 6, IsAntialias = true, Style = SKPaintStyle.Stroke };
+        canvas.DrawLine(width * 0.3f, height / 2f, width * 0.7f, height / 2f, pen);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
         return data.ToArray();
     }
 

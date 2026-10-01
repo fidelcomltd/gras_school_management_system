@@ -76,7 +76,7 @@ internal sealed class GetPortalResultHandler(IPortalRepository portal, IResultSh
         }
 
         var data = await sheets.ReadAsync(session.Use.PupilId, request.TermId, cancellationToken).ConfigureAwait(false);
-        var sheet = data is { State: ResultSetState.Published } ? ResultSheetBuilder.Build(data) : null;
+        var sheet = data is { State: ResultSetState.Published } ? ResultSheetBuilder.Build(data, forParent: true) : null;
         if (sheet is null || data!.Lines.Count == 0)
         {
             return Result.Success(new PortalResultView(PortalResultStatus.NoResult, TermName: term.TermName, UseId: session.Use.Id));

@@ -47,7 +47,40 @@ public sealed class AssignmentEndpoints : IEndpointModule
             .WithTags(Tag);
 
         MapRevoke(assignments);
+        MapCopyToSession(assignments);
     }
+
+    private static void MapCopyToSession(RouteGroupBuilder group) =>
+        group.MapPost("/copy-to-session", async (
+                CopyAssignmentsToSessionCommand command,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.SendAsync(command, cancellationToken);
+                return result.Match(TypedResults.Ok);
+            })
+            .RequirePrivilege(Privileges.Role.Assign)
+            .RequireCsrfToken()
+            .RequireIdempotencyKey(required: true)
+            .RequireRateLimiting(RateLimitingOptions.SensitivePolicyName)
+            .WithName("CopyAssignmentsToSession")
+            .WithSummary("Copy a session's role assignments into another session")
+            .WithDescription(
+                "Spec 6.1.14 and 4.2.2: last session's assignments do not carry over on their own. Every ACTIVE assignment in " +
+                "`fromSessionId` is copied into `toSessionId` or skipped with a reason: an arm-scoped one maps each class to " +
+                "the target session's class with the same level and label, and is skipped whole when any class has no match; " +
+                "the caller's own (escalation rule 1), a deactivated account, an archived role and anything the target already " +
+                "holds are skipped too. `dryRun: true` reports without writing, for review before the copy. Requires " +
+                "`role.assign`. 409 `role_assignment.session_closed` when the target session is Closed. `Idempotency-Key` " +
+                "is REQUIRED.")
+            .Produces<AssignmentCopyResultDto>()
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
     private static void MapList(RouteGroupBuilder group) =>
         group.MapGet(string.Empty, async (
@@ -99,7 +132,8 @@ public sealed class AssignmentEndpoints : IEndpointModule
                 "another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for " +
                 "the privilege it is exercising. Both rejections write an audit event. The seeded " +
                 "Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only " +
-                "through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.")
+                "through `PATCH /admins/{id}`. 409 `role_assignment.role_archived` for an archived role and " +
+                "`role_assignment.session_closed` for a Closed session (spec 6.1.13). `Idempotency-Key` is REQUIRED.")
             .Produces<RoleAssignmentDto>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status400BadRequest)

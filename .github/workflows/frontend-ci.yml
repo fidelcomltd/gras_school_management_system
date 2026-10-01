@@ -1,7 +1,8 @@
 # Frontend quality gates. Mirrors the gate list recorded in .agent/STATE.md; keep the two in step.
 #
-# Unlike backend-ci.yml there is no single wrapper script to delegate to — `npm run verify` chains
-# four of the five gates, and the contract drift check is deliberately kept OUT of it (see below).
+# Unlike backend-ci.yml there is no single wrapper script to delegate to — `npm run verify` (scripts/verify.mjs)
+# runs the same steps as below and writes a summary file; the contract drift check is deliberately kept OUT of it
+# (see below). Keep the steps here and scripts/verify-lib.mjs's DEFAULT_STEPS in step.
 
 name: frontend-ci
 
@@ -87,6 +88,10 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: Script tests
+        # TASK-0056: proves verify.mjs writes its summary file on a failing run and keeps the exit code.
+        run: npm run test:scripts
 
       - name: Build
         run: npm run build

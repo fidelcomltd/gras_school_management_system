@@ -1,7 +1,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { mockMe } from '@/test/mock-me';
-import { renderWithProviders, screen, waitFor } from '@/test/render';
+import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { PupilDetailScreen } from './pupil-detail-screen';
@@ -70,12 +70,62 @@ describe('PupilDetailScreen admission sections', () => {
     await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
     await user.type(await screen.findByLabelText('Father: full name'), 'Emeka Okafor');
     await user.type(screen.getByLabelText('Father: phone'), '08031234567');
-    await user.click(screen.getByRole('button', { name: 'Copy from father' }));
+    const emergency = screen.getByRole('group', { name: 'Primary emergency contact' });
+    expect(within(emergency).queryByRole('button', { name: 'Copy from guardian' })).not.toBeInTheDocument();
+    await user.click(within(emergency).getByRole('button', { name: 'Copy from father' }));
     await user.click(screen.getByRole('button', { name: 'Save contacts' }));
 
     await waitFor(() => expect(saved?.contacts).toHaveLength(2));
     expect(saved?.contacts[0]).toMatchObject({ role: 'Father', fullName: 'Emeka Okafor', phone: '08031234567', isPrimaryContact: true });
     expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyPrimary', fullName: 'Emeka Okafor', relationship: 'Father', isPrimaryContact: false });
+  });
+
+  it("copies the guardian into the alternative emergency slot with the guardian's own relationship", async () => {
+    mockMe('pupil.view', 'contact.view', 'contact.update');
+    mockPendingPupil();
+    let saved: { contacts: { role: string; fullName: string; phone: string; relationship: string | null }[] } | undefined;
+    server.use(
+      http.put(apiUrl('/api/v1/pupils/:pupilId/contacts'), async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json({ pupilId: 'pupil-1', items: [] });
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
+    await user.type(await screen.findByLabelText('Guardian (if applicable): full name'), 'Ngozi Eze');
+    await user.type(screen.getByLabelText('Guardian (if applicable): relationship to the pupil'), 'Aunt');
+    await user.type(screen.getByLabelText('Guardian (if applicable): phone'), '08031234567');
+    await user.click(within(screen.getByRole('group', { name: 'Alternative emergency contact' })).getByRole('button', { name: 'Copy from guardian' }));
+    await user.click(screen.getByRole('button', { name: 'Save contacts' }));
+
+    await waitFor(() => expect(saved?.contacts).toHaveLength(2));
+    expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyAlternate', fullName: 'Ngozi Eze', phone: '08031234567', relationship: 'Aunt' });
+  });
+
+  it('uploads a photograph for a barred person and attaches it when the answer is saved', async () => {
+    mockMe('pupil.view', 'contact.view', 'pupil.safeguarding.view', 'pupil.safeguarding.update');
+    mockPendingPupil();
+    let saved: { hasBarredPersons: boolean; persons: { fullName: string; photoId: string | null }[] } | undefined;
+    server.use(
+      http.get(apiUrl('/api/v1/pupils/:pupilId/pickup-persons'), () => HttpResponse.json({ pupilId: 'pupil-1', items: [] })),
+      http.get(apiUrl('/api/v1/pupils/:pupilId/barred-persons'), () => HttpResponse.json({ pupilId: 'pupil-1', hasBarredPersons: null, items: [] })),
+      http.post(apiUrl('/api/v1/pupils/:pupilId/barred-persons/photos'), () => HttpResponse.json({ photoId: 'photo-1' })),
+      http.put(apiUrl('/api/v1/pupils/:pupilId/barred-persons'), async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json({ pupilId: 'pupil-1', hasBarredPersons: true, items: [] });
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Collection' }));
+    await user.click(await screen.findByRole('radio', { name: 'Yes' }));
+    await user.type(screen.getByLabelText('Barred person 1: name'), 'John Doe');
+    await user.upload(screen.getByLabelText('Barred person 1: photograph'), new File(['jpeg'], 'john.jpg', { type: 'image/jpeg' }));
+    expect(await screen.findByRole('img', { name: 'Photograph of barred person 1' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save answer' }));
+
+    await waitFor(() => expect(saved?.persons).toEqual([{ fullName: 'John Doe', details: null, photoId: 'photo-1' }]));
   });
 
   it("shows a rejected contact's own reason, not the generic validation message", async () => {

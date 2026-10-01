@@ -16,11 +16,13 @@ internal static class FileResponses
     /// <param name="httpContext">The current request.</param>
     /// <param name="content">The opened file.</param>
     /// <param name="disposition"><c>inline</c> for an image shown on a page, <c>attachment</c> for a download.</param>
-    public static FileStreamHttpResult Serve(HttpContext httpContext, SchoolImageContent content, string disposition = "inline")
+    /// <param name="cacheControl"><c>private</c>, or <c>no-store</c> for health data that must never reach a disk cache.</param>
+    public static FileStreamHttpResult Serve(
+        HttpContext httpContext, SchoolImageContent content, string disposition = "inline", string cacheControl = "private")
     {
         ArgumentNullException.ThrowIfNull(httpContext);
         ArgumentNullException.ThrowIfNull(content);
-        httpContext.Response.Headers.CacheControl = "private";
+        httpContext.Response.Headers.CacheControl = cacheControl;
         httpContext.Response.Headers.ContentDisposition = $"{disposition}; filename={content.FileName}";
         return TypedResults.Stream(content.Content, content.ContentType);
     }

@@ -29,6 +29,7 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
     private const int JpegQuality = 90;
     private const int PupilPhotoJpegQuality = 80;
     private const string PdfContentType = "application/pdf";
+    private const int PersonPhotoMaxEdge = 800;
 
     // Magic-byte signatures (spec 9.6: content type is decided by inspecting the file's bytes, never
     // a declared content type or extension — this port is never even given a file name).
@@ -89,10 +90,18 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
             return Result.Failure<ProcessedSchoolImage>(decoded.Error);
         }
 
-        // Never resized: 600x200 is only a recommendation, and a signature is rendered at a fixed
-        // height wherever it is printed (spec 9.6), so there is no derivative to produce here.
+        // The paper goes and only the pen strokes stay (project lead, 2026-09-30), so the result is always a
+        // transparent PNG, trimmed to the strokes; there is still no smaller derivative to produce.
         using var bitmap = decoded.Value.Bitmap;
-        List<SchoolImageRendition> renditions = [Encode(bitmap, decoded.Value.ContentType, SchoolImageSizeVariant.Original)];
+        using var cleaned = SignatureCleaner.Clean(bitmap);
+        if (cleaned is null)
+        {
+            return Result.Failure<ProcessedSchoolImage>(Error.Validation(
+                SchoolImageErrorCodes.NoSignatureFound,
+                "No pen strokes were found in this image. Sign in dark ink on plain white paper and photograph it close up."));
+        }
+
+        List<SchoolImageRendition> renditions = [Encode(cleaned, PngContentType, SchoolImageSizeVariant.Original)];
 
         return Result.Success(new ProcessedSchoolImage(renditions));
     }
@@ -100,26 +109,14 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
     /// <inheritdoc />
     public Result<ProcessedPupilPhoto> ProcessPupilPhoto(byte[] fileBytes)
     {
-        ArgumentNullException.ThrowIfNull(fileBytes);
-
-        if (fileBytes.LongLength > SchoolImageLimits.MaxPupilPhotoBytes)
-        {
-            return Result.Failure<ProcessedPupilPhoto>(Error.Validation(
-                PupilUploadErrorCodes.PhotoTooLarge,
-                $"This photograph is {Megabytes(fileBytes.LongLength)} MB. The limit is {SchoolImageLimits.MaxPupilPhotoBytes / (1024 * 1024)} MB. " +
-                "Reduce the size or take the photograph again at a lower quality."));
-        }
-
-        var decoded = DecodeAndDetectType(fileBytes);
+        var decoded = DecodePhoto(fileBytes);
         if (decoded.IsFailure)
         {
-            return Result.Failure<ProcessedPupilPhoto>(decoded.Error.Code == SchoolImageErrorCodes.TooManyPixels
-                ? Error.Validation(PupilUploadErrorCodes.PhotoTooLarge, decoded.Error.Description)
-                : Error.Validation(PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
+            return Result.Failure<ProcessedPupilPhoto>(decoded.Error);
         }
 
         // Centre crop to the largest square, then both sizes come from that one crop. The original is dropped here.
-        using var bitmap = decoded.Value.Bitmap;
+        using var bitmap = decoded.Value;
         var side = Math.Min(bitmap.Width, bitmap.Height);
         using var square = new SKBitmap();
         if (!bitmap.ExtractSubset(square, SKRectI.Create((bitmap.Width - side) / 2, (bitmap.Height - side) / 2, side, side)))
@@ -131,6 +128,23 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
         return Result.Success(new ProcessedPupilPhoto(
             EncodeSquareJpeg(square, 400, SchoolImageSizeVariant.Square400),
             EncodeSquareJpeg(square, 96, SchoolImageSizeVariant.Square96)));
+    }
+
+    /// <inheritdoc />
+    public Result<SchoolImageRendition> ProcessPersonPhoto(byte[] fileBytes)
+    {
+        var decoded = DecodePhoto(fileBytes);
+        if (decoded.IsFailure)
+        {
+            return Result.Failure<SchoolImageRendition>(decoded.Error);
+        }
+
+        using var bitmap = decoded.Value;
+        var (width, height) = SkiaImages.FitWithin(bitmap.Width, bitmap.Height, PersonPhotoMaxEdge);
+        using var flattened = SkiaImages.FlattenScaled(bitmap, width, height);
+        using var output = SKImage.FromBitmap(flattened);
+        using var encoded = output.Encode(SKEncodedImageFormat.Jpeg, PupilPhotoJpegQuality);
+        return Result.Success(new SchoolImageRendition(SchoolImageSizeVariant.Original, encoded.ToArray(), width, height, JpegContentType));
     }
 
     /// <inheritdoc />
@@ -161,6 +175,33 @@ internal sealed class SkiaSchoolImageProcessor : ISchoolImageProcessor
 
         using var bitmap = decoded.Value.Bitmap;
         return Result.Success(new ProcessedDocumentScan(EncodeBitmap(bitmap, decoded.Value.ContentType), decoded.Value.ContentType));
+    }
+
+    /// <summary>
+    /// A photograph of a person (a pupil, or someone barred from collecting one): the size cap, then a decode, each
+    /// refusal worded for a photograph and carrying the photograph's error codes. The caller owns the bitmap.
+    /// </summary>
+    private static Result<SKBitmap> DecodePhoto(byte[] fileBytes)
+    {
+        ArgumentNullException.ThrowIfNull(fileBytes);
+
+        if (fileBytes.LongLength > SchoolImageLimits.MaxPupilPhotoBytes)
+        {
+            return Result.Failure<SKBitmap>(Error.Validation(
+                PupilUploadErrorCodes.PhotoTooLarge,
+                $"This photograph is {Megabytes(fileBytes.LongLength)} MB. The limit is {SchoolImageLimits.MaxPupilPhotoBytes / (1024 * 1024)} MB. " +
+                "Reduce the size or take the photograph again at a lower quality."));
+        }
+
+        var decoded = DecodeAndDetectType(fileBytes);
+        if (decoded.IsFailure)
+        {
+            return Result.Failure<SKBitmap>(decoded.Error.Code == SchoolImageErrorCodes.TooManyPixels
+                ? Error.Validation(PupilUploadErrorCodes.PhotoTooLarge, decoded.Error.Description)
+                : Error.Validation(PupilUploadErrorCodes.PhotoUnsupportedType, "Only PNG and JPEG photographs are accepted, verified by file content rather than name."));
+        }
+
+        return Result.Success(decoded.Value.Bitmap);
     }
 
     /// <summary>Rounded UP to one decimal place, so a file just over the limit never reads as exactly the limit.</summary>

@@ -18,9 +18,12 @@ export function TermCard({
   canOpen,
   canClose,
   canReopen,
+  nextTermStart = null,
 }: {
   sessionId: string;
   term: TermDto;
+  /** The following term's start date, offered as this term's "next term begins" when it has none. */
+  nextTermStart?: string | null;
   canEdit: boolean;
   canOpen: boolean;
   canClose: boolean;
@@ -77,7 +80,7 @@ export function TermCard({
       ) : null}
 
       {showEdit ? (
-        <EditTermDialog sessionId={sessionId} term={term} onClose={() => setShowEdit(false)} />
+        <EditTermDialog sessionId={sessionId} term={term} nextTermStart={nextTermStart} onClose={() => setShowEdit(false)} />
       ) : null}
       {showReopen ? (
         <ReopenTermDialog sessionId={sessionId} term={term} onClose={() => setShowReopen(false)} />

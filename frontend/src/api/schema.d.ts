@@ -326,7 +326,7 @@ export interface paths {
         put?: never;
         /**
          * Grant a role to an account
-         * @description Spec 6.1.5: role, session and either school-wide or a non-empty arm list; every arm must belong to the named session. Requires `role.assign` for a school-wide grant, or `role.scope.assign` for an arm-scoped one. Escalation rule 1 (spec 6.1.7): rejects an attempt to assign a role to yourself — `You cannot change your own roles. Ask another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for the privilege it is exercising. Both rejections write an audit event. The seeded Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only through `PATCH /admins/{id}`. `Idempotency-Key` is REQUIRED.
+         * @description Spec 6.1.5: role, session and either school-wide or a non-empty arm list; every arm must belong to the named session. Requires `role.assign` for a school-wide grant, or `role.scope.assign` for an arm-scoped one. Escalation rule 1 (spec 6.1.7): rejects an attempt to assign a role to yourself — `You cannot change your own roles. Ask another Super Admin.` Rule 3: rejects a grant wider than the caller's own scope for the privilege it is exercising. Both rejections write an audit event. The seeded Super Admin role cannot be assigned here — `is_super_admin` is a flag, set only through `PATCH /admins/{id}`. 409 `role_assignment.role_archived` for an archived role and `role_assignment.session_closed` for a Closed session (spec 6.1.13). `Idempotency-Key` is REQUIRED.
          */
         post: operations["CreateRoleAssignment"];
         delete?: never;
@@ -350,6 +350,26 @@ export interface paths {
          * @description Spec 6.1.14. Requires `role.assign`. Escalation rule 1 (spec 6.1.7): rejects revoking your own assignment, with an audit event on rejection. Always `204`.
          */
         delete: operations["RevokeRoleAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/copy-to-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy a session's role assignments into another session
+         * @description Spec 6.1.14 and 4.2.2: last session's assignments do not carry over on their own. Every ACTIVE assignment in `fromSessionId` is copied into `toSessionId` or skipped with a reason: an arm-scoped one maps each class to the target session's class with the same level and label, and is skipped whole when any class has no match; the caller's own (escalation rule 1), a deactivated account, an archived role and anything the target already holds are skipped too. `dryRun: true` reports without writing, for review before the copy. Requires `role.assign`. 409 `role_assignment.session_closed` when the target session is Closed. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CopyAssignmentsToSession"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -388,7 +408,7 @@ export interface paths {
         };
         /**
          * List audit events
-         * @description Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.
+         * @description Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), `actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter optional and combinable; `action` and `entityType` match the whole code or the start of any part of it (after a `.` or `_`), ignoring case. Sorted newest first by default (`occurred_at` descending, `id` descending as the tie-break within the same instant). Cursor-paginated per spec 9.5 — never offset. `pageSize` defaults to 25 and is capped at 100.
          */
         get: operations["ListAuditEvents"];
         put?: never;
@@ -659,6 +679,194 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fee-notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a section's fee notice grid for a term
+         * @description Spec 6.2.13: the section's lines (rows) against its active class levels (columns), with the amounts printed on `termId`'s result sheets, which carry what to pay NEXT term. A section that has saved no lines gets the six seeded lines with `isDefault: true`, unsaved. `previousTermId` is the term before, for "copy from previous term".
+         */
+        get: operations["GetFeeNoticeGrid"];
+        /**
+         * Save a section's fee notice grid for a term
+         * @description The whole grid in one save: the lines as listed become the section's lines in that order (renamed, reordered or new); a saved line left out is removed together with its amounts in every term. Cells are this term's amounts in naira; a null amount clears the cell and levels not listed are left as they are. At most one line is the per-pupil outstanding figure, which takes no amounts and carries the portal switch. Nothing is invoiced, receipted or carried forward. `Idempotency-Key` is accepted, not required.
+         */
+        put: operations["SaveFeeNoticeGrid"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/outstanding-fees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an arm's outstanding-fee figures for a term
+         * @description Spec 6.2.13's bulk grid: the arm's active pupils against one outstanding figure each, typed from the school's own records. Blank (null) is the normal case and prints as a dash. `locked` is true once the arm's results for the term are published.
+         */
+        get: operations["GetOutstandingFees"];
+        /**
+         * Save an arm's outstanding-fee figures for a term
+         * @description Saves the listed pupils' figures in naira; a null amount clears one and pupils not listed are left as they are. 409 once the arm's results for the term are published (withdraw them to correct a figure). No figure ever blocks a result, a pin or a portal lookup. `Idempotency-Key` is accepted, not required.
+         */
+        put: operations["SaveOutstandingFees"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/geography/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The states and LGAs a pupil record accepts
+         * @description Spec 6.5.4: the 36 states and the FCT, each with its LGAs, in the canonical spellings the server stores. A pupil's state of origin and LGA must come from this list. Any signed-in account; `Cache-Control: private, max-age=3600`.
+         */
+        get: operations["GetNigerianGeography"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/safeguarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The class safeguarding sheet for one arm
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. Each pupil's thumbnail travels in the sheet, under the sheet's own privilege. Health answers read `None` or `Not asked`, never blank. `Cache-Control: no-store`.
+         */
+        get: operations["GetSafeguardingSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/safeguarding/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The class safeguarding sheet as a printable PDF
+         * @description Spec 15 section 10.2: every active pupil in one arm with allergies, medical conditions, medication, special instructions, preferred hospital, authorised pickup persons and a barred-persons marker (never the names). The only export carrying health data. Needs `pupil.safeguarding.view` over the arm (checked in the handler: a route check cannot see the arm); every generation is audited as `pupil.safeguarding.sheet`, with counts only. A4 landscape with each pupil's photograph, marked confidential; `attachment`, `no-store`.
+         */
+        get: operations["GetSafeguardingSheetPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admissions/{id}/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an admission still lacks
+         * @description Spec 6.5.12: `blocking` items stop approval (contacts, the barred-persons answer, the three health answers, the declaration, a required assessment's outcome); `chased` items are tracked after approval. Each is keyed to its admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.
+         */
+        get: operations["GetAdmissionCompleteness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/incomplete-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active pupils with records still to chase
+         * @description Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with the `required` items still missing (possible after a bulk import or a health override) and the `chased` items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty when no session is active. Bounded by the active roll, so not paginated.
+         */
+        get: operations["GetIncompleteRecordsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/terms/{termId}/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a term's derived weeks
+         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
+         */
+        get: operations["GetTermWeeks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one pupil's weekly reports for a term
+         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the handler so a pupil who has left (no open enrolment) is still readable school-wide.
+         */
+        get: operations["GetPupilWeekly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arms/{armId}/head-teacher-remarks": {
         parameters: {
             query?: never;
@@ -867,6 +1075,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{sessionId}/promotion/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview a session's promotion
+         * @description Spec 6.3.7's review screen: one row per active pupil with the annual average, core subject results, the proposed outcome (Promoted, Repeat, or Graduated at the terminal level; blank with no annual result) and a default target arm dealt round-robin by descending average; the target session's arms with capacity and current counts; pupils no longer active, listed apart; and every unmet precondition in `blockers`. `targetSessionId` defaults to the next session by start date. When promotion has already run, `rows` is empty and `committedBatch` describes the batch.
+         */
+        get: operations["GetPromotionPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{sessionId}/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit a session's promotion
+         * @description Spec 6.3.7: one decision per active pupil, exactly once, applied in ONE transaction: each current enrolment closes on the old session's end date and a new one opens in the target arm on the new session's start date; a graduate changes status and gets no enrolment. Changing a proposed outcome, or choosing `PromotedOnTrial` (which also needs a reason of 10 to 500 characters), needs `promotion.decide`. Over capacity is allowed (spec 6.4.9 warns, never blocks). 409 while any preview blocker remains or when the pupils changed since the preview. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["CommitPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotion-batches/{batchId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a promotion
+         * @description Spec 6.3.7: removes the enrolments the batch opened, reopens the ones it closed, restores graduates to active and marks the batch reversed (the row is kept). Refused with 409 once a mark has been entered or a pin used in the new session, or when a pupil has moved since. Needs a reason of 10 to 500 characters, and the caller must be a Super Admin (403 otherwise, whatever the role grants). `Idempotency-Key` is accepted, not required.
+         */
+        post: operations["ReversePromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils": {
         parameters: {
             query?: never;
@@ -900,7 +1168,7 @@ export interface paths {
         };
         /**
          * Find pupil records that may be duplicates
-         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Contact-phone matching (the other half of 6.5.11's detection) is the NEXT card's, once `pupil_contact` exists. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
+         * @description Spec 6.5.11 step 1: matches surname AND first name AND date of birth, INCLUDING pending records — the point is catching a second, in-progress admission for the same child. Optional `contactPhone` (either Nigerian form) also matches surname AND any contact's phone or WhatsApp number, the other half of 6.5.11's detection. Not arm-scoped: `pupil.create` is school-wide only. Capped at 20 candidates — a panel, not a paged list.
          */
         get: operations["FindPupilDuplicates"];
         put?: never;
@@ -1231,6 +1499,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pupils/{pupilId}/admission-slip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print a pupil's admission slip
+         * @description Spec 6.5.11: the slip with the issued registration number, a PDF of half an A4 with the lower half blank (the school files them), stamped with when and by whom it was printed. `409 pupil.not_admitted` before approval. Needs `pupil.view` over the pupil.
+         */
+        get: operations["GetAdmissionSlip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/barred-persons/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photograph of someone who must not collect the pupil
+         * @description Multipart, one `file` part. JPEG or PNG only, verified by magic bytes; maximum 3 MB. Stored as a JPEG at most 800 pixels on the long edge, never cropped, with all metadata stripped. Attached to nobody until `PUT /barred-persons` names the returned `photoId` on a person, and only this pupil's list may use it. Audited as `pupil.safeguarding.photo_uploaded`. Needs `pupil.safeguarding.update` over the pupil. `Idempotency-Key` is REQUIRED.
+         */
+        post: operations["UploadBarredPersonPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a barred person's photograph
+         * @description The JPEG, `inline`, `nosniff`, `Cache-Control: no-store`. Only a photograph a current barred person of this pupil carries: `404 barred_person.photo_not_found` otherwise. Every view is audited as `pupil.safeguarding.read`. Needs `pupil.safeguarding.view` over the pupil.
+         */
+        get: operations["GetBarredPersonPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pupils/{pupilId}/photo": {
         parameters: {
             query?: never;
@@ -1294,7 +1622,7 @@ export interface paths {
         put?: never;
         /**
          * Attach or replace a checklist document's scan
-         * @description Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as received today by the uploader. The Other row needs its label first (`422 document.other_label_required`). Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is REQUIRED.
+         * @description Multipart, one `file` part (spec 6.5.8). PDF, JPEG or PNG, verified by magic bytes; maximum 5 MB. A JPEG or PNG is re-encoded at its own size, stripping EXIF and GPS; a PDF is stored as it came. An unticked row is ticked as received today by the uploader. The file's own name is kept for display only (never the download name, never audited). The Other row needs its label first (`422 document.other_label_required`). Audited as `pupil.document.file_attached`. Needs `pupil.document.manage` over the pupil. `Idempotency-Key` is REQUIRED.
          */
         post: operations["UploadPupilDocumentFile"];
         /**
@@ -1302,86 +1630,6 @@ export interface paths {
          * @description The tick stays: the paper still exists. Audited as `pupil.document.file_removed`. `404 document.file_not_found` when there is none. Needs `pupil.document.manage` over the pupil.
          */
         delete: operations["RemovePupilDocumentFile"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admissions/{id}/completeness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * What an admission still lacks
-         * @description Spec 6.5.12: `blocking` items stop approval (contacts, the barred-persons answer, the three health answers, the declaration, a required assessment's outcome); `chased` items are tracked after approval. Each is keyed to its admission-flow step. Reports whether health is answered, never what it says. Needs `pupil.view`.
-         */
-        get: operations["GetAdmissionCompleteness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/reports/incomplete-records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Active pupils with records still to chase
-         * @description Spec 6.5.12: every ACTIVE pupil in the active session with something missing, by arm then surname, each with the `required` items still missing (possible after a bulk import or a health override) and the `chased` items, plus `counts` of each gap across the report. `report.view`; an arm-restricted grant sees only its arms, and `armId` outside them is 403. Codes only: never what a health or barred-person answer says. Empty when no session is active. Bounded by the active roll, so not paginated.
-         */
-        get: operations["GetIncompleteRecordsReport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/terms/{termId}/weeks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List a term's derived weeks
-         * @description Spec 6.10.3: weeks are derived from the term's dates, never stored or typed. Week 1 starts on the Monday of the week containing the start date; weeks run to the week containing the end date, at most 20. School-wide `weekly.view`; an arm-scoped caller reads the same list from the arm grid's `weeks`.
-         */
-        get: operations["GetTermWeeks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pupils/{pupilId}/weekly": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read one pupil's weekly reports for a term
-         * @description Spec 6.10.11: one row per week of the term, with the five days where a report exists and `days: null` where nothing was written. A week that falls outside the term's current dates but holds notes is kept and flagged `outsideTerm` (6.10.10). Backs the per-pupil tab. Needs `weekly.view` over the pupil, checked in the handler so a pupil who has left (no open enrolment) is still readable school-wide.
-         */
-        get: operations["GetPupilWeekly"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1510,6 +1758,726 @@ export interface paths {
          * @description Spec §6.7.7 delta item 4: a HARD delete — inserted text is copied, never referenced. An unknown id is 404 only for a caller holding either remark-template privilege; anyone holding neither gets 403 first, before the id is even looked up. A caller holding only the OTHER kind's privilege gets 403 on a row of this kind, never 404, and the row is never touched.
          */
         delete: operations["DeleteRemarkTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/broadsheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Arm broadsheet
+         * @description One row per pupil, a CA / Exam / Total group per subject, then total, average, grade and level position, by arm position. Reads computed results in any state (the head teacher approves from it), with a note until published. `report.view`. PDF prints landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetBroadsheetReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/broadsheet/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Arm broadsheet, as CSV or PDF
+         * @description The same report as `GET /reports/broadsheet`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportBroadsheetReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/merit-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Merit list
+         * @description Position order for one arm (`armId`) or a whole level (`levelId`, ranked by level position): position, name, registration number, class for a level, average and grade. `top` keeps positions up to N, ties included. Unranked pupils are left out. `report.view`. PDF prints portrait in two columns. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetMeritListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/merit-list/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Merit list, as CSV or PDF
+         * @description The same report as `GET /reports/merit-list`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportMeritListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/result-entry-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Result entry progress
+         * @description One row per arm for the term: pupils, subjects mapped, mark cells, ratings, attendance, teacher's and head's remarks complete of total, and the result set's state. Filters: `levelId`, `state` (`NotStarted` or a result-set state). The same figures as each class's readiness grid. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetResultEntryProgressReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/result-entry-progress/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Result entry progress, as CSV or PDF
+         * @description The same report as `GET /reports/result-entry-progress`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportResultEntryProgressReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/grade-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Grade distribution
+         * @description Counts and percentages of pupils in each grade band, per subject and overall (the term grade), for one arm (`armId`) or a level (`levelId`). Every band appears, zero counts included; a text bar (#, 5% each) survives photocopying. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetGradeDistributionReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/grade-distribution/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Grade distribution, as CSV or PDF
+         * @description The same report as `GET /reports/grade-distribution`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportGradeDistributionReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/subject-performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject performance
+         * @description Per subject, each arm of the level side by side: average, highest, lowest, counted, absent from the exam, passing and pass rate, then the level as a whole. `levelId` is required. `report.view`. PDF prints landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetSubjectPerformanceReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/subject-performance/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject performance, as CSV or PDF
+         * @description The same report as `GET /reports/subject-performance`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportSubjectPerformanceReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/development-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Development domain summary
+         * @description Nursery only (spec 15 section 10.2): per indicator, grouped by domain, how many pupils sit at each rating point, and how many are not rated. An arm whose section rates traits returns no rows and a note. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetDevelopmentSummaryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/development-summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Development domain summary, as CSV or PDF
+         * @description The same report as `GET /reports/development-summary`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportDevelopmentSummaryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/fee-notice-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee notice audit
+         * @description Spec 15 section 10.2: per level, the configured fee lines and amounts for the term, their total, and how many pupils carry a typed outstanding figure and its total. Amounts are the notice as configured now (a published sheet printed its frozen copy). `levelId` optional. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetFeeNoticeAuditReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/fee-notice-audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee notice audit, as CSV or PDF
+         * @description The same report as `GET /reports/fee-notice-audit`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportFeeNoticeAuditReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/annual-cumulative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Annual cumulative report
+         * @description Per pupil for one arm (`armId`) or a level (`levelId`) of the session: the three term averages, cumulative average and grade, annual position, and promotion status (the committed decision, or the proposal marked as such until promotion runs). Empty with a note until annual computation has run. `report.view`. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetAnnualCumulativeReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/annual-cumulative/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Annual cumulative report, as CSV or PDF
+         * @description The same report as `GET /reports/annual-cumulative`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportAnnualCumulativeReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/promotion-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Promotion list
+         * @description Per pupil of the session (`levelId` optional): class, annual average, core subject results against the pass mark, proposed and final outcome, target class, and the override reason. `outcome` filters on the final outcome, or the proposal before promotion runs. Core subjects and pass mark are the result rules as configured now. `report.view`. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetPromotionListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/promotion-list/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Promotion list, as CSV or PDF
+         * @description The same report as `GET /reports/promotion-list`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportPromotionListReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/pupil-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pupil cumulative record
+         * @description One pupil across every session: term by term class, average, grade, class and level position and publication status, each session closed by its annual result and promotion outcome. An arm-restricted holder sees only the terms spent in their arms (403 when none). `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetPupilRecordReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/pupil-record/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pupil cumulative record, as CSV or PDF
+         * @description The same report as `GET /reports/pupil-record`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportPupilRecordReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/nominal-roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nominal roll
+         * @description The session's register, grouped by class: registration number, name, sex, date of birth, age (today, Lagos), admission date, status and primary guardian with phone. Filters: `levelId`, `armId`, `status` (Active when absent), `sex`. `report.view`, arm-scoped. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetNominalRollReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/nominal-roll/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nominal roll, as CSV or PDF
+         * @description The same report as `GET /reports/nominal-roll`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportNominalRollReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/enrolment-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enrolment summary
+         * @description Per arm: boys, girls, total, capacity and space left, a subtotal per level and a total. `status` (Active when absent). `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetEnrolmentSummaryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/enrolment-summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enrolment summary, as CSV or PDF
+         * @description The same report as `GET /reports/enrolment-summary`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportEnrolmentSummaryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/guardian-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Guardian contact list
+         * @description One arm's active pupils with their primary guardian, relationship, phone and alternate phone; nothing more, by design (spec 15). `contact.view` (the spec's `guardian.view`), arm-scoped; export needs `report.export` too. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetGuardianContactsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/guardian-contacts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Guardian contact list, as CSV or PDF
+         * @description The same report as `GET /reports/guardian-contacts`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportGuardianContactsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/outstanding-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outstanding admission documents
+         * @description One row per active pupil per admission document not yet received (the pupil record's own completeness check), oldest record first. Filters: `levelId`, `armId`, `documentType`. `report.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetOutstandingDocumentsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/outstanding-documents/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outstanding admission documents, as CSV or PDF
+         * @description The same report as `GET /reports/outstanding-documents`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportOutstandingDocumentsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/admissions-pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admissions pipeline
+         * @description Every pending admission by level applied for: created, days since, the step it is held at and what blocks approval. Filters: `levelId`, `minDays`. `report.view` school-wide (a pending record has no class). PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetAdmissionsPipelineReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/admissions-pipeline/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admissions pipeline, as CSV or PDF
+         * @description The same report as `GET /reports/admissions-pipeline`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportAdmissionsPipelineReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/pin-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pin distribution and usage
+         * @description Per arm of the session: active pupils, pupils whose results were opened, the pins that opened them and how many are exhausted or revoked, and the last use; each batch's totals (pins, used at least once, exhausted, revoked) in the notes. Pins open any number, so a class's pins are those used for its pupils. Filters: `armId`, `batchId`, `state`. `pin.usage.view`. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetPinUsageReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/pin-usage/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pin distribution and usage, as CSV or PDF
+         * @description The same report as `GET /reports/pin-usage`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportPinUsageReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit report
+         * @description The filtered audit log, newest first: time (WAT), actor, action, entity, outcome, reason, and before/after values for score changes. Filters: `from`/`to` (yyyy-MM-dd, Lagos days, inclusive), `actorAdminId`, `action`, `entityType`, `outcome` (Success or Rejected). At most 2000 events. `audit.view`; exporting also needs `audit.export` (spec 6.1.12), as the audit log's own export does. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetAuditReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit report, as CSV or PDF
+         * @description The same report as `GET /reports/audit`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportAuditReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/settings-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings change history
+         * @description Every configuration version, newest first, with who saved it, when, the reason, and a plain-language summary of what changed against the version before it. Filters: `from`/`to` (yyyy-MM-dd), `group`. `audit.view`. PDF landscape. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["GetSettingsHistoryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/settings-history/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings change history, as CSV or PDF
+         * @description The same report as `GET /reports/settings-history`, as `format=csv` (UTF-8 with a byte-order mark, formula-safe) or `format=pdf` (A4). Needs `report.export` as well as the report's own privilege, and writes a `report.export` audit event naming the report, the filters and the row count. The privilege is checked in the handler, not on the route (a route with no arm cannot see an arm-restricted grant): an arm-restricted holder sees only their arms, and naming another is 403.
+         */
+        get: operations["ExportSettingsHistoryReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1649,6 +2617,26 @@ export interface paths {
          * @description Spec 6.7.9, 6.7.11: Withdrawn to Draft, marks editable, needsRecompute set; it then goes back through submission, approval and publication, and republishes as the next revision. Needs `result.unpublish` (Super Admin only, who also holds `result.score.enter`). 409 `result_set.term_not_active` unless the term is active; 409 `result_set.not_withdrawn` from any other state; 404 for an unknown id.
          */
         post: operations["ReopenResultSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/arms/{armId}/result-sheets/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print an arm's published result sheets
+         * @description The A4 result sheets for a published arm-term, as one PDF: every pupil with a result, in name order, each starting on a fresh page and numbered within itself; or one pupil's sheet with `pupilId`. The same sheet the parent downloads, except that the outstanding-fee line always shows. 409 `result_set.not_published` until the arm's results for the term are published; 404 `result_sheet.not_found` when the pupil has no result in this arm, `result_sheet.none` when no pupil does; 404 `term.not_found` for a term outside the arm's session. Rendered on every request, so it takes the sensitive rate limit. Fetch it and save the blob.
+         */
+        get: operations["PrintResultSheets"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1810,7 +2798,7 @@ export interface paths {
         put?: never;
         /**
          * Create a session
-         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
+         * @description Spec 6.3.5: creates the session AND its three terms in one transaction, all `upcoming`. Name must be `YYYY/YYYY` with the second year exactly the first plus one, and unique; dates must not overlap an existing session. Each term's `timesSchoolOpened` starts as its weekdays (Monday to Friday, start to end inclusive), for the school to correct for holidays and breaks with `PATCH /terms/{id}`. `Idempotency-Key` is REQUIRED: a retry with the same key returns the same session instead of creating a second one.
          */
         post: operations["CreateSession"];
         delete?: never;
@@ -1918,7 +2906,7 @@ export interface paths {
         put?: never;
         /**
          * Upload the head teacher's signature
-         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension (600 by 200 is only a recommendation). Re-encoded to strip all metadata but never resized. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
+         * @description Multipart, one `file` part (spec 9.6). PNG or JPEG only, verified by magic bytes; maximum 1 MB; no minimum dimension, though it must hold pen strokes that can be told from the paper. The paper is removed and only the pen strokes kept: stored as a transparent PNG trimmed to the strokes, at most 1200 pixels on the long edge, with all metadata stripped. `422 school_image.no_signature_found` when no strokes can be told from the paper. Repoints the current signature; the previous asset is never deleted. `Idempotency-Key` is REQUIRED.
          */
         post: operations["UploadHeadTeacherSignature"];
         delete?: never;
@@ -2679,7 +3667,11 @@ export interface components {
          *       "isSuperAdmin": false,
          *       "mustChangePassword": false,
          *       "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "rolesHeld": [
+         *         "Class Teacher"
+         *       ],
+         *       "scopeSummary": "2 classes: Primary 2A, Primary 5B"
          *     }
          */
         AdminAccountSummaryDto: {
@@ -2727,6 +3719,18 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             createdAtUtc: string;
+            /**
+             * @description Distinct names of the roles the account actively holds, sorted (spec 6.1.8; TASK-0046).
+             * @example [
+             *       "Class Teacher"
+             *     ]
+             */
+            rolesHeld: string[];
+            /**
+             * @description `School-wide`, or the class count and the first two class names; empty when nothing is held.
+             * @example 2 classes: Primary 2A, Primary 5B
+             */
+            scopeSummary: string;
         };
         /**
          * @description What an admission still lacks (spec 6.5.12): blocking items stop approval; chased items are tracked after the pupil is
@@ -3166,6 +4170,117 @@ export interface components {
             isExamination: boolean;
         };
         /**
+         * @description What a copy did, or with a dry run would do.
+         * @example {
+         *       "dryRun": true,
+         *       "fromSessionName": "2026/2027",
+         *       "toSessionName": "2027/2028",
+         *       "copied": [
+         *         {
+         *           "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+         *           "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *           "staffName": "Ngozi Adeyemi",
+         *           "roleName": "Class Teacher",
+         *           "scopeType": "ArmList",
+         *           "armNames": [
+         *             "Primary 2A"
+         *           ],
+         *           "skipReason": null
+         *         }
+         *       ],
+         *       "skipped": []
+         *     }
+         */
+        AssignmentCopyResultDto: {
+            /**
+             * @description Whether this was only a preview.
+             * @example true
+             */
+            dryRun: boolean;
+            /**
+             * @description The source session's name.
+             * @example 2026/2027
+             */
+            fromSessionName: string;
+            /**
+             * @description The target session's name.
+             * @example 2027/2028
+             */
+            toSessionName: string;
+            /**
+             * @description The assignments created (or that would be).
+             * @example [
+             *       {
+             *         "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+             *         "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+             *         "staffName": "Ngozi Adeyemi",
+             *         "roleName": "Class Teacher",
+             *         "scopeType": "ArmList",
+             *         "armNames": [
+             *           "Primary 2A"
+             *         ],
+             *         "skipReason": null
+             *       }
+             *     ]
+             */
+            copied: components["schemas"]["AssignmentCopyRowDto"][];
+            /**
+             * @description The assignments not copied, each with its reason.
+             * @example []
+             */
+            skipped: components["schemas"]["AssignmentCopyRowDto"][];
+        };
+        /**
+         * @description One source assignment in a copy.
+         * @example {
+         *       "sourceAssignmentId": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
+         *       "adminAccountId": "0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62",
+         *       "staffName": "Ngozi Adeyemi",
+         *       "roleName": "Class Teacher",
+         *       "scopeType": "ArmList",
+         *       "armNames": [
+         *         "Primary 3B"
+         *       ],
+         *       "skipReason": "Primary 3B has no class in 2027/2028."
+         *     }
+         */
+        AssignmentCopyRowDto: {
+            /**
+             * @description The assignment in the source session.
+             * @example 0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51
+             */
+            sourceAssignmentId: string;
+            /**
+             * @description The account holding it.
+             * @example 0192f0c4-9e50-7c3d-b14f-5d0a7c8e3f62
+             */
+            adminAccountId: string;
+            /**
+             * @description That account's staff name.
+             * @example Ngozi Adeyemi
+             */
+            staffName: string;
+            /**
+             * @description The role's name.
+             * @example Class Teacher
+             */
+            roleName: string;
+            /** @description School-wide or a list of classes. */
+            scopeType: components["schemas"]["ScopeType"];
+            /**
+             * @description The classes, as named in the target session when copied, in the source session when skipped.
+             * @example [
+             *       "Primary 3B"
+             *     ]
+             */
+            armNames: string[];
+            /**
+             * @description Why it was not copied; `null` when it was.
+             * @example Primary 3B has no class in 2027/2028.
+             */
+            skipReason: null | string;
+        };
+        /**
          * @description One pupil's row on the attendance sheet (TASK-0086 stage A) — every active pupil in the arm, including one with no attendance entered at all.
          * @example {
          *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
@@ -3462,7 +4577,8 @@ export interface components {
          * @example {
          *       "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
          *       "fullName": "John Doe",
-         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *       "details": "Court order dated 03/02/2026; office holds a copy.",
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *     }
          */
         BarredPersonDto: {
@@ -3481,12 +4597,19 @@ export interface components {
              * @example Court order dated 03/02/2026; office holds a copy.
              */
             details: null | string;
+            /**
+             * @description The person's photograph, or null for none: read it from
+             *     `GET /api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}` (audited).
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId: null | string;
         };
         /**
          * @description One barred person as submitted.
          * @example {
          *       "fullName": "John Doe",
-         *       "details": "Court order dated 03/02/2026; office holds a copy."
+         *       "details": "Court order dated 03/02/2026; office holds a copy.",
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *     }
          */
         BarredPersonInput: {
@@ -3500,6 +4623,25 @@ export interface components {
              * @example Court order dated 03/02/2026; office holds a copy.
              */
             details: null | string;
+            /**
+             * @description Optional: a photograph uploaded for this pupil through `POST /barred-persons/photos`. Send it again on every save to
+             *     keep it; leave it out to remove it.
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId?: null | string;
+        };
+        /**
+         * @description An uploaded barred-person photograph, attached to nobody until the barred list is saved with its id.
+         * @example {
+         *       "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+         *     }
+         */
+        BarredPersonPhotoDto: {
+            /**
+             * @description Send as `photoId` on the person in `PUT /barred-persons`.
+             * @example 0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40
+             */
+            photoId: string;
         };
         /**
          * @description Section E's exclusion question and its answer (spec 6.5.6). Safeguarding data: every read is audited.
@@ -3510,7 +4652,8 @@ export interface components {
          *         {
          *           "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
          *           "fullName": "John Doe",
-         *           "details": "Court order dated 03/02/2026; office holds a copy."
+         *           "details": "Court order dated 03/02/2026; office holds a copy.",
+         *           "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
          *         }
          *       ]
          *     }
@@ -3532,7 +4675,8 @@ export interface components {
              *       {
              *         "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39",
              *         "fullName": "John Doe",
-             *         "details": "Court order dated 03/02/2026; office holds a copy."
+             *         "details": "Court order dated 03/02/2026; office holds a copy.",
+             *         "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
              *       }
              *     ]
              */
@@ -3744,6 +4888,61 @@ export interface components {
              * @example true
              */
             dryRun: boolean;
+        };
+        /**
+         * @description `POST /api/v1/sessions/{sessionId}/promotion` (spec 6.3.7): commits the whole school's promotion in one transaction.
+         *             Every active pupil appears exactly once. Needs `promotion.run`; changing a proposal or choosing on trial also needs
+         *             `promotion.decide`.
+         * @example {
+         *       "sessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *       "decisions": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "outcome": "Promoted",
+         *           "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *           "reason": null
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "outcome": "Repeat",
+         *           "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a",
+         *           "reason": null
+         *         }
+         *       ]
+         *     }
+         */
+        CommitPromotionCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sessionId: string;
+            /**
+             * Format: uuid
+             * @description The session promoted into, as the preview named it.
+             * @example 0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49
+             */
+            targetSessionId: string;
+            /**
+             * @description One per active pupil.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "outcome": "Promoted",
+             *         "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+             *         "reason": null
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "outcome": "Repeat",
+             *         "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a",
+             *         "reason": null
+             *       }
+             *     ]
+             */
+            decisions: components["schemas"]["PromotionDecisionInput"][];
         };
         /**
          * @description One missing item on an admission (spec 6.5.12), keyed to the step that fixes it.
@@ -4011,6 +5210,33 @@ export interface components {
          */
         ContactRole: "Father" | "Mother" | "Guardian" | "EmergencyPrimary" | "EmergencyAlternate";
         /**
+         * @description `POST /assignments/copy-to-session` (spec 6.1.14, 4.2.2; TASK-0046 B): carries a session's active assignments into
+         *             another session. With DryRun it only reports what it would create and skip, so the list can be
+         *             reviewed before anything is written.
+         * @example {
+         *       "fromSessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "toSessionId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
+         *       "dryRun": true
+         *     }
+         */
+        CopyAssignmentsToSessionCommand: {
+            /**
+             * @description The session whose active assignments are copied.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            fromSessionId: string;
+            /**
+             * @description The session they are copied into; must not be Closed.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40
+             */
+            toSessionId: string;
+            /**
+             * @description True to report without writing.
+             * @example true
+             */
+            dryRun: boolean;
+        };
+        /**
          * @description `POST /api/v1/subject-mappings/copy` (spec 6.6.5, 6.6.9): "Body carries source term and
          *             destination term." Additive only — this card's own judgement call (see the handler's remarks):
          *             the one worked example spec 6.6.8 gives ("a term with 14 mappings into a term that already has 3 →
@@ -4108,7 +5334,7 @@ export interface components {
          *       "status": "Active",
          *       "mustChangePassword": true,
          *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
-         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *       "temporaryPassword": "482915730264"
          *     }
          */
         CreateAdminAccountResponse: {
@@ -4150,7 +5376,7 @@ export interface components {
              *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute and the
              *     approved delta's orchestrator amendment A2 (spec 6.1.9/6.1.14: shown once, never again — a replay
              *     that returned it verbatim would be a second display).
-             * @example aB3xQ9mK2pL7vN4wR8dT
+             * @example 482915730264
              */
             temporaryPassword: null | string;
         };
@@ -4669,7 +5895,11 @@ export interface components {
          *           "isSuperAdmin": false,
          *           "mustChangePassword": false,
          *           "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-         *           "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *           "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *           "rolesHeld": [
+         *             "Class Teacher"
+         *           ],
+         *           "scopeSummary": "2 classes: Primary 2A, Primary 5B"
          *         }
          *       ],
          *       "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
@@ -4688,7 +5918,11 @@ export interface components {
              *         "isSuperAdmin": false,
              *         "mustChangePassword": false,
              *         "lastLoginAtUtc": "2026-08-03T09:30:00+00:00",
-             *         "createdAtUtc": "2026-08-03T09:30:00+00:00"
+             *         "createdAtUtc": "2026-08-03T09:30:00+00:00",
+             *         "rolesHeld": [
+             *           "Class Teacher"
+             *         ],
+             *         "scopeSummary": "2 classes: Primary 2A, Primary 5B"
              *       }
              *     ]
              */
@@ -5769,6 +7003,315 @@ export interface components {
             armIds: string[];
         };
         /**
+         * @description A cell.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "amount": 45000
+         *     }
+         */
+        FeeGridAmountDto: {
+            /**
+             * Format: uuid
+             * @description The column.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Naira. Zero prints as a dash.
+             * @example 45000
+             */
+            amount: number | string;
+        };
+        /**
+         * @description A cell as submitted.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "amount": 45000
+         *     }
+         */
+        FeeGridAmountInput: {
+            /**
+             * Format: uuid
+             * @description The column.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Naira; null clears the cell.
+             * @example 45000
+             */
+            amount: null | number | string;
+        };
+        /**
+         * @description A column of the grid.
+         * @example {
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "name": "Primary 3"
+         *     }
+         */
+        FeeGridLevelDto: {
+            /**
+             * Format: uuid
+             * @description The level.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * @description For example Primary 3.
+             * @example Primary 3
+             */
+            name: string;
+        };
+        /**
+         * @description A row of the grid.
+         * @example {
+         *       "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+         *       "label": "Tuition Fee",
+         *       "kind": "Amount",
+         *       "showOnPortal": false,
+         *       "amounts": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "amount": 45000
+         *         }
+         *       ]
+         *     }
+         */
+        FeeGridLineDto: {
+            /**
+             * Format: uuid
+             * @description The saved line; null for an unsaved default.
+             * @example 0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01
+             */
+            id: null | string;
+            /**
+             * @description As printed.
+             * @example Tuition Fee
+             */
+            label: string;
+            /** @description Amount, or the one per-pupil Outstanding line. */
+            kind: components["schemas"]["FeeLabelKind"];
+            /**
+             * @description Outstanding line only: whether parents see the figure on the portal. Off by default.
+             * @example false
+             */
+            showOnPortal: boolean;
+            /**
+             * @description One per level that has an amount set; an outstanding line has none.
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "amount": 45000
+             *       }
+             *     ]
+             */
+            amounts: components["schemas"]["FeeGridAmountDto"][];
+        };
+        /**
+         * @description One row as the grid screen submits it.
+         * @example {
+         *       "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+         *       "label": "Tuition Fee",
+         *       "kind": "Amount",
+         *       "showOnPortal": false,
+         *       "amounts": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "amount": 45000
+         *         }
+         *       ]
+         *     }
+         */
+        FeeGridLineInput: {
+            /**
+             * Format: uuid
+             * @description The saved line; null for a new one (or a default being saved for the first time).
+             * @example 0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01
+             */
+            id: null | string;
+            /**
+             * @description 1 to 60 characters.
+             * @example Tuition Fee
+             */
+            label: string;
+            /** @description Amount or Outstanding; a saved line's kind never changes. */
+            kind: components["schemas"]["FeeLabelKind"];
+            /**
+             * @description Outstanding line only.
+             * @example false
+             */
+            showOnPortal: boolean;
+            /**
+             * @description Cells for this term; a null amount clears the cell. Levels not listed are left as they are.
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "amount": 45000
+             *       }
+             *     ]
+             */
+            amounts: components["schemas"]["FeeGridAmountInput"][];
+        };
+        /**
+         * @description What a fee line prints (spec 6.2.13): a configured amount, or the pupil's own outstanding figure.
+         * @example Amount
+         * @enum {unknown}
+         */
+        FeeLabelKind: "Amount" | "Outstanding";
+        /**
+         * @description Spec 6.2.13's entry grid for one section and one term: the lines as rows, the section's class levels as columns, the
+         *     amounts as cells. The term is the one whose result sheets print the notice (human ruling 2026-09-27).
+         * @example {
+         *       "sectionId": "00000000-0000-0000-0000-000000000302",
+         *       "sectionName": "Primary",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "termName": "First Term",
+         *       "sessionName": "2026/2027",
+         *       "previousTermId": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02",
+         *       "previousTermLabel": "Third Term 2025/2026",
+         *       "isDefault": false,
+         *       "levels": [
+         *         {
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "name": "Primary 3"
+         *         }
+         *       ],
+         *       "lines": [
+         *         {
+         *           "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+         *           "label": "Tuition Fee",
+         *           "kind": "Amount",
+         *           "showOnPortal": false,
+         *           "amounts": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "amount": 45000
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03",
+         *           "label": "Exam & PTA",
+         *           "kind": "Amount",
+         *           "showOnPortal": false,
+         *           "amounts": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "amount": 5000
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+         *           "label": "Outstanding Fee",
+         *           "kind": "Outstanding",
+         *           "showOnPortal": false,
+         *           "amounts": []
+         *         }
+         *       ],
+         *       "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+         *     }
+         */
+        FeeNoticeGridDto: {
+            /**
+             * Format: uuid
+             * @description The section.
+             * @example 00000000-0000-0000-0000-000000000302
+             */
+            sectionId: string;
+            /**
+             * @description For example Primary.
+             * @example Primary
+             */
+            sectionName: string;
+            /**
+             * Format: uuid
+             * @description The term whose sheets print it.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description For example First Term.
+             * @example First Term
+             */
+            termName: string;
+            /**
+             * @description For example 2026/2027.
+             * @example 2026/2027
+             */
+            sessionName: string;
+            /**
+             * Format: uuid
+             * @description The term before, for "copy from previous term"; null when this is the first term on record.
+             * @example 0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02
+             */
+            previousTermId: null | string;
+            /**
+             * @description For example "Third Term 2025/2026".
+             * @example Third Term 2025/2026
+             */
+            previousTermLabel: null | string;
+            /**
+             * @description True when the section has saved no lines yet and Lines are spec 6.2.13's seed, unsaved.
+             * @example false
+             */
+            isDefault: boolean;
+            /**
+             * @description The section's active class levels, in progression order.
+             * @example [
+             *       {
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "name": "Primary 3"
+             *       }
+             *     ]
+             */
+            levels: components["schemas"]["FeeGridLevelDto"][];
+            /**
+             * @description In print order.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+             *         "label": "Tuition Fee",
+             *         "kind": "Amount",
+             *         "showOnPortal": false,
+             *         "amounts": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "amount": 45000
+             *           }
+             *         ]
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03",
+             *         "label": "Exam & PTA",
+             *         "kind": "Amount",
+             *         "showOnPortal": false,
+             *         "amounts": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "amount": 5000
+             *           }
+             *         ]
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+             *         "label": "Outstanding Fee",
+             *         "kind": "Outstanding",
+             *         "showOnPortal": false,
+             *         "amounts": []
+             *       }
+             *     ]
+             */
+            lines: components["schemas"]["FeeGridLineDto"][];
+            /**
+             * @description Opaque; sent back with a save so a stale screen cannot overwrite (or delete) newer lines. Null before any save.
+             * @example 5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d
+             */
+            version: null | string;
+        };
+        /**
          * @description Generates a batch (spec 6.8.9). Pins are not tied to any pupil.
          * @example {
          *       "sessionId": "0192f0c4-9a10-7000-8000-000000000302",
@@ -6301,6 +7844,207 @@ export interface components {
              * @example C
              */
             label: string;
+        };
+        /**
+         * @description The 36 states and the FCT, each with its LGAs.
+         * @example {
+         *       "states": [
+         *         {
+         *           "name": "Abia",
+         *           "lgas": [
+         *             "Aba North",
+         *             "Aba South",
+         *             "Arochukwu"
+         *           ]
+         *         },
+         *         {
+         *           "name": "Anambra",
+         *           "lgas": [
+         *             "Aguata",
+         *             "Anambra East",
+         *             "Awka South"
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        NigerianGeographyDto: {
+            /**
+             * @description In the National Assembly's order, as the server lists them.
+             * @example [
+             *       {
+             *         "name": "Abia",
+             *         "lgas": [
+             *           "Aba North",
+             *           "Aba South",
+             *           "Arochukwu"
+             *         ]
+             *       },
+             *       {
+             *         "name": "Anambra",
+             *         "lgas": [
+             *           "Aguata",
+             *           "Anambra East",
+             *           "Awka South"
+             *         ]
+             *       }
+             *     ]
+             */
+            states: components["schemas"]["NigerianStateDto"][];
+        };
+        /**
+         * @description One state and its local government areas.
+         * @example {
+         *       "name": "Anambra",
+         *       "lgas": [
+         *         "Aguata",
+         *         "Anambra East",
+         *         "Awka North",
+         *         "Awka South"
+         *       ]
+         *     }
+         */
+        NigerianStateDto: {
+            /**
+             * @description The canonical spelling the server stores.
+             * @example Anambra
+             */
+            name: string;
+            /**
+             * @description Its LGAs, canonical spellings, in list order.
+             * @example [
+             *       "Aguata",
+             *       "Anambra East",
+             *       "Awka North",
+             *       "Awka South"
+             *     ]
+             */
+            lgas: string[];
+        };
+        /**
+         * @description One pupil's figure as submitted.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "amount": 12500
+         *     }
+         */
+        OutstandingFeeInput: {
+            /**
+             * Format: uuid
+             * @description A pupil on the arm's roster.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * Format: int32
+             * @description Naira; null clears it.
+             * @example 12500
+             */
+            amount: null | number | string;
+        };
+        /**
+         * @description One pupil's figure.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "registrationNumber": "GRA/2026/0014",
+         *       "amount": 12500
+         *     }
+         */
+        OutstandingFeeRowDto: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Surname first.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description As issued.
+             * @example GRA/2026/0014
+             */
+            registrationNumber: null | string;
+            /**
+             * Format: int32
+             * @description Naira; null when blank, which prints as a dash.
+             * @example 12500
+             */
+            amount: null | number | string;
+        };
+        /**
+         * @description Spec 6.2.13's bulk grid: an arm's pupils against one outstanding-fee figure for a term. Blank is the normal case.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "armName": "Primary 3A",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "termName": "First Term",
+         *       "locked": false,
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "registrationNumber": "GRA/2026/0014",
+         *           "amount": 12500
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "displayName": "Bello Amina",
+         *           "registrationNumber": "GRA/2025/0031",
+         *           "amount": null
+         *         }
+         *       ]
+         *     }
+         */
+        OutstandingFeeSheetDto: {
+            /**
+             * Format: uuid
+             * @description The arm.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * @description For example Primary 3A.
+             * @example Primary 3A
+             */
+            armName: string;
+            /**
+             * Format: uuid
+             * @description The term.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description For example First Term.
+             * @example First Term
+             */
+            termName: string;
+            /**
+             * @description True once the arm's results for the term are published (human ruling 2026-09-27).
+             * @example false
+             */
+            locked: boolean;
+            /**
+             * @description The arm's active roster, surname first.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "registrationNumber": "GRA/2026/0014",
+             *         "amount": 12500
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "displayName": "Bello Amina",
+             *         "registrationNumber": "GRA/2025/0031",
+             *         "amount": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["OutstandingFeeRowDto"][];
         };
         /**
          * @description The one pagination response envelope for the whole API. Consistency here is what lets the
@@ -6887,6 +8631,526 @@ export interface components {
             lockedUntil?: string;
         };
         /**
+         * @description A promotion batch and its tallies.
+         * @example {
+         *       "id": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
+         *       "sourceSessionId": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *       "targetSessionName": "2027/2028",
+         *       "state": "Committed",
+         *       "committedAtUtc": "2027-07-28T10:15:00+00:00",
+         *       "reversedAtUtc": null,
+         *       "promoted": 182,
+         *       "repeated": 9,
+         *       "promotedOnTrial": 3,
+         *       "graduated": 41
+         *     }
+         */
+        PromotionBatchDto: {
+            /**
+             * Format: uuid
+             * @description The batch.
+             * @example 0192f0c4-bf71-7d9e-c2b0-6e1ed2093938
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Promoted from.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            sourceSessionId: string;
+            /**
+             * Format: uuid
+             * @description Promoted into.
+             * @example 0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49
+             */
+            targetSessionId: string;
+            /**
+             * @description For the screen's summary line.
+             * @example 2027/2028
+             */
+            targetSessionName: string;
+            /** @description Committed or Reversed. */
+            state: components["schemas"]["PromotionBatchState"];
+            /**
+             * Format: date-time
+             * @description When it was committed.
+             * @example 2027-07-28T10:15:00+00:00
+             */
+            committedAtUtc: string;
+            /**
+             * Format: date-time
+             * @description When it was reversed, if it was.
+             * @example 2026-08-03T09:30:00+00:00
+             */
+            reversedAtUtc: null | string;
+            /**
+             * Format: int32
+             * @description Pupils promoted.
+             * @example 182
+             */
+            promoted: number | string;
+            /**
+             * Format: int32
+             * @description Pupils repeating.
+             * @example 9
+             */
+            repeated: number | string;
+            /**
+             * Format: int32
+             * @description Pupils promoted on trial.
+             * @example 3
+             */
+            promotedOnTrial: number | string;
+            /**
+             * Format: int32
+             * @description Pupils graduated.
+             * @example 41
+             */
+            graduated: number | string;
+        };
+        /**
+         * @description A committed promotion's lifecycle (spec 6.3.7). A reversed batch is kept, marked, never deleted.
+         * @example Committed
+         * @enum {unknown}
+         */
+        PromotionBatchState: "Committed" | "Reversed";
+        /**
+         * @description One unmet precondition, with spec 6.3.7's wording where it gives one.
+         * @example {
+         *       "code": "promotion.receiving_level_without_arm",
+         *       "message": "Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion."
+         *     }
+         */
+        PromotionBlockerDto: {
+            /**
+             * @description Stable, for example `promotion.receiving_level_without_arm`.
+             * @example promotion.receiving_level_without_arm
+             */
+            code: string;
+            /**
+             * @description Shown as written.
+             * @example Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion.
+             */
+            message: string;
+        };
+        /**
+         * @description A pupil's annual mean in one core subject.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "mean": 68.5,
+         *       "passed": true
+         *     }
+         */
+        PromotionCoreResultDto: {
+            /**
+             * Format: uuid
+             * @description The core subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * Format: double
+             * @description Null when the pupil did not take it (which never counts against them).
+             * @example 68.5
+             */
+            mean: null | number | string;
+            /**
+             * @description At or above the pass mark; null when not taken.
+             * @example true
+             */
+            passed: null | boolean;
+        };
+        /**
+         * @description A core subject's name for the screen's column headings.
+         * @example {
+         *       "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *       "name": "Mathematics"
+         *     }
+         */
+        PromotionCoreSubjectDto: {
+            /**
+             * Format: uuid
+             * @description The subject.
+             * @example 0192f0c4-e294-7061-f583-9141c02d7306
+             */
+            subjectId: string;
+            /**
+             * @description As configured.
+             * @example Mathematics
+             */
+            name: string;
+        };
+        /**
+         * @description One pupil's decision as the review screen submits it.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "outcome": "PromotedOnTrial",
+         *       "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *       "reason": "Missed most of Second Term through illness; strong Third Term."
+         *     }
+         */
+        PromotionDecisionInput: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /** @description Promoted, Repeat, PromotedOnTrial or Graduated. */
+            outcome: components["schemas"]["PromotionDecisionOutcome"];
+            /**
+             * Format: uuid
+             * @description An arm of the destination level in the target session; null for a graduate.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            targetArmId: null | string;
+            /**
+             * @description Required for PromotedOnTrial; optional otherwise.
+             * @example Missed most of Second Term through illness; strong Third Term.
+             */
+            reason: null | string;
+        };
+        /**
+         * @description A promotion outcome (spec 6.3.7): Promoted, Repeat, PromotedOnTrial (never proposed, chosen with a reason) or Graduated (terminal level only).
+         * @example Promoted
+         * @enum {unknown}
+         */
+        PromotionDecisionOutcome: "Promoted" | "Repeat" | "PromotedOnTrial" | "Graduated" | null;
+        /**
+         * @description A pupil enrolled in the session who is no longer active.
+         * @example {
+         *       "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *       "displayName": "Bello Amina",
+         *       "registrationNumber": "GRA/2025/0031",
+         *       "status": "Withdrawn"
+         *     }
+         */
+        PromotionExcludedPupilDto: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-590b-7768-6c5a-08b827aad3d2
+             */
+            pupilId: string;
+            /**
+             * @description Surname first.
+             * @example Bello Amina
+             */
+            displayName: string;
+            /**
+             * @description As issued.
+             * @example GRA/2025/0031
+             */
+            registrationNumber: null | string;
+            /** @description Transferred, withdrawn or graduated. */
+            status: components["schemas"]["PupilStatus"];
+        };
+        /**
+         * @description Spec 6.3.7's review screen: every active pupil with the system's proposal and a default target arm, the destination
+         *     arms with their counts, and whatever blocks the run. When a committed batch already exists the rows are empty and
+         *     CommittedBatch describes it, so the screen can offer reversal instead.
+         * @example {
+         *       "sourceSession": {
+         *         "id": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *         "name": "2026/2027",
+         *         "startDate": "2026-09-14",
+         *         "endDate": "2027-07-23"
+         *       },
+         *       "targetSession": {
+         *         "id": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+         *         "name": "2027/2028",
+         *         "startDate": "2027-09-13",
+         *         "endDate": "2028-07-21"
+         *       },
+         *       "blockers": [],
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "displayName": "Okafor Chidera Ngozi",
+         *           "registrationNumber": "GRA/2026/0014",
+         *           "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *           "currentArmName": "Primary 2A",
+         *           "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *           "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *           "annualAverage": 71.25,
+         *           "coreResults": [
+         *             {
+         *               "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *               "mean": 68.5,
+         *               "passed": true
+         *             }
+         *           ],
+         *           "proposedOutcome": "Promoted",
+         *           "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+         *         }
+         *       ],
+         *       "targetArms": [
+         *         {
+         *           "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *           "name": "Primary 3A",
+         *           "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *           "capacity": 30,
+         *           "enrolledCount": 2
+         *         }
+         *       ],
+         *       "coreSubjects": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "name": "Mathematics"
+         *         }
+         *       ],
+         *       "excluded": [
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "displayName": "Bello Amina",
+         *           "registrationNumber": "GRA/2025/0031",
+         *           "status": "Withdrawn"
+         *         }
+         *       ],
+         *       "committedBatch": null,
+         *       "canDecide": true
+         *     }
+         */
+        PromotionPreviewDto: {
+            /** @description The session promoted from. */
+            sourceSession: components["schemas"]["PromotionSessionDto"];
+            targetSession: null | components["schemas"]["PromotionSessionDto"];
+            /**
+             * @description Every unmet precondition; commit is refused while any remains.
+             * @example []
+             */
+            blockers: components["schemas"]["PromotionBlockerDto"][];
+            /**
+             * @description One per active pupil, ordered by current arm then name.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "displayName": "Okafor Chidera Ngozi",
+             *         "registrationNumber": "GRA/2026/0014",
+             *         "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+             *         "currentArmName": "Primary 2A",
+             *         "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *         "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+             *         "annualAverage": 71.25,
+             *         "coreResults": [
+             *           {
+             *             "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *             "mean": 68.5,
+             *             "passed": true
+             *           }
+             *         ],
+             *         "proposedOutcome": "Promoted",
+             *         "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["PromotionRowDto"][];
+            /**
+             * @description The target session's active arms, with capacity and the pupils already enrolled in each.
+             * @example [
+             *       {
+             *         "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+             *         "name": "Primary 3A",
+             *         "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+             *         "capacity": 30,
+             *         "enrolledCount": 2
+             *       }
+             *     ]
+             */
+            targetArms: components["schemas"]["PromotionTargetArmDto"][];
+            /**
+             * @description The core subjects the rows' core results are reported against, in settings order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "name": "Mathematics"
+             *       }
+             *     ]
+             */
+            coreSubjects: components["schemas"]["PromotionCoreSubjectDto"][];
+            /**
+             * @description Pupils enrolled in the session who are no longer active (spec 6.3.9): shown apart, never promoted.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "displayName": "Bello Amina",
+             *         "registrationNumber": "GRA/2025/0031",
+             *         "status": "Withdrawn"
+             *       }
+             *     ]
+             */
+            excluded: components["schemas"]["PromotionExcludedPupilDto"][];
+            committedBatch: null | components["schemas"]["PromotionBatchDto"];
+            /**
+             * @description Whether the caller holds `promotion.decide`: changing a proposal and on trial need it.
+             * @example true
+             */
+            canDecide: boolean;
+        };
+        /**
+         * @description One pupil on the review screen.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "displayName": "Okafor Chidera Ngozi",
+         *       "registrationNumber": "GRA/2026/0014",
+         *       "currentArmId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "currentArmName": "Primary 2A",
+         *       "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *       "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *       "annualAverage": 71.25,
+         *       "coreResults": [
+         *         {
+         *           "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+         *           "mean": 68.5,
+         *           "passed": true
+         *         }
+         *       ],
+         *       "proposedOutcome": "Promoted",
+         *       "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+         *     }
+         */
+        PromotionRowDto: {
+            /**
+             * Format: uuid
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description Surname first.
+             * @example Okafor Chidera Ngozi
+             */
+            displayName: string;
+            /**
+             * @description As issued.
+             * @example GRA/2026/0014
+             */
+            registrationNumber: null | string;
+            /**
+             * Format: uuid
+             * @description The arm the pupil ends the session in.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            currentArmId: string;
+            /**
+             * @description For example Primary 2A.
+             * @example Primary 2A
+             */
+            currentArmName: string;
+            /**
+             * Format: uuid
+             * @description The current level: a repeat goes to an arm of this level.
+             * @example 0192f0c4-04b6-7263-1705-b363e24f9528
+             */
+            classLevelId: string;
+            /**
+             * Format: uuid
+             * @description The level promotion moves to; null at the terminal level, where promotion is graduation.
+             * @example 0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716
+             */
+            nextLevelId: null | string;
+            /**
+             * Format: double
+             * @description The annual cumulative average; null when no annual result exists (the administrator must choose).
+             * @example 71.25
+             */
+            annualAverage: null | number | string;
+            /**
+             * @description One per core subject, in IReadOnlyList&lt;PromotionCoreSubjectDto&gt; PromotionPreviewDto.CoreSubjects order.
+             * @example [
+             *       {
+             *         "subjectId": "0192f0c4-e294-7061-f583-9141c02d7306",
+             *         "mean": 68.5,
+             *         "passed": true
+             *       }
+             *     ]
+             */
+            coreResults: components["schemas"]["PromotionCoreResultDto"][];
+            proposedOutcome: null | components["schemas"]["PromotionDecisionOutcome"];
+            /**
+             * Format: uuid
+             * @description The balanced round-robin default; null for a graduate or a blank proposal.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            proposedTargetArmId: null | string;
+        };
+        /**
+         * @description A session as the promotion screen names it.
+         * @example {
+         *       "id": "0192f0c4-af61-7d4e-c250-6e1b8d9f4073",
+         *       "name": "2026/2027",
+         *       "startDate": "2026-09-14",
+         *       "endDate": "2027-07-23"
+         *     }
+         */
+        PromotionSessionDto: {
+            /**
+             * Format: uuid
+             * @description The session.
+             * @example 0192f0c4-af61-7d4e-c250-6e1b8d9f4073
+             */
+            id: string;
+            /**
+             * @description For example 2027/2028.
+             * @example 2026/2027
+             */
+            name: string;
+            /**
+             * Format: date
+             * @description The new enrolments start on the target's start date.
+             * @example 2026-09-14
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description The old enrolments close on the source's end date.
+             * @example 2027-07-23
+             */
+            endDate: string;
+        };
+        /**
+         * @description A destination arm in the target session.
+         * @example {
+         *       "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827",
+         *       "name": "Primary 3A",
+         *       "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716",
+         *       "capacity": 30,
+         *       "enrolledCount": 2
+         *     }
+         */
+        PromotionTargetArmDto: {
+            /**
+             * Format: uuid
+             * @description The arm.
+             * @example 0192f0c4-ae60-7c8d-b1af-5d0dc1f82827
+             */
+            armId: string;
+            /**
+             * @description For example Primary 3B.
+             * @example Primary 3A
+             */
+            name: string;
+            /**
+             * Format: uuid
+             * @description Its level.
+             * @example 0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716
+             */
+            classLevelId: string;
+            /**
+             * Format: int32
+             * @description Over capacity warns, never blocks (spec 6.4.9).
+             * @example 30
+             */
+            capacity: number | string;
+            /**
+             * Format: int32
+             * @description Pupils already enrolled in it, before this promotion adds any.
+             * @example 2
+             */
+            enrolledCount: number | string;
+        };
+        /**
          * @description The published set.
          * @example {
          *       "resultSet": {
@@ -7089,7 +9353,8 @@ export interface components {
          *       "file": {
          *         "contentType": "application/pdf",
          *         "sizeBytes": 412736,
-         *         "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *         "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *         "fileName": "birth-cert-scan.pdf"
          *       }
          *     }
          */
@@ -7121,7 +9386,8 @@ export interface components {
          * @example {
          *       "contentType": "application/pdf",
          *       "sizeBytes": 412736,
-         *       "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *       "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *       "fileName": "birth-cert-scan.pdf"
          *     }
          */
         PupilDocumentFileDto: {
@@ -7142,6 +9408,11 @@ export interface components {
              * @example 2026-09-14T10:05:00+00:00
              */
             uploadedAtUtc: string;
+            /**
+             * @description The name it had on the uploader's device, for display; null for a scan attached before it was kept.
+             * @example IMG_2231.jpg
+             */
+            fileName: null | string;
         };
         /**
          * @description The body of the document route: one row's state.
@@ -7186,7 +9457,8 @@ export interface components {
          *           "file": {
          *             "contentType": "application/pdf",
          *             "sizeBytes": 412736,
-         *             "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+         *             "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+         *             "fileName": "birth-cert-scan.pdf"
          *           }
          *         },
          *         {
@@ -7242,7 +9514,8 @@ export interface components {
              *         "file": {
              *           "contentType": "application/pdf",
              *           "sizeBytes": 412736,
-             *           "uploadedAtUtc": "2026-09-14T10:05:00+00:00"
+             *           "uploadedAtUtc": "2026-09-14T10:05:00+00:00",
+             *           "fileName": "birth-cert-scan.pdf"
              *         }
              *       },
              *       {
@@ -7452,6 +9725,12 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             photoUpdatedAtUtc?: null | string;
+            /**
+             * Format: int32
+             * @description The record's completeness across spec 6.5.12's chased set, 0 to 100. Populated ONLY by the pupil list (the list column
+             *     of spec 6.5.15); null everywhere else, where the record's own completeness report is the source.
+             */
+            chasedPercent?: null | number | string;
         };
         /**
          * @description One enrolment in the pupil's history (spec 02 §5.2).
@@ -9150,10 +11429,300 @@ export interface components {
             orderedLevelIds: string[];
         };
         /**
+         * @description How a column's cells sit.
+         * @example Right
+         * @enum {unknown}
+         */
+        ReportAlign: "Left" | "Center" | "Right";
+        /**
+         * @description One column.
+         * @example {
+         *       "label": "CA",
+         *       "align": "Right",
+         *       "group": "Mathematics"
+         *     }
+         */
+        ReportColumnDto: {
+            /**
+             * @description The heading.
+             * @example CA
+             */
+            label: string;
+            /** @description How its cells sit. */
+            align: components["schemas"]["ReportAlign"];
+            /**
+             * @description A heading over consecutive columns sharing it (the broadsheet's subject over CA, Exam and Total), or null.
+             * @example Mathematics
+             */
+            group?: null | string;
+        };
+        /**
+         * @description Every report in spec 15 section 10 as one tabular shape (spec 15: read-only views, CSV and PDF under `report.export`),
+         *     so a single screen, CSV writer and PDF renderer serve all of them. Cells are formatted on the server, the same text in
+         *     all three outputs.
+         * @example {
+         *       "key": "broadsheet",
+         *       "title": "Arm broadsheet",
+         *       "filters": [
+         *         "Class: Primary 2 Gold",
+         *         "First Term, 2026/2027"
+         *       ],
+         *       "orientation": "Landscape",
+         *       "twoUp": false,
+         *       "columns": [
+         *         {
+         *           "label": "Pos.",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Name",
+         *           "align": "Left",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Reg. no.",
+         *           "align": "Left",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "CA",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Exam",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Total",
+         *           "align": "Right",
+         *           "group": "Mathematics"
+         *         },
+         *         {
+         *           "label": "Total",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Average",
+         *           "align": "Right",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Grade",
+         *           "align": "Center",
+         *           "group": null
+         *         },
+         *         {
+         *           "label": "Level pos.",
+         *           "align": "Right",
+         *           "group": null
+         *         }
+         *       ],
+         *       "rows": [
+         *         {
+         *           "kind": "Data",
+         *           "cells": [
+         *             "1",
+         *             "OKAFOR Chidera Ngozi",
+         *             "GRA/2026/0014",
+         *             "38",
+         *             "52",
+         *             "90",
+         *             "90",
+         *             "90.00",
+         *             "A",
+         *             "2="
+         *           ]
+         *         }
+         *       ],
+         *       "notes": [
+         *         "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+         *       ],
+         *       "rowCount": 1,
+         *       "generatedAtUtc": "2026-12-11T09:30:00+00:00"
+         *     }
+         */
+        ReportDto: {
+            /**
+             * @description The report's route name, e.g. `broadsheet`.
+             * @example broadsheet
+             */
+            key: string;
+            /**
+             * @description The heading.
+             * @example Arm broadsheet
+             */
+            title: string;
+            /**
+             * @description The filters applied, as readable lines ("Class: Primary 3A").
+             * @example [
+             *       "Class: Primary 2 Gold",
+             *       "First Term, 2026/2027"
+             *     ]
+             */
+            filters: string[];
+            /** @description The PDF's orientation. */
+            orientation: components["schemas"]["ReportOrientation"];
+            /**
+             * @description The PDF prints the table in two columns side by side (the merit list).
+             * @example false
+             */
+            twoUp: boolean;
+            /**
+             * @description The columns.
+             * @example [
+             *       {
+             *         "label": "Pos.",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Name",
+             *         "align": "Left",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Reg. no.",
+             *         "align": "Left",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "CA",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Exam",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Total",
+             *         "align": "Right",
+             *         "group": "Mathematics"
+             *       },
+             *       {
+             *         "label": "Total",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Average",
+             *         "align": "Right",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Grade",
+             *         "align": "Center",
+             *         "group": null
+             *       },
+             *       {
+             *         "label": "Level pos.",
+             *         "align": "Right",
+             *         "group": null
+             *       }
+             *     ]
+             */
+            columns: components["schemas"]["ReportColumnDto"][];
+            /**
+             * @description The rows.
+             * @example [
+             *       {
+             *         "kind": "Data",
+             *         "cells": [
+             *           "1",
+             *           "OKAFOR Chidera Ngozi",
+             *           "GRA/2026/0014",
+             *           "38",
+             *           "52",
+             *           "90",
+             *           "90",
+             *           "90.00",
+             *           "A",
+             *           "2="
+             *         ]
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["ReportRowDto"][];
+            /**
+             * @description Lines printed under the table.
+             * @example [
+             *       "Not yet published (Awaiting approval): figures change if marks are corrected and computed again."
+             *     ]
+             */
+            notes: string[];
+            /**
+             * Format: int32
+             * @description Data rows, the figure every export audits.
+             * @example 1
+             */
+            rowCount: number | string;
+            /**
+             * Format: date-time
+             * @description When this copy was produced.
+             * @example 2026-12-11T09:30:00+00:00
+             */
+            generatedAtUtc: string;
+        };
+        /**
+         * @description The PDF's page orientation.
+         * @example Landscape
+         * @enum {unknown}
+         */
+        ReportOrientation: "Portrait" | "Landscape";
+        /**
+         * @description One row: one cell per column, already formatted, null for blank.
+         * @example {
+         *       "kind": "Data",
+         *       "cells": [
+         *         "1",
+         *         "OKAFOR Chidera Ngozi",
+         *         "GRA/2026/0014",
+         *         "38",
+         *         "52",
+         *         "90",
+         *         "90",
+         *         "90.00",
+         *         "A",
+         *         "2="
+         *       ]
+         *     }
+         */
+        ReportRowDto: {
+            /** @description What the row is. */
+            kind: components["schemas"]["ReportRowKind"];
+            /**
+             * @description The cells, in column order.
+             * @example [
+             *       "1",
+             *       "OKAFOR Chidera Ngozi",
+             *       "GRA/2026/0014",
+             *       "38",
+             *       "52",
+             *       "90",
+             *       "90",
+             *       "90.00",
+             *       "A",
+             *       "2="
+             *     ]
+             */
+            cells: string[];
+        };
+        /**
+         * @description What a row is, so screen, CSV and PDF can each style it.
+         * @example Data
+         * @enum {unknown}
+         */
+        ReportRowKind: "Data" | "Heading" | "Subtotal" | "Total";
+        /**
          * @description The new one-time temporary password (spec 6.1.11: "displays it once").
          * @example {
          *       "id": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d40",
-         *       "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+         *       "temporaryPassword": "482915730264"
          *     }
          */
         ResetAdminAccountPasswordResponse: {
@@ -9165,7 +11734,7 @@ export interface components {
             /**
              * @description The generated plaintext password. Present on the live response; REDACTED (`null`)
              *     on a stored idempotency replay — see RedactFromIdempotencyReplayAttribute.
-             * @example aB3xQ9mK2pL7vN4wR8dT
+             * @example 482915730264
              */
             temporaryPassword: null | string;
         };
@@ -9661,6 +12230,28 @@ export interface components {
             resultSet: components["schemas"]["ResultSetSummaryDto"];
         };
         /**
+         * @description `POST /api/v1/promotion-batches/{batchId}/reverse` (spec 6.3.7): undoes a committed promotion, while no mark has been
+         *             entered and no pin used in the new session. Needs `promotion.reverse`, a Super Admin, and a reason. The batch row is
+         *             kept, marked.
+         * @example {
+         *       "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938",
+         *       "reason": "Committed into the wrong session; the new session's dates were being corrected."
+         *     }
+         */
+        ReversePromotionCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-bf71-7d9e-c2b0-6e1ed2093938
+             */
+            batchId: string;
+            /**
+             * @description 10 to 500 characters.
+             * @example Committed into the wrong session; the new session's dates were being corrected.
+             */
+            reason: string;
+        };
+        /**
          * @description Wire shape of a RoleAssignment (spec 6.1.5).
          * @example {
          *       "id": "0192f0c4-8d4f-7b2c-a03e-4c9f6b7d2e51",
@@ -9673,7 +12264,12 @@ export interface components {
          *       ],
          *       "grantedBy": "0192f0c4-d183-7f60-e472-8030af1b6295",
          *       "status": "Active",
-         *       "createdAtUtc": "2026-08-03T09:30:00+00:00"
+         *       "createdAtUtc": "2026-08-03T09:30:00+00:00",
+         *       "roleName": "Class Teacher",
+         *       "sessionName": "2026/2027",
+         *       "armNames": [
+         *         "Primary 2A"
+         *       ]
          *     }
          */
         RoleAssignmentDto: {
@@ -9721,6 +12317,23 @@ export interface components {
              * @example 2026-08-03T09:30:00+00:00
              */
             createdAtUtc: string;
+            /**
+             * @description The role's name (TASK-0046).
+             * @example Class Teacher
+             */
+            roleName: string;
+            /**
+             * @description The session's name; `null` exactly when SessionId is.
+             * @example 2026/2027
+             */
+            sessionName: null | string;
+            /**
+             * @description The classes' display names, in the order of ArmIds.
+             * @example [
+             *       "Primary 2A"
+             *     ]
+             */
+            armNames: string[];
         };
         /**
          * @description Lifecycle of a RoleAssignment (spec 6.1.5).
@@ -9789,6 +12402,153 @@ export interface components {
          * @enum {unknown}
          */
         RoleStatus: "Active" | "Archived";
+        /**
+         * @description The class safeguarding sheet: every active pupil in one arm with their health and collection data.
+         * @example {
+         *       "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31",
+         *       "armName": "Primary 2 Gold",
+         *       "sessionName": "2026/2027",
+         *       "generatedAtUtc": "2026-10-05T07:45:00+00:00",
+         *       "pupils": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "registrationNumber": "GRA/2026/0014",
+         *           "name": "OKAFOR Chidera Ngozi",
+         *           "thumbnail": null,
+         *           "allergies": "Groundnuts",
+         *           "medicalConditions": "None",
+         *           "medication": "Not asked",
+         *           "specialInstructions": "Inhaler in the office",
+         *           "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+         *           "pickupPersons": [
+         *             "Ngozi Okafor (Aunt) 08059876543"
+         *           ],
+         *           "barredMarker": "Yes: see office"
+         *         }
+         *       ]
+         *     }
+         */
+        SafeguardingSheetDto: {
+            /**
+             * @description The class.
+             * @example 0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31
+             */
+            armId: string;
+            /**
+             * @description E.g. "Primary 2 Gold".
+             * @example Primary 2 Gold
+             */
+            armName: string;
+            /**
+             * @description The session the arm belongs to.
+             * @example 2026/2027
+             */
+            sessionName: string;
+            /**
+             * Format: date-time
+             * @description When this copy was generated; each generation is audited.
+             * @example 2026-10-05T07:45:00+00:00
+             */
+            generatedAtUtc: string;
+            /**
+             * @description By surname, then first name.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "registrationNumber": "GRA/2026/0014",
+             *         "name": "OKAFOR Chidera Ngozi",
+             *         "thumbnail": null,
+             *         "allergies": "Groundnuts",
+             *         "medicalConditions": "None",
+             *         "medication": "Not asked",
+             *         "specialInstructions": "Inhaler in the office",
+             *         "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+             *         "pickupPersons": [
+             *           "Ngozi Okafor (Aunt) 08059876543"
+             *         ],
+             *         "barredMarker": "Yes: see office"
+             *       }
+             *     ]
+             */
+            pupils: components["schemas"]["SafeguardingSheetRowDto"][];
+        };
+        /**
+         * @description One pupil's line. Health answers read "None" or "Not asked" when there is no detail, never blank.
+         * @example {
+         *       "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *       "registrationNumber": "GRA/2026/0014",
+         *       "name": "OKAFOR Chidera Ngozi",
+         *       "thumbnail": null,
+         *       "allergies": "Groundnuts",
+         *       "medicalConditions": "None",
+         *       "medication": "Not asked",
+         *       "specialInstructions": "Inhaler in the office",
+         *       "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666",
+         *       "pickupPersons": [
+         *         "Ngozi Okafor (Aunt) 08059876543"
+         *       ],
+         *       "barredMarker": "Yes: see office"
+         *     }
+         */
+        SafeguardingSheetRowDto: {
+            /**
+             * @description The pupil.
+             * @example 0192f0c4-48fa-7667-5b49-f7a71699c2c1
+             */
+            pupilId: string;
+            /**
+             * @description The pupil's number.
+             * @example GRA/2026/0014
+             */
+            registrationNumber: null | string;
+            /**
+             * @description Surname first.
+             * @example OKAFOR Chidera Ngozi
+             */
+            name: string;
+            /**
+             * @description The 96 pixel photograph as a `data:image/jpeg` URL, or null (none, or it could not be fetched). Carried in the sheet,
+             *     so the photograph is governed by the sheet's own privilege in both formats (spec 10.2 lists it as a column).
+             */
+            thumbnail: null | string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example Groundnuts
+             */
+            allergies: string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example None
+             */
+            medicalConditions: string;
+            /**
+             * @description "None", "Not asked", or the detail.
+             * @example Not asked
+             */
+            medication: string;
+            /**
+             * @description Free text, or empty.
+             * @example Inhaler in the office
+             */
+            specialInstructions: string;
+            /**
+             * @description Preferred hospital and its phone, or empty.
+             * @example St. Charles Borromeo Hospital, Onitsha, 08037776666
+             */
+            hospital: string;
+            /**
+             * @description "Name (relationship) phone", in the parent's order.
+             * @example [
+             *       "Ngozi Okafor (Aunt) 08059876543"
+             *     ]
+             */
+            pickupPersons: string[];
+            /**
+             * @description A marker only, never names: "Yes: see office", "No" or "Not asked".
+             * @example Yes: see office
+             */
+            barredMarker: string;
+        };
         /**
          * @description REFERENCE SLICE — read model for a sample record.
          * @example {
@@ -10091,6 +12851,104 @@ export interface components {
             };
         };
         /**
+         * @description `PUT /api/v1/fee-notices` (spec 6.2.13): the whole grid in one save. The rows as listed become the section's lines in
+         *             that order; a saved line left out is removed, with its amounts in every term. Needs `fee.manage`.
+         * @example {
+         *       "sectionId": "00000000-0000-0000-0000-000000000302",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "lines": [
+         *         {
+         *           "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+         *           "label": "Tuition Fee",
+         *           "kind": "Amount",
+         *           "showOnPortal": false,
+         *           "amounts": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "amount": 45000
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "id": null,
+         *           "label": "Uniform",
+         *           "kind": "Amount",
+         *           "showOnPortal": false,
+         *           "amounts": [
+         *             {
+         *               "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+         *               "amount": 0
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+         *           "label": "Outstanding Fee",
+         *           "kind": "Outstanding",
+         *           "showOnPortal": false,
+         *           "amounts": []
+         *         }
+         *       ],
+         *       "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+         *     }
+         */
+        SaveFeeNoticeGridCommand: {
+            /**
+             * Format: uuid
+             * @description The section.
+             * @example 00000000-0000-0000-0000-000000000302
+             */
+            sectionId: string;
+            /**
+             * Format: uuid
+             * @description The term whose sheets print it.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description Every line, in print order. Empty removes the notice: the section's sheets then print no fees block.
+             * @example [
+             *       {
+             *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01",
+             *         "label": "Tuition Fee",
+             *         "kind": "Amount",
+             *         "showOnPortal": false,
+             *         "amounts": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "amount": 45000
+             *           }
+             *         ]
+             *       },
+             *       {
+             *         "id": null,
+             *         "label": "Uniform",
+             *         "kind": "Amount",
+             *         "showOnPortal": false,
+             *         "amounts": [
+             *           {
+             *             "classLevelId": "0192f0c4-04b6-7263-1705-b363e24f9528",
+             *             "amount": 0
+             *           }
+             *         ]
+             *       },
+             *       {
+             *         "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04",
+             *         "label": "Outstanding Fee",
+             *         "kind": "Outstanding",
+             *         "showOnPortal": false,
+             *         "amounts": []
+             *       }
+             *     ]
+             */
+            lines: components["schemas"]["FeeGridLineInput"][];
+            /**
+             * @description The string? FeeNoticeGridDto.Version the screen was loaded with; 409 when the grid has changed since.
+             * @example 5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d
+             */
+            version: null | string;
+        };
+        /**
          * @description `PUT /api/v1/arms/{armId}/head-teacher-remarks` (TASK-0086 stage A) — partial-save sheet
          *             write, one transaction, plus ruling H's fill-all action. The first remark of either kind for an
          *             arm/term creates the result set (Draft), same convention as `SaveTraitRatingsCommand`.
@@ -10142,6 +13000,52 @@ export interface components {
              * @example Keep up the good work.
              */
             fillEmpty: null | string;
+        };
+        /**
+         * @description `PUT /api/v1/arms/{armId}/outstanding-fees`: saves the listed pupils' figures; pupils not listed are left as they are.
+         *             Refused once the arm's results for the term are published. Needs `fee.manage`.
+         * @example {
+         *       "armId": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184",
+         *       "termId": "0192f0c4-15c7-7364-2816-c474f3608639",
+         *       "rows": [
+         *         {
+         *           "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+         *           "amount": 12500
+         *         },
+         *         {
+         *           "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+         *           "amount": null
+         *         }
+         *       ]
+         *     }
+         */
+        SaveOutstandingFeesCommand: {
+            /**
+             * Format: uuid
+             * @description From the route.
+             * @example 0192f0c4-c072-7e5f-d361-7f2c9e0a5184
+             */
+            armId: string;
+            /**
+             * Format: uuid
+             * @description A term of the arm's session.
+             * @example 0192f0c4-15c7-7364-2816-c474f3608639
+             */
+            termId: string;
+            /**
+             * @description The figures.
+             * @example [
+             *       {
+             *         "pupilId": "0192f0c4-48fa-7667-5b49-f7a71699c2c1",
+             *         "amount": 12500
+             *       },
+             *       {
+             *         "pupilId": "0192f0c4-590b-7768-6c5a-08b827aad3d2",
+             *         "amount": null
+             *       }
+             *     ]
+             */
+            rows: components["schemas"]["OutstandingFeeInput"][];
         };
         /**
          * @description `PUT /api/v1/pupils/{pupilId}/pickup-persons`: the whole list, in the parent's order. Empty is allowed.
@@ -16695,6 +19599,114 @@ export interface operations {
             };
         };
     };
+    CopyAssignmentsToSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyAssignmentsToSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentCopyResultDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetAttendance: {
         parameters: {
             query: {
@@ -18080,6 +21092,763 @@ export interface operations {
             };
         };
     };
+    GetFeeNoticeGrid: {
+        parameters: {
+            query: {
+                sectionId: string;
+                termId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeNoticeGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveFeeNoticeGrid: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveFeeNoticeGridCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeNoticeGridDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOutstandingFees: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutstandingFeeSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveOutstandingFees: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveOutstandingFeesCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutstandingFeeSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetNigerianGeography: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NigerianGeographyDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSafeguardingSheet: {
+        parameters: {
+            query?: {
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafeguardingSheetDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSafeguardingSheetPdf: {
+        parameters: {
+            query?: {
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionCompleteness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCompletenessDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIncompleteRecordsReport: {
+        parameters: {
+            query?: {
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncompleteRecordsReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTermWeeks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermWeekListResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilWeekly: {
+        parameters: {
+            query: {
+                termId: string;
+            };
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetHeadTeacherRemarks: {
         parameters: {
             query: {
@@ -19026,6 +22795,275 @@ export interface operations {
             };
         };
     };
+    GetPromotionPreview: {
+        parameters: {
+            query?: {
+                targetSessionId?: string;
+            };
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionPreviewDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CommitPromotion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitPromotionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionBatchDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReversePromotion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Optional. A retry with the same key returns the stored response unchanged and sets the `Idempotency-Replay` response header, rather than repeating the request's effect. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversePromotionCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionBatchDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListPupils: {
         parameters: {
             query?: {
@@ -19168,6 +23206,7 @@ export interface operations {
                 surname: string;
                 firstName: string;
                 dateOfBirth: string;
+                contactPhone?: string;
             };
             header?: never;
             path?: never;
@@ -20740,6 +24779,222 @@ export interface operations {
             };
         };
     };
+    GetAdmissionSlip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UploadBarredPersonPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The value of the __Host-XSRF-TOKEN cookie, echoed verbatim (double-submit CSRF, approved contract delta §5). Obtain it from GET /auth/csrf or from a prior response's Set-Cookie. */
+                "X-CSRF-Token": string;
+                /** @description Client-generated key (UUID v4 recommended), 1-255 visible ASCII characters, no whitespace. Required on this route. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                pupilId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BarredPersonPhotoDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
+                    "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBarredPersonPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pupilId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetPupilPhoto: {
         parameters: {
             query?: never;
@@ -21188,258 +25443,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PupilDocumentListDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetAdmissionCompleteness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdmissionCompletenessDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetIncompleteRecordsReport: {
-        parameters: {
-            query?: {
-                armId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncompleteRecordsReportDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetTermWeeks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                termId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TermWeekListResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    GetPupilWeekly: {
-        parameters: {
-            query: {
-                termId: string;
-            };
-            header?: never;
-            path: {
-                pupilId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PupilWeeklyTermDto"];
                 };
             };
             /** @description Unauthorized */
@@ -21955,6 +25958,2524 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBroadsheetReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportBroadsheetReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMeritListReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+                top?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportMeritListReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+                top?: number | string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetResultEntryProgressReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportResultEntryProgressReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                state?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetGradeDistributionReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportGradeDistributionReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                levelId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSubjectPerformanceReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportSubjectPerformanceReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDevelopmentSummaryReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportDevelopmentSummaryReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                armId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetFeeNoticeAuditReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportFeeNoticeAuditReport: {
+        parameters: {
+            query?: {
+                termId?: string;
+                levelId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAnnualCumulativeReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+                levelId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportAnnualCumulativeReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+                levelId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPromotionListReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                outcome?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportPromotionListReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                outcome?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPupilRecordReport: {
+        parameters: {
+            query?: {
+                pupilId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportPupilRecordReport: {
+        parameters: {
+            query?: {
+                pupilId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetNominalRollReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                armId?: string;
+                status?: string;
+                sex?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportNominalRollReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                armId?: string;
+                status?: string;
+                sex?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetEnrolmentSummaryReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportEnrolmentSummaryReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                status?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetGuardianContactsReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportGuardianContactsReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOutstandingDocumentsReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                armId?: string;
+                documentType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportOutstandingDocumentsReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                levelId?: string;
+                armId?: string;
+                documentType?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAdmissionsPipelineReport: {
+        parameters: {
+            query?: {
+                levelId?: string;
+                minDays?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportAdmissionsPipelineReport: {
+        parameters: {
+            query?: {
+                levelId?: string;
+                minDays?: number | string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPinUsageReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+                batchId?: string;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportPinUsageReport: {
+        parameters: {
+            query?: {
+                sessionId?: string;
+                armId?: string;
+                batchId?: string;
+                state?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAuditReport: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                outcome?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportAuditReport: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                actorAdminId?: string;
+                action?: string;
+                entityType?: string;
+                outcome?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSettingsHistoryReport: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                group?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExportSettingsHistoryReport: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                group?: string;
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["Stream"];
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -22573,6 +29094,85 @@ export interface operations {
                 headers: {
                     /** @description Present and set to "true" only when this response is a replay of a prior request that used the same Idempotency-Key, rather than a fresh execution. */
                     "Idempotency-Replay"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrintResultSheets: {
+        parameters: {
+            query: {
+                termId: string;
+                pupilId?: string;
+            };
+            header?: never;
+            path: {
+                armId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["Stream"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

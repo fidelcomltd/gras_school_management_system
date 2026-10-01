@@ -90,6 +90,17 @@ internal sealed class CreateSessionHandler(
                 return Result.Failure<SessionDetailDto>(termCreation.Error);
             }
 
+            // Stored by default as the term's weekdays (project lead, 2026-09-30), so times absent works from day one;
+            // the school edits it to take off holidays and breaks.
+            if (Term.SuggestTimesSchoolOpened(input.StartDate, input.EndDate) is { } suggested)
+            {
+                var opened = termCreation.Value.SetTimesSchoolOpened(suggested);
+                if (opened.IsFailure)
+                {
+                    return Result.Failure<SessionDetailDto>(opened.Error);
+                }
+            }
+
             termEntities.Add(termCreation.Value);
         }
 

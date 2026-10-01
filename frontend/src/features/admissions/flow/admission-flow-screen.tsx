@@ -1,6 +1,6 @@
-import { Link, useParams, useSearchParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { paths } from '@/app/router/paths';
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { LoadingState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { usePupil } from '@/features/pupils/api';
@@ -8,6 +8,7 @@ import { PupilInfoForm } from '@/features/pupils/components/edit-pupil-dialog';
 import { useCompleteness } from '@/features/pupils/records/api';
 import { CollectionPanel } from '@/features/pupils/records/collection-panel';
 import { ContactsPanel } from '@/features/pupils/records/contacts-panel';
+import { usePhoneDuplicates } from '@/features/pupils/records/use-phone-duplicates';
 import { DocumentsPanel } from '@/features/pupils/records/documents-panel';
 import { HealthPanel } from '@/features/pupils/records/health-panel';
 import { PupilPhoto } from '@/features/pupils/records/pupil-photo';
@@ -16,6 +17,7 @@ import { hasPrivilege } from '@/lib/auth/auth-session';
 import { cn } from '@/lib/utils/cn';
 import { AdmittedNotice, DeclarationStep, OtherInformationStep } from './flow-steps';
 import { ReviewStep } from './review-step';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
 
 /** Spec 6.5.11's nine steps. Step 1 is the create dialog; this screen resumes from step 2. */
 const STEPS = [
@@ -39,13 +41,14 @@ export function AdmissionFlowScreen() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const pupil = usePupil(id);
+  const duplicates = usePhoneDuplicates(id);
   const pending = pupil.data?.status === 'Pending';
   const completeness = useCompleteness(id, pending);
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
-  if (pupil.isPending) return <LoadingState label="Loading the admission…" />;
-  if (pupil.isError) return <QueryErrorState error={pupil.error} onRetry={() => void pupil.refetch()} />;
+  if (pupil.isPending) return <WithTrail trail={[{ to: paths.admissions }, { label: 'Admission' }]}><LoadingState label="Loading the admission…" /></WithTrail>;
+  if (pupil.isError) return <TrailedError trail={[{ to: paths.admissions }, { label: 'Admission' }]} error={pupil.error} onRetry={() => void pupil.refetch()} />;
   const record = pupil.data;
   if (!pending) return <AdmittedNotice pupil={record} />;
 
@@ -59,9 +62,7 @@ export function AdmissionFlowScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={paths.admissions} className="text-sm text-primary hover:underline">
-        ← Admissions queue
-      </Link>
+      <PageTrail trail={[{ to: paths.admissions }, { label: pupilName(record) }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Admission: {pupilName(record)}</h1>
         <p className="text-sm text-muted-foreground">Pending. Each section saves on its own button; you can leave and come back.</p>
@@ -129,7 +130,13 @@ export function AdmissionFlowScreen() {
               Back
             </Button>
             {step < 9 ? (
-              <Button variant="outline" onClick={() => go(step + 1)}>
+              <Button
+                variant="outline"
+                // Spec 6.5.11: a possible duplicate must be checked and ticked before continuing.
+                disabled={step === 3 && duplicates.needsAcknowledgement}
+                title={step === 3 && duplicates.needsAcknowledgement ? 'Tick that you have checked the possible duplicate first' : undefined}
+                onClick={() => go(step + 1)}
+              >
                 Next: {STEPS[step]}
               </Button>
             ) : null}

@@ -84,6 +84,7 @@ public interface IPupilRepository
     /// <param name="surname">Exact match, case-insensitive.</param>
     /// <param name="firstName">Exact match, case-insensitive.</param>
     /// <param name="dateOfBirth">Exact match.</param>
+    /// <param name="contactPhone">Canonical +234 form; when given, surname plus any contact phone also matches.</param>
     /// <param name="maxResults">A small cap — this is a candidates panel, not a paged list.</param>
     /// <param name="asOfDate">"Today", for each row's derived age.</param>
     /// <param name="cancellationToken">Propagated to the underlying query.</param>
@@ -91,6 +92,7 @@ public interface IPupilRepository
         string surname,
         string firstName,
         DateOnly dateOfBirth,
+        string? contactPhone,
         int maxResults,
         DateOnly asOfDate,
         CancellationToken cancellationToken);
@@ -128,6 +130,12 @@ public interface IPupilRepository
     /// incomplete-records report's population (spec 6.5.12).
     /// </summary>
     Task<IReadOnlyList<(Pupil Pupil, Guid ArmId)>> ListActiveEnrolledInSessionAsync(Guid sessionId, CancellationToken cancellationToken);
+
+    /// <summary>Every pupil still pending admission, read-only, in one query (the admissions pipeline report).</summary>
+    Task<IReadOnlyList<Pupil>> ListPendingReadOnlyAsync(CancellationToken cancellationToken);
+
+    /// <summary>The active pupils with an open enrolment in one arm: a class's roll, without loading the whole session.</summary>
+    Task<IReadOnlyList<Pupil>> ListActiveEnrolledInArmAsync(Guid armId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Which of <paramref name="registrationNumbers"/> a pupil in ANY status already holds: the issuer's pre-check, so a

@@ -263,6 +263,17 @@ internal static class PortalHtml
         body.Append(CultureInfo.InvariantCulture, $"<h3>{teacherLabel}</h3><div class=\"notice\">{E(sheet.TeacherComment ?? string.Empty)}</div>")
             .Append(CultureInfo.InvariantCulture, $"<h3>{headLabel}</h3><div class=\"notice\">{E(sheet.HeadTeacherComment ?? string.Empty)}</div>");
 
+        if (sheet.Fees is { Count: > 0 } fees)
+        {
+            body.Append("<h3>Next term fees</h3><div class=\"scroll\"><table><tbody>");
+            foreach (var line in fees)
+            {
+                body.Append(CultureInfo.InvariantCulture, $"<tr><td>{E(line.Label)}</td><td>{Naira(line.Amount)}</td></tr>");
+            }
+
+            body.Append(CultureInfo.InvariantCulture, $"<tr><th>Total</th><th>{Naira(sheet.FeeTotal)}</th></tr></tbody></table></div>");
+        }
+
         body.Append("<details><summary>Grade key</summary><div class=\"scroll\"><table><tbody>");
         foreach (var band in sheet.GradeKey)
         {
@@ -275,6 +286,9 @@ internal static class PortalHtml
             .Append(CultureInfo.InvariantCulture, $"<a class=\"button secondary\" href=\"/portal/terms?u={useId:D}\">Back to terms</a>");
         return Page(branding, $"{sheet.TermName} result", body.ToString());
     }
+
+    // E.6: naira with separators and no kobo; zero or blank is a dash.
+    private static string Naira(int? amount) => amount is null or 0 ? "–" : amount.Value.ToString("N0", CultureInfo.InvariantCulture);
 
     /// <summary>The annual cumulative result on screen (spec 6.7.10): the same values as its PDF.</summary>
     public static string Annual(PortalBranding branding, AnnualSheet sheet, Guid sessionId, Guid useId)

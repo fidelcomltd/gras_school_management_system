@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Domain.Audit;
 
@@ -14,7 +15,8 @@ namespace SchoolManagement.Infrastructure.Audit;
 internal sealed class SystemAuditSink(
     IAuditEventRepository auditEvents,
     AuditEventFactory factory,
-    RejectedAuditEventWriter rejectedWriter)
+    RejectedAuditEventWriter rejectedWriter,
+    ILogger<SystemAuditSink> logger)
     : ISystemAuditSink
 {
     /// <inheritdoc />
@@ -47,11 +49,10 @@ internal sealed class SystemAuditSink(
         CancellationToken cancellationToken,
         string? reason = null)
     {
-        var auditEvent = await factory
-            .BuildAsync(AuditOutcome.Rejected, action, entityType, entityId, metadata, actorAdminId, reason, cancellationToken)
+        // Commits immediately, on its own connection — see RejectedAuditEventWriter's remarks. A failed write is logged,
+        // never thrown: the caller's refusal stands (TASK-0058).
+        await RejectedAuditWrite
+            .WriteOrLogAsync(factory, rejectedWriter, logger, action, entityType, entityId, metadata, actorAdminId, reason, cancellationToken)
             .ConfigureAwait(false);
-
-        // Commits immediately, on its own connection — see RejectedAuditEventWriter's remarks.
-        await rejectedWriter.WriteAsync(auditEvent, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -7,9 +7,10 @@ namespace SchoolManagement.Application.Security.Assignments;
 internal static class RoleAssignmentMapper
 {
     /// <summary>Projects <paramref name="assignment"/> to its wire shape.</summary>
-    public static RoleAssignmentDto ToDto(RoleAssignment assignment)
+    public static RoleAssignmentDto ToDto(RoleAssignment assignment, AssignmentNameLookup names)
     {
         ArgumentNullException.ThrowIfNull(assignment);
+        ArgumentNullException.ThrowIfNull(names);
 
         return new RoleAssignmentDto(
             assignment.Id.ToString("D", CultureInfo.InvariantCulture),
@@ -20,6 +21,9 @@ internal static class RoleAssignmentMapper
             assignment.ArmIds.Select(armId => armId.ToString("D", CultureInfo.InvariantCulture)).ToArray(),
             assignment.GrantedBy.ToString("D", CultureInfo.InvariantCulture),
             assignment.Status,
-            assignment.CreatedAtUtc);
+            assignment.CreatedAtUtc,
+            names.Role(assignment.RoleId),
+            names.Session(assignment.SessionId),
+            assignment.ArmIds.Select(names.Arm).ToArray());
     }
 }

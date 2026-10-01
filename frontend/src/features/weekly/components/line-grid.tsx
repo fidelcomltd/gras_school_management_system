@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -5,6 +6,7 @@ import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import type { WeeklyDraft } from '../hooks/use-weekly-draft';
 import { PHRASE_KEY, WEEKLY_DAYS, fieldMeta, formatDate, type WeeklyDay, type WeeklyField, type WeeklyGridDto } from '../types';
 import { EditedByOther, IllnessMarker } from './weekly-markers';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * The primary entry surface (spec 6.10.7): one line for the whole arm, pupils down the side, weekdays across. Offers the
@@ -30,7 +32,7 @@ export function LineGrid({
   const [fillDay, setFillDay] = useState<WeeklyDay>('Monday');
   const [fillText, setFillText] = useState('');
 
-  if (grid.rows.length === 0) return <p className="text-sm text-muted-foreground">No active pupils in this class.</p>;
+  if (grid.rows.length === 0) return <EmptyState icon={Users} title="No active pupils in this class." />;
 
   const fillDown = (event: FormEvent) => {
     event.preventDefault();

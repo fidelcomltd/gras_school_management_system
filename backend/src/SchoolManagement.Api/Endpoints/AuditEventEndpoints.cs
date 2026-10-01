@@ -66,7 +66,7 @@ public sealed class AuditEventEndpoints : IEndpointModule
             .WithDescription(
                 "Spec 6.1.12: filterable by date range (`fromUtc`/`toUtc`, both inclusive), " +
                 "`actorAdminId`, `action`, `entityType`, `entityId` and `outcome` — every filter " +
-                "optional and combinable. Sorted newest first by default (`occurred_at` descending, `id` " +
+                "optional and combinable; `action` and `entityType` match the whole code or the start of any part of it (after a `.` or `_`), ignoring case. Sorted newest first by default (`occurred_at` descending, `id` " +
                 "descending as the tie-break within the same instant). Cursor-paginated per spec " +
                 $"9.5 — never offset. `pageSize` defaults to {CursorPageRequest.DefaultPageSize} " +
                 $"and is capped at {CursorPageRequest.MaxPageSize}.")

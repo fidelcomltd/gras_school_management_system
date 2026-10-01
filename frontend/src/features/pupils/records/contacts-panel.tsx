@@ -3,6 +3,7 @@ import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/
 import { Button } from '@/components/ui/button';
 import { useContacts, useSaveContacts, type ContactRole, type PupilContactDto, type PupilContactInput } from './api';
 import { TextField } from './fields';
+import { PhoneDuplicateWarning } from './phone-duplicates';
 import { errorText, localPhone } from './format';
 
 const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean }[] = [
@@ -12,6 +13,13 @@ const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean
   { role: 'EmergencyPrimary', title: 'Primary emergency contact', adult: false, parent: false },
   { role: 'EmergencyAlternate', title: 'Alternative emergency contact', adult: false, parent: false },
 ];
+
+type EmergencyRole = Extract<ContactRole, 'EmergencyPrimary' | 'EmergencyAlternate'>;
+const isEmergency = (role: ContactRole): role is EmergencyRole => role === 'EmergencyPrimary' || role === 'EmergencyAlternate';
+
+/** Whoever is already filled in above can be copied into an emergency slot; the guardian only when there is one. */
+const COPY_SOURCES = ['Father', 'Mother', 'Guardian'] as const;
+type CopySource = (typeof COPY_SOURCES)[number];
 
 type Draft = Record<ContactRole, { fullName: string; relationship: string; phone: string; whatsappNumber: string; occupation: string; email: string }>;
 
@@ -37,7 +45,12 @@ export function ContactsPanel({ pupilId, canEdit }: { pupilId: string; canEdit: 
   const contacts = useContacts(pupilId);
   if (contacts.isPending) return <LoadingState label="Loading contacts…" />;
   if (contacts.isError) return <QueryErrorState error={contacts.error} onRetry={() => void contacts.refetch()} />;
-  return <ContactsForm key={JSON.stringify(contacts.data.items)} pupilId={pupilId} items={contacts.data.items} canEdit={canEdit} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <PhoneDuplicateWarning pupilId={pupilId} />
+      <ContactsForm key={JSON.stringify(contacts.data.items)} pupilId={pupilId} items={contacts.data.items} canEdit={canEdit} />
+    </div>
+  );
 }
 
 function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: PupilContactDto[]; canEdit: boolean }) {
@@ -47,8 +60,18 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
 
   const set = (role: ContactRole, field: keyof Draft[ContactRole], value: string) =>
     setDraft((current) => ({ ...current, [role]: { ...current[role], [field]: value } }));
-  const copyInto = (from: ContactRole) =>
-    setDraft((current) => ({ ...current, EmergencyPrimary: { ...blank, fullName: current[from].fullName, phone: current[from].phone, relationship: from } }));
+  // A guardian's own relationship ("Aunt") says more than the slot's name does; a parent's slot name is the relationship.
+  const copyInto = (target: EmergencyRole, from: CopySource) =>
+    setDraft((current) => ({
+      ...current,
+      [target]: {
+        ...blank,
+        fullName: current[from].fullName,
+        phone: current[from].phone,
+        email: current[from].email,
+        relationship: (from === 'Guardian' && current.Guardian.relationship.trim()) || from,
+      },
+    }));
 
   const recorded = SLOTS.filter((slot) => draft[slot.role].fullName.trim() !== '');
   const adults = recorded.filter((slot) => slot.adult);
@@ -82,14 +105,13 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
           return (
             <fieldset key={slot.role} className="flex flex-col gap-2 rounded-lg border border-border p-3" disabled={!canEdit}>
               <legend className="px-1 text-sm font-semibold text-foreground">{slot.title}</legend>
-              {slot.role === 'EmergencyPrimary' && canEdit ? (
-                <div className="flex gap-2">
-                  <Button type="button" variant="ghost" size="sm" disabled={draft.Father.fullName.trim() === ''} onClick={() => copyInto('Father')}>
-                    Copy from father
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" disabled={draft.Mother.fullName.trim() === ''} onClick={() => copyInto('Mother')}>
-                    Copy from mother
-                  </Button>
+              {isEmergency(slot.role) && canEdit ? (
+                <div className="flex flex-wrap gap-2">
+                  {COPY_SOURCES.filter((from) => draft[from].fullName.trim() !== '').map((from) => (
+                    <Button key={from} type="button" variant="ghost" size="sm" onClick={() => copyInto(slot.role as EmergencyRole, from)}>
+                      Copy from {from.toLowerCase()}
+                    </Button>
+                  ))}
                 </div>
               ) : null}
               <TextField label={`${slot.title}: full name`} value={entry.fullName} onChange={(value) => set(slot.role, 'fullName', value)} />

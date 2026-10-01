@@ -83,6 +83,25 @@ internal sealed class BarredPersonConfiguration : IEntityTypeConfiguration<Barre
         builder.Property(person => person.ModifiedBy).HasMaxLength(128);
         builder.HasIndex(person => person.PupilId).HasDatabaseName("ix_barred_person_pupil");
         builder.HasOne<Pupil>().WithMany().HasForeignKey(person => person.PupilId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<BarredPersonPhoto>().WithMany().HasForeignKey(person => person.PhotoId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>Mapping for <see cref="BarredPersonPhoto"/>.</summary>
+internal sealed class BarredPersonPhotoConfiguration : IEntityTypeConfiguration<BarredPersonPhoto>
+{
+    /// <inheritdoc />
+    public void Configure(EntityTypeBuilder<BarredPersonPhoto> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.ToTable("barred_person_photo");
+        builder.HasKey(photo => photo.Id);
+        builder.Property(photo => photo.Id).ValueGeneratedNever();
+        builder.Property(photo => photo.AssetId).IsRequired().HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
+        builder.Property(photo => photo.CreatedBy).HasMaxLength(128);
+        builder.Property(photo => photo.ModifiedBy).HasMaxLength(128);
+        builder.HasIndex(photo => photo.PupilId).HasDatabaseName("ix_barred_person_photo_pupil");
+        builder.HasOne<Pupil>().WithMany().HasForeignKey(photo => photo.PupilId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -127,6 +146,7 @@ internal sealed class PupilDocumentConfiguration : IEntityTypeConfiguration<Pupi
         builder.Property(document => document.FileAssetId).HasMaxLength(Domain.Settings.SchoolImage.AssetIdMaxLength);
         builder.Property(document => document.FileContentType).HasMaxLength(Domain.Settings.SchoolImage.ContentTypeMaxLength);
         builder.Property(document => document.FileUploadedBy).HasMaxLength(128);
+        builder.Property(document => document.FileName).HasMaxLength(PupilDocument.FileNameMaxLength);
         builder.Property(document => document.CreatedBy).HasMaxLength(128);
         builder.Property(document => document.ModifiedBy).HasMaxLength(128);
         builder.HasIndex(document => new { document.PupilId, document.DocumentType }).IsUnique().HasDatabaseName("ix_pupil_document_pupil_type_unique");

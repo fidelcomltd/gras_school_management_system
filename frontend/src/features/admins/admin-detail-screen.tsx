@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
-import { ApiError } from '@/lib/http';
 import { useAdmin, useRevokeAdminSessions } from './api';
+import { lagosDateTime } from '@/shared/format/date';
+import { AssignmentsSection } from './assignments/assignments-section';
 import { ChangeStatusDialog } from './components/change-status-dialog';
 import { EditAdminDialog } from './components/edit-admin-dialog';
 import { ResetPasswordDialog } from './components/reset-password-dialog';
 import type { AdminAccountStatus } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
+import { PageTrail, TrailedError, WithTrail } from '@/components/layout/page-trail';
+import { paths } from '@/app/router/paths';
 
 /** The status an account of each current status could legally move to. */
 const STATUS_TARGETS: Record<AdminAccountStatus, AdminAccountStatus[]> = {
@@ -31,21 +36,14 @@ export function AdminDetailScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   if (admin.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading admin account…</output>;
+    return <WithTrail trail={[{ to: paths.admins }, { label: 'Admin account' }]}><LoadingState label="Loading admin account…" /></WithTrail>;
   }
 
   if (admin.isError) {
-    if (admin.error instanceof ApiError && admin.error.kind === 'unauthorized') return null;
-    return (
-      <div role="alert" className="flex flex-col items-start gap-3">
-        <p className="text-sm text-destructive">{admin.error.message}</p>
-        <Button variant="outline" size="sm" onClick={() => void admin.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
+    return <TrailedError trail={[{ to: paths.admins }, { label: 'Admin account' }]} error={admin.error} onRetry={() => void admin.refetch()} />;
   }
 
   const detail = admin.data;
@@ -55,6 +53,8 @@ export function AdminDetailScreen() {
   const canGrantSuperAdmin = !!me.data?.isSuperAdmin;
   const canResetPassword = !!me.data && hasPrivilege(me.data, 'admin.password.reset');
   const canRevokeSessions = !!me.data && hasPrivilege(me.data, 'admin.session.revoke');
+  const canAssign = !!me.data && hasPrivilege(me.data, 'role.assign');
+  const canScopeAssign = !!me.data && hasPrivilege(me.data, 'role.scope.assign');
 
   const statusTargets =
     isSelf || !me.data
@@ -67,10 +67,9 @@ export function AdminDetailScreen() {
           return hasPrivilege(me.data, 'admin.suspend');
         });
 
-  const revokeError = revokeSessions.error instanceof ApiError ? revokeSessions.error.message : null;
-
   return (
     <div className="flex max-w-xl flex-col gap-6">
+      <PageTrail trail={[{ to: paths.admins }, { label: detail.staffName }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-semibold text-foreground">{detail.staffName}</h1>
@@ -90,8 +89,8 @@ export function AdminDetailScreen() {
             ['Status', detail.status],
             ['Super Admin', detail.isSuperAdmin ? 'Yes' : 'No'],
             ['Must change password', detail.mustChangePassword ? 'Yes' : 'No'],
-            ['Last signed in', detail.lastLoginAtUtc ?? 'Never'],
-            ['Created', detail.createdAtUtc],
+            ['Last signed in', detail.lastLoginAtUtc ? lagosDateTime(detail.lastLoginAtUtc) : 'Never'],
+            ['Created', lagosDateTime(detail.createdAtUtc)],
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="flex flex-col gap-0.5">
@@ -100,12 +99,6 @@ export function AdminDetailScreen() {
           </div>
         ))}
       </dl>
-
-      {revokeError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {revokeError}
-        </p>
-      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {statusTargets.length > 0 ? (
@@ -123,20 +116,31 @@ export function AdminDetailScreen() {
             variant="destructive"
             size="sm"
             disabled={revokeSessions.isPending}
-            onClick={() => {
-              if (
-                window.confirm(
-                  `Revoke every active session for ${detail.staffName}? They will be signed out everywhere.`,
-                )
-              ) {
-                revokeSessions.mutate(detail.id);
-              }
-            }}
+            onClick={() => setConfirmRevoke(true)}
           >
             {revokeSessions.isPending ? 'Revoking…' : 'Revoke sessions'}
           </Button>
         ) : null}
       </div>
+
+      <AssignmentsSection
+        adminId={detail.id}
+        staffName={detail.staffName}
+        isSelf={isSelf}
+        canAssign={canAssign}
+        canScopeAssign={canScopeAssign}
+      />
+
+      {confirmRevoke ? (
+        <ConfirmDialog
+          title={`Revoke every session for ${detail.staffName}?`}
+          description="They will be signed out everywhere at once and must sign in again."
+          confirmLabel="Revoke sessions"
+          pendingLabel="Revoking…"
+          onConfirm={() => revokeSessions.mutateAsync(detail.id)}
+          onClose={() => setConfirmRevoke(false)}
+        />
+      ) : null}
 
       {showEdit ? (
         <EditAdminDialog admin={detail} canGrantSuperAdmin={canGrantSuperAdmin} onClose={() => setShowEdit(false)} />

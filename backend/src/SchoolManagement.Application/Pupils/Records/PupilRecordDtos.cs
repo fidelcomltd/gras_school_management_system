@@ -56,7 +56,15 @@ public sealed record PickupPersonInput(string FullName, string Relationship, str
 /// <param name="Id">The row.</param>
 /// <param name="FullName">Required.</param>
 /// <param name="Details">Relevant information.</param>
-public sealed record BarredPersonDto(string Id, string FullName, string? Details);
+/// <param name="PhotoId">
+/// The person's photograph, or null for none: read it from
+/// <c>GET /api/v1/pupils/{pupilId}/barred-persons/photos/{photoId}</c> (audited).
+/// </param>
+public sealed record BarredPersonDto(string Id, string FullName, string? Details, string? PhotoId);
+
+/// <summary>An uploaded barred-person photograph, attached to nobody until the barred list is saved with its id.</summary>
+/// <param name="PhotoId">Send as <c>photoId</c> on the person in <c>PUT /barred-persons</c>.</param>
+public sealed record BarredPersonPhotoDto(string PhotoId);
 
 /// <summary>Section E's exclusion question and its answer (spec 6.5.6). Safeguarding data: every read is audited.</summary>
 /// <param name="PupilId">The pupil.</param>
@@ -67,7 +75,11 @@ public sealed record BarredPersonsDto(string PupilId, bool? HasBarredPersons, IR
 /// <summary>One barred person as submitted.</summary>
 /// <param name="FullName">Required.</param>
 /// <param name="Details">Optional, at most 500 characters.</param>
-public sealed record BarredPersonInput(string FullName, string? Details);
+/// <param name="PhotoId">
+/// Optional: a photograph uploaded for this pupil through <c>POST /barred-persons/photos</c>. Send it again on every save to
+/// keep it; leave it out to remove it.
+/// </param>
+public sealed record BarredPersonInput(string FullName, string? Details, string? PhotoId = null);
 
 /// <summary>Section F (spec 6.5.7). Null answers mean "not asked yet". Safeguarding data: every read is audited.</summary>
 /// <param name="PupilId">The pupil.</param>
@@ -100,7 +112,8 @@ public sealed record PupilDocumentDto(
 /// <param name="ContentType"><c>application/pdf</c>, <c>image/jpeg</c> or <c>image/png</c>.</param>
 /// <param name="SizeBytes">The stored file's size.</param>
 /// <param name="UploadedAtUtc">When it was attached.</param>
-public sealed record PupilDocumentFileDto(string ContentType, int SizeBytes, DateTimeOffset UploadedAtUtc);
+/// <param name="FileName">The name it had on the uploader's device, for display; null for a scan attached before it was kept.</param>
+public sealed record PupilDocumentFileDto(string ContentType, int SizeBytes, DateTimeOffset UploadedAtUtc, string? FileName);
 
 /// <summary>A pupil's current photograph (spec 6.5.4): where to read each size, through the privilege-checked endpoints.</summary>
 /// <param name="PupilId">The pupil.</param>

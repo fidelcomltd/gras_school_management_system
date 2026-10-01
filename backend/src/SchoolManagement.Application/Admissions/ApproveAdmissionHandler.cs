@@ -127,7 +127,7 @@ internal sealed class ApproveAdmissionCommandHandler(
         var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
         var resolvedHeadOfSchoolName = request.HeadOfSchoolName ?? profile.HeadTeacherName;
 
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
 
         // Section J's assessment outcome and head-of-school fields — reuses Update's own
         // null-means-unchanged convention rather than a second setter (every other field left null).
@@ -188,9 +188,9 @@ internal sealed class ApproveAdmissionCommandHandler(
         if (healthOverridden)
         {
             var grants = await effectivePrivilegeProvider
-                .GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
+                .GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
                 .ConfigureAwait(false);
-            if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.AdmissionOverride) != PupilAccessScope.SchoolWide)
+            if (PupilAccessGuard.Resolve(grants, Privileges.Pupil.AdmissionOverride, arm.SessionId) != PupilAccessScope.SchoolWide)
             {
                 return Result.Failure<PupilDto>(Error.Forbidden(
                     "admission.override_forbidden",

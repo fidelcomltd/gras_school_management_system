@@ -1,27 +1,38 @@
-import { LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { Users } from 'lucide-react';
+import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
+import { ApiError } from '@/lib/http';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilegeInArm } from '@/lib/auth/auth-session';
 import { TermPicker } from '@/shared/pickers/term-picker';
 import { useTermChoice } from '@/shared/pickers/use-term-choice';
-import { useReadiness } from './api-workflow';
+import { usePrintResultSheets, useReadiness } from './api-workflow';
 import { LabelledSelect } from '@/shared/pickers/labelled-select';
 import { ReadinessGrid } from './components/readiness-grid';
 import { WorkflowActions } from './components/workflow-actions';
 import { useClassChoice } from '@/shared/pickers/use-class-choice';
 import { STATE_LABEL } from './types';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/results` — a class's results for a term: how complete they are, and the next step (spec 6.7.5, 6.7.8–6.7.11). */
 export function ProgressScreen() {
   const term = useTermChoice();
   const klass = useClassChoice(term.sessionId, 'result.view');
   const readiness = useReadiness(klass.armId, term.termId);
+  const print = usePrintResultSheets();
+  // One request for the class button and the grid; its error belongs to the class and term it was for, not the next one.
+  const printError =
+    print.error instanceof ApiError && print.variables?.armId === klass.armId && print.variables.termId === term.termId
+      ? print.error.message
+      : null;
+  const printFor = (pupilId?: string) =>
+    print.mutate(pupilId ? { armId: klass.armId, termId: term.termId, pupilId } : { armId: klass.armId, termId: term.termId });
   const me = useMe();
   const can = (privilege: string) => !!me.data && hasPrivilegeInArm(me.data, privilege, klass.armId);
 
   const body = () => {
     if (term.isPending || klass.isPending) return <LoadingState label="Loading classes…" />;
     if (!term.termId) return <p className="text-sm text-muted-foreground">Create a session first.</p>;
-    if (!klass.armId) return <p className="text-sm text-muted-foreground">There are no classes you can see in this session.</p>;
+    if (!klass.armId) return <EmptyState icon={Users} title="There are no classes you can see in this session." />;
     if (readiness.isPending) return <LoadingState label="Loading results…" />;
     if (readiness.isError) return <QueryErrorState error={readiness.error} onRetry={() => void readiness.refetch()} />;
 
@@ -52,15 +63,22 @@ export function ProgressScreen() {
               resultSet={set}
               canSubmitNow={data.canSubmit}
               can={can}
+              onPrint={() => printFor()}
+              printing={print.isPending}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Results start when the first mark, rating or remark is saved.</p>
           )}
+          <FormError message={printError} />
         </section>
         {data.pupils.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active pupils in this class.</p>
+          <EmptyState icon={Users} title="No active pupils in this class." />
         ) : (
-          <ReadinessGrid readiness={data} />
+          <ReadinessGrid
+            readiness={data}
+            onPrint={set?.state === 'Published' && can('result.print') ? printFor : undefined}
+            printing={print.isPending}
+          />
         )}
       </div>
     );

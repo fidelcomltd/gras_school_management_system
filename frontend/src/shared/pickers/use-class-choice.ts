@@ -9,17 +9,21 @@ export interface ClassChoice {
   arm: ArmDto | undefined;
   arms: ArmDto[];
   isPending: boolean;
+  /** The arms could not be loaded: never read that as "no classes". */
+  isError: boolean;
+  retry: () => void;
   setArmId: (id: string) => void;
 }
 
 /**
  * The arm a results screen works on, from the chosen session's arms, narrowed to those `privilege` covers for the
- * signed-in admin (a class teacher sees only their own). Defaults to the first; the choice is client state.
+ * signed-in admin (a class teacher sees only their own). Defaults to the first; the choice is client state. Reports pass
+ * `anyStatus`, so a past session's closed arms can still be reported on.
  */
-export function useClassChoice(sessionId: string, privilege: string): ClassChoice {
+export function useClassChoice(sessionId: string, privilege: string, anyStatus = false): ClassChoice {
   const [choice, setChoice] = useState<string | null>(null);
   const me = useMe();
-  const query = useArms({ sessionId, status: 'Active' });
+  const query = useArms(anyStatus ? { sessionId } : { sessionId, status: 'Active' });
   const arms = (sessionId ? (query.data?.pages.flatMap((page) => page.items) ?? []) : []).filter(
     (arm) => !!me.data && hasPrivilegeInArm(me.data, privilege, arm.id),
   );
@@ -30,6 +34,8 @@ export function useClassChoice(sessionId: string, privilege: string): ClassChoic
     arm: arms.find((arm) => arm.id === armId),
     arms,
     isPending: sessionId !== '' && (query.isPending || me.isPending),
+    isError: query.isError,
+    retry: () => void query.refetch(),
     setArmId: setChoice,
   };
 }

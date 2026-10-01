@@ -13,6 +13,12 @@ internal sealed class ResultVerificationReader(ApplicationDbContext context) : I
             .Select(verification => verification.Token)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, string>> FindTokensAsync(Guid resultSetId, int revisionNumber, CancellationToken cancellationToken) =>
+        await context.ResultVerifications.AsNoTracking()
+            .Where(verification => verification.ResultSetId == resultSetId && verification.RevisionNumber == revisionNumber)
+            .ToDictionaryAsync(verification => verification.PupilId, verification => verification.Token, cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<ResultVerificationRecord?> FindAsync(string token, CancellationToken cancellationToken)
     {
         var found = await (

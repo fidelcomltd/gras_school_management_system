@@ -96,6 +96,8 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
         body.Terms[0].Name.ShouldBe("First Term");
         body.Terms[1].Name.ShouldBe("Second Term");
         body.Terms[2].Name.ShouldBe("Third Term");
+        // Suggested as each term's weekdays, for the school to correct later.
+        body.Terms.Select(term => term.TimesSchoolOpened).ShouldBe([70, 64, 69]);
     }
 
     // Review criterion 2, half A: POST /sessions creates the session AND all three terms in one
@@ -141,11 +143,18 @@ public sealed class SessionEndpointsTests : IAsyncLifetime
             .Where(endpoint => endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods.Contains("POST") == true)
             .ToArray();
 
-        // Exactly one POST route mentions "sessions" at all, and it is the collection-level create —
-        // not, for example, a hypothetical "POST /sessions/{id}/terms" that could produce a
-        // two-or-fewer-term session.
-        postSessionRoutes.Length.ShouldBe(1);
-        (postSessionRoutes[0].RoutePattern.RawText ?? string.Empty).ShouldNotContain("{id}");
+        // Exactly two POST routes mention "sessions": the collection-level create, and end-of-session
+        // promotion (TASK-0036), which moves pupils into an EXISTING next session and creates none
+        // (CreateSessionHandler is the only caller of AcademicSession.Create). A new one, for example a
+        // hypothetical "POST /sessions/{id}/terms" that could produce a two-or-fewer-term session, fails here
+        // until it is reviewed and added.
+        // Compared after the version segment and without a trailing slash, so a routing change that
+        // creates no session (a v2 group, MapPost("/") for MapPost(string.Empty)) does not trip it. The
+        // structural rule itself is SourceConventionTests.OnlyCreateSessionHandlerCreatesASession.
+        postSessionRoutes
+            .Select(endpoint => System.Text.RegularExpressions.Regex.Replace(endpoint.RoutePattern.RawText ?? string.Empty, @"^/api/v[^/]+", string.Empty).TrimEnd('/'))
+            .Distinct()
+            .ShouldBe(["/sessions", "/sessions/{sessionId:guid}/promotion"], ignoreOrder: true);
     }
 
     // Review criterion 1, session half: the partial unique index is what stops two active sessions,

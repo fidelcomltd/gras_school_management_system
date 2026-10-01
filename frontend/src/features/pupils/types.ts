@@ -7,6 +7,9 @@ export const PupilsKeys = {
   Create: 'pupils.create',
   Update: 'pupils.update',
   CorrectNumber: 'pupils.correctNumber',
+  Geography: 'pupils.geography',
+  Safeguarding: 'pupils.safeguarding',
+  Duplicates: 'pupils.duplicates',
 } as const;
 
 /** Contract-derived — never hand-typed. Source of truth: src/api/schema.d.ts. */

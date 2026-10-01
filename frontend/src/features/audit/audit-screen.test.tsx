@@ -40,11 +40,12 @@ describe('AuditScreen', () => {
     expect(screen.getByText('Reason: Head teacher remark missing')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Action, e.g. result.publish'), 'result.publish');
-    await user.type(screen.getByLabelText('From'), '2026-08-01');
-    await user.click(screen.getByRole('button', { name: 'Filter' }));
+    // Filters apply as they change, no button (lead, 2026-09-28); a part of the action is enough.
+    await user.type(screen.getByLabelText('Action'), 'publish');
+    await user.type(screen.getByLabelText('From'), '01082026');
 
-    await waitFor(() => expect(queries.at(-1)?.get('action')).toBe('result.publish'));
+    await waitFor(() => expect(queries.at(-1)?.get('action')).toBe('publish'));
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
     expect(queries.at(-1)?.get('fromUtc')).toBe('2026-07-31T23:00:00.000Z');
   });
 

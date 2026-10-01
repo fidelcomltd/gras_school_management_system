@@ -1,6 +1,8 @@
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 
@@ -13,7 +15,8 @@ namespace SchoolManagement.Application.Pupils.Records;
 /// whose open enrolment is in one of its arms.
 /// </summary>
 internal sealed class PupilRecordAccess(
-    IPupilRepository pupils, IEffectivePrivilegeProvider grantsProvider, IPupilArmOfRecordLookup armOfRecordLookup, ICurrentUser currentUser)
+    IPupilRepository pupils, IEffectivePrivilegeProvider grantsProvider, IPupilArmOfRecordLookup armOfRecordLookup, ICurrentUser currentUser,
+    IArmRepository arms, IAcademicSessionRepository sessions)
 {
     /// <summary>The pupil, when it exists and <see cref="ICurrentUser"/> holds <paramref name="privilege"/> over it.</summary>
     public async Task<Result<Pupil>> CheckAsync(Guid pupilId, string privilege, CancellationToken cancellationToken)
@@ -23,9 +26,8 @@ internal sealed class PupilRecordAccess(
             return Result.Failure<Pupil>(Error.Unauthenticated("authentication.required", "Sign in to perform this action."));
         }
 
-        var grants = await grantsProvider.GetGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
-        var scope = PupilAccessGuard.Resolve(grants, privilege);
-        if (scope == PupilAccessScope.Forbidden)
+        var grants = await grantsProvider.GetAllGrantsAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (PupilAccessGuard.Resolve(grants, privilege, targetSessionId: null) == PupilAccessScope.Forbidden)
         {
             return Forbidden(privilege);
         }
@@ -35,9 +37,12 @@ internal sealed class PupilRecordAccess(
             return Result.Failure<Pupil>(Error.NotFound("pupil.not_found", "No pupil was found with that id."));
         }
 
-        if (scope == PupilAccessScope.ArmRestricted
-            && (await armOfRecordLookup.GetArmIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not { } armId
-                || !PupilAccessGuard.ResolveArmIds(grants, privilege).Contains(armId)))
+        // TASK-0060: only grants in the session of the pupil's arm of record count.
+        var (armOfRecord, sessionId) = await PupilAccessGuard.ResolvePupilTargetAsync(pupilId, armOfRecordLookup, arms, sessions, cancellationToken).ConfigureAwait(false);
+        var scope = PupilAccessGuard.Resolve(grants, privilege, sessionId);
+        if (scope == PupilAccessScope.Forbidden
+            || (scope == PupilAccessScope.ArmRestricted
+                && (armOfRecord is not { } armId || !PupilAccessGuard.ResolveArmIds(grants, privilege, sessionId).Contains(armId))))
         {
             return Forbidden(privilege);
         }
@@ -52,11 +57,12 @@ internal sealed class PupilRecordAccess(
     /// </summary>
     public async Task<Result> CheckArmAsync(Guid armId, string privilege, CancellationToken cancellationToken)
     {
-        var grants = await grantsProvider.GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
-        var covered = PupilAccessGuard.Resolve(grants, privilege) switch
+        var grants = await grantsProvider.GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var sessionId = (await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false))?.SessionId;
+        var covered = PupilAccessGuard.Resolve(grants, privilege, sessionId) switch
         {
             PupilAccessScope.SchoolWide => true,
-            PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, privilege).Contains(armId),
+            PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, privilege, sessionId).Contains(armId),
             _ => false,
         };
 

@@ -43,13 +43,13 @@ internal sealed class ArmCapacityGuard(
         }
 
         var grants = await effectivePrivilegeProvider
-            .GetGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
+            .GetAllGrantsAsync(currentUser.UserId ?? string.Empty, cancellationToken)
             .ConfigureAwait(false);
 
-        var canOverride = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride) switch
+        var canOverride = PupilAccessGuard.Resolve(grants, Privileges.Arm.CapacityOverride, arm.SessionId) switch
         {
             PupilAccessScope.SchoolWide => true,
-            PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride).Contains(arm.Id),
+            PupilAccessScope.ArmRestricted => PupilAccessGuard.ResolveArmIds(grants, Privileges.Arm.CapacityOverride, arm.SessionId).Contains(arm.Id),
             _ => false,
         };
 

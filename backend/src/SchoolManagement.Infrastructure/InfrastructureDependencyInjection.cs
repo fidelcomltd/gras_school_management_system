@@ -170,12 +170,16 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<Application.Abstractions.Pins.IPinBatchRepository, Persistence.Repositories.PinBatchRepository>();
         services.AddOptions<Pins.PortalOptions>().Bind(configuration.GetSection(Pins.PortalOptions.SectionName));
         services.AddSingleton<Application.Abstractions.Pins.IPinSlipRenderer, Pins.QuestPdfPinSlipRenderer>();
+        services.AddSingleton<Application.Abstractions.Pupils.ISafeguardingSheetRenderer, Pupils.QuestPdfSafeguardingSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Pupils.IAdmissionSlipRenderer, Pupils.QuestPdfAdmissionSlipRenderer>();
         services.AddSingleton<Application.Abstractions.Pupils.IPupilImportWorkbook, Pupils.ClosedXmlPupilImportWorkbook>();
         services.AddScoped<Application.Abstractions.Portal.IPortalRepository, Persistence.Repositories.PortalRepository>();
         services.AddScoped<Application.Abstractions.Results.IResultSheetReader, Results.ResultSheetReader>();
         services.AddScoped<Application.Abstractions.Results.IResultVerificationReader, Results.ResultVerificationReader>();
         services.AddScoped<Application.Abstractions.Results.IAnnualSheetReader, Results.AnnualSheetReader>();
         services.AddSingleton<Application.Abstractions.Results.IResultSheetPdfRenderer, Results.QuestPdfResultSheetRenderer>();
+        services.AddSingleton<Application.Abstractions.Reports.IReportPdfRenderer, Reports.QuestPdfReportRenderer>();
+        services.AddScoped<Application.Abstractions.Reports.IReportReader, Reports.ReportReader>();
         services.AddSingleton<Application.Abstractions.Results.IResultPdfCache, Results.DiskResultPdfCache>();
         services.AddSingleton<Pins.PinMaintenanceService>();
         services.AddHostedService(provider => provider.GetRequiredService<Pins.PinMaintenanceService>());
@@ -296,6 +300,8 @@ public static class InfrastructureDependencyInjection
 
         // TASK-0059: enrolment — dated membership of a pupil in an arm (spec 02 §5.2).
         services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
+        services.AddScoped<Application.Abstractions.Promotion.IPromotionRepository, PromotionRepository>();
+        services.AddScoped<Application.Abstractions.Fees.IFeeNoticeRepository, FeeNoticeRepository>();
 
         // TASK-0062: admission_record — sections A, I and J of the admission form (spec 6.5.9).
         services.AddScoped<IAdmissionRecordRepository, AdmissionRecordRepository>();

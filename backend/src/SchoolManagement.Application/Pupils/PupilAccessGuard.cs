@@ -1,4 +1,6 @@
 using SchoolManagement.Application.Abstractions.Authorization;
+using SchoolManagement.Application.Abstractions.Classes;
+using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Domain.Security;
 
 namespace SchoolManagement.Application.Pupils;
@@ -46,17 +48,29 @@ internal enum PupilAccessScope
 /// for <c>ScopeResolution.Unresolvable</c> generally.
 /// Full background on why this bypasses the declarative mechanism at all: <c>backend/docs/ASSUMPTIONS.md</c> §2.27.
 /// </para>
+/// <para>
+/// SESSION BOUNDARY (TASK-0060, decided 2026-09-27): this guard stays, and takes the target's session instead of
+/// pupil routes moving to declarative <c>ScopeParameterKind.Pupil</c>. Lists, reports, the capacity override and the
+/// import have no single route-declared target, so they need this guard whatever single-pupil routes do; one mechanism
+/// for every pupil check beats two. Every method takes the session the target belongs to and counts only grants that
+/// <see cref="PrivilegeGrant.AppliesToSession"/> it, the same filter <c>PrivilegeDecision</c> applies to a resolved arm.
+/// </para>
 /// </remarks>
 internal static class PupilAccessGuard
 {
-    /// <summary>Resolves <paramref name="grants"/> against <paramref name="privilege"/> (a <c>Privileges.Pupil.*</c> constant).</summary>
-    public static PupilAccessScope Resolve(IReadOnlyCollection<PrivilegeGrant> grants, string privilege)
+    /// <summary>
+    /// Resolves <paramref name="grants"/> against <paramref name="privilege"/> (a <c>Privileges.Pupil.*</c> constant)
+    /// for a target in <paramref name="targetSessionId"/>; <see langword="null"/> when the target has no session.
+    /// </summary>
+    public static PupilAccessScope Resolve(IReadOnlyCollection<PrivilegeGrant> grants, string privilege, Guid? targetSessionId)
     {
         ArgumentNullException.ThrowIfNull(grants);
         ArgumentException.ThrowIfNullOrWhiteSpace(privilege);
 
         var canonical = PrivilegeAliases.Resolve(privilege);
-        var matching = grants.Where(grant => string.Equals(grant.Privilege, canonical, StringComparison.Ordinal)).ToArray();
+        var matching = grants
+            .Where(grant => string.Equals(grant.Privilege, canonical, StringComparison.Ordinal) && grant.AppliesToSession(targetSessionId))
+            .ToArray();
 
         if (matching.Length == 0)
         {
@@ -75,7 +89,7 @@ internal static class PupilAccessGuard
     /// <see cref="PupilAccessScope.ArmRestricted"/> — a <see cref="PupilAccessScope.SchoolWide"/> or
     /// <see cref="PupilAccessScope.Forbidden"/> caller never consults an arm list at all.
     /// </summary>
-    public static IReadOnlySet<Guid> ResolveArmIds(IReadOnlyCollection<PrivilegeGrant> grants, string privilege)
+    public static IReadOnlySet<Guid> ResolveArmIds(IReadOnlyCollection<PrivilegeGrant> grants, string privilege, Guid? targetSessionId)
     {
         ArgumentNullException.ThrowIfNull(grants);
         ArgumentException.ThrowIfNullOrWhiteSpace(privilege);
@@ -83,8 +97,34 @@ internal static class PupilAccessGuard
         var canonical = PrivilegeAliases.Resolve(privilege);
 
         return grants
-            .Where(grant => string.Equals(grant.Privilege, canonical, StringComparison.Ordinal) && grant.Scope == ScopeType.ArmList)
+            .Where(grant => string.Equals(grant.Privilege, canonical, StringComparison.Ordinal)
+                && grant.Scope == ScopeType.ArmList
+                && grant.AppliesToSession(targetSessionId))
             .SelectMany(grant => grant.ArmIds)
             .ToHashSet();
+    }
+
+    /// <summary>
+    /// A pupil as a scope target: the arm of their open enrolment and that arm's session. A pupil with none (a pending
+    /// admission, a leaver) has no arm and belongs to the active session, spec 4.2.1's "arm of record for the active term".
+    /// </summary>
+    public static async Task<(Guid? ArmId, Guid? SessionId)> ResolvePupilTargetAsync(
+        Guid pupilId,
+        IPupilArmOfRecordLookup armOfRecordLookup,
+        IArmRepository arms,
+        IAcademicSessionRepository sessions,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(armOfRecordLookup);
+        ArgumentNullException.ThrowIfNull(arms);
+        ArgumentNullException.ThrowIfNull(sessions);
+
+        if (await armOfRecordLookup.GetArmIdAsync(pupilId, cancellationToken).ConfigureAwait(false) is not { } armId)
+        {
+            return (null, (await sessions.FindActiveAsync(cancellationToken).ConfigureAwait(false))?.Id);
+        }
+
+        var arm = await arms.FindReadOnlyByIdAsync(armId, cancellationToken).ConfigureAwait(false);
+        return (armId, arm?.SessionId);
     }
 }

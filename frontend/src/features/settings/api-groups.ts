@@ -3,6 +3,11 @@ import { apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
 import type { components } from '@/api/schema';
 import { getFile, postRequest } from '@/lib/http';
 import { SettingsKeys } from './types';
+import { assertFileSize, downscaleImage } from '@/shared/images/downscale';
+
+const SIGNATURE_MAX_EDGE = 1600;
+/** The server's signature cap (SchoolImageLimits.MaxSignatureBytes). */
+const SIGNATURE_MAX_BYTES = 1024 * 1024;
 
 /**
  * The settings groups beyond identity (spec 6.2): registration numbers, grading, assessment, result rules, and the
@@ -68,9 +73,15 @@ export function useUploadSchoolImage(kind: 'logo' | 'signature') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: ['settings.upload', kind],
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const form = new FormData();
-      form.append('file', file);
+      // A phone photograph of a signature is several megabytes; the server keeps only the strokes, at most 1200 px wide.
+      form.append(
+        'file',
+        kind === 'signature'
+          ? assertFileSize(await downscaleImage(file, SIGNATURE_MAX_EDGE, { maxBytes: SIGNATURE_MAX_BYTES }), SIGNATURE_MAX_BYTES, 'file')
+          : file,
+      );
       return postRequest<S['SchoolImageDto'], FormData>(`/api/v1/settings/identity/${kind}`, form, {
         headers: { 'Idempotency-Key': crypto.randomUUID() },
       });

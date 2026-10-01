@@ -11,13 +11,21 @@ public abstract record ScopeResolution
 
     /// <summary>The scope parameter resolved to a single arm.</summary>
     /// <param name="ArmId">The resolved arm.</param>
-    public sealed record ResolvedArm(Guid ArmId) : ScopeResolution;
+    /// <param name="SessionId">
+    /// The arm's session, which only grants in that session satisfy (spec 4.2.1, TASK-0060); <see langword="null"/>
+    /// when the arm does not exist, which the handler then answers with a 404.
+    /// </param>
+    public sealed record ResolvedArm(Guid ArmId, Guid? SessionId) : ScopeResolution;
 
     /// <summary>
     /// The target has no single arm (a level named with no arm) — spec 4.2.1: "requires the
     /// privilege school-wide." Only a school-wide grant can satisfy this outcome.
     /// </summary>
-    public sealed record RequiresSchoolWide : ScopeResolution;
+    /// <param name="SessionId">
+    /// The session only grants in which count (TASK-0060): the active session for a pupil with no open enrolment,
+    /// who belongs to it by spec 4.2.1's "arm of record for the active term"; <see langword="null"/> for a level.
+    /// </param>
+    public sealed record RequiresSchoolWide(Guid? SessionId) : ScopeResolution;
 
     /// <summary>
     /// The scope parameter was missing, or the named pupil/result set could not be resolved to an
@@ -48,10 +56,8 @@ public abstract record ScopeResolution
     /// <see cref="ScopeParameterKind"/>/<c>ScopeResolver</c>, because which of two DIFFERENT
     /// privileges (<c>result.remark.classteacher</c> vs <c>result.remark.headteacher</c>) applies
     /// depends on a request's <c>kind</c> (query string, body field, or a stored row), never on a
-    /// route parameter the declarative mechanism can read. Like every other resolution here, this
-    /// does not consult <c>PrivilegeGrant.SessionId</c> — the same pre-existing gap
-    /// TODO(TASK-0060) on <c>PrivilegeDecision</c> describes, not newly introduced or widened by
-    /// this case.
+    /// route parameter the declarative mechanism can read. It names no session: callers pass only the
+    /// grants that count now (the active session; TASK-0046 B), so last session's grant does not satisfy it.
     /// </remarks>
     public sealed record AnyGrant : ScopeResolution;
 }

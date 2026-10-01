@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen, userEvent, waitFor, within } from '@/test/render';
 import { apiUrl, http, HttpResponse, problemResponse } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -81,15 +81,17 @@ describe('LevelList — delete surfaces the named 409 verbatim', () => {
         problemResponse(409, { detail: 'Primary 1 is referenced by Arm "1A" and cannot be deleted.' }),
       ),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const user = userEvent.setup();
     renderList();
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Primary 1?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete level' }));
 
+    // The server's refusal shows inside the still-open dialog.
     expect(
-      await screen.findByText('Primary 1 is referenced by Arm "1A" and cannot be deleted.'),
+      await within(dialog).findByText('Primary 1 is referenced by Arm "1A" and cannot be deleted.'),
     ).toBeInTheDocument();
   });
 });

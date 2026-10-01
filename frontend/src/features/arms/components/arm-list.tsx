@@ -1,3 +1,4 @@
+import { LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,9 @@ import { ApiError } from '@/lib/http';
 import { useArms, type ArmsFilters } from '../api';
 import { useFormTeacherNames } from '../hooks/use-form-teacher-names';
 import { FormTeacherLabel } from './form-teacher-label';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 /**
  * The arms themselves (spec 6.4.5). Four required states (CONVENTIONS.md
@@ -41,7 +45,7 @@ export function ArmList({ filters }: { filters: ArmsFilters }) {
   );
 
   if (arms.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading arms…</output>;
+    return <LoadingState label="Loading arms…" />;
   }
 
   if (arms.isError) {
@@ -57,7 +61,7 @@ export function ArmList({ filters }: { filters: ArmsFilters }) {
   }
 
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">No arms found.</p>;
+    return <EmptyState icon={LayoutGrid} title="No arms found." />;
   }
 
   return (
@@ -89,14 +93,7 @@ export function ArmList({ filters }: { filters: ArmsFilters }) {
       </ul>
 
       {arms.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void arms.fetchNextPage()}
-          disabled={arms.isFetchingNextPage}
-        >
-          {arms.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={arms.isFetchingNextPage} onClick={() => void arms.fetchNextPage()} />
       ) : null}
     </div>
   );

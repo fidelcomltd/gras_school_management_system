@@ -2,11 +2,13 @@ import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/http';
 import { useSignOut } from './api';
 import { ChangePasswordForm } from './components/change-password-form';
+import { PageTrail } from '@/components/layout/page-trail';
 
 /** `/account/password`: a signed-in staff member changes their own password. */
 export function ChangePasswordScreen() {
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
+      <PageTrail trail={[{ label: 'Change password' }]} />
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">Change password</h1>
         <p className="text-sm text-muted-foreground">Other devices signed in to your account will be signed out.</p>

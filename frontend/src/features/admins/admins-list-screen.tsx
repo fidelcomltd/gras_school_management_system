@@ -1,3 +1,4 @@
+import { ShieldUser } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { paths } from '@/app/router/paths';
@@ -6,8 +7,13 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError } from '@/lib/http';
 import { useAdmins } from './api';
+import { lagosDateTime } from '@/shared/format/date';
+import { CopyAssignmentsDialog } from './assignments/copy-assignments-dialog';
 import { CreateAdminDialog } from './components/create-admin-dialog';
 import type { AdminAccountStatus } from './types';
+import { LoadingState } from '@/components/feedback/query-states';
+import { LoadMoreButton } from '@/components/ui/load-more-button';
+import { EmptyState } from '@/components/feedback/empty-state';
 
 const STATUS_OPTIONS: { value: AdminAccountStatus | ''; label: string }[] = [
   { value: '', label: 'Active & suspended' },
@@ -26,10 +32,12 @@ export function AdminsListScreen() {
   const admins = useAdmins(status === '' ? undefined : status);
   const me = useMe();
   const [showCreate, setShowCreate] = useState(false);
+  const [showCopy, setShowCopy] = useState(false);
   const canCreate = !!me.data && hasPrivilege(me.data, 'admin.create');
+  const canCopy = !!me.data && hasPrivilege(me.data, 'role.assign');
 
   if (admins.isPending) {
-    return <output className="text-sm text-muted-foreground">Loading admin accounts…</output>;
+    return <LoadingState label="Loading admin accounts…" />;
   }
 
   if (admins.isError) {
@@ -53,7 +61,14 @@ export function AdminsListScreen() {
           <h1 className="font-display text-2xl font-semibold text-foreground">Admin accounts</h1>
           <p className="text-sm text-muted-foreground">Who else has access, and what they can do.</p>
         </div>
-        {canCreate ? <Button onClick={() => setShowCreate(true)}>New admin</Button> : null}
+        <div className="flex flex-wrap gap-2">
+          {canCopy ? (
+            <Button variant="outline" onClick={() => setShowCopy(true)}>
+              Copy assignments…
+            </Button>
+          ) : null}
+          {canCreate ? <Button onClick={() => setShowCreate(true)}>New admin</Button> : null}
+        </div>
       </header>
 
       <label className="flex items-center gap-2 text-sm text-foreground">
@@ -72,38 +87,48 @@ export function AdminsListScreen() {
       </label>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No admin accounts found.</p>
+        <EmptyState icon={ShieldUser} title="No admin accounts found." />
       ) : (
-        <ul aria-label="Admin accounts" className="flex flex-col gap-2">
-          {items.map((admin) => (
-            <li key={admin.id}>
-              <Link
-                to={paths.adminDetail(admin.id)}
-                className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3 text-sm hover:bg-muted"
-              >
-                <span className="flex flex-col">
-                  <span className="font-medium text-foreground">{admin.staffName}</span>
-                  <span className="text-xs text-muted-foreground">{admin.email}</span>
-                </span>
-                <span className="text-muted-foreground">{admin.status}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        // Spec 6.1.8's columns: who can do what is the question this list answers, so roles and scope are columns.
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table aria-label="Admin accounts" className="w-full text-left text-sm">
+            <thead className="bg-surface-sunken text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Staff</th>
+                <th className="px-3 py-2 font-medium">Roles held</th>
+                <th className="px-3 py-2 font-medium">Scope</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Last login</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-surface">
+              {items.map((admin) => (
+                <tr key={admin.id}>
+                  <td className="px-3 py-2">
+                    <Link to={paths.adminDetail(admin.id)} aria-label={admin.staffName} className="flex flex-col hover:underline">
+                      <span className="font-medium text-foreground">{admin.staffName}</span>
+                      <span className="text-xs text-muted-foreground">{admin.email}</span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-foreground">
+                    {admin.rolesHeld.length === 0 ? <span className="text-muted-foreground">No roles yet</span> : admin.rolesHeld.join(', ')}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.scopeSummary}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.status}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{admin.lastLoginAtUtc ? lagosDateTime(admin.lastLoginAtUtc) : 'Never'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {admins.hasNextPage ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void admins.fetchNextPage()}
-          disabled={admins.isFetchingNextPage}
-        >
-          {admins.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </Button>
+        <LoadMoreButton loading={admins.isFetchingNextPage} onClick={() => void admins.fetchNextPage()} />
       ) : null}
 
       {showCreate ? <CreateAdminDialog onClose={() => setShowCreate(false)} /> : null}
+      {showCopy ? <CopyAssignmentsDialog onClose={() => setShowCopy(false)} /> : null}
     </div>
   );
 }

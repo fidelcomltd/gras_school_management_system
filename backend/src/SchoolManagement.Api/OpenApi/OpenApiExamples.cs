@@ -8,13 +8,16 @@ using SchoolManagement.Application.Auth.ChangePassword;
 using SchoolManagement.Application.Auth.SignIn;
 using SchoolManagement.Application.Classes;
 using SchoolManagement.Application.Common.Pagination;
+using SchoolManagement.Application.Fees;
 using SchoolManagement.Application.Pins;
+using SchoolManagement.Application.Promotion;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Pupils.Import;
 using SchoolManagement.Application.Pupils.Movement;
 using SchoolManagement.Application.Pupils.Records;
 using SchoolManagement.Application.Reference.Ping;
 using SchoolManagement.Application.Reference.SampleRecords;
+using SchoolManagement.Application.Reports;
 using SchoolManagement.Application.Results;
 using SchoolManagement.Application.Results.Annual;
 using SchoolManagement.Application.Security.Assignments;
@@ -892,7 +895,7 @@ internal static class OpenApiExamples
               "status": "Active",
               "mustChangePassword": true,
               "createdAtUtc": "{{CanonicalTimestamp}}",
-              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+              "temporaryPassword": "482915730264"
             }
             """,
 
@@ -906,7 +909,9 @@ internal static class OpenApiExamples
               "isSuperAdmin": false,
               "mustChangePassword": false,
               "lastLoginAtUtc": "{{CanonicalTimestamp}}",
-              "createdAtUtc": "{{CanonicalTimestamp}}"
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "rolesHeld": ["Class Teacher"],
+              "scopeSummary": "2 classes: Primary 2A, Primary 5B"
             }
             """,
 
@@ -922,7 +927,9 @@ internal static class OpenApiExamples
                   "isSuperAdmin": false,
                   "mustChangePassword": false,
                   "lastLoginAtUtc": "{{CanonicalTimestamp}}",
-                  "createdAtUtc": "{{CanonicalTimestamp}}"
+                  "createdAtUtc": "{{CanonicalTimestamp}}",
+                  "rolesHeld": ["Class Teacher"],
+                  "scopeSummary": "2 classes: Primary 2A, Primary 5B"
                 }
               ],
               "nextCursor": "MHxuZ296aSBhZGV5ZW1pfDAxOTJmMGM0LTdjM2UtN2ExYi05ZjJkLTNiOGU1YTZjMWQ0MA=="
@@ -964,7 +971,7 @@ internal static class OpenApiExamples
         [typeof(ResetAdminAccountPasswordResponse)] = $$"""
             {
               "id": "{{ExampleId}}",
-              "temporaryPassword": "aB3xQ9mK2pL7vN4wR8dT"
+              "temporaryPassword": "482915730264"
             }
             """,
 
@@ -1063,6 +1070,46 @@ internal static class OpenApiExamples
             }
             """,
 
+        [typeof(CopyAssignmentsToSessionCommand)] = $$"""
+            {
+              "fromSessionId": "{{ExampleSessionId}}",
+              "toSessionId": "{{ExampleId}}",
+              "dryRun": true
+            }
+            """,
+
+        [typeof(AssignmentCopyRowDto)] = $$"""
+            {
+              "sourceAssignmentId": "{{ExampleAssignmentId}}",
+              "adminAccountId": "{{ExampleAdminAccountId}}",
+              "staffName": "Ngozi Adeyemi",
+              "roleName": "Class Teacher",
+              "scopeType": "ArmList",
+              "armNames": ["Primary 3B"],
+              "skipReason": "Primary 3B has no class in 2027/2028."
+            }
+            """,
+
+        [typeof(AssignmentCopyResultDto)] = $$"""
+            {
+              "dryRun": true,
+              "fromSessionName": "2026/2027",
+              "toSessionName": "2027/2028",
+              "copied": [
+                {
+                  "sourceAssignmentId": "{{ExampleAssignmentId}}",
+                  "adminAccountId": "{{ExampleAdminAccountId}}",
+                  "staffName": "Ngozi Adeyemi",
+                  "roleName": "Class Teacher",
+                  "scopeType": "ArmList",
+                  "armNames": ["Primary 2A"],
+                  "skipReason": null
+                }
+              ],
+              "skipped": []
+            }
+            """,
+
         [typeof(RoleAssignmentDto)] = $$"""
             {
               "id": "{{ExampleAssignmentId}}",
@@ -1073,7 +1120,10 @@ internal static class OpenApiExamples
               "armIds": ["{{ExampleArmId}}"],
               "grantedBy": "{{ExampleGrantedById}}",
               "status": "Active",
-              "createdAtUtc": "{{CanonicalTimestamp}}"
+              "createdAtUtc": "{{CanonicalTimestamp}}",
+              "roleName": "Class Teacher",
+              "sessionName": "2026/2027",
+              "armNames": ["Primary 2A"]
             }
             """,
 
@@ -3052,19 +3102,31 @@ internal static class OpenApiExamples
             """,
 
         [typeof(BarredPersonDto)] = """
-            { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            {
+              "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.",
+              "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+            }
+            """,
+
+        [typeof(BarredPersonPhotoDto)] = """
+            { "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40" }
             """,
 
         [typeof(BarredPersonsDto)] = $$"""
             {
               "pupilId": "{{ExamplePupilId}}",
               "hasBarredPersons": true,
-              "items": [ { "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." } ]
+              "items": [
+                {
+                  "id": "0192f0c4-bf61-7e9e-c2b0-6e1ed1093a39", "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.",
+                  "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40"
+                }
+              ]
             }
             """,
 
         [typeof(BarredPersonInput)] = """
-            { "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy." }
+            { "fullName": "John Doe", "details": "Court order dated 03/02/2026; office holds a copy.", "photoId": "0192f0c4-bf62-7e9e-c2b0-6e1ed1093a40" }
             """,
 
         [typeof(SaveBarredPersonsCommand)] = $$"""
@@ -3108,12 +3170,240 @@ internal static class OpenApiExamples
         [typeof(PupilDocumentDto)] = """
             {
               "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
-              "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+              "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "birth-cert-scan.pdf" }
             }
             """,
 
         [typeof(PupilDocumentFileDto)] = """
-            { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+            { "contentType": "image/jpeg", "sizeBytes": 538211, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "IMG_2231.jpg" }
+            """,
+
+        [typeof(NigerianStateDto)] = """
+            { "name": "Anambra", "lgas": ["Aguata", "Anambra East", "Awka North", "Awka South"] }
+            """,
+
+        [typeof(NigerianGeographyDto)] = """
+            {
+              "states": [
+                { "name": "Abia", "lgas": ["Aba North", "Aba South", "Arochukwu"] },
+                { "name": "Anambra", "lgas": ["Aguata", "Anambra East", "Awka South"] }
+              ]
+            }
+            """,
+
+        [typeof(SafeguardingSheetRowDto)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "thumbnail": null, "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
+            """,
+
+        [typeof(SafeguardingSheetDto)] = $$"""
+            {
+              "armId": "0192f0c4-7c3e-7a1b-9f2d-3b8e5a6c1d31",
+              "armName": "Primary 2 Gold",
+              "sessionName": "2026/2027",
+              "generatedAtUtc": "2026-10-05T07:45:00+00:00",
+              "pupils": [
+                { "pupilId": "{{ExamplePupilId}}", "registrationNumber": "GRA/2026/0014", "name": "OKAFOR Chidera Ngozi", "thumbnail": null, "allergies": "Groundnuts", "medicalConditions": "None", "medication": "Not asked", "specialInstructions": "Inhaler in the office", "hospital": "St. Charles Borromeo Hospital, Onitsha, 08037776666", "pickupPersons": ["Ngozi Okafor (Aunt) 08059876543"], "barredMarker": "Yes: see office" }
+              ]
+            }
+            """,
+
+        [typeof(ReportColumnDto)] = """
+            { "label": "CA", "align": "Right", "group": "Mathematics" }
+            """,
+
+        [typeof(ReportRowDto)] = """
+            { "kind": "Data", "cells": ["1", "OKAFOR Chidera Ngozi", "GRA/2026/0014", "38", "52", "90", "90", "90.00", "A", "2="] }
+            """,
+
+        [typeof(ReportDto)] = """
+            {
+              "key": "broadsheet",
+              "title": "Arm broadsheet",
+              "filters": ["Class: Primary 2 Gold", "First Term, 2026/2027"],
+              "orientation": "Landscape",
+              "twoUp": false,
+              "columns": [
+                { "label": "Pos.", "align": "Right", "group": null },
+                { "label": "Name", "align": "Left", "group": null },
+                { "label": "Reg. no.", "align": "Left", "group": null },
+                { "label": "CA", "align": "Right", "group": "Mathematics" },
+                { "label": "Exam", "align": "Right", "group": "Mathematics" },
+                { "label": "Total", "align": "Right", "group": "Mathematics" },
+                { "label": "Total", "align": "Right", "group": null },
+                { "label": "Average", "align": "Right", "group": null },
+                { "label": "Grade", "align": "Center", "group": null },
+                { "label": "Level pos.", "align": "Right", "group": null }
+              ],
+              "rows": [
+                { "kind": "Data", "cells": ["1", "OKAFOR Chidera Ngozi", "GRA/2026/0014", "38", "52", "90", "90", "90.00", "A", "2="] }
+              ],
+              "notes": ["Not yet published (Awaiting approval): figures change if marks are corrected and computed again."],
+              "rowCount": 1,
+              "generatedAtUtc": "2026-12-11T09:30:00+00:00"
+            }
+            """,
+
+        [typeof(PromotionSessionDto)] = $$"""
+            { "id": "{{ExampleSessionId}}", "name": "2026/2027", "startDate": "2026-09-14", "endDate": "2027-07-23" }
+            """,
+
+        [typeof(PromotionBlockerDto)] = """
+            { "code": "promotion.receiving_level_without_arm", "message": "Primary 3 has no arm in 2027/2028. Create at least one arm before running promotion." }
+            """,
+
+        [typeof(PromotionCoreResultDto)] = $$"""
+            { "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }
+            """,
+
+        [typeof(PromotionCoreSubjectDto)] = $$"""
+            { "subjectId": "{{ExampleSubjectId}}", "name": "Mathematics" }
+            """,
+
+        [typeof(PromotionRowDto)] = $$"""
+            {
+              "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014",
+              "currentArmId": "{{ExampleArmId}}", "currentArmName": "Primary 2A", "classLevelId": "{{ExampleLevelId}}",
+              "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "annualAverage": 71.25,
+              "coreResults": [{ "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }],
+              "proposedOutcome": "Promoted", "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+            }
+            """,
+
+        [typeof(PromotionTargetArmDto)] = """
+            { "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "name": "Primary 3A", "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "capacity": 30, "enrolledCount": 2 }
+            """,
+
+        [typeof(PromotionExcludedPupilDto)] = $$"""
+            { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "status": "Withdrawn" }
+            """,
+
+        [typeof(PromotionBatchDto)] = $$"""
+            {
+              "id": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938", "sourceSessionId": "{{ExampleSessionId}}",
+              "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49", "targetSessionName": "2027/2028", "state": "Committed",
+              "committedAtUtc": "2027-07-28T10:15:00+00:00", "reversedAtUtc": null,
+              "promoted": 182, "repeated": 9, "promotedOnTrial": 3, "graduated": 41
+            }
+            """,
+
+        [typeof(PromotionPreviewDto)] = $$"""
+            {
+              "sourceSession": { "id": "{{ExampleSessionId}}", "name": "2026/2027", "startDate": "2026-09-14", "endDate": "2027-07-23" },
+              "targetSession": { "id": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49", "name": "2027/2028", "startDate": "2027-09-13", "endDate": "2028-07-21" },
+              "blockers": [],
+              "rows": [
+                {
+                  "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014",
+                  "currentArmId": "{{ExampleArmId}}", "currentArmName": "Primary 2A", "classLevelId": "{{ExampleLevelId}}",
+                  "nextLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "annualAverage": 71.25,
+                  "coreResults": [{ "subjectId": "{{ExampleSubjectId}}", "mean": 68.5, "passed": true }],
+                  "proposedOutcome": "Promoted", "proposedTargetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827"
+                }
+              ],
+              "targetArms": [
+                { "armId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "name": "Primary 3A", "classLevelId": "0192f0c4-9d4f-7b7c-a09e-4cfcb0e71716", "capacity": 30, "enrolledCount": 2 }
+              ],
+              "coreSubjects": [{ "subjectId": "{{ExampleSubjectId}}", "name": "Mathematics" }],
+              "excluded": [
+                { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "status": "Withdrawn" }
+              ],
+              "committedBatch": null,
+              "canDecide": true
+            }
+            """,
+
+        [typeof(PromotionDecisionInput)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "outcome": "PromotedOnTrial", "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "reason": "Missed most of Second Term through illness; strong Third Term." }
+            """,
+
+        [typeof(CommitPromotionCommand)] = $$"""
+            {
+              "sessionId": "{{ExampleSessionId}}",
+              "targetSessionId": "0192f0c4-c082-7eaf-d3c1-7f2fe31a4a49",
+              "decisions": [
+                { "pupilId": "{{ExamplePupilId}}", "outcome": "Promoted", "targetArmId": "0192f0c4-ae60-7c8d-b1af-5d0dc1f82827", "reason": null },
+                { "pupilId": "{{ExampleSecondPupilId}}", "outcome": "Repeat", "targetArmId": "0192f0c4-d193-7fb0-e4d2-8030f42b5b5a", "reason": null }
+              ]
+            }
+            """,
+
+        [typeof(ReversePromotionCommand)] = """
+            { "batchId": "0192f0c4-bf71-7d9e-c2b0-6e1ed2093938", "reason": "Committed into the wrong session; the new session's dates were being corrected." }
+            """,
+
+        [typeof(FeeGridLevelDto)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "name": "Primary 3" }
+            """,
+
+        [typeof(FeeGridAmountDto)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }
+            """,
+
+        [typeof(FeeGridLineDto)] = $$"""
+            { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] }
+            """,
+
+        [typeof(FeeNoticeGridDto)] = $$"""
+            {
+              "sectionId": "00000000-0000-0000-0000-000000000302", "sectionName": "Primary",
+              "termId": "{{ExampleTermId}}", "termName": "First Term", "sessionName": "2026/2027",
+              "previousTermId": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c02", "previousTermLabel": "Third Term 2025/2026",
+              "isDefault": false,
+              "levels": [{ "classLevelId": "{{ExampleLevelId}}", "name": "Primary 3" }],
+              "lines": [
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c03", "label": "Exam & PTA", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 5000 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
+              ],
+              "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+            }
+            """,
+
+        [typeof(FeeGridAmountInput)] = $$"""
+            { "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }
+            """,
+
+        [typeof(FeeGridLineInput)] = $$"""
+            { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] }
+            """,
+
+        [typeof(SaveFeeNoticeGridCommand)] = $$"""
+            {
+              "sectionId": "00000000-0000-0000-0000-000000000302",
+              "termId": "{{ExampleTermId}}",
+              "lines": [
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c01", "label": "Tuition Fee", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 45000 }] },
+                { "id": null, "label": "Uniform", "kind": "Amount", "showOnPortal": false, "amounts": [{ "classLevelId": "{{ExampleLevelId}}", "amount": 0 }] },
+                { "id": "0192f0c4-e1a4-7f11-a8c2-9e3fd41b7c04", "label": "Outstanding Fee", "kind": "Outstanding", "showOnPortal": false, "amounts": [] }
+              ],
+              "version": "5f2c0d1e9a7b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d"
+            }
+            """,
+
+        [typeof(OutstandingFeeRowDto)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014", "amount": 12500 }
+            """,
+
+        [typeof(OutstandingFeeSheetDto)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}", "armName": "Primary 3A", "termId": "{{ExampleTermId}}", "termName": "First Term", "locked": false,
+              "rows": [
+                { "pupilId": "{{ExamplePupilId}}", "displayName": "Okafor Chidera Ngozi", "registrationNumber": "GRA/2026/0014", "amount": 12500 },
+                { "pupilId": "{{ExampleSecondPupilId}}", "displayName": "Bello Amina", "registrationNumber": "GRA/2025/0031", "amount": null }
+              ]
+            }
+            """,
+
+        [typeof(OutstandingFeeInput)] = $$"""
+            { "pupilId": "{{ExamplePupilId}}", "amount": 12500 }
+            """,
+
+        [typeof(SaveOutstandingFeesCommand)] = $$"""
+            {
+              "armId": "{{ExampleArmId}}",
+              "termId": "{{ExampleTermId}}",
+              "rows": [{ "pupilId": "{{ExamplePupilId}}", "amount": 12500 }, { "pupilId": "{{ExampleSecondPupilId}}", "amount": null }]
+            }
             """,
 
         [typeof(PupilPhotoDto)] = $$"""
@@ -3131,7 +3421,7 @@ internal static class OpenApiExamples
               "items": [
                 {
                   "documentType": "BirthCertificate", "otherLabel": null, "received": true, "receivedDate": "2026-09-14", "remarks": "Photocopy; original seen.",
-                  "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00" }
+                  "file": { "contentType": "application/pdf", "sizeBytes": 412736, "uploadedAtUtc": "2026-09-14T10:05:00+00:00", "fileName": "birth-cert-scan.pdf" }
                 },
                 { "documentType": "PassportPhotograph", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
                 { "documentType": "PreviousSchoolResult", "otherLabel": null, "received": false, "receivedDate": null, "remarks": null, "file": null },
@@ -3367,6 +3657,8 @@ internal static class OpenApiExamples
         // the XML doc comment on T does not reach.
         [typeof(SchoolManagement.Domain.Pupils.BloodGroup?)] = "A blood group (spec 6.5.7): A+, A-, B+, B-, AB+, AB-, O+ or O-, spelled out. Free text is not accepted.",
         [typeof(SchoolManagement.Domain.Pupils.Genotype?)] = "A genotype (spec 6.5.7): AA, AS, SS, AC or SC.",
+        [typeof(SchoolManagement.Domain.Promotion.PromotionDecisionOutcome?)] =
+            "A promotion outcome (spec 6.3.7): Promoted, Repeat, PromotedOnTrial (never proposed, chosen with a reason) or Graduated (terminal level only).",
 
         [typeof(Microsoft.AspNetCore.Mvc.ProblemDetails)] =
             "An RFC 9457 problem response. Returned for every error. Branch on the `errorCode` " +

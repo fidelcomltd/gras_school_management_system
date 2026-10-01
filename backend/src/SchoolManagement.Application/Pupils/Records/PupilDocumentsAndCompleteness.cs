@@ -184,6 +184,17 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
         Block(record is { AssessmentRequired: true } && string.IsNullOrWhiteSpace(record.AssessmentResultRemarks),
             9, "assessment.outcome", "Record the assessment outcome.");
 
+        var (chased, percent) = Chased(new ChasedInputs(
+            pupil.PhotoAssetId is not null, pupil.PreviousSchool, pupil.OtherInformation, pickup.Count, health, documents));
+        return new AdmissionCompletenessDto(PupilContactsMapper.Id(pupil.Id), blocking, chased, percent);
+    }
+
+    /// <summary>The chased-set percentage alone, for a list row (spec 6.5.15's completeness column), by the same rules.</summary>
+    public static int ChasedPercent(ChasedInputs inputs) => Chased(inputs).Percent;
+
+    /// <summary>Spec 6.5.12's chased set: what is still to collect, each keyed to its step, and the share present.</summary>
+    private static (List<CompletenessItemDto> Missing, int Percent) Chased(ChasedInputs inputs)
+    {
         var chased = new List<CompletenessItemDto>();
         var chasedTotal = 0;
         void Chase(bool missing, int step, string code, string message)
@@ -195,20 +206,20 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
             }
         }
 
-        Chase(pupil.PhotoAssetId is null, 2, PhotographCode, "Photograph.");
-        Chase(pupil.PreviousSchool is null, 2, "pupil.previous_school", "Previous school.");
-        Chase(pickup.Count == 0, 4, "collection.pickup", "Authorised pickup persons.");
-        Chase(health?.PreferredHospital is null, 5, "health.hospital", "Preferred hospital.");
-        Chase(health?.BloodGroup is null, 5, "health.blood_group", "Blood group.");
-        Chase(health?.Genotype is null, 5, "health.genotype", "Genotype.");
-        Chase(pupil.OtherInformation is null, 6, "pupil.other_information", "Other important information.");
+        Chase(!inputs.HasPhoto, 2, PhotographCode, "Photograph.");
+        Chase(inputs.PreviousSchool is null, 2, "pupil.previous_school", "Previous school.");
+        Chase(inputs.PickupCount == 0, 4, "collection.pickup", "Authorised pickup persons.");
+        Chase(inputs.Health?.PreferredHospital is null, 5, "health.hospital", "Preferred hospital.");
+        Chase(inputs.Health?.BloodGroup is null, 5, "health.blood_group", "Blood group.");
+        Chase(inputs.Health?.Genotype is null, 5, "health.genotype", "Genotype.");
+        Chase(inputs.OtherInformation is null, 6, "pupil.other_information", "Other important information.");
         foreach (var type in Enum.GetValues<PupilDocumentType>().Where(type => type != PupilDocumentType.Other))
         {
-            Chase(!documents.Any(document => document.DocumentType == type && document.Received), 7, $"documents.{type}", DocumentMapper.Label(type));
+            Chase(!inputs.Documents.Any(document => document.DocumentType == type && document.Received), 7, $"documents.{type}", DocumentMapper.Label(type));
         }
 
         var percent = chasedTotal == 0 ? 100 : (int)Math.Round(100.0 * (chasedTotal - chased.Count) / chasedTotal);
-        return new AdmissionCompletenessDto(PupilContactsMapper.Id(pupil.Id), blocking, chased, percent);
+        return (chased, percent);
     }
 
     private static List<CompletenessItemDto> SectionsBlocking(IReadOnlyList<PupilContact> contacts, BarredPersonAnswer? barred, PupilHealth? health)
@@ -231,6 +242,16 @@ internal sealed class AdmissionCompleteness(IPupilRecordRepository records, IAdm
         return blocking;
     }
 }
+
+/// <summary>What the chased set reads, from an entity or from a list row.</summary>
+/// <param name="HasPhoto">A photograph is on file.</param>
+/// <param name="PreviousSchool">Section B's previous school.</param>
+/// <param name="OtherInformation">Section G.</param>
+/// <param name="PickupCount">Authorised pickup persons recorded.</param>
+/// <param name="Health">Section F, where saved.</param>
+/// <param name="Documents">The checklist rows.</param>
+public sealed record ChasedInputs(
+    bool HasPhoto, string? PreviousSchool, string? OtherInformation, int PickupCount, PupilHealth? Health, IReadOnlyList<PupilDocument> Documents);
 
 /// <summary>Document mapping: every type appears, in form order.</summary>
 internal static class DocumentMapper
@@ -256,6 +277,6 @@ internal static class DocumentMapper
 
     private static PupilDocumentFileDto? FileOf(PupilDocument document) =>
         document is { FileContentType: { } contentType, FileSizeBytes: { } size, FileUploadedAtUtc: { } uploadedAt }
-            ? new PupilDocumentFileDto(contentType, size, uploadedAt)
+            ? new PupilDocumentFileDto(contentType, size, uploadedAt, document.FileName)
             : null;
 }

@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FormError } from '@/components/feedback/query-states';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
@@ -79,11 +80,7 @@ export function SchoolIdentityForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
-      {formError ? (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {formError}
-        </p>
-      ) : null}
+      <FormError message={formError} />
 
       <Field invalid={!!errors.schoolName}>
         <FieldLabel>School name</FieldLabel>

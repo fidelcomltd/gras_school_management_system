@@ -114,6 +114,18 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
         }
     }
 
+    private const string LikeEscape = "\\";
+
+    // LIKE patterns for "starts the code", "starts a part after a dot" and "starts a part after an underscore".
+    private static (string Start, string AfterDot, string AfterUnderscore) PartStarts(string text)
+    {
+        var literal = text.Trim()
+            .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
+            .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
+            .Replace("_", LikeEscape + "_", StringComparison.Ordinal);
+        return (literal + "%", "%." + literal + "%", "%" + LikeEscape + "_" + literal + "%");
+    }
+
     private static IQueryable<AuditEvent> ApplyFilters(
         IQueryable<AuditEvent> query,
         DateTimeOffset? fromUtc,
@@ -139,14 +151,25 @@ internal sealed class AuditEventQueryRepository(ApplicationDbContext context) : 
             query = query.Where(auditEvent => auditEvent.ActorAdminId == actor);
         }
 
+        // Action and record type match the whole code or the START of any part of it, ignoring case: nobody types an
+        // internal code like result.publish exactly (lead, 2026-09-28: the filters "did not seem to work"), yet
+        // "publish" must not also find result.unpublish. LIKE wildcards in the input are matched literally.
         if (action is not null)
         {
-            query = query.Where(auditEvent => auditEvent.Action == action);
+            var (start, afterDot, afterUnderscore) = PartStarts(action);
+            query = query.Where(auditEvent =>
+                EF.Functions.ILike(auditEvent.Action, start, LikeEscape)
+                || EF.Functions.ILike(auditEvent.Action, afterDot, LikeEscape)
+                || EF.Functions.ILike(auditEvent.Action, afterUnderscore, LikeEscape));
         }
 
         if (entityType is not null)
         {
-            query = query.Where(auditEvent => auditEvent.EntityType == entityType);
+            var (start, afterDot, afterUnderscore) = PartStarts(entityType);
+            query = query.Where(auditEvent =>
+                EF.Functions.ILike(auditEvent.EntityType, start, LikeEscape)
+                || EF.Functions.ILike(auditEvent.EntityType, afterDot, LikeEscape)
+                || EF.Functions.ILike(auditEvent.EntityType, afterUnderscore, LikeEscape));
         }
 
         if (entityId is not null)

@@ -10,11 +10,13 @@ import { authRoutes, publicAuthRoutes } from '@/features/auth/auth-routes';
 import { classesRoutes } from '@/features/classes/classes-routes';
 import { pinsRoutes } from '@/features/pins/pins-routes';
 import { pupilsRoutes } from '@/features/pupils/pupils-routes';
+import { reportsRoutes } from '@/features/reports/reports-routes';
 import { resultsRoutes } from '@/features/results/results-routes';
 import { weeklyRoutes } from '@/features/weekly/weekly-routes';
 import { subjectsRoutes } from '@/features/subjects/subjects-routes';
 import { rolesRoutes } from '@/features/roles/roles-routes';
 import { sessionsRoutes } from '@/features/sessions/sessions-routes';
+import { feesRoutes } from '@/features/fees/fees-routes';
 import { settingsRoutes } from '@/features/settings/settings-routes';
 import { ProtectedLayout } from './protected-layout';
 
@@ -36,12 +38,14 @@ const router = createBrowserRouter([
       ...authRoutes,
       ...settingsRoutes,
       ...sessionsRoutes,
+      ...feesRoutes,
       ...classesRoutes,
       ...armsRoutes,
       ...admissionsRoutes,
       ...pupilsRoutes,
       ...subjectsRoutes,
       ...resultsRoutes,
+      ...reportsRoutes,
       ...weeklyRoutes,
       ...pinsRoutes,
       ...auditRoutes,

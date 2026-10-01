@@ -129,4 +129,21 @@ describe('SessionsListScreen — create session', () => {
     await waitFor(() => expect(keysSeen.length).toBe(2));
     expect(new Set(keysSeen).size).toBe(2);
   }, 15000);
+
+  it("fills each term's 'next term begins' from the following term's start, but keeps a date typed by hand", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole('button', { name: 'New session' }));
+    fireEvent.change(screen.getByLabelText('Second term start date'), { target: { value: '2027-01-11' } });
+    expect(screen.getByLabelText('First term: next term begins (printed on its results)')).toHaveValue('11/01/2027');
+    // Following a change, while nobody has typed over it.
+    fireEvent.change(screen.getByLabelText('Second term start date'), { target: { value: '2027-01-12' } });
+    expect(screen.getByLabelText('First term: next term begins (printed on its results)')).toHaveValue('12/01/2027');
+
+    fireEvent.change(screen.getByLabelText('Second term: next term begins (printed on its results)'), { target: { value: '2027-04-26' } });
+    fireEvent.change(screen.getByLabelText('Third term start date'), { target: { value: '2027-04-27' } });
+    expect(screen.getByLabelText('Second term: next term begins (printed on its results)')).toHaveValue('26/04/2027');
+    expect(screen.getByLabelText('Third term: next term begins (printed on its results)')).toHaveValue('');
+  });
 });

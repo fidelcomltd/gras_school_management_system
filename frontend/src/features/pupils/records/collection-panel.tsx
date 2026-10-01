@@ -1,7 +1,11 @@
+import { Camera, Trash2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/query-states';
 import { Button } from '@/components/ui/button';
+import { FileButton } from '@/components/ui/file-button';
+import { Spinner } from '@/components/ui/spinner';
 import { useBarredPersons, usePickupPersons, useSaveBarredPersons, useSavePickupPersons, type BarredPersonsDto } from './api';
+import { useBarredPhotoUrl, useUploadBarredPhoto } from './files-api';
 import { TextField, YesNo } from './fields';
 import { errorText, localPhone } from './format';
 
@@ -51,7 +55,9 @@ export function CollectionPanel({
           <h2 id="barred-heading" className="text-base font-semibold text-foreground">
             Anyone who must NOT collect the child
           </h2>
-          <p className="text-xs text-muted-foreground">Safeguarding information. Never printed or exported; every view is logged.</p>
+          <p className="text-xs text-muted-foreground">
+            Safeguarding information. Never printed or exported; every view is logged. A photograph is optional and helps the gate recognise them.
+          </p>
           {barred.isPending ? (
             <LoadingState label="Loading…" />
           ) : barred.isError ? (
@@ -99,14 +105,19 @@ function PickupForm({ pupilId, initial, canEdit }: { pupilId: string; initial: P
   );
 }
 
+type BarredRow = { key: string; fullName: string; details: string; photoId: string | null; preview: string | null };
+const blankBarred = (): BarredRow => ({ key: crypto.randomUUID(), fullName: '', details: '', photoId: null, preview: null });
+
 function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredPersonsDto; canEdit: boolean }) {
   const save = useSaveBarredPersons(pupilId);
   const [answer, setAnswer] = useState<boolean | null>(data.hasBarredPersons ?? null);
-  const [persons, setPersons] = useState(() =>
+  const [persons, setPersons] = useState<BarredRow[]>(() =>
     data.items.length > 0
-      ? data.items.map((item) => ({ key: item.id, fullName: item.fullName, details: item.details ?? '' }))
-      : [{ key: crypto.randomUUID(), fullName: '', details: '' }],
+      ? data.items.map((item) => ({ key: item.id, fullName: item.fullName, details: item.details ?? '', photoId: item.photoId ?? null, preview: null }))
+      : [blankBarred()],
   );
+  const setRow = (index: number, change: Partial<BarredRow>) =>
+    setPersons((current) => current.map((row, at) => (at === index ? { ...row, ...change } : row)));
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,16 +125,20 @@ function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredP
       {answer ? (
         <fieldset disabled={!canEdit} className="flex flex-col gap-2">
           {persons.map((person, index) => (
-            <div key={person.key} className="grid gap-2 sm:grid-cols-2">
-              <TextField
-                label={`Barred person ${index + 1}: name`}
-                value={person.fullName}
-                onChange={(value) => setPersons((current) => current.map((row, at) => (at === index ? { ...row, fullName: value } : row)))}
+            <div key={person.key} className="grid gap-2 sm:grid-cols-[auto_1fr_1fr]">
+              <BarredPhoto
+                pupilId={pupilId}
+                label={`Barred person ${index + 1}`}
+                photoId={person.photoId}
+                preview={person.preview}
+                canEdit={canEdit}
+                onChange={(photoId, preview) => setRow(index, { photoId, preview })}
               />
+              <TextField label={`Barred person ${index + 1}: name`} value={person.fullName} onChange={(value) => setRow(index, { fullName: value })} />
               <TextField
                 label={`Barred person ${index + 1}: relevant information`}
                 value={person.details}
-                onChange={(value) => setPersons((current) => current.map((row, at) => (at === index ? { ...row, details: value } : row)))}
+                onChange={(value) => setRow(index, { details: value })}
               />
             </div>
           ))}
@@ -133,7 +148,7 @@ function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredP
       {canEdit ? (
         <div className="flex gap-2">
           {answer ? (
-            <Button variant="outline" size="sm" onClick={() => setPersons((current) => [...current, { key: crypto.randomUUID(), fullName: '', details: '' }])}>
+            <Button variant="outline" size="sm" onClick={() => setPersons((current) => [...current, blankBarred()])}>
               Add a name
             </Button>
           ) : null}
@@ -143,12 +158,84 @@ function BarredForm({ pupilId, data, canEdit }: { pupilId: string; data: BarredP
             onClick={() =>
               save.mutate({
                 hasBarredPersons: answer === true,
-                persons: answer ? persons.filter((person) => person.fullName.trim() !== '').map((person) => ({ fullName: person.fullName, details: person.details || null })) : [],
+                persons: answer
+                  ? persons
+                      // A row with a photograph but no name is sent, so the server's "enter the name" shows instead of the photo vanishing.
+                      .filter((person) => person.fullName.trim() !== '' || person.photoId !== null)
+                      .map((person) => ({ fullName: person.fullName, details: person.details || null, photoId: person.photoId }))
+                  : [],
               })
             }
           >
             {save.isPending ? 'Saving…' : 'Save answer'}
           </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * An optional photograph of a barred person, so staff at the gate can recognise them (project lead, 2026-09-30). A new one
+ * uploads at once and shows from the local file; it is attached to the person when the answer is saved. A saved one is
+ * read from the server, which logs the view.
+ */
+function BarredPhoto({
+  pupilId,
+  label,
+  photoId,
+  preview,
+  canEdit,
+  onChange,
+}: {
+  pupilId: string;
+  label: string;
+  photoId: string | null;
+  preview: string | null;
+  canEdit: boolean;
+  onChange: (photoId: string | null, preview: string | null) => void;
+}) {
+  const upload = useUploadBarredPhoto(pupilId);
+  const saved = useBarredPhotoUrl(pupilId, preview ? null : photoId);
+  const src = preview ?? saved.data ?? null;
+
+  return (
+    <div className="flex items-start gap-2">
+      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+        {upload.isPending || (photoId && !src && saved.isPending) ? (
+          <output>
+            <Spinner />
+            <span className="sr-only">{upload.isPending ? 'Uploading the photograph…' : 'Loading the photograph…'}</span>
+          </output>
+        ) : src ? (
+          <img src={src} alt={`Photograph of ${label.toLowerCase()}`} className="size-full object-cover" />
+        ) : photoId && saved.isError ? (
+          // Never the "no photograph" placeholder when there IS one we could not read: staff must not conclude there is none.
+          <button type="button" className="px-1 text-center text-xs text-destructive underline" onClick={() => void saved.refetch()}>
+            Photograph unavailable. Retry
+          </button>
+        ) : (
+          <UserRound className="size-8 text-muted-foreground/60" aria-label="No photograph" />
+        )}
+      </div>
+      {canEdit ? (
+        <div className="flex flex-col gap-1">
+          <FileButton
+            inputLabel={`${label}: photograph`}
+            accept="image/png,image/jpeg"
+            disabled={upload.isPending}
+            onFile={(file) => upload.mutate(file, { onSuccess: (result) => onChange(result.photoId, result.preview) })}
+          >
+            <Camera aria-hidden="true" />
+            {photoId ? 'Replace photo' : 'Add photo'}
+          </FileButton>
+          {photoId ? (
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => onChange(null, null)}>
+              <Trash2 aria-hidden="true" />
+              Remove photo
+            </Button>
+          ) : null}
+          <FormError message={errorText(upload.error)} />
         </div>
       ) : null}
     </div>
