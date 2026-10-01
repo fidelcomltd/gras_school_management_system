@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Promotion;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils.Movement;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Promotion;
@@ -112,7 +113,7 @@ internal sealed class ReversePromotionHandler(
                 "promotion.pupils_moved", $"{moved} {(moved == 1 ? "pupil has" : "pupils have")} moved or changed status since this promotion. {MoveInstead}"));
         }
 
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
         foreach (var decision in batch.Decisions)
         {
             if (decision.NewEnrolmentId is { } newId)

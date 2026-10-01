@@ -3,6 +3,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -75,7 +76,7 @@ internal sealed class ListPupilsQueryHandler(
         }
 
         var pageSize = Math.Clamp(request.PageSize ?? CursorPageRequest.DefaultPageSize, 1, CursorPageRequest.MaxPageSize);
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         var page = await pupils
             .ListAsync(request.Status, request.Search, request.Cursor, pageSize, today, allowedArmIds, cancellationToken)

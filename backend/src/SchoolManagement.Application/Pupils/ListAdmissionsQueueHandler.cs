@@ -1,5 +1,6 @@
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Pupils;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Common.Pagination;
 using SchoolManagement.Domain.Common;
 
@@ -23,7 +24,7 @@ internal sealed class ListAdmissionsQueueQueryHandler(IPupilRepository pupils, T
         }
 
         var pageSize = Math.Clamp(request.PageSize ?? CursorPageRequest.DefaultPageSize, 1, CursorPageRequest.MaxPageSize);
-        var today = Weekly.WeeklyProjection.LagosToday(timeProvider.GetUtcNow());
+        var today = SchoolTime.Today(timeProvider.GetUtcNow());
 
         var page = await pupils.ListAdmissionsQueueAsync(request.Cursor, pageSize, today, cancellationToken).ConfigureAwait(false);
 

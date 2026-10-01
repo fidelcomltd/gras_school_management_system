@@ -1,7 +1,7 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Audit;
 using SchoolManagement.Application.Abstractions.Reports;
-using SchoolManagement.Application.Weekly;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Domain.Audit;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pins;
@@ -65,11 +65,10 @@ internal static class ReportDays
         return true;
     }
 
-    public static string When(DateTimeOffset instant) =>
-        instant.ToOffset(WeeklyProjection.LagosOffset).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+    public static string When(DateTimeOffset instant) => SchoolTime.Stamp(instant);
 
-    // Midnight in Lagos, as UTC: the database stores and compares UTC instants only.
-    private static DateTimeOffset Start(DateOnly day) => new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), WeeklyProjection.LagosOffset).ToUniversalTime();
+    // The school's midnight, as UTC: the database stores and compares UTC instants only.
+    private static DateTimeOffset Start(DateOnly day) => new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), SchoolTime.Offset).ToUniversalTime();
 
     private static bool TryDay(string? value, out DateOnly? day)
     {
@@ -278,7 +277,7 @@ internal sealed class AuditReport(IAuditEventQueryRepository events, IReportRead
             "Audit report",
             filterLines,
             [
-                new("When (WAT)", ReportAlign.Left),
+                new("When", ReportAlign.Left),
                 new("Actor", ReportAlign.Left),
                 new("Action", ReportAlign.Left),
                 new("Entity", ReportAlign.Left),
@@ -355,7 +354,7 @@ internal sealed class SettingsHistoryReport(IReportReader reader) : ReportBuilde
             "Settings change history",
             filterLines,
             [
-                new("When (WAT)", ReportAlign.Left),
+                new("When", ReportAlign.Left),
                 new("Group", ReportAlign.Left),
                 new("By", ReportAlign.Left),
                 new("Reason", ReportAlign.Left),

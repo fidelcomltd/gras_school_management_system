@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { schoolClock } from '@/shared/format/date';
 import type { WeeklyDayDto } from '../types';
 
 /** Spec 6.10.6: a quiet marker beside a pupil with symptoms noted on two or more days of the week. */
@@ -14,6 +15,5 @@ export function EditedByOther({ day, accountId }: { day: WeeklyDayDto; accountId
   if (!day.lastEditedAt || !day.lastEditedBy || day.lastEditedById === accountId) return null;
   const at = new Date(day.lastEditedAt);
   if (now - at.getTime() > 60 * 60 * 1000) return null;
-  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
-  return <span className="block text-xs text-muted-foreground">Edited by {day.lastEditedBy} at {time}</span>;
+  return <span className="block text-xs text-muted-foreground">Edited by {day.lastEditedBy} at {schoolClock(day.lastEditedAt)}</span>;
 }

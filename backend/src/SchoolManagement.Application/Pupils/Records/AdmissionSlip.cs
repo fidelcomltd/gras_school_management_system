@@ -10,7 +10,6 @@ using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Abstractions.Settings;
 using SchoolManagement.Application.Portal;
 using SchoolManagement.Application.Settings;
-using SchoolManagement.Application.Weekly;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Security;
@@ -104,7 +103,7 @@ internal sealed class GetAdmissionSlipHandler(
             className ?? "Not yet placed",
             session?.Name ?? string.Empty,
             dateAdmitted.Value,
-            timeProvider.GetUtcNow().ToOffset(WeeklyProjection.LagosOffset).DateTime,
+            timeProvider.GetUtcNow(),
             printedBy ?? "Unknown account",
             profile.Motto,
             contact,

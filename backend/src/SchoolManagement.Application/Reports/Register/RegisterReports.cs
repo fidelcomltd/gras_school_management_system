@@ -1,8 +1,8 @@
 using System.Globalization;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Reports;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils.Records;
-using SchoolManagement.Application.Weekly;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
@@ -136,7 +136,7 @@ internal sealed class NominalRollReport(IReportReader reader, IPupilRecordReposi
             .ThenBy(pupil => pupil.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var set = await records.LoadForPupilsAsync([.. pupils.Select(pupil => pupil.PupilId)], cancellationToken).ConfigureAwait(false);
-        var today = WeeklyProjection.LagosToday(context.Now);
+        var today = SchoolTime.Today(context.Now);
         var byArm = pupils.ToLookup(pupil => pupil.ArmId);
 
         var rows = new List<ReportRowDto>();
@@ -400,7 +400,7 @@ internal sealed class OutstandingDocumentsReport(IReportReader reader, IPupilRep
             .ThenBy(entry => entry.Pupil.Surname, StringComparer.OrdinalIgnoreCase)
             .Select(entry => new ReportRowDto(ReportRowKind.Data,
             [
-                RegisterText.Date(DateOnly.FromDateTime(entry.Pupil.CreatedAtUtc.ToOffset(WeeklyProjection.LagosOffset).DateTime)),
+                RegisterText.Date(DateOnly.FromDateTime(entry.Pupil.CreatedAtUtc.ToOffset(SchoolTime.Offset).DateTime)),
                 ReportRegisterPupil.Name(entry.Pupil.Surname, entry.Pupil.FirstName, entry.Pupil.MiddleName),
                 entry.Pupil.RegistrationNumber,
                 arms[entry.ArmId].Name,
@@ -466,13 +466,13 @@ internal sealed class AdmissionsPipelineReport(IReportReader reader, IPupilRepos
         var set = await records.LoadForPupilsAsync([.. pending.Select(pupil => pupil.Id)], cancellationToken).ConfigureAwait(false);
         var levels = await reader.FindLevelsAsync([.. set.Admissions.Values.Select(admission => admission.ClassAdmittedInto).Distinct()], cancellationToken)
             .ConfigureAwait(false);
-        var today = WeeklyProjection.LagosToday(context.Now);
+        var today = SchoolTime.Today(context.Now);
 
         var rows = pending
             .Select(pupil =>
             {
                 var admission = set.Admissions.GetValueOrDefault(pupil.Id);
-                var created = DateOnly.FromDateTime(pupil.CreatedAtUtc.ToOffset(WeeklyProjection.LagosOffset).DateTime);
+                var created = DateOnly.FromDateTime(pupil.CreatedAtUtc.ToOffset(SchoolTime.Offset).DateTime);
                 var completeness = AdmissionCompleteness.Evaluate(pupil, set);
                 return (Pupil: pupil, LevelId: admission?.ClassAdmittedInto, Created: created, Days: today.DayNumber - created.DayNumber, completeness.Blocking);
             })

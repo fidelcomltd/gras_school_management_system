@@ -20,7 +20,7 @@ public interface IAdmissionSlipRenderer
 /// <param name="ClassName">The arm the pupil was admitted into, e.g. "Primary 2 Gold".</param>
 /// <param name="SessionName">The session admitted into.</param>
 /// <param name="DateAdmitted">Section A's admission date.</param>
-/// <param name="PrintedAtLagos">When it was printed, Lagos time (every printed artefact carries it).</param>
+/// <param name="PrintedAt">When it was printed (every printed artefact carries it).</param>
 /// <param name="PrintedBy">The account that printed it.</param>
 /// <param name="SchoolMotto">Under the name, when the school has one.</param>
 /// <param name="SchoolContact">The school's phone and email, one line.</param>
@@ -37,7 +37,7 @@ public sealed record AdmissionSlipDocument(
     string ClassName,
     string SessionName,
     DateOnly DateAdmitted,
-    DateTime PrintedAtLagos,
+    DateTimeOffset PrintedAt,
     string PrintedBy,
     string? SchoolMotto = null,
     string? SchoolContact = null,

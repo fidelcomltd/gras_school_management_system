@@ -70,7 +70,7 @@ internal sealed class QuestPdfReportRenderer : IReportPdfRenderer
                 });
                 page.Footer().BorderTop(0.5f).PaddingTop(3).Row(row =>
                 {
-                    row.RelativeItem().Text($"Printed {PrintedTime.Format(report.GeneratedAtUtc)}")
+                    row.RelativeItem().Text($"Printed {SchoolTime.Stamp(report.GeneratedAtUtc)}")
                         .FontSize(6.5f);
                     row.RelativeItem().AlignRight().Text(text =>
                     {

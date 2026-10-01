@@ -6,6 +6,7 @@ using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
 using SchoolManagement.Application.Abstractions.Reports;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Common;
 using SchoolManagement.Application.Pupils;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Common;
@@ -251,7 +252,7 @@ internal sealed class ReportServices(
         }
 
         await auditSink.RecordAsync(ExportAuditAction, "report", report.Key, metadata, currentUser.UserId, cancellationToken).ConfigureAwait(false);
-        var stamp = report.GeneratedAtUtc.ToOffset(TimeSpan.FromHours(1)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var stamp = SchoolTime.At(report.GeneratedAtUtc).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return new ReportFile($"{report.Key}_{stamp}.{(pdf ? "pdf" : "csv")}", pdf ? "application/pdf" : "text/csv", content);
     }
 
