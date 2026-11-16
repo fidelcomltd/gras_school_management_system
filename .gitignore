@@ -4,3 +4,5 @@
 
 # Per-developer Claude Code settings (holds each clone's autoMemoryDirectory).
 /.claude/settings.local.json
+
+/assets/
