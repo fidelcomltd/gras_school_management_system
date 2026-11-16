@@ -17,12 +17,16 @@
 # preview read this file. Set them per deploy context in the Netlify UI (Site configuration → Environment
 # variables), using .env.example as the checklist. Secrets (RESEND_API_KEY) only ever live in the UI.
 
-# Deploy previews and branch deploys must never be indexed, or Google sees duplicate copies of the site.
+# Deploy previews and branch deploys (including a `staging` branch deploy) must never be indexed, or
+# Google sees duplicate copies of the site, and must never send parents to the live result portal.
+# Production sets neither: it uses the defaults in config/env.ts (results.goldenroyalark.com).
 [context.deploy-preview.environment]
   NEXT_PUBLIC_SITE_ENV = "preview"
+  NEXT_PUBLIC_RESULT_PORTAL_URL = "https://staging-api.goldenroyalark.com/portal"
 
 [context.branch-deploy.environment]
   NEXT_PUBLIC_SITE_ENV = "preview"
+  NEXT_PUBLIC_RESULT_PORTAL_URL = "https://staging-api.goldenroyalark.com/portal"
 
 [[headers]]
   for = "/_next/static/*"
