@@ -1,0 +1,50 @@
+{
+  "name": "gras-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Public website for Golden Royal Ark School, Owerri (goldenroyalark.com).",
+  "scripts": {
+    "dev": "next dev",
+    "dev:clean": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true})\" && next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm run format:check",
+    "images": "node scripts/process-images.mjs",
+    "test": "playwright test",
+    "screenshots": "node scripts/screenshots.mjs",
+    "verify": "npm run check && npm run build && npm run test"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "resend": "^6.38.1",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@playwright/test": "1.65.0",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.1.6",
+    "prettier": "3.8.1",
+    "prettier-plugin-tailwindcss": "0.7.2",
+    "schema-dts": "^2.1.0",
+    "sharp": "0.34.5",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
