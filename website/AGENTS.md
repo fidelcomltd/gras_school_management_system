@@ -21,7 +21,7 @@ phone menu, and a style guide. Copy is verbatim from it.
 | Motion    | CSS only (keyframes in `@theme`) + one IntersectionObserver (`RevealObserver`). No animation library |
 | Email     | Resend, from the `/api/contact` route handler                                                        |
 | Tests     | Playwright e2e against the production build                                                          |
-| Hosting   | Netlify (Next.js runtime auto-detected), Node 22                                                     |
+| Hosting   | Netlify + Next.js runtime (declared in netlify.toml), Node 22                                        |
 
 ## Commands
 

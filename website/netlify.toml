@@ -9,6 +9,13 @@
   command = "npm run build"
   publish = ".next"
 
+# The Next.js runtime turns .next into a deployable site (server handler, routing, Image CDN). Netlify is
+# meant to add it automatically, but on this site it detected Next.js and skipped the runtime anyway:
+# 0 functions were uploaded and every URL returned Netlify's 404. Declared explicitly so the deploy never
+# depends on auto-detection.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 [build.environment]
   NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
