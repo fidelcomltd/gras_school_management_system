@@ -1,0 +1,30 @@
+# Netlify build for the PUBLIC WEBSITE (goldenroyalark.com).
+#
+# This is its own Netlify site, separate from the admin app (the repo-root netlify.toml, base = frontend).
+# In the Netlify UI set:  Site configuration → Build & deploy → Base directory = website
+# Netlify then reads THIS file. Next.js is detected automatically and deployed with the Netlify Next.js
+# runtime (server rendering, route handlers for /api/contact, and the Image CDN behind next/image).
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Non-secret values that differ by environment are NOT set here: both the production site and every deploy
+# preview read this file. Set them per deploy context in the Netlify UI (Site configuration → Environment
+# variables), using .env.example as the checklist. Secrets (RESEND_API_KEY) only ever live in the UI.
+
+# Deploy previews and branch deploys must never be indexed, or Google sees duplicate copies of the site.
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_SITE_ENV = "preview"
+
+[context.branch-deploy.environment]
+  NEXT_PUBLIC_SITE_ENV = "preview"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

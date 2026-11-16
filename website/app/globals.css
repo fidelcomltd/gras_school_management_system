@@ -1,0 +1,376 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — the single home for every colour, font and motion value in the design
+ * (canvas "Golden Royal Ark School — Website", Style guide artboard). Components use the
+ * generated utilities (bg-navy, text-crimson…), never hex literals. docs: AGENTS.md › Tokens.
+ */
+@theme {
+  /* Brand */
+  --color-crimson: #a61b37;
+  --color-crimson-hover: #861229;
+  --color-crimson-deep: #8f1530;
+  --color-crimson-deeper: #7a1129;
+  --color-crimson-tint: #fdecef;
+  --color-rose: #fbdde3; /* body text on crimson */
+  --color-rose-soft: #fde7eb;
+  --color-error-line: #f3b9c4;
+
+  --color-gold: #c89b3c;
+  --color-gold-text: #8a6516; /* gold-toned text on white, passes AA */
+  --color-gold-value: #a87a1f;
+  --color-gold-soft: #f3e3b8; /* gold-toned text on navy/crimson */
+  --color-gold-cream: #fff8e8;
+  --color-gold-tint: #fbf2de;
+  --color-gold-line: #ebd7a7;
+  --color-gold-line-soft: #e9d3a1;
+  --color-umber: #5a4a20; /* body text on gold-cream */
+
+  --color-royal: #1b3a8c;
+  --color-royal-tint: #e5eefb;
+  --color-azure: #2a7bc0;
+  --color-navy: #0e1d47;
+  --color-navy-raised: #14296a;
+
+  --color-sky: #9cc9ee;
+  --color-sky-tint: #eaf4fd;
+  --color-sky-wash: #d7eafa;
+  --color-sky-soft: #cfe4f7;
+  --color-sky-mid: #b7d7f2;
+
+  /* Neutrals */
+  --color-ink: #16213e;
+  --color-slate: #4a5675;
+  --color-slate-deep: #3e4c6d;
+  --color-muted: #7b87a3;
+  --color-mist: #f6fafe;
+  --color-field: #fafcff;
+  --color-field-addon: #f2f6fc;
+  --color-field-line: #dce4f0;
+  --color-line: #e6ecf5;
+  --color-line-soft: #eef2f8;
+  --color-line-cool: #e3edf8;
+
+  /* Text on navy, lightest → dimmest */
+  --color-on-navy: #dce6f7;
+  --color-on-navy-hero: #d5dff2;
+  --color-on-navy-soft: #c9d5ee;
+  --color-on-navy-muted: #b9c7e4;
+  --color-on-navy-dim: #9fb2d8;
+  --color-on-navy-faint: #8fa2cb;
+
+  /* Type. Named sizes keep the browser's "normal" line-height, as the design does; set leading-*
+     explicitly where the design specifies one. */
+  --text-xs--line-height: normal;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
+  --text-2xl--line-height: normal;
+  --text-4xl--line-height: normal;
+  --text-5xl--line-height: normal;
+  --text-6xl--line-height: normal;
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+
+  /* Shadows (design values, navy-tinted) */
+  --shadow-card: 0 24px 60px -30px rgb(14 29 71 / 0.35);
+  --shadow-lift: 0 28px 50px -24px rgb(14 29 71 / 0.45);
+  --shadow-photo: 0 30px 60px -30px rgb(14 29 71 / 0.45);
+  --shadow-panel: 0 30px 70px -40px rgb(14 29 71 / 0.45);
+  --shadow-step: 0 16px 36px -26px rgb(14 29 71 / 0.5);
+  --shadow-crimson: 0 14px 30px -14px rgb(166 27 55 / 0.9);
+  --shadow-gold: 0 14px 30px -14px rgb(138 101 22 / 0.8);
+
+  /* One-off shadows from the design, named so a palette change reaches them */
+  --shadow-float-photo: 0 30px 70px -30px rgb(0 0 0 / 0.6);
+  --shadow-float-badge: 0 24px 50px -24px rgb(0 0 0 / 0.6);
+  --shadow-details: 0 30px 70px -40px color-mix(in srgb, var(--color-navy) 70%, transparent);
+  --shadow-panel-sm: 0 24px 50px -36px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-inset-photo: 0 20px 40px -24px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-inset-photo-lg: 0 30px 60px -30px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-badge: 0 20px 40px -20px color-mix(in srgb, var(--color-navy) 60%, transparent);
+  --shadow-address-sm: 0 16px 34px -22px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-value-sm: 0 12px 30px -24px color-mix(in srgb, var(--color-navy) 60%, transparent);
+  --shadow-value: 0 16px 40px -28px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-value-hover: 0 28px 50px -24px color-mix(in srgb, var(--color-navy) 60%, transparent);
+  --shadow-gallery-hover: 0 30px 60px -24px color-mix(in srgb, var(--color-navy) 50%, transparent);
+  --shadow-pin: 0 16px 30px -12px color-mix(in srgb, var(--color-crimson) 80%, transparent);
+  --shadow-crimson-sm: 0 10px 24px -12px color-mix(in srgb, var(--color-crimson) 80%, transparent);
+  --shadow-badge-crimson: 0 20px 40px -18px color-mix(in srgb, var(--color-crimson) 80%, transparent);
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--color-royal) 15%, transparent);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --animate-ken-burns: ken-burns 7s ease-out both;
+  --animate-rise: rise 0.9s var(--ease-out-soft) both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pop: pop 0.6s var(--ease-out-soft) both;
+  --animate-slide-in: slide-in 0.55s var(--ease-out-soft) both;
+
+  @keyframes marquee {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+  @keyframes ken-burns {
+    from {
+      transform: scale(1.12);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(var(--rise-from, 26px));
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* `inline` so var(--marquee-duration) resolves on the element (the phone track sets 50s), not on :root. */
+@theme inline {
+  --animate-marquee: marquee var(--marquee-duration, 70s) linear infinite;
+}
+
+@layer base {
+  :root {
+    /* Sticky header height INCLUDING its 1px bottom border. The About page's sticky section nav and
+       anchor offsets sit below it. */
+    --header-h: 67px;
+    scroll-padding-top: calc(var(--header-h) + 72px);
+  }
+  @media (min-width: 64rem) {
+    :root {
+      --header-h: 85px;
+    }
+  }
+  html {
+    /* The design sets no base line-height (browser "normal"); Tailwind's preflight would make it 1.5. */
+    line-height: normal;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-white font-sans text-ink antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-[-0.02em];
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-gold);
+    outline-offset: 3px;
+  }
+  ::selection {
+    background: var(--color-gold-soft);
+    color: var(--color-navy);
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+}
+
+/* Photo overlays (navy fades) from the design, built on the navy token */
+@utility fade-hero-x {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-navy) 92%, transparent) 0%,
+    color-mix(in srgb, var(--color-navy) 72%, transparent) 38%,
+    color-mix(in srgb, var(--color-navy) 15%, transparent) 75%,
+    transparent 100%
+  );
+}
+@utility fade-hero-y {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-navy) 10%, transparent) 0%,
+    color-mix(in srgb, var(--color-navy) 25%, transparent) 35%,
+    color-mix(in srgb, var(--color-navy) 90%, transparent) 72%,
+    color-mix(in srgb, var(--color-navy) 96%, transparent) 100%
+  );
+}
+@utility fade-hero-bottom {
+  background-image: linear-gradient(0deg, color-mix(in srgb, var(--color-navy) 55%, transparent), transparent);
+}
+@utility fade-card {
+  background-image: linear-gradient(
+    180deg,
+    transparent 35%,
+    color-mix(in srgb, var(--color-navy) 94%, transparent) 100%
+  );
+}
+@utility fade-card-lg {
+  background-image: linear-gradient(
+    180deg,
+    transparent 35%,
+    color-mix(in srgb, var(--color-navy) 92%, transparent) 100%
+  );
+}
+@utility fade-panel {
+  background-image: linear-gradient(180deg, transparent 40%, var(--color-navy) 100%);
+}
+
+/* Interaction helpers. @utility (not @layer components) so they accept variants, e.g. md:card-lift. */
+
+/* Pill buttons lift on hover (design .g-btn) */
+@utility lift-on-hover {
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Cards rise and gain shadow (design .g-lift) */
+@utility card-lift {
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* Photo zooms within its frame (design .g-zoom) */
+@utility zoom-on-hover {
+  & img {
+    transition: transform 0.9s var(--ease-out-soft);
+  }
+  &:hover img {
+    transform: scale(1.07);
+  }
+}
+
+/* Hide scrollbars on horizontal swipe rails without losing scrolling */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /*
+   * Scroll reveal. Hidden only when JS is running (html.js is set before paint in the root layout),
+   * so crawlers, no-JS visitors and print always see the content. RevealObserver adds .is-revealed.
+   */
+  .js [data-reveal] {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.9s var(--ease-out-soft),
+      transform 0.9s var(--ease-out-soft);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .js [data-reveal="fade"] {
+    transform: none;
+  }
+  .js [data-reveal="scale"] {
+    transform: scale(0.96);
+  }
+  .js [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Gallery marquee pauses on hover/focus (design .g-marquee). Unlayered on purpose: the track's
+ * animate-marquee utility sets the `animation` shorthand (play-state: running) in the utilities layer,
+ * which would beat this rule inside any @layer.
+ */
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .js [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+  .marquee {
+    overflow-x: auto;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+}
