@@ -27,8 +27,9 @@ export function readUrl(name: string, raw: string | undefined, fallback: string)
   return v.replace(/\/$/, "")
 }
 
-function optionalUrl(name: string, raw: string | undefined) {
-  return blank(raw) === undefined ? undefined : readUrl(name, raw, "")
+function optionalUrl(name: string, raw: string | undefined, fallback?: string) {
+  if (blank(raw) === undefined) return fallback
+  return readUrl(name, raw, "")
 }
 
 function optionalNumber(name: string, raw: string | undefined) {
@@ -64,8 +65,16 @@ export const env = {
   region: blank(process.env.NEXT_PUBLIC_ADDRESS_REGION) ?? "Imo State",
   lat: optionalNumber("NEXT_PUBLIC_GEO_LAT", process.env.NEXT_PUBLIC_GEO_LAT),
   lng: optionalNumber("NEXT_PUBLIC_GEO_LNG", process.env.NEXT_PUBLIC_GEO_LNG),
-  tiktokUrl: optionalUrl("NEXT_PUBLIC_TIKTOK_URL", process.env.NEXT_PUBLIC_TIKTOK_URL),
-  facebookUrl: optionalUrl("NEXT_PUBLIC_FACEBOOK_URL", process.env.NEXT_PUBLIC_FACEBOOK_URL),
+  tiktokUrl: optionalUrl(
+    "NEXT_PUBLIC_TIKTOK_URL",
+    process.env.NEXT_PUBLIC_TIKTOK_URL,
+    "https://www.tiktok.com/@goldenroyalarkschool"
+  ),
+  facebookUrl: optionalUrl(
+    "NEXT_PUBLIC_FACEBOOK_URL",
+    process.env.NEXT_PUBLIC_FACEBOOK_URL,
+    "https://www.facebook.com/profile.php?id=100095517095251"
+  ),
   googleSiteVerification: blank(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION),
 } as const
 
