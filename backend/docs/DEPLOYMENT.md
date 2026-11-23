@@ -298,7 +298,8 @@ outage into a restart loop.
 **Confirming a deploy went live:** `/health/live` reports `commit`, the SHA Render built (its
 `RENDER_GIT_COMMIT`). It should equal `git rev-parse origin/staging` once the deploy finishes; the
 previous SHA means the deploy is still running or failed (Render keeps the old version serving), and
-the Render dashboard's Events say which. Hosts that set no such variable report `unknown`.
+the Render dashboard's Events say which. This covers Render (staging) only: the VPS sets no such
+variable, so production reports `unknown`.
 
 **It runs on Render's free plan** (no payment card). Three consequences:
 

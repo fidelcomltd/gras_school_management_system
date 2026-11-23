@@ -123,13 +123,14 @@ public static class HealthEndpoints
 
     /// <summary>
     /// The commit this process was built from, so a deploy can be confirmed from outside by comparing it
-    /// with the pushed branch head. Only a plain git SHA is echoed: this endpoint is anonymous, so a value
-    /// that is anything else (a misconfigured variable holding a secret, say) is never reflected back.
+    /// with the pushed branch head. Only a full git SHA (40 hex characters, or 64 for SHA-256) is echoed,
+    /// lower-cased so it matches <c>git rev-parse</c>: this endpoint is anonymous, so a value that is
+    /// anything else (a misconfigured variable holding a secret, say) is never reflected back.
     /// </summary>
-    private static string DeployedCommit(IConfiguration configuration)
+    internal static string DeployedCommit(IConfiguration configuration)
     {
-        var value = configuration[DeployedCommitKey]?.Trim();
-        return value is { Length: >= 7 and <= 40 } && value.All(char.IsAsciiHexDigitLower)
+        var value = configuration[DeployedCommitKey]?.Trim().ToLowerInvariant();
+        return value is { Length: 40 or 64 } && value.All(char.IsAsciiHexDigitLower)
             ? value
             : UnknownCommit;
     }
