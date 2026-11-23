@@ -50,41 +50,32 @@ public sealed class PupilTests
         result.Value.Nationality.ShouldBe(Pupil.DefaultNationality);
     }
 
-    // Spec 6.5.4's own worked example, formatted with real values rather than copied literally.
-    [Fact]
-    public void Create_WithAnAgeBelowTheMinimum_RejectsWithTheVerbatimMessageShape()
-    {
-        var dateOfBirth = new DateOnly(2026, 5, 3); // ~4 months old as of Today — under MinAgeYears.
-
-        var result = CreateValid(dateOfBirth);
-
-        result.IsFailure.ShouldBeTrue();
-        result.Error.Code.ShouldBe("pupil.date_of_birth_out_of_range");
-        result.Error.Description.ShouldBe("A date of birth of 03/05/2026 makes this pupil 0 years old. Check the date.");
-    }
-
-    [Fact]
-    public void Create_WithAnAgeAboveTheMaximum_Rejects()
-    {
-        var dateOfBirth = new DateOnly(2005, 1, 1); // 21 as of Today — one over MaxAgeYears.
-
-        var result = CreateValid(dateOfBirth);
-
-        result.IsFailure.ShouldBeTrue();
-        result.Error.Code.ShouldBe("pupil.date_of_birth_out_of_range");
-        result.Error.Description.ShouldContain("21 years old");
-    }
-
     [Theory]
-    [InlineData(2)]
-    [InlineData(20)]
-    public void Create_AtEitherAgeBoundary_IsInclusiveAndSucceeds(int ageYears)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(25)]
+    [InlineData(60)]
+    public void Create_WithAnyAgeAndAPastDateOfBirth_Succeeds(int ageYears)
     {
-        var dateOfBirth = Today.AddYears(-ageYears);
+        var dateOfBirth = Today.AddYears(-ageYears).AddDays(-1);
 
         var result = CreateValid(dateOfBirth);
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Description : string.Empty);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Create_WithADateOfBirthTodayOrLater_RejectsWithTheVerbatimMessageShape(int daysAhead)
+    {
+        var dateOfBirth = Today.AddDays(daysAhead);
+
+        var result = CreateValid(dateOfBirth);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("pupil.date_of_birth_not_in_past");
+        result.Error.Description.ShouldBe($"A date of birth of {dateOfBirth:dd/MM/yyyy} is not in the past. Check the date.");
     }
 
     [Fact]
@@ -194,7 +185,7 @@ public sealed class PupilTests
     }
 
     [Fact]
-    public void UpdateBiographical_WithAnOutOfRangeDateOfBirth_RejectsAndLeavesTheOriginalUnchanged()
+    public void UpdateBiographical_WithADateOfBirthNotInThePast_RejectsAndLeavesTheOriginalUnchanged()
     {
         var pupil = CreateValid().Value;
         var originalDateOfBirth = pupil.DateOfBirth;

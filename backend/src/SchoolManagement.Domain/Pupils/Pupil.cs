@@ -42,12 +42,6 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     /// <summary>Spec 6.5.4: <c>other_information</c> is <c>Text 1000</c>.</summary>
     public const int OtherInformationMaxLength = 1000;
 
-    /// <summary>Spec 6.5.4: "Must give an age between 2 and 20." Lower bound, inclusive.</summary>
-    public const int MinAgeYears = 2;
-
-    /// <summary>Spec 6.5.4: "Must give an age between 2 and 20." Upper bound, inclusive.</summary>
-    public const int MaxAgeYears = 20;
-
     /// <summary>Nigerian nationality's spelling, used whenever the caller omits one (spec 6.5.4: "Defaults Nigerian").</summary>
     public const string DefaultNationality = "Nigerian";
 
@@ -113,7 +107,7 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     /// <summary>Male or female (spec 6.5.4).</summary>
     public PupilSex Sex { get; private set; }
 
-    /// <summary>In the past; must give an age between <see cref="MinAgeYears"/> and <see cref="MaxAgeYears"/>.</summary>
+    /// <summary>In the past. No age range is enforced (school decision, 2026-11-23).</summary>
     public DateOnly DateOfBirth { get; private set; }
 
     /// <summary>Free text with an autocomplete on the client; defaults <see cref="DefaultNationality"/>.</summary>
@@ -175,8 +169,8 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     /// <param name="firstName">Same rule as <paramref name="surname"/>.</param>
     /// <param name="middleName">Optional. Same rule as <paramref name="surname"/> when supplied.</param>
     /// <param name="sex">Male or female.</param>
-    /// <param name="dateOfBirth">In the past; must give an age between <see cref="MinAgeYears"/> and <see cref="MaxAgeYears"/> as of <paramref name="asOfDate"/>.</param>
-    /// <param name="asOfDate">"Now", for the age-range check — never computed internally (spec: inject <c>TimeProvider</c>, never call it here).</param>
+    /// <param name="dateOfBirth">Before <paramref name="asOfDate"/>. No age range is enforced.</param>
+    /// <param name="asOfDate">"Now", for the in-the-past check — never computed internally (spec: inject <c>TimeProvider</c>, never call it here).</param>
     /// <param name="nationality"><see langword="null"/> or blank defaults to <see cref="DefaultNationality"/>.</param>
     /// <param name="stateOfOrigin">Must resolve to one of <see cref="NigerianGeography.States"/>.</param>
     /// <param name="lga">Must resolve to one of <paramref name="stateOfOrigin"/>'s LGAs.</param>
@@ -223,9 +217,9 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
             return Result.Failure<Pupil>(middleNameError);
         }
 
-        if (!TryValidateAge(dateOfBirth, asOfDate, out var ageError))
+        if (!TryValidateDateOfBirth(dateOfBirth, asOfDate, out var dateOfBirthError))
         {
-            return Result.Failure<Pupil>(ageError);
+            return Result.Failure<Pupil>(dateOfBirthError);
         }
 
         var resolvedNationality = string.IsNullOrWhiteSpace(nationality) ? DefaultNationality : nationality.Trim();
@@ -347,7 +341,7 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
 
         if (dateOfBirth is { } requestedDateOfBirth)
         {
-            if (!TryValidateAge(requestedDateOfBirth, asOfDate, out var error))
+            if (!TryValidateDateOfBirth(requestedDateOfBirth, asOfDate, out var error))
             {
                 return Result.Failure(error);
             }
@@ -629,9 +623,8 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
     }
 
     /// <summary>
-    /// Whole years between <paramref name="dateOfBirth"/> and <paramref name="asOfDate"/> — the same
-    /// computation <see cref="Create"/>/<see cref="UpdateBiographical"/> use to enforce the age range,
-    /// exposed so the read side (<c>PupilMapper</c>) never re-derives it a second way.
+    /// Whole years between <paramref name="dateOfBirth"/> and <paramref name="asOfDate"/>, exposed so the
+    /// read side (<c>PupilMapper</c>, the register reports) never re-derives it a second way.
     /// </summary>
     public static int CalculateAgeYears(DateOnly dateOfBirth, DateOnly asOfDate)
     {
@@ -645,19 +638,17 @@ public sealed partial class Pupil : Entity<Guid>, IAuditableEntity
         return age;
     }
 
-    private static bool TryValidateAge(DateOnly dateOfBirth, DateOnly asOfDate, out Error error)
+    private static bool TryValidateDateOfBirth(DateOnly dateOfBirth, DateOnly asOfDate, out Error error)
     {
-        var age = CalculateAgeYears(dateOfBirth, asOfDate);
-
-        if (age is >= MinAgeYears and <= MaxAgeYears)
+        if (dateOfBirth < asOfDate)
         {
             error = Error.None;
             return true;
         }
 
         error = Error.Validation(
-            "pupil.date_of_birth_out_of_range",
-            $"A date of birth of {dateOfBirth:dd/MM/yyyy} makes this pupil {age} years old. Check the date.");
+            "pupil.date_of_birth_not_in_past",
+            $"A date of birth of {dateOfBirth:dd/MM/yyyy} is not in the past. Check the date.");
         return false;
     }
 
