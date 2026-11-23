@@ -5,6 +5,8 @@ using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Common;
+using SchoolManagement.Application.Portal;
+using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
@@ -26,7 +28,7 @@ internal sealed class PupilImportProcessor(
     IArmRepository armRepository,
     IEnrolmentRepository enrolments,
     IPupilRepository pupils,
-    IPupilRegNumberHistoryRepository regNumberHistory,
+    ISchoolProfileRepository schoolProfiles,
     TimeProvider timeProvider)
 {
     /// <summary>Validates <paramref name="file"/>. A failure is a whole-file problem; row problems are in the report.</summary>
@@ -77,7 +79,8 @@ internal sealed class PupilImportProcessor(
 
         var arms = await ArmDirectory.LoadAsync(session, classLevels, armRepository, cancellationToken).ConfigureAwait(false);
         var today = SchoolTime.Today(timeProvider.GetUtcNow());
-        var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today, mode)).ToList();
+        var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
+        var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today, mode, profile)).ToList();
 
         FlagDuplicatesInFile(drafts);
         await CheckKeptNumbersAsync(drafts, cancellationToken).ConfigureAwait(false);
@@ -121,7 +124,8 @@ internal sealed class PupilImportProcessor(
         return warnings;
     }
 
-    private static PupilImportDraft BuildRow(RowReader row, AcademicSession session, ArmDirectory arms, DateOnly today, PupilImportMode mode)
+    private static PupilImportDraft BuildRow(
+        RowReader row, AcademicSession session, ArmDirectory arms, DateOnly today, PupilImportMode mode, SchoolProfile profile)
     {
         var draft = new PupilImportDraft(row.SheetRow, row.Text(PupilImportColumns.Surname), row.Text(PupilImportColumns.FirstName));
         var pupilId = Guid.CreateVersion7();
@@ -162,16 +166,15 @@ internal sealed class PupilImportProcessor(
             draft.Error(PupilImportColumns.AdmissionType, typeError!);
         }
 
-        var keptNumber = row.Text(PupilImportColumns.RegistrationNumber);
+        // Upper case, as every number this system issues is: the portal upper-cases what a parent types but not what is stored.
+        var keptNumber = row.Text(PupilImportColumns.RegistrationNumber)?.ToUpperInvariant();
         if (keptNumber is not null && mode == PupilImportMode.Applications)
         {
             draft.Error(PupilImportColumns.RegistrationNumber, "Leave Registration Number blank: an application is numbered when it is approved.");
         }
-        else if (keptNumber is not null && (keptNumber.Length > Pupil.RegistrationNumberMaxLength || !RegNumberFormat.IsWellFormed(keptNumber)))
+        else if (keptNumber is not null && KeptNumberProblem(keptNumber, profile) is { } problem)
         {
-            draft.Error(
-                PupilImportColumns.RegistrationNumber,
-                $"{keptNumber} is not a registration number this system can keep. Use the form ABBREVIATION/YEAR/SERIAL, for example GRAS/2024/0017, or leave it blank to issue a new one.");
+            draft.Error(PupilImportColumns.RegistrationNumber, problem);
         }
         else
         {
@@ -184,6 +187,11 @@ internal sealed class PupilImportProcessor(
         }
         else
         {
+            if (row.Text(PupilImportColumns.ArmLabel) is not null)
+            {
+                draft.Error(PupilImportColumns.ArmLabel, "Leave Arm Label blank: an application's arm is chosen when it is approved.");
+            }
+
             draft.Level = arms.ResolveLevel(row.Text(PupilImportColumns.ClassLevel), draft);
             draft.LevelName = draft.Level?.Name;
         }
@@ -354,8 +362,34 @@ internal sealed class PupilImportProcessor(
         }
     }
 
+    /// <summary>
+    /// Why <paramref name="number"/> cannot be kept, or null. Beyond the shape: a number in the school's own abbreviation
+    /// moves that year's counter past its serial for good, so a serial longer than the configured width (a typo such as
+    /// 00170000017) is refused rather than allowed to push every later number out of range.
+    /// </summary>
+    private static string? KeptNumberProblem(string number, SchoolProfile profile)
+    {
+        if (number.Length > Pupil.RegistrationNumberMaxLength
+            || !RegNumberFormat.TryParse(number, out var abbreviation, out var separator, out _, out _))
+        {
+            return $"{number} is not a registration number this system can keep. Use the form ABBREVIATION/YEAR/SERIAL, " +
+                "for example GRAS/2024/0017, or leave it blank to issue a new one.";
+        }
+
+        var serialDigits = number.Length - number.LastIndexOf(separator, StringComparison.Ordinal) - 1;
+        if (string.Equals(abbreviation, profile.Abbreviation, StringComparison.OrdinalIgnoreCase) && serialDigits > profile.SerialWidth)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{number} has a {serialDigits}-digit serial, but this school's numbers have {profile.SerialWidth}. Check the number for a typo, or widen the serial in the registration number settings first.");
+        }
+
+        return null;
+    }
+
     // A kept number must be unique in the file, on the register and among corrected numbers' old aliases (spec 6.5.10's
-    // own two-table rule), or it would point a parent at the wrong child.
+    // own two-table rule), all compared as the portal compares them (separators removed, upper case): two numbers that
+    // differ only there would leave the portal unable to tell the two pupils apart, so neither family could find theirs.
     private async Task CheckKeptNumbersAsync(List<PupilImportDraft> drafts, CancellationToken cancellationToken)
     {
         var kept = drafts.Where(draft => draft.RegistrationNumber is not null).ToList();
@@ -364,35 +398,30 @@ internal sealed class PupilImportProcessor(
             return;
         }
 
-        var firstSeen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var firstSeen = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var draft in kept)
         {
-            if (firstSeen.TryGetValue(draft.RegistrationNumber!, out var first))
+            var key = PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!);
+            if (firstSeen.TryGetValue(key, out var first))
             {
                 draft.Error(PupilImportColumns.RegistrationNumber, string.Create(
-                    CultureInfo.InvariantCulture, $"Row {first} has the same registration number. Each pupil needs their own."));
+                    CultureInfo.InvariantCulture,
+                    $"Row {first} has the same registration number (ignoring separators). Each pupil needs their own."));
             }
             else
             {
-                firstSeen.Add(draft.RegistrationNumber!, draft.SheetRow);
+                firstSeen.Add(key, draft.SheetRow);
             }
         }
 
-        var numbers = kept.ConvertAll(draft => draft.RegistrationNumber!);
-        var held = (await pupils.ListTakenRegistrationNumbersAsync(numbers, cancellationToken).ConfigureAwait(false))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var aliased = (await regNumberHistory.ListExistingAsync(numbers, cancellationToken).ConfigureAwait(false))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var draft in kept)
+        var clashes = (await pupils.ListNormalizedRegistrationNumberClashesAsync(firstSeen.Keys, cancellationToken).ConfigureAwait(false))
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var draft in kept.Where(draft => clashes.Contains(PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!))))
         {
-            if (held.Contains(draft.RegistrationNumber!))
-            {
-                draft.Error(PupilImportColumns.RegistrationNumber, $"{draft.RegistrationNumber} already belongs to a pupil on the register.");
-            }
-            else if (aliased.Contains(draft.RegistrationNumber!))
-            {
-                draft.Error(PupilImportColumns.RegistrationNumber, $"{draft.RegistrationNumber} was a pupil's number before it was corrected, so it cannot be reused.");
-            }
+            draft.Error(
+                PupilImportColumns.RegistrationNumber,
+                $"{draft.RegistrationNumber} already belongs to a pupil on the register, or was a pupil's number before it was " +
+                "corrected (separators are ignored when comparing).");
         }
     }
 

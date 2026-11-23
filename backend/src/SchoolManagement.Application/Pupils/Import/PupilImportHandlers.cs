@@ -6,8 +6,10 @@ using SchoolManagement.Application.Abstractions.Classes;
 using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Identity;
 using SchoolManagement.Application.Abstractions.Messaging;
+using SchoolManagement.Application.Abstractions.Persistence;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
+using SchoolManagement.Application.Portal;
 using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Enrolments;
@@ -39,7 +41,25 @@ internal sealed class GetPupilImportTemplateHandler(
         var directory = session is null ? null : await ArmDirectory.LoadAsync(session, classLevels, arms, cancellationToken).ConfigureAwait(false);
         var armList = directory?.Arms ?? [];
 
-        var accepted = new ImportReferenceSheet(
+        var applications = request.Mode == PupilImportMode.Applications;
+        // An application names a level only (any active one, arm or not); its arm is chosen at approval.
+        var accepted = applications
+            ? new ImportReferenceSheet(
+                "Accepted values",
+                ["Sex", "State of Origin", "Relationship", "Blood Group", "Genotype", "Admission Type", "Yes or No", "Primary Contact",
+                    "Class Level"],
+                [
+                    ["Male", "Female"],
+                    NigerianGeography.States,
+                    Relationships,
+                    PupilImportCells.BloodGroups,
+                    Enum.GetNames<Genotype>(),
+                    ["New", "Returning"],
+                    ["Yes", "No"],
+                    ["Father", "Mother", "Guardian"],
+                    directory?.ActiveLevelNames ?? [],
+                ])
+            : new ImportReferenceSheet(
             "Accepted values",
             ["Sex", "State of Origin", "Relationship", "Blood Group", "Genotype", "Admission Type", "Yes or No", "Primary Contact",
                 "Class Level", "Arm Label", "Arm"],
@@ -61,12 +81,12 @@ internal sealed class GetPupilImportTemplateHandler(
         var lgas = new ImportReferenceSheet(
             "LGAs", ["State of Origin", "LGA"], [pairs.ConvertAll(pair => pair.State), pairs.ConvertAll(pair => pair.Lga)]);
 
-        // An application has no number yet, so its template has no column to put one in.
-        var headers = request.Mode == PupilImportMode.Applications
-            ? PupilImportColumns.All.Where(column => column != PupilImportColumns.RegistrationNumber).ToList()
+        // An application has no number or arm yet, so its template has no column to put either in.
+        var headers = applications
+            ? PupilImportColumns.All.Where(column => column is not PupilImportColumns.RegistrationNumber and not PupilImportColumns.ArmLabel).ToList()
             : PupilImportColumns.All;
         var content = workbook.WriteTemplate(headers, [accepted, lgas]);
-        var fileName = request.Mode == PupilImportMode.Applications ? "application-import-template.xlsx" : "pupil-import-template.xlsx";
+        var fileName = applications ? "application-import-template.xlsx" : "pupil-import-template.xlsx";
         return Result.Success(new SpreadsheetFile(fileName, content));
     }
 }
@@ -113,6 +133,8 @@ internal sealed class CommitPupilImportHandler(
     ISchoolProfileRepository schoolProfiles,
     RegistrationNumberIssuer issuer,
     IRegistrationCounterRepository registrationCounters,
+    IUnitOfWork unitOfWork,
+    IPersistenceErrorTranslator persistenceErrorTranslator,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -222,7 +244,18 @@ internal sealed class CommitPupilImportHandler(
             }
         }
 
-        // Kept numbers first: the counters move past the school's old serials BEFORE any new number is drawn.
+        // Kept numbers first: saved on their own, so a number someone took since validation is reported against its row
+        // (the issuer below would only redraw ITS serials, which cannot clear a clash on a number it did not draw).
+        if (keptSerials.Count > 0 || toCreate.Any(draft => draft.RegistrationNumber is not null))
+        {
+            var savedKept = await SaveKeptNumbersAsync(toCreate, cancellationToken).ConfigureAwait(false);
+            if (savedKept.IsFailure)
+            {
+                return Result.Failure<PupilImportResultDto>(savedKept.Error);
+            }
+        }
+
+        // Then the counters move past the school's old serials, BEFORE any new number is drawn.
         foreach (var (counterKey, serial) in keptSerials)
         {
             await registrationCounters.EnsureLastSerialAtLeastAsync(counterKey, serial, cancellationToken).ConfigureAwait(false);
@@ -294,19 +327,46 @@ internal sealed class CommitPupilImportHandler(
                 $"{group.First().RegistrationNumber} to {group.Last().RegistrationNumber} ({group.Count()})"))
             .ToList();
 
-    // Only a kept number in the school's CURRENT abbreviation and separator can ever meet a number this system draws, so
-    // only those move a counter; an old prefix the school has since changed is kept as it is and touches nothing.
+    // A kept number in the school's CURRENT abbreviation moves its counter, whatever its separator: the portal ignores
+    // separators, so GRAS.2024.0040 and a later drawn GRAS/2024/0040 would be the same number to a parent. An old prefix
+    // the school has since changed can never meet a drawn number, so it is kept as it is and touches nothing.
     private static void NoteKeptSerial(string kept, SchoolProfile profile, Dictionary<string, int> keptSerials)
     {
-        if (!RegNumberFormat.TryParse(kept, out var abbreviation, out var separator, out var year, out var serial)
-            || !string.Equals(abbreviation, profile.Abbreviation, StringComparison.OrdinalIgnoreCase)
-            || separator != profile.Separator)
+        if (!RegNumberFormat.TryParse(kept, out var abbreviation, out _, out var year, out var serial)
+            || !string.Equals(abbreviation, profile.Abbreviation, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
         var counterKey = RegistrationCounterPartition.Resolve(profile.SerialReset, year);
         keptSerials[counterKey] = Math.Max(keptSerials.GetValueOrDefault(counterKey), serial);
+    }
+
+    private const string DuplicateValueErrorCode = "persistence.duplicate_value";
+
+    // Saves everything staged so far (EF wraps it in a savepoint under the ambient transaction). A duplicate here can only
+    // be a kept number taken since validation, so it is named against its row; the whole import then rolls back.
+    private async Task<Result> SaveKeptNumbersAsync(List<PupilImportDraft> toCreate, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Result.Success();
+        }
+        catch (Exception exception) when (persistenceErrorTranslator.TryTranslate(exception) is { Code: DuplicateValueErrorCode })
+        {
+            var kept = toCreate.Where(draft => draft.RegistrationNumber is not null).ToList();
+            var normalized = kept.ConvertAll(draft => PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!));
+            var taken = (await pupils.ListNormalizedRegistrationNumberClashesAsync(normalized, cancellationToken).ConfigureAwait(false))
+                .ToHashSet(StringComparer.Ordinal);
+            var rows = kept.Where(draft => taken.Contains(PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!))).ToList();
+            var named = rows.Count == 0
+                ? "A registration number in this file"
+                : string.Join(", ", rows.Take(5).Select(draft => string.Create(CultureInfo.InvariantCulture, $"{draft.RegistrationNumber} (row {draft.SheetRow})")));
+            return Result.Failure(Error.Conflict(
+                "import.registration_number_taken",
+                $"{named} was given to another pupil while this file was being imported, so nothing was imported. Check the file again."));
+        }
     }
 
     // Applications mode: each row exactly as the admission form would create it, pending, then one audit event.

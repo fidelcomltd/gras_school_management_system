@@ -61,7 +61,8 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         applications.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var applicationBook = new XLWorkbook(new MemoryStream(await applications.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)));
         applicationBook.Worksheet("Pupils").Cell(1, 1).GetString().ShouldBe("Surname");
-        applicationBook.Worksheet("Pupils").Row(1).CellsUsed().Count().ShouldBe(43);
+        applicationBook.Worksheet("Pupils").Row(1).CellsUsed().Count().ShouldBe(42);
+        applicationBook.Worksheet("Pupils").Row(1).CellsUsed().Select(cell => cell.GetString()).ShouldNotContain("Arm Label");
     }
 
     [Fact]
@@ -191,7 +192,7 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
         var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
         var kept = Row("Okafor", "Chidera", levelName, "A");
-        kept["Registration Number"] = "GRAS/2024/0017";
+        kept["Registration Number"] = "gras/2024/0017"; // stored upper case, as the portal expects
         kept["Admission Date"] = "10/09/2024";
         var drawn2024 = Row("Bello", "Amina", levelName, "A");
         drawn2024["Admission Date"] = "10/09/2024";
@@ -219,7 +220,14 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
         await SeedPupilHoldingNumberAsync("GRAS/2023/0005");
         var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
-        var rows = new[] { ("Okafor", "Chidera", "GRA-17"), ("Bello", "Amina", "GRAS/2023/0005"), ("Eze", "Ifeanyi", "GRAS/2023/0009"), ("Obi", "Kene", "GRAS/2023/0009") }
+
+        // Held and repeated are judged as the portal judges them: separators and case ignored. The last row's serial is
+        // longer than the school's 4-digit width, a typo that would otherwise push 2023's counter out of range for good.
+        var rows = new[]
+            {
+                ("Okafor", "Chidera", "GRA-17"), ("Bello", "Amina", "gras-2023-0005"), ("Eze", "Ifeanyi", "GRAS/2023/0009"),
+                ("Obi", "Kene", "GRAS.2023.0009"), ("Nwosu", "Ada", "GRAS/2023/00170000017"),
+            }
             .Select(entry =>
             {
                 var row = Row(entry.Item1, entry.Item2, levelName, "A");
@@ -231,11 +239,15 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         var report = await ValidateAsync(jar, Workbook(rows));
 
         report.Rows.Select(row => row.Outcome).ShouldBe(
-            [PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Accepted, PupilImportRowOutcome.Rejected]);
+            [
+                PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Accepted,
+                PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Rejected,
+            ]);
         report.Rows.Where(row => row.Outcome == PupilImportRowOutcome.Rejected)
             .ShouldAllBe(row => row.Errors.All(error => error.Column == "Registration Number"));
         report.Rows[1].Errors[0].Message.ShouldContain("already belongs to a pupil");
         report.Rows[3].Errors[0].Message.ShouldContain("Row 4");
+        report.Rows[4].Errors[0].Message.ShouldContain("11-digit serial");
     }
 
     // Project lead, 2026-11-23: Admissions imports a new intake as applications, which wait in the queue like typed ones.
@@ -270,7 +282,7 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
     }
 
     [Fact]
-    public async Task Validate_Applications_RefusesARegistrationNumber()
+    public async Task Validate_Applications_RefusesARegistrationNumberAndAnArmLabel()
     {
         RequireDatabase();
         var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
@@ -278,10 +290,13 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         var row = Row("Okafor", "Chidera", levelName, null);
         row["Registration Number"] = "GRAS/2024/0017";
 
-        var report = await ValidateAsync(jar, Workbook(row), mode: "Applications");
+        // The arm is chosen at approval, so an Arm Label would be silently lost: refused instead.
+        var report = await ValidateAsync(jar, Workbook(row, Row("Bello", "Amina", levelName, "A")), mode: "Applications");
 
         report.Rows[0].Outcome.ShouldBe(PupilImportRowOutcome.Rejected);
         report.Rows[0].Errors.ShouldContain(error => error.Column == "Registration Number");
+        report.Rows[1].Outcome.ShouldBe(PupilImportRowOutcome.Rejected);
+        report.Rows[1].Errors.ShouldContain(error => error.Column == "Arm Label");
     }
 
     // The decisions are part of the request: the same key with different ones is a conflict, not a replay.

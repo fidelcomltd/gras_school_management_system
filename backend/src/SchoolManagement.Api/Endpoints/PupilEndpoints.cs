@@ -63,7 +63,8 @@ public sealed class PupilEndpoints : IEndpointModule
                 "`Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, " +
                 "yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet " +
                 "`LGAs` lists every state's LGAs. With no active session the arm columns are empty. `mode=Applications` " +
-                "leaves out the `Registration Number` column, which only `Register` (the default) uses.")
+                "leaves out the `Registration Number` and `Arm Label` columns (an application has neither until it is " +
+                "approved) and lists every active class level, arm or not.")
             .Produces<Stream>(StatusCodes.Status200OK, XlsxContentType)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -92,9 +93,11 @@ public sealed class PupilEndpoints : IEndpointModule
             .WithDescription(
                 "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils) and an optional `mode`: " +
                 "`Register` (default; existing pupils, made active) or `Applications` (new applications, made pending, " +
-                "placed at a class level with no arm, no capacity warnings, and `Registration Number` must be blank). " +
-                "In `Register` a `Registration Number` is kept as given: it must have the ABBR/YEAR/SERIAL shape and be " +
-                "unique in the file, on the register and among corrected numbers' old aliases. WRITES NOTHING. Returns every " +
+                "placed at a class level with no arm, no capacity warnings; `Registration Number` and `Arm Label` must be " +
+                "blank). In `Register` a `Registration Number` is kept, upper-cased: it must have the ABBR/YEAR/SERIAL shape, a " +
+                "serial no longer than the school's serial width when it uses the school's abbreviation, and be unique in the " +
+                "file, on the register and among corrected numbers' old aliases, compared as the portal compares numbers " +
+                "(separators and case ignored). WRITES NOTHING. Returns every " +
                 "row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already " +
                 "on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or " +
                 "create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the " +
@@ -141,7 +144,8 @@ public sealed class PupilEndpoints : IEndpointModule
                 "registration number (that year's counter is raised past it) or issued one in file order by the same " +
                 "counter as admission approval, with an open enrolment and an admission record with the declaration " +
                 "unsigned. `Applications`: each pupil is created pending with no number and no enrolment, for the " +
-                "admissions queue. Health columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 " +
+                "admissions queue. Health columns left blank stay unanswered. 409 `import.registration_number_taken` when a " +
+                "kept number was given to another pupil after validation; 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 " +
                 "`import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, " +
                 "`import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.")
             .Produces<PupilImportResultDto>(StatusCodes.Status200OK)

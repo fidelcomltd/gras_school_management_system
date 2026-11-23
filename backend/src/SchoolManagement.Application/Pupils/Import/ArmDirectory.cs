@@ -37,6 +37,7 @@ internal sealed class ArmDirectory
         _armsByLevel = open.GroupBy(arm => arm.ClassLevelId).ToDictionary(group => group.Key, group => group.ToList());
         _namesByArm = open.ToDictionary(arm => arm.Id, arm => ArmDisplayName.Compose(levelsById[arm.ClassLevelId].Name, arm.Label));
         LevelNames = open.ConvertAll(arm => levelsById[arm.ClassLevelId].Name);
+        ActiveLevelNames = levelsById.Values.OrderBy(level => level.ProgressionOrder).Select(level => level.Name).ToList();
         Arms = open;
         foreach (var arm in open)
         {
@@ -50,6 +51,9 @@ internal sealed class ArmDirectory
 
     /// <summary>Each of <see cref="Arms"/>' level name, aligned.</summary>
     public IReadOnlyList<string> LevelNames { get; }
+
+    /// <summary>Every active level, in progression order: what an application may be made for, arm or no arm.</summary>
+    public IReadOnlyList<string> ActiveLevelNames { get; }
 
     public static async Task<ArmDirectory> LoadAsync(
         AcademicSession session, IClassLevelRepository classLevels, IArmRepository arms, CancellationToken cancellationToken)

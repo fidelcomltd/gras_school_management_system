@@ -16,7 +16,4 @@ public interface IPupilRegNumberHistoryRepository
     /// history row is never the same pupil's own live number, so there is no "self" to exclude.
     /// </summary>
     Task<bool> ExistsAsync(string registrationNumber, CancellationToken cancellationToken);
-
-    /// <summary>Which of <paramref name="registrationNumbers"/> are someone's old, aliased number: bulk import's one-query check.</summary>
-    Task<IReadOnlyList<string>> ListExistingAsync(IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken);
 }

@@ -59,6 +59,8 @@ export function LevelList() {
   // The server reorders exactly the ACTIVE levels (an inactive one in the list is rejected), so the arrows move a
   // level past its neighbouring active level even while "Show inactive levels too" is ticked.
   const active = items.filter((level) => level.status === 'Active');
+  // A reorder must name every active level, so it waits until all of them are loaded.
+  const partial = levels.hasNextPage;
 
   function move(level: LevelDto, direction: -1 | 1): void {
     const next = [...active];
@@ -114,7 +116,7 @@ export function LevelList() {
                       variant="ghost"
                       size="sm"
                       aria-label={`Move ${level.name} up`}
-                      disabled={activeIndex === 0 || reorder.isPending}
+                      disabled={activeIndex === 0 || reorder.isPending || partial}
                       onClick={() => move(level, -1)}
                     >
                       ↑
@@ -123,7 +125,7 @@ export function LevelList() {
                       variant="ghost"
                       size="sm"
                       aria-label={`Move ${level.name} down`}
-                      disabled={activeIndex === active.length - 1 || reorder.isPending}
+                      disabled={activeIndex === active.length - 1 || reorder.isPending || partial}
                       onClick={() => move(level, 1)}
                     >
                       ↓
