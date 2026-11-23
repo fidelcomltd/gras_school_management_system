@@ -52,6 +52,10 @@ paths = [
   # Build output and packages.
   '''(^|/)(bin|obj|artifacts)/''',
   '''(^|/)packages/''',
+  # The public website's Next.js build output (gitignored, so only the local working-tree pass sees
+  # it). It holds Next's per-build random preview and server-action keys, and its bundled URL parser
+  # (`s.password=r.password,s.host=...`) trips the connection-string rule. Checked 2026-11-23.
+  '''(^|/)website/\.next/''',
   # This file: it necessarily contains patterns that look like the things it detects.
   '''\.gitleaks\.toml$''',
 ]
