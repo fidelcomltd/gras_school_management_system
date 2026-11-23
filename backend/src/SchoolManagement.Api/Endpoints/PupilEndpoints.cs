@@ -49,9 +49,9 @@ public sealed class PupilEndpoints : IEndpointModule
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private static void MapImportTemplate(RouteGroupBuilder group) =>
-        group.MapGet("/import/template", async (ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/import/template", async (PupilImportMode? mode, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.SendAsync(new GetPupilImportTemplateQuery(), cancellationToken);
+                var result = await sender.SendAsync(new GetPupilImportTemplateQuery(mode ?? PupilImportMode.Register), cancellationToken);
                 return result.Match(file => TypedResults.File(file.Content.ToArray(), XlsxContentType, file.FileName));
             })
             .RequirePrivilege(Privileges.Pupil.Import)
@@ -62,7 +62,8 @@ public sealed class PupilEndpoints : IEndpointModule
                 "Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet " +
                 "`Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, " +
                 "yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet " +
-                "`LGAs` lists every state's LGAs. With no active session the arm columns are empty.")
+                "`LGAs` lists every state's LGAs. With no active session the arm columns are empty. `mode=Applications` " +
+                "leaves out the `Registration Number` column, which only `Register` (the default) uses.")
             .Produces<Stream>(StatusCodes.Status200OK, XlsxContentType)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -71,11 +72,12 @@ public sealed class PupilEndpoints : IEndpointModule
     private static void MapImportValidate(RouteGroupBuilder group) =>
         group.MapPost("/import/validate", async (
                 IFormFile file,
+                [FromForm] PupilImportMode? mode,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
-                var result = await sender.SendAsync(new ValidatePupilImportQuery(bytes), cancellationToken);
+                var result = await sender.SendAsync(new ValidatePupilImportQuery(bytes, mode ?? PupilImportMode.Register), cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
             .RequirePrivilege(Privileges.Pupil.Import)
@@ -88,7 +90,11 @@ public sealed class PupilEndpoints : IEndpointModule
             .WithName("ValidatePupilImport")
             .WithSummary("Validate a bulk-import file")
             .WithDescription(
-                "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils). WRITES NOTHING. Returns every " +
+                "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils) and an optional `mode`: " +
+                "`Register` (default; existing pupils, made active) or `Applications` (new applications, made pending, " +
+                "placed at a class level with no arm, no capacity warnings, and `Registration Number` must be blank). " +
+                "In `Register` a `Registration Number` is kept as given: it must have the ABBR/YEAR/SERIAL shape and be " +
+                "unique in the file, on the register and among corrected numbers' old aliases. WRITES NOTHING. Returns every " +
                 "row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already " +
                 "on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or " +
                 "create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the " +
@@ -109,11 +115,13 @@ public sealed class PupilEndpoints : IEndpointModule
                 [FromForm] int[]? skipRows,
                 [FromForm] int[]? createRows,
                 [FromForm] bool? overrideCapacity,
+                [FromForm] PupilImportMode? mode,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var bytes = await file.ReadAllBytesAsync(cancellationToken).ConfigureAwait(false);
-                var command = new CommitPupilImportCommand(bytes, fileSha256, skipRows ?? [], createRows ?? [], overrideCapacity ?? false);
+                var command = new CommitPupilImportCommand(
+                    bytes, fileSha256, skipRows ?? [], createRows ?? [], overrideCapacity ?? false, mode ?? PupilImportMode.Register);
                 var result = await sender.SendAsync(command, cancellationToken);
                 return result.Match(TypedResults.Ok);
             })
@@ -128,10 +136,12 @@ public sealed class PupilEndpoints : IEndpointModule
             .WithDescription(
                 "Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` " +
                 "(repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import " +
-                "past an arm's capacity (needs `arm.capacity.override`). The file is re-validated and imported ALL OR NOTHING: " +
-                "each pupil is created active, with a registration number issued in file order by the same counter as " +
-                "admission approval, an open enrolment, and an admission record with the declaration unsigned; health " +
-                "columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 " +
+                "past an arm's capacity (needs `arm.capacity.override`), and the same `mode` it was validated in. The file " +
+                "is re-validated and imported ALL OR NOTHING. `Register`: each pupil is created active, keeping the file's " +
+                "registration number (that year's counter is raised past it) or issued one in file order by the same " +
+                "counter as admission approval, with an open enrolment and an admission record with the declaration " +
+                "unsigned. `Applications`: each pupil is created pending with no number and no enrolment, for the " +
+                "admissions queue. Health columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 " +
                 "`import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, " +
                 "`import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.")
             .Produces<PupilImportResultDto>(StatusCodes.Status200OK)

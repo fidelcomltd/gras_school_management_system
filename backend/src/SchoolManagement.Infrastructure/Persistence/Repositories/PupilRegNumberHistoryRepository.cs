@@ -27,4 +27,23 @@ internal sealed class PupilRegNumberHistoryRepository(ApplicationDbContext conte
             .AsNoTracking()
             .AnyAsync(row => row.OldRegistrationNumber == registrationNumber, cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListExistingAsync(IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(registrationNumbers);
+        if (registrationNumbers.Count == 0)
+        {
+            return [];
+        }
+
+        var numbers = registrationNumbers.ToArray();
+        return await context.PupilRegNumberHistory
+            .AsNoTracking()
+            .Where(row => numbers.Contains(row.OldRegistrationNumber))
+            .Select(row => row.OldRegistrationNumber)
+            .Distinct()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

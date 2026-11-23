@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { RequirePrivilege } from '@/app/router/require-privilege';
+import { ImportPupilsScreen } from '@/features/pupils/import/import-pupils-screen';
 import { AdmissionsQueueScreen } from './admissions-queue-screen';
 import { AdmissionFlowScreen } from './flow/admission-flow-screen';
 
@@ -14,6 +15,15 @@ export const admissionsRoutes: RouteObject[] = [
     element: (
       <RequirePrivilege privilege="pupil.view">
         <AdmissionsQueueScreen />
+      </RequirePrivilege>
+    ),
+  },
+  {
+    // Before `admissions/:id`, so "import" is never read as an id.
+    path: 'admissions/import',
+    element: (
+      <RequirePrivilege privilege="pupil.import">
+        <ImportPupilsScreen mode="Applications" />
       </RequirePrivilege>
     ),
   },

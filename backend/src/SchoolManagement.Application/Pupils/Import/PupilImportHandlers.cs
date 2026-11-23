@@ -13,6 +13,7 @@ using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Enrolments;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Security;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Application.Pupils.Import;
 
@@ -60,8 +61,13 @@ internal sealed class GetPupilImportTemplateHandler(
         var lgas = new ImportReferenceSheet(
             "LGAs", ["State of Origin", "LGA"], [pairs.ConvertAll(pair => pair.State), pairs.ConvertAll(pair => pair.Lga)]);
 
-        var content = workbook.WriteTemplate(PupilImportColumns.All, [accepted, lgas]);
-        return Result.Success(new SpreadsheetFile("pupil-import-template.xlsx", content));
+        // An application has no number yet, so its template has no column to put one in.
+        var headers = request.Mode == PupilImportMode.Applications
+            ? PupilImportColumns.All.Where(column => column != PupilImportColumns.RegistrationNumber).ToList()
+            : PupilImportColumns.All;
+        var content = workbook.WriteTemplate(headers, [accepted, lgas]);
+        var fileName = request.Mode == PupilImportMode.Applications ? "application-import-template.xlsx" : "pupil-import-template.xlsx";
+        return Result.Success(new SpreadsheetFile(fileName, content));
     }
 }
 
@@ -73,7 +79,7 @@ internal sealed class ValidatePupilImportHandler(PupilImportProcessor processor)
     public async Task<Result<PupilImportReportDto>> HandleAsync(ValidatePupilImportQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var run = await processor.RunAsync(request.File, cancellationToken).ConfigureAwait(false);
+        var run = await processor.RunAsync(request.File, request.Mode, cancellationToken).ConfigureAwait(false);
         return run.IsFailure ? Result.Failure<PupilImportReportDto>(run.Error) : Result.Success(run.Value.Report);
     }
 }
@@ -86,10 +92,16 @@ internal sealed class ValidatePupilImportHandler(PupilImportProcessor processor)
 /// ambient transaction (<c>UnitOfWorkBehavior</c>), so a failure part-way rolls back every pupil already staged.
 /// </para>
 /// <para>
-/// Imported pupils go straight to active with a number (an existing register is not a queue of applications), issued in
-/// FILE ORDER through <see cref="RegistrationNumberIssuer"/>, the same counter, composition and retry loop as admission
-/// approval, one increment per row. Each opens an enrolment dated as approval dates one. The admission record keeps
-/// <c>declaration_signed</c> false, which is what flags it for the office.
+/// REGISTER mode: imported pupils go straight to active with a number (an existing register is not a queue of
+/// applications). A number in the file is KEPT exactly, and the counter for its year is raised past it so later draws do
+/// not burn through the school's old serials; every other row is issued one in FILE ORDER through
+/// <see cref="RegistrationNumberIssuer"/>, the same counter, composition and retry loop as admission approval. Each opens
+/// an enrolment dated as approval dates one. The admission record keeps <c>declaration_signed</c> false, which is what
+/// flags it for the office.
+/// </para>
+/// <para>
+/// APPLICATIONS mode: each row is created PENDING, exactly as one typed into the admission form would be: no number, no
+/// enrolment, a class level but no arm. It then waits in the admissions queue for approval or decline.
 /// </para>
 /// </remarks>
 internal sealed class CommitPupilImportHandler(
@@ -100,6 +112,7 @@ internal sealed class CommitPupilImportHandler(
     IEnrolmentRepository enrolments,
     ISchoolProfileRepository schoolProfiles,
     RegistrationNumberIssuer issuer,
+    IRegistrationCounterRepository registrationCounters,
     IEffectivePrivilegeProvider effectivePrivilegeProvider,
     ICurrentUser currentUser,
     ISystemAuditSink auditSink,
@@ -111,7 +124,7 @@ internal sealed class CommitPupilImportHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var validated = await processor.RunAsync(request.File, cancellationToken).ConfigureAwait(false);
+        var validated = await processor.RunAsync(request.File, request.Mode, cancellationToken).ConfigureAwait(false);
         if (validated.IsFailure)
         {
             return Result.Failure<PupilImportResultDto>(validated.Error);
@@ -146,6 +159,11 @@ internal sealed class CommitPupilImportHandler(
                 "import.nothing_to_import", "Every row is skipped, so there is nothing to import."));
         }
 
+        if (run.Mode == PupilImportMode.Applications)
+        {
+            return await CommitApplicationsAsync(run, toCreate, cancellationToken).ConfigureAwait(false);
+        }
+
         var overCapacity = await processor.CapacityWarningsAsync(toCreate, run.Arms, cancellationToken).ConfigureAwait(false);
         var capacityCheck = await CheckCapacityAsync(overCapacity, request.OverrideCapacity, run.Session.Id, cancellationToken).ConfigureAwait(false);
         if (capacityCheck.IsFailure)
@@ -158,6 +176,7 @@ internal sealed class CommitPupilImportHandler(
         var now = timeProvider.GetUtcNow();
         var batchId = Guid.CreateVersion7().ToString("D", CultureInfo.InvariantCulture);
         var batch = new List<(Pupil Pupil, int AdmissionYear)>(toCreate.Count);
+        var keptSerials = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var draft in toCreate)
         {
@@ -192,19 +211,36 @@ internal sealed class CommitPupilImportHandler(
             }
 
             await enrolments.AddAsync(enrolment.Value, cancellationToken).ConfigureAwait(false);
-            batch.Add((pupil, record.DateAdmitted.Year));
+            if (draft.RegistrationNumber is { } kept)
+            {
+                pupil.IssueRegistrationNumber(kept);
+                NoteKeptSerial(kept, profile, keptSerials);
+            }
+            else
+            {
+                batch.Add((pupil, record.DateAdmitted.Year));
+            }
         }
 
-        // One counter increment per row in file order, then one save, through approval's own issuer.
-        var issued = await issuer.IssueAndSaveAsync(batch, profile, cancellationToken).ConfigureAwait(false);
-        if (issued.IsFailure)
+        // Kept numbers first: the counters move past the school's old serials BEFORE any new number is drawn.
+        foreach (var (counterKey, serial) in keptSerials)
         {
-            return Result.Failure<PupilImportResultDto>(issued.Error);
+            await registrationCounters.EnsureLastSerialAtLeastAsync(counterKey, serial, cancellationToken).ConfigureAwait(false);
+        }
+
+        // One counter increment per row still needing a number, in file order, then one save, through approval's own issuer.
+        if (batch.Count > 0)
+        {
+            var issued = await issuer.IssueAndSaveAsync(batch, profile, cancellationToken).ConfigureAwait(false);
+            if (issued.IsFailure)
+            {
+                return Result.Failure<PupilImportResultDto>(issued.Error);
+            }
         }
 
         var imported = toCreate
-            .Select((draft, index) => new PupilImportedDto(
-                draft.SheetRow, draft.Pupil!.Id.ToString("D", CultureInfo.InvariantCulture), issued.Value[index]))
+            .Select(draft => new PupilImportedDto(
+                draft.SheetRow, draft.Pupil!.Id.ToString("D", CultureInfo.InvariantCulture), draft.Pupil.RegistrationNumber))
             .ToList();
 
         foreach (var warning in overCapacity)
@@ -234,9 +270,11 @@ internal sealed class CommitPupilImportHandler(
             metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["batchId"] = batchId,
+                ["mode"] = nameof(PupilImportMode.Register),
                 ["imported"] = imported.Count,
                 ["skipped"] = skipped,
-                ["registrationNumbers"] = NumberRanges(batch, imported),
+                ["registrationNumbers"] = NumberRanges(batch),
+                ["keptNumbers"] = imported.Count - batch.Count,
                 ["fileSha256"] = run.Report.FileSha256,
             },
             actorAdminId: currentUser.UserId,
@@ -246,15 +284,71 @@ internal sealed class CommitPupilImportHandler(
     }
 
     // Rows from different admission years draw from different counters, so one first-to-last pair would misstate the batch.
-    private static List<string> NumberRanges(List<(Pupil Pupil, int AdmissionYear)> batch, List<PupilImportedDto> imported) =>
-        imported
-            .Select((pupil, index) => (Year: batch[index].AdmissionYear, pupil.RegistrationNumber))
+    private static List<string> NumberRanges(List<(Pupil Pupil, int AdmissionYear)> batch) =>
+        batch
+            .Select(entry => (Year: entry.AdmissionYear, entry.Pupil.RegistrationNumber))
             .GroupBy(entry => entry.Year)
             .OrderBy(group => group.Key)
             .Select(group => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{group.First().RegistrationNumber} to {group.Last().RegistrationNumber} ({group.Count()})"))
             .ToList();
+
+    // Only a kept number in the school's CURRENT abbreviation and separator can ever meet a number this system draws, so
+    // only those move a counter; an old prefix the school has since changed is kept as it is and touches nothing.
+    private static void NoteKeptSerial(string kept, SchoolProfile profile, Dictionary<string, int> keptSerials)
+    {
+        if (!RegNumberFormat.TryParse(kept, out var abbreviation, out var separator, out var year, out var serial)
+            || !string.Equals(abbreviation, profile.Abbreviation, StringComparison.OrdinalIgnoreCase)
+            || separator != profile.Separator)
+        {
+            return;
+        }
+
+        var counterKey = RegistrationCounterPartition.Resolve(profile.SerialReset, year);
+        keptSerials[counterKey] = Math.Max(keptSerials.GetValueOrDefault(counterKey), serial);
+    }
+
+    // Applications mode: each row exactly as the admission form would create it, pending, then one audit event.
+    private async Task<Result<PupilImportResultDto>> CommitApplicationsAsync(
+        PupilImportRun run, List<PupilImportDraft> toCreate, CancellationToken cancellationToken)
+    {
+        foreach (var draft in toCreate)
+        {
+            await pupils.AddAsync(draft.Pupil!, cancellationToken).ConfigureAwait(false);
+            await admissionRecords.AddAsync(draft.Record!, cancellationToken).ConfigureAwait(false);
+            foreach (var contact in draft.Contacts)
+            {
+                await records.AddAsync(contact, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (draft.Health is { } health)
+            {
+                await records.AddAsync(health, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var imported = toCreate
+            .Select(draft => new PupilImportedDto(draft.SheetRow, draft.Pupil!.Id.ToString("D", CultureInfo.InvariantCulture), null))
+            .ToList();
+        var skipped = run.Report.AcceptedCount - toCreate.Count;
+        await auditSink.RecordAsync(
+            Privileges.Pupil.Import,
+            "pupil",
+            entityId: null,
+            metadata: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["batchId"] = Guid.CreateVersion7().ToString("D", CultureInfo.InvariantCulture),
+                ["mode"] = nameof(PupilImportMode.Applications),
+                ["imported"] = imported.Count,
+                ["skipped"] = skipped,
+                ["fileSha256"] = run.Report.FileSha256,
+            },
+            actorAdminId: currentUser.UserId,
+            cancellationToken).ConfigureAwait(false);
+
+        return Result.Success(new PupilImportResultDto(imported.Count, skipped, imported));
+    }
 
     // Every register match needs exactly one decision, and a decision on any other row means the client is out of step.
     private static Result<List<PupilImportDraft>> Decide(PupilImportRun run, CommitPupilImportCommand request)

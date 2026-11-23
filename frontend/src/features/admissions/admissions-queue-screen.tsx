@@ -1,3 +1,8 @@
+import { Link } from 'react-router';
+import { paths } from '@/app/router/paths';
+import { Button } from '@/components/ui/button';
+import { useMe } from '@/features/auth/api';
+import { hasPrivilege } from '@/lib/auth/auth-session';
 import { AdmissionQueueList } from './components/admission-queue-list';
 
 /**
@@ -6,13 +11,22 @@ import { AdmissionQueueList } from './components/admission-queue-list';
  * application: approve into a named arm, or decline with a reason.
  */
 export function AdmissionsQueueScreen() {
+  const me = useMe();
+  const canImport = !!me.data && hasPrivilege(me.data, 'pupil.import');
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-semibold text-foreground">Admissions queue</h1>
-        <p className="text-sm text-muted-foreground">
-          Every pending applicant, with what is still missing before a decision can be made.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display text-2xl font-semibold text-foreground">Admissions queue</h1>
+          <p className="text-sm text-muted-foreground">
+            Every pending applicant, with what is still missing before a decision can be made.
+          </p>
+        </div>
+        {canImport ? (
+          <Button variant="outline" render={<Link to={paths.admissionsImport} />}>
+            Import applications
+          </Button>
+        ) : null}
       </header>
 
       <AdmissionQueueList />

@@ -13,6 +13,7 @@ internal sealed class ArmDirectory
 {
     private readonly AcademicSession _session;
     private readonly Dictionary<string, ClassLevel> _levelsByKey;
+    private readonly Dictionary<Guid, ClassLevel> _levelsById;
     private readonly Dictionary<Guid, List<Arm>> _armsByLevel;
     private readonly Dictionary<Guid, string> _namesByArm;
 
@@ -27,6 +28,7 @@ internal sealed class ArmDirectory
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         // New enrolment only: an Inactive arm and every arm of an Inactive level are hidden from it (spec 6.4.2, 6.4.7).
         var levelsById = levels.Where(level => level.Status == LevelStatus.Active).ToDictionary(level => level.Id);
+        _levelsById = levelsById;
         var open = arms
             .Where(arm => arm.SessionId == session.Id && arm.Status == ArmStatus.Active && levelsById.ContainsKey(arm.ClassLevelId))
             .OrderBy(arm => levelsById[arm.ClassLevelId].ProgressionOrder)
@@ -59,11 +61,42 @@ internal sealed class ArmDirectory
 
     public string NameOf(Arm arm) => _namesByArm[arm.Id];
 
+    /// <summary>The name of <paramref name="arm"/>'s class level.</summary>
+    public string LevelNameOf(Arm arm) => _levelsById[arm.ClassLevelId].Name;
+
+    /// <summary>
+    /// Applications mode: the class level applied for, from the Class Level column (a level name, or an arm's composed
+    /// name, whose level is taken). Any active level will do, with or without an arm yet: the arm is chosen at approval.
+    /// </summary>
+    public ClassLevel? ResolveLevel(string? levelText, PupilImportDraft draft)
+    {
+        if (levelText is null)
+        {
+            draft.Error(PupilImportColumns.ClassLevel, "Enter the class level applied for, for example Primary 2.");
+            return null;
+        }
+
+        var key = PupilImportColumns.Key(levelText);
+        if (_levelsByKey.TryGetValue(key, out var level))
+        {
+            return level;
+        }
+
+        if (_armsByComposedKey.TryGetValue(key, out var arm) && arm is not null)
+        {
+            return _levelsById[arm.ClassLevelId];
+        }
+
+        draft.Error(PupilImportColumns.ClassLevel, $"There is no class level named {levelText}. Use a name from the Accepted values sheet.");
+        return null;
+    }
+
     /// <summary>Resolves a row's arm, recording the reason against its column when it cannot.</summary>
     public Arm? Resolve(string? levelText, string? labelText, PupilImportDraft draft)
     {
         var arm = Find(levelText, labelText, draft);
         draft.ArmName = arm is null ? null : NameOf(arm);
+        draft.LevelName = arm is null ? null : LevelNameOf(arm);
         return arm;
     }
 

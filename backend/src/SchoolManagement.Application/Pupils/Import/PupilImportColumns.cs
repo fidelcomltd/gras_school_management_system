@@ -18,6 +18,12 @@ internal static class PupilImportColumns
     public const string PreviousSchool = "Previous School";
     public const string PreviousClass = "Previous Class";
     public const string AdmissionDate = "Admission Date";
+
+    /// <summary>
+    /// Register mode only, optional: the number the school already gave a pupil before it used this system, kept exactly
+    /// (project lead, 2026-11-23). Blank draws a new number from the Admission Date's year.
+    /// </summary>
+    public const string RegistrationNumber = "Registration Number";
     public const string AdmissionType = "Admission Type";
     public const string ClassLevel = "Class Level";
     public const string ArmLabel = "Arm Label";
@@ -36,7 +42,7 @@ internal static class PupilImportColumns
     /// <summary>The spec's column list, verbatim and in order.</summary>
     public static readonly IReadOnlyList<string> All =
     [
-        Surname, FirstName, MiddleName, Sex, DateOfBirth, Nationality, StateOfOrigin, Lga, HomeAddress, PreviousSchool,
+        RegistrationNumber, Surname, FirstName, MiddleName, Sex, DateOfBirth, Nationality, StateOfOrigin, Lga, HomeAddress, PreviousSchool,
         PreviousClass, AdmissionDate, AdmissionType, ClassLevel, ArmLabel,
         "Father Name", "Father Phone", "Father WhatsApp", "Father Occupation",
         "Mother Name", "Mother Phone", "Mother WhatsApp", "Mother Occupation",
