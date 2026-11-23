@@ -370,6 +370,35 @@ internal sealed class PupilRepository(ApplicationDbContext context) : IPupilRepo
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListNormalizedRegistrationNumberClashesAsync(
+        IReadOnlyCollection<string> normalizedNumbers, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(normalizedNumbers);
+
+        if (normalizedNumbers.Count == 0)
+        {
+            return [];
+        }
+
+        var numbers = normalizedNumbers.ToArray();
+
+        // The same normalisation as PortalRepository.FindPupilAsync, plus upper-casing, so "same number" here means what it
+        // means to a parent typing it into the portal.
+        var current = context.Pupils
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(pupil => pupil.RegistrationNumber != null)
+            .Select(pupil => pupil.RegistrationNumber!.Replace("-", string.Empty).Replace("/", string.Empty).Replace(" ", string.Empty).Replace(".", string.Empty).ToUpper())
+            .Where(normalized => numbers.Contains(normalized));
+        var aliases = context.PupilRegNumberHistory
+            .AsNoTracking()
+            .Select(alias => alias.OldRegistrationNumber.Replace("-", string.Empty).Replace("/", string.Empty).Replace(" ", string.Empty).Replace(".", string.Empty).ToUpper())
+            .Where(normalized => numbers.Contains(normalized));
+
+        return await current.Concat(aliases).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<PupilRegisterEntry>> ListByDatesOfBirthAsync(
         IReadOnlyCollection<DateOnly> datesOfBirth, CancellationToken cancellationToken)
     {

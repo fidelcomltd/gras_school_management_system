@@ -330,6 +330,12 @@ public sealed class ClassLevelEndpointsTests : IAsyncLifetime
         body[0].NextLevelId.ShouldBe(orderedIds[1]);
         body[1].Name.ShouldBe("Nursery 1");
         body[1].ProgressionOrder.ShouldBe(2);
+
+        // Re-read: the levels that kept their place must be persisted too, not left at the negated
+        // intermediate value (they were, until 2026-11-23, because EF saw them as unchanged).
+        var reread = await ReadAsync<CursorPageDto>(await GetAsync($"{LevelsUrl}?pageSize=100", jar));
+        reread.Items.Select(item => item.Id).ShouldBe(orderedIds);
+        reread.Items.Select(item => item.ProgressionOrder).ShouldBe(Enumerable.Range(1, orderedIds.Length));
     }
 
     // The entry level (Nursery 1) has never been referenced by any other level's nextLevelId —

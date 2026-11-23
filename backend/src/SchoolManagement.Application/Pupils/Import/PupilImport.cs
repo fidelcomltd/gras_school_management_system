@@ -14,26 +14,51 @@ public static class PupilImportLimits
     public const int MaxFileBytes = 5 * 1024 * 1024;
 }
 
+/// <summary>What a bulk import creates (project lead, 2026-11-23: two entry points, one screen and template).</summary>
+public enum PupilImportMode
+{
+    /// <summary>
+    /// The existing register, from Pupils: each row becomes an ACTIVE pupil with an open enrolment and a registration
+    /// number, either the one in the file (kept as the school issued it) or one drawn from the Admission Date's year.
+    /// </summary>
+    Register,
+
+    /// <summary>
+    /// New applications, from Admissions: each row becomes a PENDING admission with no number and no enrolment, placed at a
+    /// class level only, and goes through the ordinary approve or decline flow, which issues its number.
+    /// </summary>
+    Applications,
+}
+
 /// <summary>An XLSX file to download.</summary>
 /// <param name="FileName">The suggested name.</param>
 /// <param name="Content">The workbook.</param>
 public sealed record SpreadsheetFile(string FileName, ReadOnlyMemory<byte> Content);
 
 /// <summary><c>GET /api/v1/pupils/import/template</c> (spec 6.5.13): the header row plus the accepted-values sheets.</summary>
-public sealed record GetPupilImportTemplateQuery : IQuery<Result<SpreadsheetFile>>;
+/// <param name="Mode">Applications leaves out the Registration Number column, since an application has none yet.</param>
+public sealed record GetPupilImportTemplateQuery(PupilImportMode Mode = PupilImportMode.Register) : IQuery<Result<SpreadsheetFile>>;
 
-/// <summary>Nothing to check.</summary>
-internal sealed class GetPupilImportTemplateQueryValidator : AbstractValidator<GetPupilImportTemplateQuery>;
+/// <summary>Only the mode.</summary>
+internal sealed class GetPupilImportTemplateQueryValidator : AbstractValidator<GetPupilImportTemplateQuery>
+{
+    public GetPupilImportTemplateQueryValidator() => RuleFor(query => query.Mode).IsInEnum();
+}
 
 /// <summary><c>POST /api/v1/pupils/import/validate</c> (spec 6.5.13): the report, writing nothing.</summary>
 /// <param name="File">The uploaded workbook's bytes.</param>
-public sealed record ValidatePupilImportQuery(ReadOnlyMemory<byte> File) : IQuery<Result<PupilImportReportDto>>;
+/// <param name="Mode">Register (active pupils) or Applications (pending admissions).</param>
+public sealed record ValidatePupilImportQuery(ReadOnlyMemory<byte> File, PupilImportMode Mode = PupilImportMode.Register)
+    : IQuery<Result<PupilImportReportDto>>;
 
 /// <summary>An empty body never reaches the reader; the reader owns every real rule.</summary>
 internal sealed class ValidatePupilImportQueryValidator : AbstractValidator<ValidatePupilImportQuery>
 {
-    public ValidatePupilImportQueryValidator() =>
+    public ValidatePupilImportQueryValidator()
+    {
         RuleFor(query => query.File.Length).GreaterThan(0).LessThanOrEqualTo(PupilImportLimits.MaxFileBytes);
+        RuleFor(query => query.Mode).IsInEnum();
+    }
 }
 
 /// <summary>
@@ -44,9 +69,15 @@ internal sealed class ValidatePupilImportQueryValidator : AbstractValidator<Vali
 /// <param name="FileSha256">The report's <c>fileSha256</c>, proving the decisions were made against this file.</param>
 /// <param name="SkipRows">Sheet rows matching the register to leave out.</param>
 /// <param name="CreateRows">Sheet rows matching the register to import anyway.</param>
-/// <param name="OverrideCapacity">Confirms importing past an arm's capacity; needs <c>arm.capacity.override</c>.</param>
+/// <param name="OverrideCapacity">Confirms importing past an arm's capacity; needs <c>arm.capacity.override</c>. Register mode only.</param>
+/// <param name="Mode">The mode the file was validated in.</param>
 public sealed record CommitPupilImportCommand(
-    ReadOnlyMemory<byte> File, string FileSha256, IReadOnlyList<int> SkipRows, IReadOnlyList<int> CreateRows, bool OverrideCapacity)
+    ReadOnlyMemory<byte> File,
+    string FileSha256,
+    IReadOnlyList<int> SkipRows,
+    IReadOnlyList<int> CreateRows,
+    bool OverrideCapacity,
+    PupilImportMode Mode = PupilImportMode.Register)
     : ICommand<Result<PupilImportResultDto>>;
 
 /// <summary>Structural checks; the processor and handler own the rest.</summary>
@@ -58,5 +89,6 @@ internal sealed class CommitPupilImportCommandValidator : AbstractValidator<Comm
         RuleFor(command => command.FileSha256).NotEmpty().Length(64).Matches("^[0-9a-fA-F]{64}$");
         RuleForEach(command => command.SkipRows).GreaterThan(1);
         RuleForEach(command => command.CreateRows).GreaterThan(1);
+        RuleFor(command => command.Mode).IsInEnum();
     }
 }

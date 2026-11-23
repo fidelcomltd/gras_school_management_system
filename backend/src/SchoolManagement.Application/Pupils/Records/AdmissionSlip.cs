@@ -90,6 +90,7 @@ internal sealed class GetAdmissionSlipHandler(
             .ConfigureAwait(false);
         var signature = await SnapshotImages.ReadAsync(schoolImages, imageStore, profile.CurrentSignatureGroupId, DomainSizeVariant.Original, cancellationToken)
             .ConfigureAwait(false);
+        var photo = await ReadPhotoAsync(pupil.PhotoAssetId, cancellationToken).ConfigureAwait(false);
         var contact = string.Join("  ·  ", new[] { profile.Phone, profile.Email }.Where(part => !string.IsNullOrWhiteSpace(part)));
 
         var name = string.Join(' ', new[] { pupil.Surname.ToUpperInvariant(), pupil.FirstName, pupil.MiddleName }.Where(part => !string.IsNullOrWhiteSpace(part)));
@@ -109,9 +110,27 @@ internal sealed class GetAdmissionSlipHandler(
             contact,
             profile.HeadTeacherName,
             logo,
-            signature);
+            signature,
+            photo);
         var bytes = renderer.Render(slip);
         return Result.Success(new SchoolImageContent(new MemoryStream(bytes, writable: false), "application/pdf", "admission-slip.pdf"));
+    }
+
+    /// <summary>The pupil's current photograph, or empty when none has been taken (photos are chased, never required).</summary>
+    private async Task<ReadOnlyMemory<byte>> ReadPhotoAsync(string? assetId, CancellationToken cancellationToken)
+    {
+        if (assetId is null)
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        var stream = await imageStore.OpenAsync(assetId, cancellationToken).ConfigureAwait(false);
+        await using (stream.ConfigureAwait(false))
+        {
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return buffer.ToArray();
+        }
     }
 
     /// <summary>The admission arm, composed as the school writes it.</summary>

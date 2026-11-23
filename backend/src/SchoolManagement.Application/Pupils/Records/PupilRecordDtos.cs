@@ -7,13 +7,13 @@ namespace SchoolManagement.Application.Pupils.Records;
 /// <param name="Role">Which of the five slots.</param>
 /// <param name="FullName">Two words minimum.</param>
 /// <param name="Relationship">Guardian and emergency roles only.</param>
-/// <param name="Phone">Canonical <c>+234</c> form.</param>
+/// <param name="Phone">Canonical <c>+234</c> form. Null only for an alternative emergency contact recorded without one.</param>
 /// <param name="WhatsappNumber">Father and mother only.</param>
 /// <param name="Occupation">Father and mother only.</param>
 /// <param name="Email">Optional.</param>
 /// <param name="IsPrimaryContact">The person the school telephones first.</param>
 public sealed record PupilContactDto(
-    string Id, ContactRole Role, string FullName, string? Relationship, string Phone, string? WhatsappNumber, string? Occupation, string? Email,
+    string Id, ContactRole Role, string FullName, string? Relationship, string? Phone, string? WhatsappNumber, string? Occupation, string? Email,
     bool IsPrimaryContact);
 
 /// <summary>A pupil's contacts, in role order. At most five.</summary>
@@ -24,14 +24,14 @@ public sealed record PupilContactListDto(string PupilId, IReadOnlyList<PupilCont
 /// <summary>One contact as submitted. Phones may be typed in either Nigerian form.</summary>
 /// <param name="Role">Which slot; each at most once.</param>
 /// <param name="FullName">Two words minimum.</param>
-/// <param name="Relationship">Required for guardian and the emergency roles; ignored for father and mother.</param>
-/// <param name="Phone">Required on every contact.</param>
+/// <param name="Relationship">Required for guardian and the primary emergency contact; optional for the alternative; ignored for father and mother.</param>
+/// <param name="Phone">Required on every contact except the alternative emergency contact.</param>
 /// <param name="WhatsappNumber">Father and mother only.</param>
 /// <param name="Occupation">Father and mother only.</param>
 /// <param name="Email">Optional.</param>
 /// <param name="IsPrimaryContact">Exactly one, and a father, mother or guardian, whenever one exists.</param>
 public sealed record PupilContactInput(
-    ContactRole Role, string FullName, string? Relationship, string Phone, string? WhatsappNumber, string? Occupation, string? Email,
+    ContactRole Role, string FullName, string? Relationship, string? Phone, string? WhatsappNumber, string? Occupation, string? Email,
     bool IsPrimaryContact);
 
 /// <summary>One authorised pickup person (spec 6.5.6).</summary>

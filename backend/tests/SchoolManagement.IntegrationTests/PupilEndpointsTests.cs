@@ -63,21 +63,21 @@ public sealed class PupilEndpointsTests(ApiTestFixture fixture) : IntegrationTes
     }
 
     [Fact]
-    public async Task Create_WithAnOutOfRangeDateOfBirth_Returns422WithTheVerbatimMessageShape()
+    public async Task Create_WithAFutureDateOfBirth_Returns422WithTheVerbatimMessageShape()
     {
         RequireDatabase();
 
         var jar = await SignInWithGrantAsync([Privileges.Pupil.Create], ScopeType.SchoolWide);
-        var command = (await CreateCommandAsync("Okafor", "Chidera")) with { DateOfBirth = new DateOnly(2025, 1, 1) };
+        var command = (await CreateCommandAsync("Okafor", "Chidera")) with { DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(1) };
 
         var response = await PostAsync(PupilsUrl, jar, command, $"key-{Guid.NewGuid():N}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         using var document = await ReadJsonAsync(response);
-        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("pupil.date_of_birth_out_of_range");
+        document.RootElement.GetProperty("errorCode").GetString().ShouldBe("pupil.date_of_birth_not_in_past");
         var detail = document.RootElement.GetProperty("detail").GetString();
         detail.ShouldNotBeNull();
-        detail.ShouldContain("makes this pupil");
+        detail.ShouldContain("is not in the past");
         detail.ShouldContain("Check the date.");
     }
 

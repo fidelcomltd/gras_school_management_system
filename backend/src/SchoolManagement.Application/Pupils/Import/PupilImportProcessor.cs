@@ -5,11 +5,14 @@ using SchoolManagement.Application.Abstractions.Enrolments;
 using SchoolManagement.Application.Abstractions.Pupils;
 using SchoolManagement.Application.Abstractions.Sessions;
 using SchoolManagement.Application.Common;
+using SchoolManagement.Application.Portal;
+using SchoolManagement.Application.Settings;
 using SchoolManagement.Domain.Admissions;
 using SchoolManagement.Domain.Classes;
 using SchoolManagement.Domain.Common;
 using SchoolManagement.Domain.Pupils;
 using SchoolManagement.Domain.Sessions;
+using SchoolManagement.Domain.Settings;
 
 namespace SchoolManagement.Application.Pupils.Import;
 
@@ -25,10 +28,11 @@ internal sealed class PupilImportProcessor(
     IArmRepository armRepository,
     IEnrolmentRepository enrolments,
     IPupilRepository pupils,
+    ISchoolProfileRepository schoolProfiles,
     TimeProvider timeProvider)
 {
     /// <summary>Validates <paramref name="file"/>. A failure is a whole-file problem; row problems are in the report.</summary>
-    public async Task<Result<PupilImportRun>> RunAsync(ReadOnlyMemory<byte> file, CancellationToken cancellationToken)
+    public async Task<Result<PupilImportRun>> RunAsync(ReadOnlyMemory<byte> file, PupilImportMode mode, CancellationToken cancellationToken)
     {
         var read = workbook.Read(file, PupilImportLimits.MaxRows);
         if (read.IsFailure)
@@ -75,11 +79,17 @@ internal sealed class PupilImportProcessor(
 
         var arms = await ArmDirectory.LoadAsync(session, classLevels, armRepository, cancellationToken).ConfigureAwait(false);
         var today = SchoolTime.Today(timeProvider.GetUtcNow());
-        var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today)).ToList();
+        var profile = await schoolProfiles.GetReadOnlySingletonAsync(cancellationToken).ConfigureAwait(false);
+        var drafts = sheet.Rows.Select(row => BuildRow(new RowReader(row, columns), session, arms, today, mode, profile)).ToList();
 
         FlagDuplicatesInFile(drafts);
+        await CheckKeptNumbersAsync(drafts, cancellationToken).ConfigureAwait(false);
         await AttachRegisterMatchesAsync(drafts, cancellationToken).ConfigureAwait(false);
-        var capacity = await CapacityWarningsAsync(drafts.Where(draft => draft.IsAccepted), arms, cancellationToken).ConfigureAwait(false);
+
+        // An application takes no place in an arm until it is approved, and approval checks capacity then.
+        var capacity = mode == PupilImportMode.Register
+            ? await CapacityWarningsAsync(drafts.Where(draft => draft.IsAccepted), arms, cancellationToken).ConfigureAwait(false)
+            : [];
 
         var rows = drafts.ConvertAll(draft => draft.ToDto());
         var report = new PupilImportReportDto(
@@ -91,7 +101,7 @@ internal sealed class PupilImportProcessor(
             rows,
             capacity);
 
-        return Result.Success(new PupilImportRun(report, drafts, session, arms));
+        return Result.Success(new PupilImportRun(report, drafts, session, arms, mode));
     }
 
     /// <summary>Arms that <paramref name="accepted"/> would take over capacity, given what each holds now.</summary>
@@ -114,7 +124,8 @@ internal sealed class PupilImportProcessor(
         return warnings;
     }
 
-    private static PupilImportDraft BuildRow(RowReader row, AcademicSession session, ArmDirectory arms, DateOnly today)
+    private static PupilImportDraft BuildRow(
+        RowReader row, AcademicSession session, ArmDirectory arms, DateOnly today, PupilImportMode mode, SchoolProfile profile)
     {
         var draft = new PupilImportDraft(row.SheetRow, row.Text(PupilImportColumns.Surname), row.Text(PupilImportColumns.FirstName));
         var pupilId = Guid.CreateVersion7();
@@ -155,7 +166,35 @@ internal sealed class PupilImportProcessor(
             draft.Error(PupilImportColumns.AdmissionType, typeError!);
         }
 
-        draft.Arm = arms.Resolve(row.Text(PupilImportColumns.ClassLevel), row.Text(PupilImportColumns.ArmLabel), draft);
+        // Upper case, as every number this system issues is: the portal upper-cases what a parent types but not what is stored.
+        var keptNumber = row.Text(PupilImportColumns.RegistrationNumber)?.ToUpperInvariant();
+        if (keptNumber is not null && mode == PupilImportMode.Applications)
+        {
+            draft.Error(PupilImportColumns.RegistrationNumber, "Leave Registration Number blank: an application is numbered when it is approved.");
+        }
+        else if (keptNumber is not null && KeptNumberProblem(keptNumber, profile) is { } problem)
+        {
+            draft.Error(PupilImportColumns.RegistrationNumber, problem);
+        }
+        else
+        {
+            draft.RegistrationNumber = keptNumber;
+        }
+
+        if (mode == PupilImportMode.Register)
+        {
+            draft.Arm = arms.Resolve(row.Text(PupilImportColumns.ClassLevel), row.Text(PupilImportColumns.ArmLabel), draft);
+        }
+        else
+        {
+            if (row.Text(PupilImportColumns.ArmLabel) is not null)
+            {
+                draft.Error(PupilImportColumns.ArmLabel, "Leave Arm Label blank: an application's arm is chosen when it is approved.");
+            }
+
+            draft.Level = arms.ResolveLevel(row.Text(PupilImportColumns.ClassLevel), draft);
+            draft.LevelName = draft.Level?.Name;
+        }
 
         // The entity's own rules, only once every field it needs could be read, so each message names one real problem.
         if (!draft.HasErrors && sex is { } pupilSex && dateOfBirth is { } dob)
@@ -175,10 +214,12 @@ internal sealed class PupilImportProcessor(
             }
         }
 
-        if (draft.Arm is { } arm)
+        if ((draft.Arm?.ClassLevelId ?? draft.Level?.Id) is { } classLevelId)
         {
+            // An imported application was received on the day it was imported; a register pupil's application date is unknown.
+            var received = mode == PupilImportMode.Applications ? today : (DateOnly?)null;
             var record = AdmissionRecord.Create(
-                Guid.CreateVersion7(), pupilId, session.Id, dateApplicationReceived: null, dateAdmitted, today, arm.ClassLevelId,
+                Guid.CreateVersion7(), pupilId, session.Id, received, dateAdmitted, today, classLevelId,
                 admissionType, admissionTypeNote: null, assessmentRequired: false);
             if (record.IsFailure)
             {
@@ -227,7 +268,7 @@ internal sealed class PupilImportProcessor(
             var applied = contact.Apply(
                 row.Text($"{prefix} Name") ?? string.Empty,
                 row.Text($"{prefix} Relationship"),
-                PupilImportCells.Phone(row.Cell($"{prefix} Phone")) ?? string.Empty,
+                PupilImportCells.Phone(row.Cell($"{prefix} Phone")),
                 PupilImportCells.Phone(row.Cell($"{prefix} WhatsApp")),
                 row.Text($"{prefix} Occupation"),
                 email: null,
@@ -321,6 +362,69 @@ internal sealed class PupilImportProcessor(
         }
     }
 
+    /// <summary>
+    /// Why <paramref name="number"/> cannot be kept, or null. Beyond the shape: a number in the school's own abbreviation
+    /// moves that year's counter past its serial for good, so a serial longer than the configured width (a typo such as
+    /// 00170000017) is refused rather than allowed to push every later number out of range.
+    /// </summary>
+    private static string? KeptNumberProblem(string number, SchoolProfile profile)
+    {
+        if (number.Length > Pupil.RegistrationNumberMaxLength
+            || !RegNumberFormat.TryParse(number, out var abbreviation, out var separator, out _, out _))
+        {
+            return $"{number} is not a registration number this system can keep. Use the form ABBREVIATION/YEAR/SERIAL, " +
+                "for example GRAS/2024/0017, or leave it blank to issue a new one.";
+        }
+
+        var serialDigits = number.Length - number.LastIndexOf(separator, StringComparison.Ordinal) - 1;
+        if (string.Equals(abbreviation, profile.Abbreviation, StringComparison.OrdinalIgnoreCase) && serialDigits > profile.SerialWidth)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{number} has a {serialDigits}-digit serial, but this school's numbers have {profile.SerialWidth}. Check the number for a typo, or widen the serial in the registration number settings first.");
+        }
+
+        return null;
+    }
+
+    // A kept number must be unique in the file, on the register and among corrected numbers' old aliases (spec 6.5.10's
+    // own two-table rule), all compared as the portal compares them (separators removed, upper case): two numbers that
+    // differ only there would leave the portal unable to tell the two pupils apart, so neither family could find theirs.
+    private async Task CheckKeptNumbersAsync(List<PupilImportDraft> drafts, CancellationToken cancellationToken)
+    {
+        var kept = drafts.Where(draft => draft.RegistrationNumber is not null).ToList();
+        if (kept.Count == 0)
+        {
+            return;
+        }
+
+        var firstSeen = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var draft in kept)
+        {
+            var key = PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!);
+            if (firstSeen.TryGetValue(key, out var first))
+            {
+                draft.Error(PupilImportColumns.RegistrationNumber, string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Row {first} has the same registration number (ignoring separators). Each pupil needs their own."));
+            }
+            else
+            {
+                firstSeen.Add(key, draft.SheetRow);
+            }
+        }
+
+        var clashes = (await pupils.ListNormalizedRegistrationNumberClashesAsync(firstSeen.Keys, cancellationToken).ConfigureAwait(false))
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var draft in kept.Where(draft => clashes.Contains(PortalValues.NormalizeRegistrationNumber(draft.RegistrationNumber!))))
+        {
+            draft.Error(
+                PupilImportColumns.RegistrationNumber,
+                $"{draft.RegistrationNumber} already belongs to a pupil on the register, or was a pupil's number before it was " +
+                "corrected (separators are ignored when comparing).");
+        }
+    }
+
     // Spec 6.5.13: matches against the register are warnings; the administrator chooses skip or create per row.
     private async Task AttachRegisterMatchesAsync(List<PupilImportDraft> drafts, CancellationToken cancellationToken)
     {
@@ -399,8 +503,9 @@ internal sealed class PupilImportProcessor(
 /// <param name="Drafts">Every row, in file order.</param>
 /// <param name="Session">The active session the arms belong to.</param>
 /// <param name="Arms">The arm lookup used.</param>
+/// <param name="Mode">What the rows become.</param>
 internal sealed record PupilImportRun(
-    PupilImportReportDto Report, IReadOnlyList<PupilImportDraft> Drafts, AcademicSession Session, ArmDirectory Arms);
+    PupilImportReportDto Report, IReadOnlyList<PupilImportDraft> Drafts, AcademicSession Session, ArmDirectory Arms, PupilImportMode Mode);
 
 /// <summary>One row being validated: the entities built so far and every problem found.</summary>
 internal sealed class PupilImportDraft(int sheetRow, string? surname, string? firstName)
@@ -419,6 +524,14 @@ internal sealed class PupilImportDraft(int sheetRow, string? surname, string? fi
 
     public string? ArmName { get; set; }
 
+    /// <summary>Applications mode: the class level applied for. Register mode leaves it null and uses <see cref="Arm"/>.</summary>
+    public ClassLevel? Level { get; set; }
+
+    public string? LevelName { get; set; }
+
+    /// <summary>Register mode: the number the file gives, kept as is; null draws a new one.</summary>
+    public string? RegistrationNumber { get; set; }
+
     public Pupil? Pupil { get; set; }
 
     public AdmissionRecord? Record { get; set; }
@@ -431,7 +544,7 @@ internal sealed class PupilImportDraft(int sheetRow, string? surname, string? fi
 
     public bool HasErrors => _errors.Count > 0;
 
-    public bool IsAccepted => !HasErrors && Pupil is not null && Record is not null && Arm is not null;
+    public bool IsAccepted => !HasErrors && Pupil is not null && Record is not null && (Arm is not null || Level is not null);
 
     /// <summary>The in-file and register duplicate key, when name and date of birth could be read.</summary>
     public string? MatchKey => Surname is not null && FirstName is not null && DateOfBirth is { } dob ? KeyOf(Surname, FirstName, dob) : null;
@@ -446,5 +559,9 @@ internal sealed class PupilImportDraft(int sheetRow, string? surname, string? fi
     public PupilImportRowDto ToDto() => new(
         SheetRow, Surname, FirstName, DateOfBirth, Arm?.Id.ToString("D", CultureInfo.InvariantCulture), ArmName,
         IsAccepted ? PupilImportRowOutcome.Accepted : PupilImportRowOutcome.Rejected,
-        [.. _errors], IsAccepted ? [.. RegisterMatches] : []);
+        [.. _errors], IsAccepted ? [.. RegisterMatches] : [],
+        LevelName,
+        RegistrationNumber,
+        // The year a NEW number will carry: only a register row drawing one has it.
+        Arm is not null && RegistrationNumber is null ? Record?.DateAdmitted.Year : null);
 }

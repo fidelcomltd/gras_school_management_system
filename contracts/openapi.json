@@ -9697,8 +9697,17 @@
           "Pupils"
         ],
         "summary": "Download the bulk-import template",
-        "description": "Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet `Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet `LGAs` lists every state's LGAs. With no active session the arm columns are empty.",
+        "description": "Spec 6.5.13: an XLSX workbook. Sheet `Pupils` holds the header row, one column per spec field; sheet `Accepted values` lists sex, state of origin, suggested relationships, blood group, genotype, admission type, yes/no, primary contact, and the active session's open arms (class level, arm label, composed name); sheet `LGAs` lists every state's LGAs. With no active session the arm columns are empty. `mode=Applications` leaves out the `Registration Number` and `Arm Label` columns (an application has neither until it is approved) and lists every active class level, arm or not.",
         "operationId": "GetPupilImportTemplate",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PupilImportMode"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -9749,7 +9758,7 @@
           "Pupils"
         ],
         "summary": "Validate a bulk-import file",
-        "description": "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils). WRITES NOTHING. Returns every row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the file duplicating an earlier row are rejected. Whole-file problems are 422: `import.file_invalid`, `import.file_empty`, `import.too_many_rows`, `import.missing_columns`; 409 `import.no_active_session`.",
+        "description": "Spec 6.5.13. Multipart, one `file` part (XLSX, at most 5 MB and 1000 pupils) and an optional `mode`: `Register` (default; existing pupils, made active) or `Applications` (new applications, made pending, placed at a class level with no arm, no capacity warnings; `Registration Number` and `Arm Label` must be blank). In `Register` a `Registration Number` is kept, upper-cased: it must have the ABBR/YEAR/SERIAL shape, a serial no longer than the school's serial width when it uses the school's abbreviation, and be unique in the file, on the register and among corrected numbers' old aliases, compared as the portal compares numbers (separators and case ignored). WRITES NOTHING. Returns every row accepted or rejected, each rejection naming its column and reason; accepted rows matching a pupil already on the register (same surname, first name and date of birth) carry `registerMatches` and need a skip or create decision at commit; `capacityWarnings` lists arms the file would take over capacity. Rows in the file duplicating an earlier row are rejected. Whole-file problems are 422: `import.file_invalid`, `import.file_empty`, `import.too_many_rows`, `import.missing_columns`; 409 `import.no_active_session`.",
         "operationId": "ValidatePupilImport",
         "parameters": [
           {
@@ -9770,11 +9779,24 @@
                   "file"
                 ],
                 "type": "object",
-                "properties": {
-                  "file": {
-                    "$ref": "#/components/schemas/IFormFile"
+                "allOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "$ref": "#/components/schemas/IFormFile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "$ref": "#/components/schemas/PupilImportMode"
+                      }
+                    }
                   }
-                }
+                ]
               }
             }
           },
@@ -9860,7 +9882,7 @@
           "Pupils"
         ],
         "summary": "Import a validated file",
-        "description": "Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` (repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import past an arm's capacity (needs `arm.capacity.override`). The file is re-validated and imported ALL OR NOTHING: each pupil is created active, with a registration number issued in file order by the same counter as admission approval, an open enrolment, and an admission record with the declaration unsigned; health columns left blank stay unanswered. 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 `import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, `import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.",
+        "description": "Spec 6.5.13. Multipart: the SAME `file` again, `fileSha256` from its report, `skipRows` and `createRows` (repeated fields, sheet row numbers) deciding every register match, and `overrideCapacity=true` to import past an arm's capacity (needs `arm.capacity.override`), and the same `mode` it was validated in. The file is re-validated and imported ALL OR NOTHING. `Register`: each pupil is created active, keeping the file's registration number (that year's counter is raised past it) or issued one in file order by the same counter as admission approval, with an open enrolment and an admission record with the declaration unsigned. `Applications`: each pupil is created pending with no number and no enrolment, for the admissions queue. Health columns left blank stay unanswered. 409 `import.registration_number_taken` when a kept number was given to another pupil after validation; 409 `import.file_changed`, `import.capacity_unconfirmed`; 422 `import.rows_rejected`, `import.decision_missing`, `import.decision_conflict`, `import.decision_unexpected`, `import.nothing_to_import`; 403 `import.capacity_override_forbidden`. `Idempotency-Key` is REQUIRED.",
         "operationId": "CommitPupilImport",
         "parameters": [
           {
@@ -9945,6 +9967,14 @@
                     "properties": {
                       "overrideCapacity": {
                         "type": "boolean"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "$ref": "#/components/schemas/PupilImportMode"
                       }
                     }
                   }
@@ -27722,7 +27752,7 @@
           },
           "dateOfBirth": {
             "type": "string",
-            "description": "In the past; must give an age between 2 and 20.",
+            "description": "In the past. No age range is enforced.",
             "format": "date",
             "example": "2020-05-03"
           },
@@ -32600,8 +32630,11 @@
             "description": "Guardian and emergency roles only."
           },
           "phone": {
-            "type": "string",
-            "description": "Canonical `+234` form.",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Canonical `+234` form. Null only for an alternative emergency contact recorded without one.",
             "example": "+2348031234567"
           },
           "whatsappNumber": {
@@ -32674,11 +32707,14 @@
               "null",
               "string"
             ],
-            "description": "Required for guardian and the emergency roles; ignored for father and mother."
+            "description": "Required for guardian and the primary emergency contact; optional for the alternative; ignored for father and mother."
           },
           "phone": {
-            "type": "string",
-            "description": "Required on every contact.",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required on every contact except the alternative emergency contact.",
             "example": "08031234567"
           },
           "whatsappNumber": {
@@ -33718,6 +33754,15 @@
           "message": "03/05/18 has a 2-digit year. Enter the year in full, for example 03/05/2018."
         }
       },
+      "PupilImportMode": {
+        "enum": [
+          "Register",
+          "Applications",
+          null
+        ],
+        "description": "What a bulk import creates (project lead, 2026-11-23). `Register` (default): the school's existing pupils, made active with an enrolment, keeping any `Registration Number` the file gives or issuing one from the Admission Date's year. `Applications`: a new intake, made pending for the admissions queue at a class level only, numbered when approved.",
+        "example": "Register"
+      },
       "PupilImportRegisterMatchDto": {
         "required": [
           "pupilId",
@@ -33949,7 +33994,7 @@
             "items": {
               "$ref": "#/components/schemas/PupilImportedDto"
             },
-            "description": "Each created pupil, in file order, which is registration-number order.",
+            "description": "Each created pupil, in file order.",
             "example": [
               {
                 "sheetRow": 2,
@@ -34027,7 +34072,7 @@
               "null",
               "string"
             ],
-            "description": "The resolved arm, when it could be.",
+            "description": "The resolved arm, when it could be. Always null in Applications mode, where the arm is chosen at approval.",
             "example": "0192f0c4-c072-7e5f-d361-7f2c9e0a5184"
           },
           "armName": {
@@ -34057,6 +34102,30 @@
             },
             "description": "Existing pupils with the same surname, first name and date of birth. A warning, not an error.",
             "example": [ ]
+          },
+          "classLevelName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The resolved class level, in either mode."
+          },
+          "registrationNumber": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Register mode: the number the file gives, kept as is. Null when a new one will be drawn."
+          },
+          "admissionYear": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Register mode: the year a newly drawn number will carry (the Admission Date's, or this year's when that is blank).\nNull when the row keeps its own number, in Applications mode, or when the date could not be read.",
+            "format": "int32"
           }
         },
         "additionalProperties": false,
@@ -34105,8 +34174,11 @@
             "example": "0192f0c4-48fa-7667-5b49-f7a71699c2c1"
           },
           "registrationNumber": {
-            "type": "string",
-            "description": "The number issued.",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The number kept or issued; null for a pending application, numbered at approval.",
             "example": "GRAS/2026/0041"
           }
         },
@@ -42012,7 +42084,7 @@
               "null",
               "string"
             ],
-            "description": "In the past; must give an age between 2 and 20.",
+            "description": "In the past. No age range is enforced.",
             "format": "date"
           },
           "nationality": {

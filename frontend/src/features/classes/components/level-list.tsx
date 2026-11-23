@@ -9,7 +9,7 @@ import { useDeleteLevel, useLevels, useReorderLevels } from '../api';
 import type { LevelDto } from '../types';
 import { CreateLevelDialog } from './create-level-dialog';
 import { EditLevelDialog } from './edit-level-dialog';
-import { LoadingState } from '@/components/feedback/query-states';
+import { FormError, LoadingState } from '@/components/feedback/query-states';
 import { LoadMoreButton } from '@/components/ui/load-more-button';
 import { EmptyState } from '@/components/feedback/empty-state';
 
@@ -56,15 +56,22 @@ export function LevelList() {
     (a, b) => Number(a.progressionOrder) - Number(b.progressionOrder),
   );
 
-  function move(index: number, direction: -1 | 1): void {
-    const next = [...items];
+  // The server reorders exactly the ACTIVE levels (an inactive one in the list is rejected), so the arrows move a
+  // level past its neighbouring active level even while "Show inactive levels too" is ticked.
+  const active = items.filter((level) => level.status === 'Active');
+  // A reorder must name every active level, so it waits until all of them are loaded.
+  const partial = levels.hasNextPage;
+
+  function move(level: LevelDto, direction: -1 | 1): void {
+    const next = [...active];
+    const index = next.findIndex((candidate) => candidate.id === level.id);
     const target = index + direction;
     const a = next[index];
     const b = next[target];
-    if (!a || !b) return;
+    if (index < 0 || !a || !b) return;
     next[index] = b;
     next[target] = a;
-    reorder.mutate({ orderedLevelIds: next.map((level) => level.id) });
+    reorder.mutate({ orderedLevelIds: next.map((candidate) => candidate.id) });
   }
 
 
@@ -78,11 +85,15 @@ export function LevelList() {
         {canCreate ? <Button size="sm" onClick={() => setShowCreate(true)}>New level</Button> : null}
       </div>
 
+      <FormError message={reorder.error instanceof ApiError ? reorder.error.message : null} />
+
       {items.length === 0 ? (
         <EmptyState icon={Layers} title="No levels yet." />
       ) : (
         <ul aria-label="Levels" className="flex flex-col gap-2">
-          {items.map((level, index) => (
+          {items.map((level) => {
+            const activeIndex = active.findIndex((candidate) => candidate.id === level.id);
+            return (
             <li
               key={level.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3 text-sm"
@@ -99,24 +110,28 @@ export function LevelList() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Move ${level.name} up`}
-                  disabled={index === 0 || reorder.isPending}
-                  onClick={() => move(index, -1)}
-                >
-                  ↑
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Move ${level.name} down`}
-                  disabled={index === items.length - 1 || reorder.isPending}
-                  onClick={() => move(index, 1)}
-                >
-                  ↓
-                </Button>
+                {canEdit && activeIndex >= 0 ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Move ${level.name} up`}
+                      disabled={activeIndex === 0 || reorder.isPending || partial}
+                      onClick={() => move(level, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Move ${level.name} down`}
+                      disabled={activeIndex === active.length - 1 || reorder.isPending || partial}
+                      onClick={() => move(level, 1)}
+                    >
+                      ↓
+                    </Button>
+                  </>
+                ) : null}
                 {canEdit ? (
                   <Button variant="outline" size="sm" onClick={() => setEditing(level)}>
                     Edit
@@ -133,7 +148,8 @@ export function LevelList() {
                 ) : null}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

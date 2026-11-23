@@ -21,6 +21,7 @@ export const paths = {
   arms: '/arms',
   armDetail: (id: string) => `/arms/${id}`,
   admissions: '/admissions',
+  admissionsImport: '/admissions/import',
   admissionFlow: (id: string, step?: number) => `/admissions/${id}${step ? `?step=${step}` : ''}`,
   pupils: '/pupils',
   pupilImport: '/pupils/import',

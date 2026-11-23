@@ -37,11 +37,17 @@ public sealed record PupilImportReportDto(
 /// <param name="Surname">As typed, when present.</param>
 /// <param name="FirstName">As typed, when present.</param>
 /// <param name="DateOfBirth">When it could be read.</param>
-/// <param name="ArmId">The resolved arm, when it could be.</param>
+/// <param name="ArmId">The resolved arm, when it could be. Always null in Applications mode, where the arm is chosen at approval.</param>
 /// <param name="ArmName">The resolved arm's display name.</param>
 /// <param name="Outcome">Accepted or rejected.</param>
 /// <param name="Errors">Why the row is rejected: one entry per problem, each naming its column.</param>
 /// <param name="RegisterMatches">Existing pupils with the same surname, first name and date of birth. A warning, not an error.</param>
+/// <param name="ClassLevelName">The resolved class level, in either mode.</param>
+/// <param name="RegistrationNumber">Register mode: the number the file gives, kept as is. Null when a new one will be drawn.</param>
+/// <param name="AdmissionYear">
+/// Register mode: the year a newly drawn number will carry (the Admission Date's, or this year's when that is blank).
+/// Null when the row keeps its own number, in Applications mode, or when the date could not be read.
+/// </param>
 public sealed record PupilImportRowDto(
     int SheetRow,
     string? Surname,
@@ -51,7 +57,10 @@ public sealed record PupilImportRowDto(
     string? ArmName,
     PupilImportRowOutcome Outcome,
     IReadOnlyList<PupilImportIssueDto> Errors,
-    IReadOnlyList<PupilImportRegisterMatchDto> RegisterMatches);
+    IReadOnlyList<PupilImportRegisterMatchDto> RegisterMatches,
+    string? ClassLevelName = null,
+    string? RegistrationNumber = null,
+    int? AdmissionYear = null);
 
 /// <summary>One problem with a row.</summary>
 /// <param name="Column">The template column it concerns.</param>
@@ -79,11 +88,11 @@ public sealed record PupilImportCapacityWarningDto(string ArmId, string ArmName,
 /// <summary>What a commit created.</summary>
 /// <param name="ImportedCount">Pupils created.</param>
 /// <param name="SkippedCount">Rows skipped by decision.</param>
-/// <param name="Pupils">Each created pupil, in file order, which is registration-number order.</param>
+/// <param name="Pupils">Each created pupil, in file order.</param>
 public sealed record PupilImportResultDto(int ImportedCount, int SkippedCount, IReadOnlyList<PupilImportedDto> Pupils);
 
 /// <summary>One created pupil.</summary>
 /// <param name="SheetRow">Its row in the file.</param>
 /// <param name="PupilId">The new pupil.</param>
-/// <param name="RegistrationNumber">The number issued.</param>
-public sealed record PupilImportedDto(int SheetRow, string PupilId, string RegistrationNumber);
+/// <param name="RegistrationNumber">The number kept or issued; null for a pending application, numbered at approval.</param>
+public sealed record PupilImportedDto(int SheetRow, string PupilId, string? RegistrationNumber);

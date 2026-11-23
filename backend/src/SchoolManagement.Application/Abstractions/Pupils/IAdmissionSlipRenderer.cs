@@ -27,6 +27,7 @@ public interface IAdmissionSlipRenderer
 /// <param name="HeadTeacherName">Under the signature line.</param>
 /// <param name="Logo">The current logo (the 200 pixel rendition), or empty for none.</param>
 /// <param name="Signature">The head teacher's current signature (strokes only, transparent), or empty for none.</param>
+/// <param name="Photo">The pupil's current 400 by 400 photograph, or empty when none has been taken yet.</param>
 public sealed record AdmissionSlipDocument(
     string SchoolName,
     string SchoolAddress,
@@ -43,4 +44,5 @@ public sealed record AdmissionSlipDocument(
     string? SchoolContact = null,
     string? HeadTeacherName = null,
     ReadOnlyMemory<byte> Logo = default,
-    ReadOnlyMemory<byte> Signature = default);
+    ReadOnlyMemory<byte> Signature = default,
+    ReadOnlyMemory<byte> Photo = default);

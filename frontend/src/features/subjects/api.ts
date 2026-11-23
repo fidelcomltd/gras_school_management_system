@@ -17,13 +17,21 @@ const COPY_PATH = '/api/v1/subject-mappings/copy';
 const PREFILL_PATH = '/api/v1/subject-mappings/prefill';
 
 /** Gated `subject.view`. */
-export function useSubjects(status?: SubjectStatus) {
+export function useSubjects(status?: SubjectStatus, options: { termId?: string | undefined; enabled?: boolean } = {}) {
+  const { termId, enabled = true } = options;
   return useInfiniteQuery({
-    queryKey: [SubjectsKeys.List, status],
+    // The per-term counts (mappedLevelCount and friends) are null unless a term is sent: the endpoint never guesses one.
+    queryKey: [SubjectsKeys.List, status, termId],
+    enabled,
     queryFn: ({ pageParam, signal }) =>
       apiGet(
         SUBJECTS_PATH,
-        { ...(pageParam !== undefined ? { cursor: pageParam } : {}), ...(status ? { status } : {}), pageSize: 100 },
+        {
+          ...(pageParam !== undefined ? { cursor: pageParam } : {}),
+          ...(status ? { status } : {}),
+          ...(termId ? { termId } : {}),
+          pageSize: 100,
+        },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,
@@ -97,7 +105,10 @@ export function useCopyMappings(termId: string) {
     mutationFn: ({ sourceTermId, dryRun }: { sourceTermId: string; dryRun: boolean }) =>
       apiPost(COPY_PATH, { sourceTermId, destinationTermId: termId, dryRun }, { idempotencyKey: crypto.randomUUID() }),
     onSuccess: (result) => {
-      if (!result.dryRun) void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.Grid, termId] });
+      if (!result.dryRun) {
+        void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.Grid, termId] });
+        void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.List] });
+      }
     },
   });
 }
@@ -109,7 +120,10 @@ export function usePrefillMappings(termId: string) {
     mutationKey: [SubjectsKeys.Prefill, termId],
     mutationFn: (dryRun: boolean) => apiPost(PREFILL_PATH, { termId, dryRun }, { idempotencyKey: crypto.randomUUID() }),
     onSuccess: (result) => {
-      if (!result.dryRun) void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.Grid, termId] });
+      if (!result.dryRun) {
+        void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.Grid, termId] });
+        void queryClient.invalidateQueries({ queryKey: [SubjectsKeys.List] });
+      }
     },
   });
 }

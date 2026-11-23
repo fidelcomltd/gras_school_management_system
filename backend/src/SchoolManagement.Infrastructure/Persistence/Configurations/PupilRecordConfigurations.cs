@@ -17,7 +17,7 @@ internal sealed class PupilContactConfiguration : IEntityTypeConfiguration<Pupil
         builder.Property(contact => contact.Role).IsRequired().HasConversion<string>().HasMaxLength(24);
         builder.Property(contact => contact.FullName).IsRequired().HasMaxLength(PersonFields.FullNameMaxLength);
         builder.Property(contact => contact.Relationship).HasMaxLength(PersonFields.RelationshipMaxLength);
-        builder.Property(contact => contact.Phone).IsRequired().HasMaxLength(20);
+        builder.Property(contact => contact.Phone).HasMaxLength(20);
         builder.Property(contact => contact.WhatsappNumber).HasMaxLength(20);
         builder.Property(contact => contact.Occupation).HasMaxLength(PupilContact.OccupationMaxLength);
         builder.Property(contact => contact.Email).HasMaxLength(PupilContact.EmailMaxLength);

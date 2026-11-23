@@ -41,4 +41,17 @@ internal sealed class RegistrationCounterRepository(ApplicationDbContext context
 
         return rows[0];
     }
+
+    /// <inheritdoc />
+    public async Task EnsureLastSerialAtLeastAsync(string counterKey, int serial, CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO registration_counter (counter_key, last_serial)
+            VALUES ({counterKey}, {serial})
+            ON CONFLICT (counter_key) DO UPDATE
+                SET last_serial = GREATEST(registration_counter.last_serial, EXCLUDED.last_serial)
+            """,
+            cancellationToken).ConfigureAwait(false);
+    }
 }

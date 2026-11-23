@@ -17,7 +17,7 @@ namespace SchoolManagement.Application.Pupils;
 /// <param name="FirstName">Same rule as <paramref name="Surname"/>.</param>
 /// <param name="MiddleName">Optional. Same rule as <paramref name="Surname"/> when supplied.</param>
 /// <param name="Sex">Male or female.</param>
-/// <param name="DateOfBirth">In the past; must give an age between 2 and 20.</param>
+/// <param name="DateOfBirth">In the past. No age range is enforced.</param>
 /// <param name="Nationality"><see langword="null"/> defaults to <c>Nigerian</c>.</param>
 /// <param name="StateOfOrigin">One of the 36 states or the Federal Capital Territory — free text is rejected.</param>
 /// <param name="Lga">Must belong to <paramref name="StateOfOrigin"/> — free text is rejected.</param>
