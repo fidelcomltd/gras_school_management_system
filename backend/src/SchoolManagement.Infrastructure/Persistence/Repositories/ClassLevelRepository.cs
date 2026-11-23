@@ -74,5 +74,15 @@ internal sealed class ClassLevelRepository(ApplicationDbContext context) : IClas
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE class_levels SET progression_order = -progression_order WHERE id = ANY({ids.ToArray()})",
             cancellationToken).ConfigureAwait(false);
+
+        // The statement bypassed change tracking, so EF still believes each row holds its old positive value. Without
+        // telling it otherwise, a level whose final order equals its old one looks unchanged, is never written back, and
+        // is left NEGATIVE in the database: every reorder that keeps any level in place scrambled the list.
+        var negated = ids.ToHashSet();
+        foreach (var entry in context.ChangeTracker.Entries<ClassLevel>().Where(entry => negated.Contains(entry.Entity.Id)))
+        {
+            var order = entry.Property(level => level.ProgressionOrder);
+            order.OriginalValue = -order.OriginalValue;
+        }
     }
 }
