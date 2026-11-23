@@ -96,11 +96,32 @@ describe('PupilDetailScreen admission sections', () => {
     await user.type(await screen.findByLabelText('Guardian (if applicable): full name'), 'Ngozi Eze');
     await user.type(screen.getByLabelText('Guardian (if applicable): relationship to the pupil'), 'Aunt');
     await user.type(screen.getByLabelText('Guardian (if applicable): phone'), '08031234567');
-    await user.click(within(screen.getByRole('group', { name: 'Alternative emergency contact' })).getByRole('button', { name: 'Copy from guardian' }));
+    await user.click(within(screen.getByRole('group', { name: 'Alternative emergency contact (optional)' })).getByRole('button', { name: 'Copy from guardian' }));
     await user.click(screen.getByRole('button', { name: 'Save contacts' }));
 
     await waitFor(() => expect(saved?.contacts).toHaveLength(2));
     expect(saved?.contacts[1]).toMatchObject({ role: 'EmergencyAlternate', fullName: 'Ngozi Eze', phone: '08031234567', relationship: 'Aunt' });
+  });
+
+  it('saves an alternative emergency contact with a name alone, sending no phone or relationship', async () => {
+    mockMe('pupil.view', 'contact.view', 'contact.update');
+    mockPendingPupil();
+    let saved: { contacts: { role: string; phone: string | null; relationship: string | null }[] } | undefined;
+    server.use(
+      http.put(apiUrl('/api/v1/pupils/:pupilId/contacts'), async ({ request }) => {
+        saved = (await request.json()) as typeof saved;
+        return HttpResponse.json({ pupilId: 'pupil-1', items: [] });
+      }),
+    );
+
+    const { user } = renderScreen();
+    await user.click(await screen.findByRole('tab', { name: 'Contacts' }));
+    expect(await screen.findByLabelText('Father: WhatsApp (optional)')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Alternative emergency contact: full name'), 'Ngozi Eze');
+    await user.click(screen.getByRole('button', { name: 'Save contacts' }));
+
+    await waitFor(() => expect(saved?.contacts).toHaveLength(1));
+    expect(saved?.contacts[0]).toMatchObject({ role: 'EmergencyAlternate', phone: null, relationship: null });
   });
 
   it('uploads a photograph for a barred person and attaches it when the answer is saved', async () => {
