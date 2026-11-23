@@ -295,6 +295,11 @@ The health check is `/health/live`, not `/health/ready`: Render restarts an inst
 of failed checks, and with migrations in the entrypoint a readiness check would turn a short database
 outage into a restart loop.
 
+**Confirming a deploy went live:** `/health/live` reports `commit`, the SHA Render built (its
+`RENDER_GIT_COMMIT`). It should equal `git rev-parse origin/staging` once the deploy finishes; the
+previous SHA means the deploy is still running or failed (Render keeps the old version serving), and
+the Render dashboard's Events say which. Hosts that set no such variable report `unknown`.
+
 **It runs on Render's free plan** (no payment card). Three consequences:
 
 - It sleeps after 15 idle minutes. Measured under the free limits (0.1 CPU, 512 MB), a boot takes

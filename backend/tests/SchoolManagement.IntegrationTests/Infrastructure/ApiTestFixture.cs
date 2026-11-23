@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SchoolManagement.Api.Configuration;
+using SchoolManagement.Api.Endpoints;
 using SchoolManagement.Api.Observability;
 using SchoolManagement.Api.Security;
 using SchoolManagement.Domain.Classes;
@@ -34,6 +35,9 @@ namespace SchoolManagement.IntegrationTests.Infrastructure;
 /// </remarks>
 public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    /// <summary>The commit this host is told it was deployed from (<see cref="HealthEndpoints.DeployedCommitKey"/>).</summary>
+    public const string TestDeployedCommit = "3036cf0b1d2e4f5a6b7c8d9e0f1a2b3c4d5e6f70";
+
     private PostgreSqlContainer? _container;
     private string? _connectionString;
 
@@ -163,6 +167,10 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
                 ["Cloudinary:CloudName"] = string.Empty,
                 ["Cloudinary:ApiKey"] = string.Empty,
                 ["Cloudinary:ApiSecret"] = string.Empty,
+
+                // The deployed commit /health/live reports: fixed, so HealthEndpointTests asserts a known
+                // value whatever the machine's environment holds.
+                [HealthEndpoints.DeployedCommitKey] = TestDeployedCommit,
 
                 // Retries off: a transient-failure retry inside a test turns a genuine failure into a
                 // slow, confusing one.
