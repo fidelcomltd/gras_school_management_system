@@ -35,6 +35,22 @@ public sealed class HealthEndpointTests(ApiTestFixture fixture) : IntegrationTes
     }
 
     [Fact]
+    public async Task Live_ReportsTheDeployedCommit_AndReadyDoesNot()
+    {
+        RequireDatabase();
+
+        // Render sets RENDER_GIT_COMMIT on every deploy, so comparing this with the pushed branch head
+        // confirms from outside that a deploy went live. Readiness stays as it was.
+        var live = await Client.GetAsync(new Uri("/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
+        var ready = await Client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        using var liveDocument = await ReadJsonAsync(live);
+        liveDocument.RootElement.GetProperty("commit").GetString().ShouldBe(ApiTestFixture.TestDeployedCommit);
+        using var readyDocument = await ReadJsonAsync(ready);
+        readyDocument.RootElement.TryGetProperty("commit", out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Ready_IncludesTheDatabaseCheck()
     {
         RequireDatabase();

@@ -1829,7 +1829,6 @@ namespace SchoolManagement.Infrastructure.Persistence.Migrations
                         .HasColumnName("occupation");
 
                     b.Property<string>("Phone")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");

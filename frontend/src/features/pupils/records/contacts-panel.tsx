@@ -6,12 +6,13 @@ import { TextField } from './fields';
 import { PhoneDuplicateWarning } from './phone-duplicates';
 import { errorText, localPhone } from './format';
 
-const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean }[] = [
+const SLOTS: { role: ContactRole; title: string; adult: boolean; parent: boolean; optional?: true }[] = [
   { role: 'Father', title: 'Father', adult: true, parent: true },
   { role: 'Mother', title: 'Mother', adult: true, parent: true },
   { role: 'Guardian', title: 'Guardian (if applicable)', adult: true, parent: false },
   { role: 'EmergencyPrimary', title: 'Primary emergency contact', adult: false, parent: false },
-  { role: 'EmergencyAlternate', title: 'Alternative emergency contact', adult: false, parent: false },
+  // Optional, and may be recorded partially: a name alone saves (project lead, 2026-11-23).
+  { role: 'EmergencyAlternate', title: 'Alternative emergency contact', adult: false, parent: false, optional: true },
 ];
 
 type EmergencyRole = Extract<ContactRole, 'EmergencyPrimary' | 'EmergencyAlternate'>;
@@ -84,7 +85,7 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
         role: slot.role,
         fullName: entry.fullName,
         relationship: slot.parent ? null : entry.relationship || null,
-        phone: entry.phone,
+        phone: entry.phone || null,
         whatsappNumber: slot.parent ? entry.whatsappNumber || null : null,
         occupation: slot.parent ? entry.occupation || null : null,
         email: entry.email || null,
@@ -104,7 +105,10 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
           const entry = draft[slot.role];
           return (
             <fieldset key={slot.role} className="flex flex-col gap-2 rounded-lg border border-border p-3" disabled={!canEdit}>
-              <legend className="px-1 text-sm font-semibold text-foreground">{slot.title}</legend>
+              <legend className="px-1 text-sm font-semibold text-foreground">
+                {slot.optional ? `${slot.title} ` : slot.title}
+                {slot.optional ? <span className="font-normal text-muted-foreground">(optional)</span> : null}
+              </legend>
               {isEmergency(slot.role) && canEdit ? (
                 <div className="flex flex-wrap gap-2">
                   {COPY_SOURCES.filter((from) => draft[from].fullName.trim() !== '').map((from) => (
@@ -116,12 +120,12 @@ function ContactsForm({ pupilId, items, canEdit }: { pupilId: string; items: Pup
               ) : null}
               <TextField label={`${slot.title}: full name`} value={entry.fullName} onChange={(value) => set(slot.role, 'fullName', value)} />
               {slot.parent ? null : (
-                <TextField label={`${slot.title}: relationship to the pupil`} value={entry.relationship} onChange={(value) => set(slot.role, 'relationship', value)} />
+                <TextField label={`${slot.title}: relationship to the pupil${slot.optional ? ' (optional)' : ''}`} value={entry.relationship} onChange={(value) => set(slot.role, 'relationship', value)} />
               )}
-              <TextField label={`${slot.title}: phone`} value={entry.phone} inputMode="tel" placeholder="08031234567" onChange={(value) => set(slot.role, 'phone', value)} />
+              <TextField label={`${slot.title}: phone${slot.optional ? ' (optional)' : ''}`} value={entry.phone} inputMode="tel" placeholder="08031234567" onChange={(value) => set(slot.role, 'phone', value)} />
               {slot.parent ? (
                 <>
-                  <TextField label={`${slot.title}: WhatsApp`} value={entry.whatsappNumber} inputMode="tel" onChange={(value) => set(slot.role, 'whatsappNumber', value)} />
+                  <TextField label={`${slot.title}: WhatsApp (optional)`} value={entry.whatsappNumber} inputMode="tel" onChange={(value) => set(slot.role, 'whatsappNumber', value)} />
                   {canEdit && entry.phone !== '' && entry.whatsappNumber !== entry.phone ? (
                     <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => set(slot.role, 'whatsappNumber', entry.phone)}>
                       WhatsApp same as phone

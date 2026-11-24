@@ -30,7 +30,8 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
 
     private static readonly string[] Headers =
     [
-        "Surname", "First Name", "Sex", "Date of Birth", "State of Origin", "LGA", "Home Address", "Admission Date",
+        "Registration Number", "Surname", "First Name", "Sex", "Date of Birth", "State of Origin", "LGA", "Home Address",
+        "Admission Date",
         "Class Level", "Arm Label", "Mother Name", "Mother Phone", "Emergency Primary Name", "Emergency Primary Relationship",
         "Emergency Primary Phone", "Has Allergy", "Has Medical Condition", "Medical Condition Details", "Takes Medication",
     ];
@@ -48,12 +49,20 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         response.Content.Headers.ContentType!.MediaType.ShouldBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         using var workbook = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)));
         var data = workbook.Worksheet("Pupils");
-        data.Cell(1, 1).GetString().ShouldBe("Surname");
-        data.Row(1).CellsUsed().Count().ShouldBe(43);
+        data.Cell(1, 1).GetString().ShouldBe("Registration Number");
+        data.Row(1).CellsUsed().Count().ShouldBe(44);
         var accepted = workbook.Worksheet("Accepted values");
         var armColumn = accepted.Row(1).CellsUsed().Single(cell => cell.GetString() == "Arm").Address.ColumnNumber;
         accepted.Column(armColumn).CellsUsed().Select(cell => cell.GetString()).ShouldContain(armName);
         workbook.Worksheet("LGAs").Cell(2, 1).GetString().ShouldBe("Abia");
+
+        // An application has no number yet, so its template has no column for one.
+        using var applications = await GetAsync(TemplateUrl + "?mode=Applications", jar);
+        applications.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var applicationBook = new XLWorkbook(new MemoryStream(await applications.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)));
+        applicationBook.Worksheet("Pupils").Cell(1, 1).GetString().ShouldBe("Surname");
+        applicationBook.Worksheet("Pupils").Row(1).CellsUsed().Count().ShouldBe(42);
+        applicationBook.Worksheet("Pupils").Row(1).CellsUsed().Select(cell => cell.GetString()).ShouldNotContain("Arm Label");
     }
 
     [Fact]
@@ -172,6 +181,122 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await ReadAsync<PupilImportResultDto>(response)).Pupils.Select(pupil => pupil.RegistrationNumber)
             .ShouldBe(["GRAS/2026/0041", "GRAS/2026/0043", "GRAS/2026/0044"]);
+    }
+
+    // Project lead, 2026-11-23: pupils who were at the school before the system keep the number the school gave them, and
+    // that year's counter moves past it so the next number drawn for that year does not collide or burn through.
+    [Fact]
+    public async Task Commit_KeepsTheFilesRegistrationNumbers_AndMovesThatYearsCounterPastThem()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        var kept = Row("Okafor", "Chidera", levelName, "A");
+        kept["Registration Number"] = "gras/2024/0017"; // stored upper case, as the portal expects
+        kept["Admission Date"] = "10/09/2024";
+        var drawn2024 = Row("Bello", "Amina", levelName, "A");
+        drawn2024["Admission Date"] = "10/09/2024";
+        var drawn2026 = Row("Eze", "Ifeanyi", levelName, "A");
+        var file = Workbook(kept, drawn2024, drawn2026);
+
+        var report = await ValidateAsync(jar, file);
+        report.RejectedCount.ShouldBe(0);
+        report.Rows.Select(row => (row.RegistrationNumber, row.AdmissionYear)).ShouldBe([("GRAS/2024/0017", (int?)null), (null, 2024), (null, 2026)]);
+
+        using var response = await CommitAsync(jar, file, report.FileSha256);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var numbers = (await ReadAsync<PupilImportResultDto>(response)).Pupils.Select(pupil => pupil.RegistrationNumber).ToList();
+        numbers[0].ShouldBe("GRAS/2024/0017");
+        numbers[1].ShouldBe("GRAS/2024/0018");
+        numbers[2].ShouldNotBeNull();
+        numbers[2]!.ShouldStartWith("GRAS/2026/");
+    }
+
+    [Fact]
+    public async Task Validate_AKeptNumberThatIsMalformedHeldOrRepeated_IsRejectedOnItsColumn()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        await SeedPupilHoldingNumberAsync("GRAS/2023/0005");
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+
+        // Held and repeated are judged as the portal judges them: separators and case ignored. The last row's serial is
+        // longer than the school's 4-digit width, a typo that would otherwise push 2023's counter out of range for good.
+        var rows = new[]
+            {
+                ("Okafor", "Chidera", "GRA-17"), ("Bello", "Amina", "gras-2023-0005"), ("Eze", "Ifeanyi", "GRAS/2023/0009"),
+                ("Obi", "Kene", "GRAS.2023.0009"), ("Nwosu", "Ada", "GRAS/2023/00170000017"),
+            }
+            .Select(entry =>
+            {
+                var row = Row(entry.Item1, entry.Item2, levelName, "A");
+                row["Registration Number"] = entry.Item3;
+                return row;
+            })
+            .ToArray();
+
+        var report = await ValidateAsync(jar, Workbook(rows));
+
+        report.Rows.Select(row => row.Outcome).ShouldBe(
+            [
+                PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Accepted,
+                PupilImportRowOutcome.Rejected, PupilImportRowOutcome.Rejected,
+            ]);
+        report.Rows.Where(row => row.Outcome == PupilImportRowOutcome.Rejected)
+            .ShouldAllBe(row => row.Errors.All(error => error.Column == "Registration Number"));
+        report.Rows[1].Errors[0].Message.ShouldContain("already belongs to a pupil");
+        report.Rows[3].Errors[0].Message.ShouldContain("Row 4");
+        report.Rows[4].Errors[0].Message.ShouldContain("11-digit serial");
+    }
+
+    // Project lead, 2026-11-23: Admissions imports a new intake as applications, which wait in the queue like typed ones.
+    [Fact]
+    public async Task Commit_Applications_CreatesPendingAdmissionsWithNoNumberArmOrEnrolment()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        var file = Workbook(Row("Okafor", "Chidera", levelName, null), Row("Bello", "Amina", levelName, null));
+
+        var report = await ValidateAsync(jar, file, mode: "Applications");
+        report.AcceptedCount.ShouldBe(2);
+        report.CapacityWarnings.ShouldBeEmpty();
+        report.Rows.ShouldAllBe(row => row.ArmId == null && row.ClassLevelName == levelName && row.AdmissionYear == null);
+
+        using var response = await CommitAsync(jar, file, report.FileSha256, mode: "Applications");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await ReadAsync<PupilImportResultDto>(response);
+        result.Pupils.ShouldAllBe(pupil => pupil.RegistrationNumber == null);
+
+        await using var scope = Fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var ids = result.Pupils.Select(pupil => Guid.Parse(pupil.PupilId)).ToList();
+        var pupils = await context.Pupils.AsNoTracking().Where(pupil => ids.Contains(pupil.Id)).ToListAsync(TestContext.Current.CancellationToken);
+        pupils.ShouldAllBe(pupil => pupil.Status == PupilStatus.Pending && pupil.RegistrationNumber == null);
+        (await context.Enrolments.AsNoTracking().AnyAsync(enrolment => ids.Contains(enrolment.PupilId), TestContext.Current.CancellationToken))
+            .ShouldBeFalse();
+        var records = await context.Set<AdmissionRecord>().AsNoTracking().Where(record => ids.Contains(record.PupilId)).ToListAsync(TestContext.Current.CancellationToken);
+        records.ShouldAllBe(record => record.ApprovedAt == null && record.DateApplicationReceived != null);
+    }
+
+    [Fact]
+    public async Task Validate_Applications_RefusesARegistrationNumberAndAnArmLabel()
+    {
+        RequireDatabase();
+        var (sessionId, levelName, _) = await SeedSessionAndArmAsync();
+        var jar = await SignInWithAsync([Privileges.Pupil.Import], sessionId);
+        var row = Row("Okafor", "Chidera", levelName, null);
+        row["Registration Number"] = "GRAS/2024/0017";
+
+        // The arm is chosen at approval, so an Arm Label would be silently lost: refused instead.
+        var report = await ValidateAsync(jar, Workbook(row, Row("Bello", "Amina", levelName, "A")), mode: "Applications");
+
+        report.Rows[0].Outcome.ShouldBe(PupilImportRowOutcome.Rejected);
+        report.Rows[0].Errors.ShouldContain(error => error.Column == "Registration Number");
+        report.Rows[1].Outcome.ShouldBe(PupilImportRowOutcome.Rejected);
+        report.Rows[1].Errors.ShouldContain(error => error.Column == "Arm Label");
     }
 
     // The decisions are part of the request: the same key with different ones is a conflict, not a replay.
@@ -518,17 +643,23 @@ public sealed class PupilImportEndpointsTests(ApiTestFixture fixture) : Integrat
 
     // ---- HTTP ------------------------------------------------------------------------------------
 
-    private async Task<PupilImportReportDto> ValidateAsync(CookieJar jar, byte[] file)
+    private async Task<PupilImportReportDto> ValidateAsync(CookieJar jar, byte[] file, string? mode = null)
     {
-        using var response = await PostFileAsync(ValidateUrl, jar, file);
+        using var response = await PostFileAsync(ValidateUrl, jar, file, mode is null ? null : [("mode", mode)]);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         return await ReadAsync<PupilImportReportDto>(response);
     }
 
     private Task<HttpResponseMessage> CommitAsync(
-        CookieJar jar, byte[] file, string fileSha256, int[]? skipRows = null, bool overrideCapacity = false, string? idempotencyKey = null)
+        CookieJar jar, byte[] file, string fileSha256, int[]? skipRows = null, bool overrideCapacity = false, string? idempotencyKey = null,
+        string? mode = null)
     {
         var fields = new List<(string Name, string Value)> { ("fileSha256", fileSha256) };
+        if (mode is not null)
+        {
+            fields.Add(("mode", mode));
+        }
+
         fields.AddRange((skipRows ?? []).Select(row => ("skipRows", row.ToString(CultureInfo.InvariantCulture))));
         if (overrideCapacity)
         {

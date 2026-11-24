@@ -1,10 +1,11 @@
 ---
 name: probe-wsl-before-declaring-a-tool-absent
 description: "On this Windows machine the Bash tool is Git Bash, not WSL — two probe methods gave true-but-misleading \"absent\" answers about Docker and cost a wrong decision."
-metadata: 
+metadata:
   node_type: memory
   type: feedback
-  modified: 2026-09-16T18:45:40.416Z
+  modified: 2026-11-23T01:30:58.133Z
+  originSessionId: 34e43587-a55e-4e37-991f-48e087d838eb
 ---
 
 (Recorded on the project lead's Windows dev machine; applies to any Windows machine running Docker inside WSL.) Twice in one session I reported Docker unavailable when it was running fine. Both were method
@@ -32,6 +33,15 @@ original machine only the hostname `localhost` works; on the second machine (202
 (`localhost`, `127.0.0.1`, `[::1]`) with `curl -m 4`. Also, PowerShell 5.1's `Invoke-WebRequest`
 answered `localhost` there while .NET 10's `HttpClient` timed out, so probe with the client that
 will actually be used. See [[two-dev-machines]].
+
+**2026-11-23, HomePC machine:** dockerd's systemd override binds `tcp://127.0.0.1:2375` (WSL loopback only).
+PowerShell reached it but .NET HttpClient got "refused" on `127.0.0.1` and hung on `localhost`, so every integration
+test died in fixture setup. Fixed by `networkingMode=mirrored` under `[wsl2]` in `C:\Users\HomePC\.wslconfig`, then
+`wsl --shutdown`: `127.0.0.1` then answers from .NET (`localhost` still hangs; the fixture tries `127.0.0.1`). Rebinding
+dockerd to `0.0.0.0` as root was refused by the permission classifier, so don't retry that. Probe with a .NET
+file-based app (`dotnet run ping.cs`), not curl or `Invoke-WebRequest`. WSL also shuts down a few seconds after
+the last attached process exits, taking dockerd with it, so start `wsl.exe -e sleep 3600` in the background
+before an integration run unless a WSL terminal is open.
 
 Project-side facts about this Docker setup live in the repo at `.agent/STATE.md` `## Toolchain`,
 which every session is routed to read — that, not this memory, is the durable home for them.

@@ -48,7 +48,7 @@ export const reasonsLong = reasons.map((r) =>
 )
 
 export const founderQuote =
-  "Her vision is to provide quality, child-centred education built on academic excellence, discipline, integrity, creativity, and godly values."
+  "Her vision is to provide quality, child-centred education built on academic excellence, discipline, integrity, creativity, and Godly values."
 
 export const founderBelief =
   "She believes that every child is uniquely gifted and deserves the opportunity to discover and develop their full potential in a safe, caring, and stimulating environment."

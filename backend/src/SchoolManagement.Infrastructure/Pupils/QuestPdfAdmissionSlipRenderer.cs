@@ -27,6 +27,7 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
 
         var logo = slip.Logo.IsEmpty ? null : Image.FromBinaryData(slip.Logo.ToArray());
         var signature = slip.Signature.IsEmpty ? null : Image.FromBinaryData(slip.Signature.ToArray());
+        var photo = slip.Photo.IsEmpty ? null : Image.FromBinaryData(slip.Photo.ToArray());
 
         return Document.Create(document => document.Page(page =>
         {
@@ -46,20 +47,21 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
                     number.Item().AlignCenter().Text(slip.RegistrationNumber).Bold().FontSize(22);
                 });
 
-                column.Item().Table(table =>
+                // The photograph sits beside the details, so it costs the fixed half page no height. Without one, a labelled
+                // box keeps the layout identical and tells the office the photo is still to be taken.
+                column.Item().Row(details =>
                 {
-                    table.ColumnsDefinition(columns =>
+                    details.RelativeItem().Element(item => Details(item, slip));
+                    details.ConstantItem(12);
+                    var frame = details.ConstantItem(90).Height(90).Border(0.75f).BorderColor(Colors.Grey.Medium);
+                    if (photo is not null)
                     {
-                        columns.ConstantColumn(130);
-                        columns.RelativeColumn();
-                    });
-
-                    Row(table, "Pupil", slip.PupilName);
-                    Row(table, "Sex", slip.Sex);
-                    Row(table, "Date of birth", slip.DateOfBirth.ToString(DateFormat, CultureInfo.InvariantCulture));
-                    Row(table, "Class", slip.ClassName);
-                    Row(table, "Session", slip.SessionName);
-                    Row(table, "Date admitted", slip.DateAdmitted.ToString(DateFormat, CultureInfo.InvariantCulture));
+                        frame.Image(photo).FitArea();
+                    }
+                    else
+                    {
+                        frame.AlignMiddle().AlignCenter().Text("No photo").FontSize(8).FontColor(Colors.Grey.Darken1);
+                    }
                 });
 
                 column.Item().ExtendVertical().AlignBottom().Row(row =>
@@ -88,6 +90,24 @@ internal sealed class QuestPdfAdmissionSlipRenderer : IAdmissionSlipRenderer
             });
         })).GeneratePdf();
     }
+
+    /// <summary>The pupil's admission details, label beside value.</summary>
+    private static void Details(IContainer container, AdmissionSlipDocument slip) =>
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(110);
+                columns.RelativeColumn();
+            });
+
+            Row(table, "Pupil", slip.PupilName);
+            Row(table, "Sex", slip.Sex);
+            Row(table, "Date of birth", slip.DateOfBirth.ToString(DateFormat, CultureInfo.InvariantCulture));
+            Row(table, "Class", slip.ClassName);
+            Row(table, "Session", slip.SessionName);
+            Row(table, "Date admitted", slip.DateAdmitted.ToString(DateFormat, CultureInfo.InvariantCulture));
+        });
 
     /// <summary>The logo beside the school's name, motto, address and contact line, centred; a blank column balances the logo.</summary>
     private static void Letterhead(IContainer container, AdmissionSlipDocument slip, Image? logo) =>

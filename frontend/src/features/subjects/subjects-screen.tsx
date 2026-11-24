@@ -6,6 +6,7 @@ import { FormError, LoadingState, QueryErrorState } from '@/components/feedback/
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
+import { useTermChoice } from '@/shared/pickers/use-term-choice';
 import { ApiError } from '@/lib/http';
 import { useDeleteSubject, useSubjects } from './api';
 import { SubjectDialog } from './components/subject-dialog';
@@ -14,13 +15,15 @@ import { EmptyState } from '@/components/feedback/empty-state';
 
 /** `/subjects` — the subject catalogue (spec 6.6.3); which levels take which subject is on the mapping screen. */
 export function SubjectsScreen() {
-  const subjects = useSubjects();
+  // The class count is per term: the active term's, the same default the mapping screen opens on.
+  const choice = useTermChoice();
+  const subjects = useSubjects(undefined, { termId: choice.termId || undefined, enabled: !choice.isPending });
   const remove = useDeleteSubject();
   const me = useMe();
   const [editing, setEditing] = useState<SubjectDto | 'new' | null>(null);
   const can = (privilege: string) => !!me.data && hasPrivilege(me.data, privilege);
 
-  if (subjects.isPending) return <LoadingState label="Loading subjects…" />;
+  if (choice.isPending || subjects.isPending) return <LoadingState label="Loading subjects…" />;
   if (subjects.isError) return <QueryErrorState error={subjects.error} onRetry={() => void subjects.refetch()} />;
 
   const items = subjects.data.pages.flatMap((page) => page.items);
@@ -59,7 +62,7 @@ export function SubjectsScreen() {
               <th className="py-2 font-medium">Subject</th>
               <th className="py-2 font-medium">Code</th>
               <th className="py-2 font-medium">Status</th>
-              <th className="py-2 font-medium">Classes</th>
+              <th className="py-2 font-medium">{choice.term ? `Classes (${choice.term.name})` : 'Classes'}</th>
               <th className="py-2">
                 <span className="sr-only">Actions</span>
               </th>
@@ -71,7 +74,7 @@ export function SubjectsScreen() {
                 <td className="py-2 font-medium text-foreground">{subject.name}</td>
                 <td className="py-2 text-muted-foreground">{subject.code ?? '—'}</td>
                 <td className="py-2 text-muted-foreground">{subject.status}</td>
-                <td className="py-2 text-muted-foreground">{subject.mappedLevelCount ?? 0}</td>
+                <td className="py-2 text-muted-foreground">{subject.mappedLevelCount ?? '—'}</td>
                 <td className="flex justify-end gap-2 py-2">
                   {can('subject.update') ? (
                     <Button size="sm" variant="outline" onClick={() => setEditing(subject)}>

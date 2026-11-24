@@ -38,4 +38,12 @@ public interface IRegistrationCounterRepository
     /// <param name="counterKey">See <see cref="GetLastSerialAsync"/>.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     Task<int> IncrementAndGetNextSerialAsync(string counterKey, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Raises <paramref name="counterKey"/>'s <c>last_serial</c> to at least <paramref name="serial"/>, never lowering it
+    /// (creating the row at <paramref name="serial"/> if absent). Bulk import calls it after keeping numbers a school
+    /// issued before it used this system, so the next number drawn for that year starts past them instead of burning
+    /// through them. Same row lock and immediacy as <see cref="IncrementAndGetNextSerialAsync"/>.
+    /// </summary>
+    Task EnsureLastSerialAtLeastAsync(string counterKey, int serial, CancellationToken cancellationToken);
 }

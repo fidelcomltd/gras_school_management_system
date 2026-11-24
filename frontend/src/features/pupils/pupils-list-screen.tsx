@@ -40,7 +40,7 @@ export function PupilsListScreen() {
         <div className="flex gap-2">
           {canImport ? (
             <Button variant="outline" render={<Link to={paths.pupilImport} />}>
-              Import
+              Import existing pupils
             </Button>
           ) : null}
           {canCreate ? <Button onClick={() => setShowCreate(true)}>New pupil</Button> : null}

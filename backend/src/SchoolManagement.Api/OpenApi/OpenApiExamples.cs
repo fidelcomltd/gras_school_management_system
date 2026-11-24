@@ -271,6 +271,15 @@ internal static class OpenApiExamples
             "binary image content, sent as the multipart request's `file` part"
             """,
 
+        // The pupil import's mode reaches the document only as a nullable query or form parameter, never through a DTO
+        // property, so it needs its own example (a bare JSON string, like the binary shapes here).
+        [typeof(SchoolManagement.Application.Pupils.Import.PupilImportMode?)] = """
+            "Register"
+            """,
+        [typeof(SchoolManagement.Application.Pupils.Import.PupilImportMode)] = """
+            "Register"
+            """,
+
         // TASK-0005b stage C: the image-serving responses' body. Same bare binary-string shape.
         [typeof(Stream)] = """
             "binary PNG or JPEG bytes"
@@ -3655,6 +3664,10 @@ internal static class OpenApiExamples
     {
         // Spec 6.5.7: enums used only as NULLABLE properties reach the transformer as Nullable<T>, whose component schema
         // the XML doc comment on T does not reach.
+        [typeof(SchoolManagement.Application.Pupils.Import.PupilImportMode?)] =
+            "What a bulk import creates (project lead, 2026-11-23). `Register` (default): the school's existing pupils, made active with an enrolment, keeping any `Registration Number` the file gives or issuing one from the Admission Date's year. `Applications`: a new intake, made pending for the admissions queue at a class level only, numbered when approved.",
+        [typeof(SchoolManagement.Application.Pupils.Import.PupilImportMode)] =
+            "What a bulk import creates (project lead, 2026-11-23). `Register` (default): the school's existing pupils, made active with an enrolment, keeping any `Registration Number` the file gives or issuing one from the Admission Date's year. `Applications`: a new intake, made pending for the admissions queue at a class level only, numbered when approved.",
         [typeof(SchoolManagement.Domain.Pupils.BloodGroup?)] = "A blood group (spec 6.5.7): A+, A-, B+, B-, AB+, AB-, O+ or O-, spelled out. Free text is not accepted.",
         [typeof(SchoolManagement.Domain.Pupils.Genotype?)] = "A genotype (spec 6.5.7): AA, AS, SS, AC or SC.",
         [typeof(SchoolManagement.Domain.Promotion.PromotionDecisionOutcome?)] =

@@ -9,7 +9,15 @@ import { useMe } from '@/features/auth/api';
 import { hasPrivilege } from '@/lib/auth/auth-session';
 import { ApiError, saveFile } from '@/lib/http';
 import { formatDate } from '@/shared/format/date';
-import { useCommitImport, useDownloadImportTemplate, useValidateImport, type PupilImportReport, type PupilImportResult } from './api';
+import {
+  useCommitImport,
+  useDownloadImportTemplate,
+  useValidateImport,
+  type ImportMode,
+  type PupilImportReport,
+  type PupilImportResult,
+  type PupilImportRow,
+} from './api';
 import { reportToCsv } from './report-csv';
 import { PageTrail } from '@/components/layout/page-trail';
 
@@ -22,17 +30,37 @@ function errorMessage(error: unknown): string | null {
   return error instanceof ApiError ? error.message : null;
 }
 
+/** What each entry point says (project lead, 2026-11-23: two entry points, one screen). */
+const COPY: Record<ImportMode, { title: string; lead: string; noun: [string, string] }> = {
+  Register: {
+    title: 'Import existing pupils',
+    lead:
+      'Up to 1,000 pupils already at the school, from the template. Each is added as active. A pupil who already has a ' +
+      'registration number keeps it: put it in the Registration Number column. Anyone without one is issued a number ' +
+      'for the year in their Admission Date, so fill that in for pupils who joined in earlier years.',
+    noun: ['pupil', 'pupils'],
+  },
+  Applications: {
+    title: 'Import applications',
+    lead:
+      'Up to 1,000 new applicants, from the template. Each joins the admissions queue as pending, at the class level ' +
+      'applied for, and gets a registration number and an arm when it is approved.',
+    noun: ['application', 'applications'],
+  },
+};
+
 /**
- * `/pupils/import` (spec 6.5.13): download the template, validate a filled-in file (nothing is written), decide each
- * register match, then import all or nothing. Each imported pupil is active with a registration number, issued in file
- * order.
+ * `/pupils/import` and `/admissions/import` (spec 6.5.13): download the template, validate a filled-in file (nothing is
+ * written), decide each register match, then import all or nothing. `Register` makes active pupils, keeping or issuing
+ * registration numbers; `Applications` makes pending admissions for the queue.
  */
-export function ImportPupilsScreen() {
+export function ImportPupilsScreen({ mode = 'Register' }: { mode?: ImportMode }) {
   const me = useMe();
+  const copy = COPY[mode];
   const canOverride = !!me.data && hasPrivilege(me.data, 'arm.capacity.override');
-  const template = useDownloadImportTemplate();
-  const validate = useValidateImport();
-  const commit = useCommitImport();
+  const template = useDownloadImportTemplate(mode);
+  const validate = useValidateImport(mode);
+  const commit = useCommitImport(mode);
   const [file, setFile] = useState<File | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [overrideCapacity, setOverrideCapacity] = useState(false);
@@ -47,7 +75,7 @@ export function ImportPupilsScreen() {
 
   const report = validate.data;
   if (commit.data) {
-    return <ImportDone result={commit.data} onAnother={() => reset(null)} />;
+    return <ImportDone mode={mode} result={commit.data} onAnother={() => reset(null)} />;
   }
 
   const matchRows = report?.rows.filter((row) => row.registerMatches.length > 0) ?? [];
@@ -67,13 +95,11 @@ export function ImportPupilsScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTrail trail={[{ to: paths.pupils }, { label: 'Import pupils' }]} />
+      <PageTrail trail={[{ to: mode === 'Applications' ? paths.admissions : paths.pupils }, { label: copy.title }]} />
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display text-2xl font-semibold text-foreground">Import pupils</h1>
-          <p className="text-sm text-muted-foreground">
-            Up to 1,000 pupils from the template. Each is added as active, with a registration number in file order.
-          </p>
+        <div className="flex max-w-3xl flex-col gap-1">
+          <h1 className="font-display text-2xl font-semibold text-foreground">{copy.title}</h1>
+          <p className="text-sm text-muted-foreground">{copy.lead}</p>
         </div>
         <Button variant="outline" onClick={() => template.mutate()} disabled={template.isPending}>
           {template.isPending ? 'Downloading…' : 'Download template'}
@@ -106,6 +132,8 @@ export function ImportPupilsScreen() {
           <ReportSummary report={report} />
 
           {report.rejectedCount > 0 ? <Rejections report={report} /> : null}
+
+          {report.acceptedCount > 0 ? <AcceptedRows mode={mode} report={report} /> : null}
 
           {matchRows.length > 0 ? (
             <section className="flex flex-col gap-3">
@@ -178,7 +206,7 @@ export function ImportPupilsScreen() {
               }
               disabled={!canCommit || commit.isPending}
             >
-              {commit.isPending ? 'Importing…' : `Import ${toImport} ${toImport === 1 ? 'pupil' : 'pupils'}`}
+              {commit.isPending ? 'Importing…' : `Import ${toImport} ${toImport === 1 ? copy.noun[0] : copy.noun[1]}`}
             </Button>
             {report.rejectedCount > 0 ? (
               <span className="text-sm text-muted-foreground">Fix the rejected rows and check the file again. Nothing imports until every row is valid.</span>
@@ -216,6 +244,45 @@ function ReportSummary({ report }: { report: PupilImportReport }) {
       ) : null}
     </section>
   );
+}
+
+/** What each accepted row will become, so the office sees every number (kept, or the year a new one will carry) before committing. */
+function AcceptedRows({ mode, report }: { mode: ImportMode; report: PupilImportReport }) {
+  const accepted = report.rows.filter((row) => row.outcome === 'Accepted');
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-lg font-semibold text-foreground">Will be added</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-2 pr-4 font-medium">Row</th>
+              <th className="py-2 pr-4 font-medium">Pupil</th>
+              <th className="py-2 pr-4 font-medium">{mode === 'Applications' ? 'Class applied for' : 'Class'}</th>
+              {mode === 'Register' ? <th className="py-2 font-medium">Registration number</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {accepted.map((row) => (
+              <tr key={row.sheetRow} className="border-t border-border align-top">
+                <td className="py-2 pr-4 text-foreground">{row.sheetRow}</td>
+                <td className="py-2 pr-4 text-foreground">
+                  {row.surname} {row.firstName}
+                </td>
+                <td className="py-2 pr-4 text-foreground">{mode === 'Applications' ? row.classLevelName : row.armName}</td>
+                {mode === 'Register' ? <td className="py-2 text-foreground">{numberCell(row)}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function numberCell(row: PupilImportRow): string {
+  if (row.registrationNumber) return `${row.registrationNumber} (kept)`;
+  return row.admissionYear === null ? 'New number' : `New ${row.admissionYear} number`;
 }
 
 function Rejections({ report }: { report: PupilImportReport }) {
@@ -256,6 +323,7 @@ function Rejections({ report }: { report: PupilImportReport }) {
 function numberRanges(result: PupilImportResult): string[] {
   const groups = new Map<string, string[]>();
   for (const pupil of result.pupils) {
+    if (!pupil.registrationNumber) continue;
     const prefix = pupil.registrationNumber.replace(/\d+$/, '');
     groups.set(prefix, [...(groups.get(prefix) ?? []), pupil.registrationNumber]);
   }
@@ -264,22 +332,28 @@ function numberRanges(result: PupilImportResult): string[] {
   );
 }
 
-function ImportDone({ result, onAnother }: { result: PupilImportResult; onAnother: () => void }) {
+function ImportDone({ mode, result, onAnother }: { mode: ImportMode; result: PupilImportResult; onAnother: () => void }) {
   const ranges = numberRanges(result);
+  const [one, many] = COPY[mode].noun;
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">Import complete</h1>
       <output className="block text-sm text-foreground">
-        Imported {result.importedCount} {result.importedCount === 1 ? 'pupil' : 'pupils'}
+        Imported {result.importedCount} {result.importedCount === 1 ? one : many}
         {ranges.length > 0 ? `, numbered ${ranges.join('; ')}` : ''}
         {result.skippedCount > 0 ? `. Skipped ${result.skippedCount}.` : '.'}
       </output>
       <p className="text-sm text-muted-foreground">
-        Their declarations are recorded as unsigned, and health questions left blank stay unanswered rather than No, so the
-        office can follow both up with each family.
+        {mode === 'Applications'
+          ? 'Each is pending in the admissions queue. Approving one issues its registration number and places it in an arm.'
+          : 'Their declarations are recorded as unsigned, and health questions left blank stay unanswered rather than No, so the office can follow both up with each family.'}
       </p>
       <div className="flex gap-3">
-        <Button render={<Link to={paths.pupils} />}>Go to pupils</Button>
+        {mode === 'Applications' ? (
+          <Button render={<Link to={paths.admissions} />}>Go to the admissions queue</Button>
+        ) : (
+          <Button render={<Link to={paths.pupils} />}>Go to pupils</Button>
+        )}
         <Button variant="outline" onClick={onAnother}>
           Import another file
         </Button>

@@ -49,8 +49,28 @@ public static partial class RegNumberFormat
     public static bool IsWellFormed(string candidate) =>
         !string.IsNullOrEmpty(candidate) && ShapePattern().IsMatch(candidate);
 
+    /// <summary>
+    /// Splits a well-formed number into its parts, for bulk import's kept numbers: the serial tells the counter how far
+    /// the school has already gone. False for anything <see cref="IsWellFormed"/> rejects, or a serial too long for an int.
+    /// </summary>
+    public static bool TryParse(string candidate, out string abbreviation, out string separator, out int year, out int serial)
+    {
+        abbreviation = separator = string.Empty;
+        year = serial = 0;
+        var match = string.IsNullOrEmpty(candidate) ? null : ShapePattern().Match(candidate);
+        if (match is not { Success: true })
+        {
+            return false;
+        }
+
+        abbreviation = match.Groups["abbr"].Value;
+        separator = match.Groups["sep"].Value;
+        return int.TryParse(match.Groups["year"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out year)
+            && int.TryParse(match.Groups["serial"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out serial);
+    }
+
     // abbreviation (no separator character), one separator, a 4-digit year, the same separator again,
     // one or more digits — the literal shape spec 6.5.10 describes and GRAS/2026/0041 exemplifies.
-    [GeneratedRegex(@"^[^/\-.]+(?<sep>[/\-.])\d{4}\k<sep>\d+$")]
+    [GeneratedRegex(@"^(?<abbr>[^/\-.]+)(?<sep>[/\-.])(?<year>\d{4})\k<sep>(?<serial>\d+)$")]
     private static partial Regex ShapePattern();
 }

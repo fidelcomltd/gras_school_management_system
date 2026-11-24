@@ -132,4 +132,54 @@ describe('LevelList — reorder', () => {
     );
     expect(names).toEqual(['Primary 2', 'Primary 1']);
   });
+
+  it('with inactive levels shown, moves past the neighbouring ACTIVE level and posts active levels only', async () => {
+    mockMe('level.view', 'level.update');
+    let postedBody: { orderedLevelIds: string[] } | undefined;
+    server.use(
+      http.get(apiUrl('/api/v1/levels'), () =>
+        HttpResponse.json({
+          items: [level('l-1', 'Primary 1', 1), level('l-x', 'Primary 9', 2, { status: 'Inactive' }), level('l-2', 'Primary 2', 3)],
+          nextCursor: null,
+        }),
+      ),
+      http.post(apiUrl('/api/v1/levels/reorder'), async ({ request }) => {
+        postedBody = (await request.json()) as { orderedLevelIds: string[] };
+        return HttpResponse.json([level('l-2', 'Primary 2', 1), level('l-1', 'Primary 1', 2)]);
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderList();
+
+    await screen.findByText('Primary 9');
+    expect(screen.queryByRole('button', { name: 'Move Primary 9 up' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Move Primary 2 up' }));
+
+    await waitFor(() => expect(postedBody).toEqual({ orderedLevelIds: ['l-2', 'l-1'] }));
+  });
+
+  it("shows the server's reason when a reorder is refused, and hides the arrows without level.update", async () => {
+    mockMe('level.view', 'level.update');
+    server.use(
+      http.get(apiUrl('/api/v1/levels'), () =>
+        HttpResponse.json({ items: [level('l-1', 'Primary 1', 1), level('l-2', 'Primary 2', 2)], nextCursor: null }),
+      ),
+      http.post(apiUrl('/api/v1/levels/reorder'), () =>
+        problemResponse(422, { detail: 'The reordered list must contain exactly every currently active level, each exactly once.' }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    const { unmount } = renderList();
+    await screen.findByText('Primary 1');
+    await user.click(screen.getByRole('button', { name: 'Move Primary 2 up' }));
+    expect(await screen.findByText(/must contain exactly every currently active level/)).toBeInTheDocument();
+    unmount();
+
+    mockMe('level.view');
+    renderList();
+    await screen.findByText('Primary 1');
+    expect(screen.queryByRole('button', { name: 'Move Primary 2 up' })).not.toBeInTheDocument();
+  });
 });

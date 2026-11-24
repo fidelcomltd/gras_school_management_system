@@ -71,7 +71,9 @@ async function stubBackOffice(page: Page): Promise<{ getIdempotencyKeySeen: () =
     route.fulfill({ json: { sections: [{ id: 'sec-1', name: 'Primary' }] } }),
   );
 
-  await page.route('**/api/v1/levels', async (route: Route) => {
+  // A regex, not '**/api/v1/levels': a glob must match the whole URL, query string included, and the
+  // list is requested as /levels?pageSize=100.
+  await page.route(/\/api\/v1\/levels(\?.*)?$/, async (route: Route) => {
     if (route.request().method() === 'POST') {
       idempotencyKeySeen = route.request().headers()['idempotency-key'] ?? null;
       const body = route.request().postDataJSON() as { name: string; insertAfterLevelId: string | null };

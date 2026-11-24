@@ -40,6 +40,22 @@ public sealed class PupilRecordTests
     }
 
     [Fact]
+    public void Contact_TheAlternativeEmergencyContactMayBeRecordedWithANameAlone_ThePrimaryMayNot()
+    {
+        var alternate = PupilContact.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), ContactRole.EmergencyAlternate);
+        alternate.Apply("Ada Eze", null, "  ", null, null, null, isPrimary: false).IsSuccess.ShouldBeTrue();
+        alternate.Phone.ShouldBeNull();
+        alternate.Relationship.ShouldBeNull();
+
+        // A phone that IS typed must still be a real one.
+        alternate.Apply("Ada Eze", null, "12345", null, null, null, isPrimary: false).Error.Code.ShouldBe("contact.phone_invalid");
+
+        var primary = PupilContact.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), ContactRole.EmergencyPrimary);
+        primary.Apply("Ada Eze", null, "08031234567", null, null, null, isPrimary: false).Error.Code.ShouldBe("contact.relationship_required");
+        primary.Apply("Ada Eze", "Aunt", null, null, null, null, isPrimary: false).Error.Code.ShouldBe("contact.phone_invalid");
+    }
+
+    [Fact]
     public void Health_IsAnsweredOnlyWhenAllThreeQuestionsAre_AndADetailFollowsItsAnswer()
     {
         var health = PupilHealth.Create(Guid.CreateVersion7());

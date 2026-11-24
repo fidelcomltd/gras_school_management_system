@@ -145,6 +145,14 @@ public interface IPupilRepository
         IReadOnlyCollection<string> registrationNumbers, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Which of <paramref name="normalizedNumbers"/> (already in the portal's form: separators removed, upper case) some
+    /// pupil's current number OR some corrected number's old alias normalises to. The portal finds a pupil by that form and
+    /// refuses an ambiguous match, so a kept import number must be unique in it, not merely as typed.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListNormalizedRegistrationNumberClashesAsync(
+        IReadOnlyCollection<string> normalizedNumbers, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every pupil, in ANY status, born on one of <paramref name="datesOfBirth"/>: bulk import's register-duplicate check
     /// (spec 6.5.13) in one query, matched on name in memory by the caller.
     /// </summary>

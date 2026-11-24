@@ -69,4 +69,14 @@ public sealed class RegNumberFormatTests
     {
         RegNumberFormat.IsWellFormed(candidate).ShouldBe(expected);
     }
+
+    [Fact]
+    public void TryParse_SplitsAWellFormedNumber_AndRefusesAnythingElse()
+    {
+        RegNumberFormat.TryParse("GRAS-2024-0017", out var abbreviation, out var separator, out var year, out var serial).ShouldBeTrue();
+        (abbreviation, separator, year, serial).ShouldBe(("GRAS", "-", 2024, 17));
+
+        RegNumberFormat.TryParse("GRAS/24/0017", out _, out _, out _, out _).ShouldBeFalse();
+        RegNumberFormat.TryParse("GRAS/2024/99999999999", out _, out _, out _, out _).ShouldBeFalse();
+    }
 }

@@ -24,7 +24,8 @@ export function useLevels(status?: 'all') {
     queryFn: ({ pageParam, signal }) =>
       apiGet(
         LEVELS_PATH,
-        { ...(pageParam !== undefined ? { cursor: pageParam } : {}), ...(status !== undefined ? { status } : {}) },
+        // The largest page the API allows: a reorder must name every active level, and no school has 100.
+        { ...(pageParam !== undefined ? { cursor: pageParam } : {}), ...(status !== undefined ? { status } : {}), pageSize: 100 },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,

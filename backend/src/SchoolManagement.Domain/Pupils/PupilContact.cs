@@ -58,7 +58,6 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
         PupilId = pupilId;
         Role = role;
         FullName = string.Empty;
-        Phone = string.Empty;
     }
 
     // EF Core materialisation constructor.
@@ -66,7 +65,6 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
         : base()
     {
         FullName = string.Empty;
-        Phone = string.Empty;
     }
 
     /// <summary>The pupil.</summary>
@@ -78,11 +76,14 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
     /// <summary>Two words minimum.</summary>
     public string FullName { get; private set; }
 
-    /// <summary>Required for guardian and the emergency roles; null for father and mother.</summary>
+    /// <summary>
+    /// Required for guardian and the primary emergency contact; optional for the alternative emergency contact (project
+    /// lead, 2026-11-23); null for father and mother.
+    /// </summary>
     public string? Relationship { get; private set; }
 
-    /// <summary>Canonical <c>+234</c> form.</summary>
-    public string Phone { get; private set; }
+    /// <summary>Canonical <c>+234</c> form. Null only for an alternative emergency contact recorded without one.</summary>
+    public string? Phone { get; private set; }
 
     /// <summary>Father and mother only.</summary>
     public string? WhatsappNumber { get; private set; }
@@ -114,8 +115,12 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
     /// <summary>A new, empty contact row; <see cref="Apply"/> fills it.</summary>
     public static PupilContact Create(Guid id, Guid pupilId, ContactRole role) => new(id, pupilId, role);
 
-    /// <summary>Validates and writes every field. Father and mother drop relationship; the others drop WhatsApp and occupation.</summary>
-    public Result Apply(string fullName, string? relationship, string phone, string? whatsappNumber, string? occupation, string? email, bool isPrimary)
+    /// <summary>
+    /// Validates and writes every field. Father and mother drop relationship; the others drop WhatsApp and occupation. The
+    /// alternative emergency contact may be recorded partially: a name alone is enough, since the slot is optional anyway
+    /// and a name the office has is better than none (project lead, 2026-11-23).
+    /// </summary>
+    public Result Apply(string fullName, string? relationship, string? phone, string? whatsappNumber, string? occupation, string? email, bool isPrimary)
     {
         if (!PersonFields.IsFullName(fullName))
         {
@@ -123,8 +128,9 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
         }
 
         var parent = Role is ContactRole.Father or ContactRole.Mother;
+        var partialAllowed = Role is ContactRole.EmergencyAlternate;
         var cleanRelationship = parent ? null : PersonFields.Clean(relationship);
-        if (!parent && cleanRelationship is null)
+        if (!parent && !partialAllowed && cleanRelationship is null)
         {
             return Result.Failure(Error.Validation("contact.relationship_required", "Enter how this person is related to the pupil."));
         }
@@ -134,9 +140,16 @@ public sealed class PupilContact : Entity<Guid>, IAuditableEntity
             return Result.Failure(Error.Validation("contact.relationship_too_long", "Relationship must be at most 60 characters."));
         }
 
-        if (!NigerianPhoneNumber.TryNormalize(phone, out var canonicalPhone))
+        string? canonicalPhone = null;
+        var cleanPhone = PersonFields.Clean(phone);
+        if (cleanPhone is not null || !partialAllowed)
         {
-            return Result.Failure(Error.Validation("contact.phone_invalid", "Enter a Nigerian phone number, for example 08031234567."));
+            if (!NigerianPhoneNumber.TryNormalize(cleanPhone ?? string.Empty, out var normalisedPhone))
+            {
+                return Result.Failure(Error.Validation("contact.phone_invalid", "Enter a Nigerian phone number, for example 08031234567."));
+            }
+
+            canonicalPhone = normalisedPhone;
         }
 
         string? canonicalWhatsapp = null;

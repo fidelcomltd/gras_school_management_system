@@ -19,6 +19,7 @@ public sealed class QuestPdfAdmissionSlipRendererTests
         var lines = PdfText.Lines(bytes);
         lines.ShouldContain(line => line.Contains("Printed Sept 10, 2026, 10:15am WAT by Chisom Maxwell.", StringComparison.Ordinal));
         lines.ShouldNotContain(line => line.Contains("Lagos", StringComparison.Ordinal));
+        lines.ShouldContain(line => line.Contains("No photo", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -37,14 +38,15 @@ public sealed class QuestPdfAdmissionSlipRendererTests
     [Fact]
     public void Render_WithFullBrandingAndTheLongestText_StillFitsTheHalfPage()
     {
-        // Logo, motto, contact line, head teacher and signature on top of every field at its maximum length.
+        // Logo, motto, contact line, head teacher, signature and the pupil's photograph on top of every field at its maximum length.
         var bytes = new QuestPdfAdmissionSlipRenderer().Render(new AdmissionSlipDocument(
             new string('G', 160), new string('A', 300), $"{new string('S', 60)} {new string('F', 60)} {new string('M', 60)}", "GRA/2026/0014",
             "Female", new DateOnly(2019, 5, 3), new string('C', 120), "2026/2027", new DateOnly(2026, 9, 10), new DateTimeOffset(2026, 9, 10, 9, 15, 0, TimeSpan.Zero),
             new string('P', 120), new string('m', 120), "+2348031234567  ·  " + new string('e', 160) + "@school.ng", new string('H', 120),
-            Png(200, 190, SKColors.Goldenrod), Png(600, 180, SKColors.Navy)));
+            Png(200, 190, SKColors.Goldenrod), Png(600, 180, SKColors.Navy), Png(400, 400, SKColors.SeaGreen)));
 
         bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8).ShouldBeTrue();
+        PdfText.Lines(bytes).ShouldNotContain(line => line.Contains("No photo", StringComparison.Ordinal));
     }
 
     private static byte[] Png(int width, int height, SKColor colour)

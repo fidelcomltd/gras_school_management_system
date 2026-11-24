@@ -17,14 +17,37 @@ function renderScreen() {
 }
 
 describe('SubjectsScreen', () => {
-  it('loading, then the list with each subject\'s class count', async () => {
+  it('loading, then the list with each subject\'s class count for the active term', async () => {
     mockMe('subject.view');
-    server.use(http.get(apiUrl('/api/v1/subjects'), () => HttpResponse.json({ items: [MATHS], nextCursor: null })));
+    let termId: string | null = null;
+    server.use(
+      http.get(apiUrl('/api/v1/sessions'), () =>
+        HttpResponse.json({ items: [{ id: 's-1', name: '2026/2027', startDate: '2026-09-14', endDate: '2027-07-25', state: 'Active' }], nextCursor: null }),
+      ),
+      http.get(apiUrl('/api/v1/sessions/:id'), () =>
+        HttpResponse.json({
+          id: 's-1',
+          name: '2026/2027',
+          startDate: '2026-09-14',
+          endDate: '2027-07-25',
+          state: 'Active',
+          armCount: 2,
+          terms: [{ id: 't-1', sessionId: 's-1', ordinal: 1, name: 'First Term', startDate: '2026-09-14', endDate: '2026-12-18', nextResumptionDate: null, timesSchoolOpened: null, state: 'Active', closedAtUtc: null, closedBy: null }],
+        }),
+      ),
+      http.get(apiUrl('/api/v1/subjects'), ({ request }) => {
+        termId = new URL(request.url).searchParams.get('termId');
+        // The real endpoint returns null counts when no term is sent, which is the bug this test guards against.
+        return HttpResponse.json({ items: [termId ? MATHS : { ...MATHS, mappedLevelCount: null }], nextCursor: null });
+      }),
+    );
 
     renderScreen();
 
     expect(screen.getByText('Loading subjects…')).toBeInTheDocument();
     expect(await screen.findByRole('cell', { name: 'Mathematics' })).toBeInTheDocument();
+    expect(termId).toBe('t-1');
+    expect(screen.getByRole('columnheader', { name: 'Classes (First Term)' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '9' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New subject' })).not.toBeInTheDocument();
   });

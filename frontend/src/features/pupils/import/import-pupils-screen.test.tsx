@@ -43,10 +43,10 @@ function report(rows: Row[], overrides: Partial<Report> = {}): Report {
   };
 }
 
-function renderScreen() {
+function renderScreen(mode: 'Register' | 'Applications' = 'Register') {
   return renderWithProviders(
     <MemoryRouter>
-      <ImportPupilsScreen />
+      <ImportPupilsScreen mode={mode} />
     </MemoryRouter>,
   );
 }
@@ -161,6 +161,49 @@ describe('ImportPupilsScreen', () => {
     expect(await screen.findByText(/This file has 501 pupils. Importing it may take a minute/)).toBeInTheDocument();
   });
 
+  it('previews each row\'s registration number: kept from the file, or the year a new one will carry', async () => {
+    mockMe('pupil.import');
+    let mode: FormDataEntryValue | null = null;
+    server.use(
+      http.post(apiUrl('/api/v1/pupils/import/validate'), async ({ request }) => {
+        mode = (await request.formData()).get('mode');
+        return HttpResponse.json(
+          report([row(2, { registrationNumber: 'GRAS/2024/0017', admissionYear: null }), row(3, { registrationNumber: null, admissionYear: 2024 })]),
+        );
+      }),
+    );
+    const { user } = renderScreen();
+    await user.upload(screen.getByLabelText('Filled-in template (.xlsx)', { selector: 'input' }), new File(['x'], 'register.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Check file' }));
+
+    expect(await screen.findByRole('cell', { name: 'GRAS/2024/0017 (kept)' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'New 2024 number' })).toBeInTheDocument();
+    expect(mode).toBe('Register');
+  });
+
+  it('imports applications in Applications mode, sending the mode and pointing at the admissions queue', async () => {
+    mockMe('pupil.import');
+    let sent: FormData | undefined;
+    server.use(
+      http.post(apiUrl('/api/v1/pupils/import/commit'), async ({ request }) => {
+        sent = await request.formData();
+        return HttpResponse.json({ importedCount: 1, skippedCount: 0, pupils: [{ sheetRow: 2, pupilId: 'p-2', registrationNumber: null }] });
+      }),
+    );
+    const { user } = renderScreen('Applications');
+    expect(screen.getByRole('heading', { name: 'Import applications' })).toBeInTheDocument();
+
+    await chooseAndCheck(user, report([row(2, { armId: null, armName: null, classLevelName: 'Primary 1' })]));
+    expect(await screen.findByRole('columnheader', { name: 'Class applied for' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Primary 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Registration number' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Import 1 application' }));
+
+    expect(await screen.findByText(/Imported 1 application\./)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to the admissions queue' })).toBeInTheDocument();
+    expect(sent?.get('mode')).toBe('Applications');
+  });
+
   it('shows a whole-file problem from the server', async () => {
     mockMe('pupil.import');
     server.use(
@@ -181,6 +224,7 @@ describe('reportToCsv', () => {
     const rejected: PupilImportRow = {
       ...row(2),
       sheetRow: 2,
+      admissionYear: null,
       surname: '=HYPERLINK("x")',
       outcome: 'Rejected',
       errors: [{ column: 'Sex', message: 'Enter Male or Female.' }],
